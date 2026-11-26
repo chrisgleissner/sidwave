@@ -134,6 +134,39 @@ export function diffSidwave(a: string, b: string): SemanticDiff {
   return { changes, compiledEqual: compileEqual(a, b) };
 }
 
+/**
+ * The merged value written as YAML text. The edits are applied to the YAML document of "ours", so its comments,
+ * anchors, aliases and flow style stay wherever the merge did not change a value. A value that was changed by the
+ * merge is written from the merged data; an edit that cannot be applied in place (for example below an alias) makes
+ * the whole result be written from the merged data, which drops comments and expands aliases.
+ */
+function applyToOurs(ours: string, oursValue: any, merged: any): string {
+  try {
+    const doc = YAML.parseDocument(ours, { version: "1.2", keepSourceTokens: true });
+    if (doc.errors.length) throw doc.errors[0];
+    const isObject = (v: any) => v !== null && typeof v === "object" && !Array.isArray(v);
+    const apply = (o: any, m: any, path: (string | number)[]): void => {
+      if (equal(o, m)) return;
+      if (isObject(o) && isObject(m)) {
+        for (const k of new Set([...Object.keys(o), ...Object.keys(m)])) {
+          if (m[k] === undefined) doc.deleteIn([...path, k]);
+          else if (o[k] === undefined) doc.setIn([...path, k], doc.createNode(m[k]));
+          else apply(o[k], m[k], [...path, k]);
+        }
+      } else if (Array.isArray(o) && Array.isArray(m) && o.length === m.length) {
+        m.forEach((v, i) => apply(o[i], v, [...path, i]));
+      } else if (path.length === 0) doc.contents = doc.createNode(m) as any;
+      else doc.setIn(path, doc.createNode(m));
+    };
+    apply(oursValue, merged, []);
+    const text = doc.toString();
+    if (!equal(YAML.parse(text), JSON.parse(JSON.stringify(merged)))) throw new Error("in-place merge differs from the merged data");
+    return text;
+  } catch {
+    return YAML.stringify(merged);
+  }
+}
+
 export function mergeSidwave(base: string, ours: string, theirs: string): { merged?: string; conflicts: Conflict[] } {
   const b: any = YAML.parse(base), o: any = YAML.parse(ours), t: any = YAML.parse(theirs), conflicts: Conflict[] = [];
   const merge = (bv: any, ov: any, tv: any, path: string): any => {
@@ -157,6 +190,6 @@ export function mergeSidwave(base: string, ours: string, theirs: string): { merg
   };
   const result = merge(b, o, t, "");
   if (conflicts.length) return { conflicts };
-  try { const merged = formatSidwave(YAML.stringify(result)); parseSidwave(merged); return { merged, conflicts }; }
+  try { const merged = formatSidwave(applyToOurs(ours, o, result)); parseSidwave(merged); return { merged, conflicts }; }
   catch (e) { return { conflicts: [{ path: "", summary: e instanceof Error ? e.message : String(e) }] }; }
 }

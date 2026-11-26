@@ -138,21 +138,13 @@ voices:
   - id: 1
     waveform: "triangle"
     patterns:
-      A:
-        groove: "D4 ~ ~ ~"
-        length: 1
+      A: {groove: "D4 ~ ~ ~", length: 1}
   - id: 2
     waveform: "noise"
     patterns:
-      A:
-        groove: "C3 ~ ~ ~"
-        length: 1
+      A: {groove: "C3 ~ ~ ~", length: 1}
 sections:
-  s:
-    bars: 1
-    layers:
-      v1: "A"
-      v2: "A"
+  s: {bars: 1, layers: {v1: "A", v2: "A"}}
 timeline: ["s"]
 `);
 });
@@ -353,14 +345,9 @@ voices:
   - id: 1
     waveform: "pulse"
     patterns:
-      A:
-        groove: "C4 ~ ~ ~"
-        length: 1
+      A: {groove: "C4 ~ ~ ~", length: 1}
 sections:
-  s:
-    bars: 1
-    layers:
-      v1: "A"
+  s: {bars: 1, layers: {v1: "A"}}
 timeline: ["s"]
 `);
   assert.deepEqual(compileSidwaveToPrg(parseSidwave(result.merged), { loop: false }).prg.length > 0, true);
@@ -472,4 +459,47 @@ test("diff classifies by schema position, not by key names found at any depth", 
   // Samples and kit are sound definitions.
   assert.deepEqual(classOf("samples: {defs: {a: 1}}\n", "samples: {defs: {a: 2}}\n"), [["synthesis", "/samples/defs/a"]]);
   assert.deepEqual(classOf("kit: {k: 1}\n", "kit: {k: 2}\n"), [["synthesis", "/kit/k"]]);
+});
+
+test("merge keeps the comments of our side and falls back to plain data below an alias", () => {
+  const commented = `# Header
+
+sidwave: 1.2
+title: "Test" # the title
+# the tempo
+tempo: 120
+voices:
+  - id: 1
+    patterns:
+      A: {groove: "C4 ~ ~ ~", length: 1}
+timeline: [{bars: 1, layers: {v1: "A"}}]
+`;
+  const merged = mergeSidwave(commented, commented.replace("Test", "Ours"), commented.replace("tempo: 120", "tempo: 100"));
+  assert.deepEqual(merged.conflicts, []);
+  assert.equal(merged.merged, `# Header
+
+sidwave: 1.2
+title: "Ours" # the title
+# the tempo
+tempo: 100
+voices:
+  - id: 1
+    patterns:
+      A: {groove: "C4 ~ ~ ~", length: 1}
+timeline: [{bars: 1, layers: {v1: "A"}}]
+`);
+  const aliased = `sidwave: 1.2
+title: "Test"
+tempo: 120
+voices:
+  - id: 1
+    patterns:
+      A: &p {groove: "C4 ~ ~ ~", length: 1}
+      B: *p
+timeline: [{bars: 1, layers: {v1: "A"}}]
+`;
+  const joined = mergeSidwave(aliased, aliased.replace("Test", "Ours"), aliased.replace("tempo: 120", "tempo: 100"));
+  assert.deepEqual(joined.conflicts, []);
+  const doc = YAML.parse(joined.merged);
+  assert.deepEqual([doc.title, doc.tempo, doc.voices[0].patterns.B.groove], ["Ours", 100, "C4 ~ ~ ~"]);
 });
