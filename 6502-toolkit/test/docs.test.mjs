@@ -98,7 +98,7 @@ test("the control-code table in doc/commodore.md matches the names the package a
 });
 
 test("pages avoid emoji and marketing words", () => {
-  const banned = /\b(blazing|powerful|seamless|seamlessly|effortless|cutting-edge|robust|world-class)\b/i;
+  const banned = /\b(great|excellent|best|blazing|powerful|seamless|seamlessly|effortless|cutting-edge|robust|world-class)\b/i;
   for (const file of docFiles()) {
     const text = read(file);
     assert.equal(banned.test(text), false, `${file} uses a marketing word`);

@@ -158,6 +158,9 @@ export function coverPackage(packageDir) {
   fs.writeFileSync(path.join(outDir, "lcov.info"), formatLcov(codeLines, packageDir, packagesRoot, branches));
   const summary = summarise(codeLines);
   const branchSummary = minimumBranches === undefined ? undefined : summariseBranches(branches);
+  if (branchSummary && branchSummary.total === 0) {
+    throw new Error(`No branch records were read for ${path.basename(packageDir)} although a branch minimum of ${minimumBranches}% is configured`);
+  }
   return { name: path.basename(packageDir), minimum, minimumBranches, branches: branchSummary, ...summary };
 }
 
