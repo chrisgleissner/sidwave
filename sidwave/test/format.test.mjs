@@ -3,6 +3,7 @@ import assert from "#test/assert";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import YAML from "yaml";
 import { formatSidwave, diffSidwave, mergeSidwave } from "../src/format/sidwaveFormat.js";
 import { parseSidwave } from "../src/sidwave.js";
 import { compileSidwaveToPrg } from "../src/sidwaveCompiler.js";
@@ -13,12 +14,25 @@ const fixtureDir = join(root, "test/fixtures");
 const minimal = (patch = {}) => ({ sidwave: "1.0", title: "Test", tempo: 100, voices: [{ id: 1, patterns: { A: { groove: ["C3", "D3"] } } }], timeline: [{ bars: 1, layers: { v1: "A" } }], ...patch });
 const yaml = (o) => import("yaml").then(({ default: Y }) => Y.stringify(o));
 
-test("formatter is idempotent and preserves parser and PRG semantics across bundled scores", { timeout: 120000 }, async () => {
-  const files = [
-    ...(await readdir(exampleDir)).filter((f) => f.endsWith(".yaml")).map((f) => join(exampleDir, f)),
-    ...(await (async function walk(dir) { const out = []; for (const e of await readdir(dir, { withFileTypes: true })) { const p = join(dir, e.name); if (e.isDirectory()) out.push(...await walk(p)); else if (p.endsWith(".yaml")) out.push(p); } return out; })(fixtureDir)),
-  ];
-  for (const file of files) {
+const exampleFiles = (await readdir(exampleDir)).filter((f) => f.endsWith(".yaml")).sort();
+const fixtureFiles = await (async function walk(dir) { const out = []; for (const e of await readdir(dir, { withFileTypes: true })) { const p = join(dir, e.name); if (e.isDirectory()) out.push(...await walk(p)); else if (p.endsWith(".yaml")) out.push(p); } return out; })(fixtureDir);
+
+test("the bundled example directory holds the 14 scores the formatter tests cover", () => {
+  assert.equal(exampleFiles.length, 14);
+});
+
+for (const name of exampleFiles) {
+  test(`formatter is idempotent and keeps parser and PRG output for ${name}`, { timeout: 120000 }, async () => {
+    const source = await readFile(join(exampleDir, name), "utf8"), formatted = formatSidwave(source);
+    assert.equal(formatSidwave(formatted), formatted);
+    assert.deepEqual(parseSidwave(formatted), parseSidwave(source));
+    assert.deepEqual(compileSidwaveToPrg(parseSidwave(formatted), { loop: false }).prg, compileSidwaveToPrg(parseSidwave(source), { loop: false }).prg);
+  });
+}
+
+test("formatter is idempotent and keeps parser and PRG output for the compatibility fixtures", { timeout: 120000 }, async () => {
+  assert.ok(fixtureFiles.length > 0);
+  for (const file of fixtureFiles) {
     const source = await readFile(file, "utf8"), formatted = formatSidwave(source);
     assert.equal(formatSidwave(formatted), formatted, file);
     assert.deepEqual(parseSidwave(formatted), parseSidwave(source), file);
@@ -160,4 +174,281 @@ title: "T"
 tempo: 120 # beats per minute
 `);
   assert.equal(formatSidwave(formatted), formatted);
+});
+
+test("formatter writes canonical quoting, flow lists and indentation and keeps comments", () => {
+  const source = `# Header comment, kept first
+
+# Second block of comment
+tempo: 120 # beats per minute
+title: 'It''s single quoted'
+sidwave: 1.2
+# note about voices
+voices:
+  - id: 1
+    # inside voice
+    patterns:
+      A: {groove: [C4, D4, E4, F4, G4, A4, B4], length: 1}
+    short: [x, y, z]
+    block_short:
+    - one
+    - two
+    block_seven:
+    - a
+    - b
+    - c
+    - d
+    - e
+    - f
+    - g
+    block_long:
+    - aaaaaaaaaaaaaaaaaaaaaaaa
+    - bbbbbbbbbbbbbbbbbbbbbbbbbb
+    - cccccccccccccccccccccccccc
+    nested: [[1, 2], [3, 4]]
+    mixed: [1, "two", 3.5, true, null]
+    empty: []
+    text: |
+      multi
+      line
+`;
+  assert.equal(formatSidwave(source), `# Header comment, kept first
+
+sidwave: 1.2
+title: "It's single quoted"
+# Second block of comment
+tempo: 120 # beats per minute
+# note about voices
+voices:
+  - id: 1
+    # inside voice
+    patterns:
+      A: {groove: ["C4", "D4", "E4", "F4", "G4", "A4", "B4"], length: 1}
+    short: ["x", "y", "z"]
+    block_short: ["one", "two"]
+    block_seven:
+      - "a"
+      - "b"
+      - "c"
+      - "d"
+      - "e"
+      - "f"
+      - "g"
+    block_long:
+      - "aaaaaaaaaaaaaaaaaaaaaaaa"
+      - "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+      - "cccccccccccccccccccccccccc"
+    nested: [[1, 2], [3, 4]]
+    mixed: [1, "two", 3.5, true, null]
+    empty: []
+    text: "multi\\nline\\n"
+`);
+});
+
+test("formatter rejects text that is not valid YAML", () => {
+  assert.throws(() => formatSidwave("a: ["), (e) => e.name === "YAMLParseError" && e.code === "BAD_INDENT");
+});
+
+test("formatter orders the top-level keys and the song, sid and fx keys", () => {
+  const source = `timeline: ["s"]
+sids:
+  - {pan: "Left 4", id: sid1}
+song: {global_fx: {vibrato: {depth: 1}}, tempo: 100, title: T}
+global_fx: {filter_mod: {x: 1}, vibrato: {y: 2}}
+unknown: 1
+tempo: 100
+`;
+  assert.equal(formatSidwave(source), `song: {title: "T", tempo: 100, global_fx: {vibrato: {depth: 1}}}
+tempo: 100
+sids:
+  - {id: "sid1", pan: "Left 4"}
+global_fx: {vibrato: {y: 2}, filter_mod: {x: 1}}
+timeline: ["s"]
+unknown: 1
+`);
+});
+
+const diffBase = `sidwave: 1.2
+title: "Test"
+tempo: 120
+mode: "PAL"
+voices:
+  - id: 1
+    waveform: "pulse"
+    patterns:
+      A: {groove: "C4 ~ ~ ~", length: 1}
+sections:
+  s: {bars: 1, layers: {v1: "A"}}
+timeline: ["s"]
+`;
+const change = (path, before, after, cls) => ({ class: cls, path, ...(before === undefined ? {} : { before }), ...(after === undefined ? {} : { after }), summary: `${path} changed` });
+
+test("diff reports each change class with exact paths and values", () => {
+  const cases = [
+    ["musical note", diffBase.replace("C4 ~ ~ ~", "D4 ~ ~ ~"), [change("/voices/0/patterns/A/groove", "C4 ~ ~ ~", "D4 ~ ~ ~", "musical")], false],
+    ["musical tempo", diffBase.replace("tempo: 120", "tempo: 100"), [change("/tempo", 120, 100, "musical")], false],
+    ["musical timeline", diffBase.replace('["s"]', '["s", "s"]'), [change("/timeline", ["s"], ["s", "s"], "musical")], false],
+    ["musical section", diffBase.replace("bars: 1", "bars: 2"), [change("/sections/s/bars", 1, 2, "musical")], false],
+    ["synthesis waveform", diffBase.replace("pulse", "triangle"), [change("/voices/0/waveform", "pulse", "triangle", "synthesis")], false],
+    ["hardware mode", diffBase.replace("PAL", "NTSC"), [change("/mode", "PAL", "NTSC", "hardware")], false],
+    ["hardware sids added", diffBase.replace("mode:", 'sids: [{id: "sid1", address: "$D400", model: "6581"}]\nmode:'), [change("/sids", undefined, [{ id: "sid1", address: "$D400", model: "6581" }], "hardware")], true],
+    ["structural title", diffBase.replace("Test", "Other"), [change("/title", "Test", "Other", "structural")], true],
+    ["structural key added", `${diffBase}author: "Me"\n`, [change("/author", undefined, "Me", "structural")], true],
+    ["structural key removed", diffBase.replace('title: "Test"\n', ""), [change("/title", "Test", undefined, "structural")], true],
+  ];
+  for (const [name, after, expected, compiledEqual] of cases) {
+    const diff = diffSidwave(diffBase, after);
+    assert.deepEqual(diff.changes, expected, name);
+    assert.equal(diff.compiledEqual, compiledEqual, name);
+  }
+});
+
+test("diff lists several changes in key order and compares lists of different length as one value", () => {
+  const after = diffBase.replace("Test", "X").replace("PAL", "NTSC").replace("pulse", "saw").replace("C4 ~ ~ ~", "E4 ~ ~ ~");
+  assert.deepEqual(diffSidwave(diffBase, after).changes.map((c) => [c.class, c.path]), [
+    ["structural", "/title"], ["hardware", "/mode"], ["synthesis", "/voices/0/waveform"], ["musical", "/voices/0/patterns/A/groove"],
+  ]);
+  const longer = diffBase.replace('["s"]', '["s", "s"]');
+  assert.deepEqual(diffSidwave(diffBase, longer).changes, [change("/timeline", ["s"], ["s", "s"], "musical")]);
+});
+
+test("diff escapes ~ and / in key names in paths", () => {
+  const a = `sidwave: 1.2\ninstruments:\n  "a/b~c": {waveform: "saw"}\n`;
+  const b = `sidwave: 1.2\ninstruments:\n  "a/b~c": {waveform: "pulse"}\n`;
+  assert.deepEqual(diffSidwave(a, b).changes, [change("/instruments/a~1b~0c/waveform", "saw", "pulse", "synthesis")]);
+});
+
+test("diff of identical text has no changes and equal compiled output", () => {
+  assert.deepEqual(diffSidwave(diffBase, diffBase), { changes: [], compiledEqual: true });
+});
+
+test("diff reports text that differs only in layout as a formatting change with equal output", () => {
+  assert.equal(formatSidwave(diffBase), diffBase);
+  for (const reformatted of [diffBase.replace('title: "Test"', "title:   Test   # note"), diffBase.replace('sidwave: 1.2\ntitle: "Test"', 'title: "Test"\nsidwave: 1.2')]) {
+    assert.deepEqual(diffSidwave(diffBase, reformatted), { changes: [{ class: "formatting", path: "", summary: "YAML formatting changed" }], compiledEqual: true });
+  }
+});
+
+test("diff reports compiledEqual false when either score does not compile", () => {
+  const broken = "sidwave: 1.2\n";
+  const diff = diffSidwave(diffBase, broken);
+  assert.equal(diff.compiledEqual, false);
+  assert.deepEqual(diff.changes.map((c) => [c.class, c.path]), [
+    ["structural", "/title"], ["musical", "/tempo"], ["hardware", "/mode"], ["structural", "/voices"], ["musical", "/sections"], ["musical", "/timeline"],
+  ]);
+  assert.deepEqual(diffSidwave(broken, broken), { changes: [], compiledEqual: false });
+});
+
+const mergeBase = diffBase;
+const edited = (a, b) => mergeBase.replace(a, b);
+
+test("merge joins edits to different keys and returns canonical text", () => {
+  const result = mergeSidwave(mergeBase, edited("Test", "Ours"), edited("tempo: 120", "tempo: 110"));
+  assert.deepEqual(result.conflicts, []);
+  assert.equal(result.merged, `sidwave: 1.2
+title: "Ours"
+tempo: 110
+mode: "PAL"
+voices:
+  - id: 1
+    waveform: "pulse"
+    patterns:
+      A:
+        groove: "C4 ~ ~ ~"
+        length: 1
+sections:
+  s:
+    bars: 1
+    layers:
+      v1: "A"
+timeline: ["s"]
+`);
+  assert.deepEqual(compileSidwaveToPrg(parseSidwave(result.merged), { loop: false }).prg.length > 0, true);
+});
+
+test("merge takes the changed side when only one side edits", () => {
+  const ours = edited("tempo: 120", "tempo: 90");
+  for (const [o, t] of [[ours, mergeBase], [mergeBase, ours], [ours, ours]]) {
+    const result = mergeSidwave(mergeBase, o, t);
+    assert.deepEqual(result.conflicts, []);
+    assert.equal(YAML.parse(result.merged).tempo, 90);
+  }
+  const unchanged = mergeSidwave(mergeBase, mergeBase, mergeBase);
+  assert.deepEqual(unchanged.conflicts, []);
+  assert.deepEqual(YAML.parse(unchanged.merged), YAML.parse(mergeBase));
+});
+
+test("merge reports a conflict when both sides change the same value differently", () => {
+  assert.deepEqual(mergeSidwave(mergeBase, edited("tempo: 120", "tempo: 110"), edited("tempo: 120", "tempo: 130")), {
+    conflicts: [{ path: "/tempo", base: 120, ours: 110, theirs: 130, summary: "Concurrent edits at /tempo" }],
+  });
+  const noteConflict = mergeSidwave(mergeBase, edited("C4 ~ ~ ~", "D4 ~ ~ ~"), edited("C4 ~ ~ ~", "E4 ~ ~ ~"));
+  assert.deepEqual(noteConflict, {
+    conflicts: [{ path: "/voices/0/patterns/A/groove", base: "C4 ~ ~ ~", ours: "D4 ~ ~ ~", theirs: "E4 ~ ~ ~", summary: "Concurrent edits at /voices/0/patterns/A/groove" }],
+  });
+});
+
+test("merge reports every conflicting path", () => {
+  const ours = edited("tempo: 120", "tempo: 110").replace("Test", "A");
+  const theirs = edited("tempo: 120", "tempo: 130").replace("Test", "B");
+  assert.deepEqual(mergeSidwave(mergeBase, ours, theirs).conflicts.map((c) => c.path), ["/title", "/tempo"]);
+});
+
+test("merge treats delete against modify as a conflict and delete against delete as a deletion", () => {
+  const withAuthor = `${mergeBase}author: "Me"\n`;
+  const deleted = mergeBase, modified = `${mergeBase}author: "You"\n`;
+  assert.deepEqual(mergeSidwave(withAuthor, deleted, modified), { conflicts: [{ path: "/author", base: "Me", theirs: "You", summary: "Concurrent edits at /author" }] });
+  assert.deepEqual(mergeSidwave(withAuthor, modified, deleted), { conflicts: [{ path: "/author", base: "Me", ours: "You", summary: "Concurrent edits at /author" }] });
+  const both = mergeSidwave(withAuthor, deleted, deleted);
+  assert.deepEqual(both.conflicts, []);
+  assert.equal(YAML.parse(both.merged).author, undefined);
+  const oneDeletes = mergeSidwave(withAuthor, deleted, withAuthor);
+  assert.equal(YAML.parse(oneDeletes.merged).author, undefined);
+});
+
+test("merge treats two different additions of one key as a conflict and different keys as a join", () => {
+  assert.deepEqual(mergeSidwave(mergeBase, `${mergeBase}author: "A"\n`, `${mergeBase}author: "B"\n`), { conflicts: [{ path: "/author", ours: "A", theirs: "B", summary: "Concurrent edits at /author" }] });
+  const joined = mergeSidwave(mergeBase, `${mergeBase}author: "A"\n`, edited("mode: \"PAL\"", 'mode: "NTSC"'));
+  assert.deepEqual([YAML.parse(joined.merged).author, YAML.parse(joined.merged).mode], ["A", "NTSC"]);
+});
+
+test("merge treats lists of different length changed on both sides as a conflict", () => {
+  const ours = edited('["s"]', '["s", "s"]'), theirs = edited('["s"]', '["s", "s", "s"]');
+  assert.deepEqual(mergeSidwave(mergeBase, ours, theirs), { conflicts: [{ path: "/timeline", base: ["s"], ours: ["s", "s"], theirs: ["s", "s", "s"], summary: "Concurrent edits at /timeline" }] });
+});
+
+test("merge reports a conflict when the merged score is not valid SIDWave", () => {
+  const withoutVoices = mergeBase.replace(/voices:[\s\S]*?sections:/, "sections:");
+  const result = mergeSidwave(mergeBase, withoutVoices, edited("Test", "Theirs"));
+  assert.deepEqual(result, { conflicts: [{ path: "", summary: "Invalid SIDWAVE at $.voices: missing voices (expected a list of 1 to 30 voices)" }] });
+});
+
+test("merge throws on text that is not valid YAML", () => {
+  assert.throws(() => mergeSidwave(mergeBase, "a: [", mergeBase));
+});
+
+test("README example: format, diff and merge", () => {
+  const base = formatSidwave(`title: Demo
+sidwave: 1.2
+tempo: 120
+voices:
+  - id: 1
+    patterns:
+      A: { groove: "C4 ~ ~ ~", length: 1 }
+timeline: [{ bars: 1, layers: { v1: A } }]
+`);
+  assert.equal(base, `sidwave: 1.2
+title: "Demo"
+tempo: 120
+voices:
+  - id: 1
+    patterns:
+      A: {groove: "C4 ~ ~ ~", length: 1}
+timeline: [{bars: 1, layers: {v1: "A"}}]
+`);
+  const ours = base.replace("Demo", "Demo tune"), theirs = base.replace("C4", "D4");
+  assert.deepEqual(diffSidwave(base, theirs).changes, [{ class: "musical", path: "/voices/0/patterns/A/groove", before: "C4 ~ ~ ~", after: "D4 ~ ~ ~", summary: "/voices/0/patterns/A/groove changed" }]);
+  const merged = YAML.parse(mergeSidwave(base, ours, theirs).merged);
+  assert.deepEqual([merged.title, merged.voices[0].patterns.A.groove], ["Demo tune", "D4 ~ ~ ~"]);
+  assert.deepEqual(mergeSidwave(base, base.replace("C4", "E4"), theirs).conflicts, [{ path: "/voices/0/patterns/A/groove", base: "C4 ~ ~ ~", ours: "E4 ~ ~ ~", theirs: "D4 ~ ~ ~", summary: "Concurrent edits at /voices/0/patterns/A/groove" }]);
 });
