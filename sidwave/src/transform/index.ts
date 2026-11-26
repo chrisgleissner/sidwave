@@ -153,22 +153,27 @@ export function quantise(text:string,{grid}:{grid:number}):TransformResult {
   if(!Number.isFinite(grid)||grid<=0) throw new SidwaveTransformError("precondition","grid must be positive and finite");
   const doc=docFor(text), root=js(doc), changed:string[]=[], warnings:string[]=[];
   for(const [vi,voice] of (root.voices??[]).entries()) for(const [pn,pat] of Object.entries<any>(voice.patterns??{})) {
-    const entries:any[] = pat.groove ?? pat.notes ?? [];
-    if(typeof pat.groove==="string") { warnings.push(`/voices/${vi}/patterns/${esc(pn)}/groove uses implicit entry lengths; unchanged`); continue; }
-    const explicitCount=entries.filter(e=>e&&typeof e==="object"&&typeof e.len==="number").length;
-    if(explicitCount===1 && entries.some(e=>e&&typeof e==="object"&&typeof e.len==="number"&&Math.max(grid,Math.round(e.len/grid)*grid)!==e.len)) { warnings.push(`/voices/${vi}/patterns/${esc(pn)} has no second explicit duration for length-preserving quantisation; unchanged`); continue; }
-    for(const [ei,entry] of entries.entries()) if(entry&&typeof entry==="object"&&typeof entry.len==="number") {
-      const before=entry.len, after=Math.max(grid,Math.round(before/grid)*grid);
-      // Preserve sum by compensating the final explicit duration in this pattern.
-      if(after!==before){
-        const path=["voices",vi,"patterns",pn,pat.groove?"groove":"notes",ei,"len"] as (string|number)[];
-        setAt(doc,path,after); changed.push(ptr(path.map(String)));
+    const where=`/voices/${vi}/patterns/${esc(pn)}`;
+    if(typeof pat.groove==="string") { warnings.push(`${where}/groove uses implicit entry lengths; unchanged`); continue; }
+    const key=pat.groove?"groove":"notes", entries:any[] = pat.groove ?? pat.notes ?? [];
+    const groups=entryGroups(entries), next=new Map<number,number>();
+    const explicit=entries.map((e,i)=>e&&typeof e==="object"&&typeof e.len==="number"?i:-1).filter(i=>i>=0);
+    let unsupported=false;
+    for(const g of new Set(explicit.map(i=>groups[i]!))) {
+      const inGroup=explicit.filter(i=>groups[i]===g);
+      const grid_=inGroup.map(i=>Math.max(grid,tidy(Math.round(entries[i].len/grid)*grid)));
+      const total=tidy(grid_.reduce((sum,v,k)=>sum+v-entries[inGroup[k]!].len,0));
+      if(Math.abs(total)>1e-9) {
+        // Keep the bar group's length: the last explicit duration in the group absorbs the difference.
+        if(inGroup.length<2) { unsupported=true; break; }
+        const last=inGroup.length-1, corrected=tidy(grid_[last]!-total);
+        if(corrected<=0) throw new SidwaveTransformError("unsupported",`Grid cannot preserve pattern length at ${where}`);
+        grid_[last]=corrected;
       }
+      inGroup.forEach((i,k)=>next.set(i,grid_[k]!));
     }
-    const deltas=entries.map(e=>e&&typeof e==="object"&&typeof e.len==="number"?Math.max(grid,Math.round(e.len/grid)*grid)-e.len:0);
-    const total=deltas.reduce((a,b)=>a+b,0);
-    if(Math.abs(total)>1e-9 && entries.filter(e=>e&&typeof e==="object"&&typeof e.len==="number").length < 2){warnings.push(`/voices/${vi}/patterns/${esc(pn)} has no second explicit duration for length-preserving quantisation; unchanged`);continue;}
-    if(Math.abs(total)>1e-9){let ix=-1;for(let j=entries.length-1;j>=0;j--)if(entries[j]&&typeof entries[j]==="object"&&typeof entries[j].len==="number"){ix=j;break;}if(ix<0)throw new SidwaveTransformError("unsupported",`Cannot preserve pattern length at /voices/${vi}/patterns/${esc(pn)}`);const corrected=entries[ix]!.len+deltas[ix]!-total;if(corrected<=0)throw new SidwaveTransformError("unsupported",`Grid cannot preserve pattern length at /voices/${vi}/patterns/${esc(pn)}`);setAt(doc,["voices",vi,"patterns",pn,pat.groove?"groove":"notes",ix,"len"],corrected);}
+    if(unsupported) { warnings.push(`${where} has no second explicit duration for length-preserving quantisation; unchanged`); continue; }
+    for(const [i,len] of next) if(len!==entries[i].len) { const path=["voices",vi,"patterns",pn,key,i,"len"] as (string|number)[]; setAt(doc,path,len); changed.push(ptr(path.map(String))); }
   }
   return finish(doc,changed,["total length of every pattern"],warnings);
 }

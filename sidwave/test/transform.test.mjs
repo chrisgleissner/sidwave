@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import YAML from "yaml";
 import { transpose, setTempo, scaleTempo, substituteInstrument, quantise, restructure, humanise, SidwaveTransformError } from "../src/transform/index.js";
 import { parseSidwave } from "../src/sidwave.js";
+import { formatSidwave } from "../src/format/sidwaveFormat.js";
 import { arrangeSidwave, compileSidwaveToPrg } from "../src/sidwaveCompiler.js";
 
 const source = await readFile(new URL("../data/sound/examples/title_fanfare.yaml", import.meta.url), "utf8");
@@ -131,4 +132,46 @@ timeline: ["s"]
   assert.notEqual(groove[0].len, 1);
   assert.deepEqual([groove[2].len, groove[4].len], [2, 4]);
   valid(result.text);
+});
+
+const quantiseScore = (groove) => `sidwave: 1.2
+title: "T"
+tempo: 120
+sids: [{id: "sid1", address: "$D400", model: "8580"}]
+instruments:
+  lead: {waveform: "saw", adsr: [0, 4, 10, 4]}
+voices:
+  - id: 1
+    instrument: "lead"
+    patterns:
+      A:
+        groove:
+${groove}
+sections:
+  s: {bars: 2, layers: {v1: "A"}}
+timeline: ["s"]
+`;
+
+test("quantise keeps the length of every bar group and reports each changed duration", () => {
+  const text = quantiseScore(`          - {note: "C4", len: 1.25}
+          - {note: "D4", len: 0.75}
+          - {note: "E4", len: 2}
+          - "|"
+          - {note: "F4", len: 1.6}
+          - {note: "G4", len: 2.4}`);
+  const result = quantise(text, { grid: 0.5 });
+  const groove = YAML.parse(result.text).voices[0].patterns.A.groove;
+  assert.deepEqual(groove.filter((e) => typeof e === "object").map((e) => e.len), [1.5, 1, 1.5, 1.5, 2.5]);
+  assert.deepEqual(result.report.changed, ["/voices/0/patterns/A/groove/0/len", "/voices/0/patterns/A/groove/1/len", "/voices/0/patterns/A/groove/2/len", "/voices/0/patterns/A/groove/4/len", "/voices/0/patterns/A/groove/5/len"]);
+  assert.deepEqual(result.report.warnings, []);
+  valid(result.text);
+});
+
+test("quantise leaves a pattern untouched when a bar group cannot keep its length", () => {
+  const text = quantiseScore(`          - {note: "C4", len: 1.25}
+          - "D4 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~"`);
+  const result = quantise(text, { grid: 0.5 });
+  assert.equal(result.text, formatSidwave(text));
+  assert.deepEqual(result.report.changed, []);
+  assert.deepEqual(result.report.warnings, ["/voices/0/patterns/A has no second explicit duration for length-preserving quantisation; unchanged"]);
 });
