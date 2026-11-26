@@ -150,7 +150,7 @@ test("assemblyToPrg adds no stub when the source sets its own origin", () => {
 * = $1000
     rts
   `);
-  assert.equal(withOrg.readUInt16LE(0), 0x0801);
+  assert.equal((withOrg[0] | (withOrg[1] << 8)), 0x0801);
   assert.deepEqual([...withOrg.subarray(2, 14)], [0x0b, 0x08, 0x0a, 0x00, 0x9e, 0x34, 0x30, 0x39, 0x36, 0x00, 0x00, 0x00]);
   // The user's own stub says SYS4096.
   assert.equal(prgEntryAddress(withOrg), 0x1000);
@@ -342,7 +342,7 @@ test("assemblyToPrgDetailed enters at the first instruction, not the lowest addr
 * = $0900
 sub: rts
   `);
-  assert.equal(result.prg.readUInt16LE(0), 0x0900);
+  assert.equal((result.prg[0] | (result.prg[1] << 8)), 0x0900);
   assert.equal(result.entryAddress, 0xc000);
   // A leading SYS stub still decides the entry point.
   assert.equal(assemblyToPrgDetailed("msg: .byte 1\nstart: rts").entryAddress, 0x080f);
@@ -491,7 +491,7 @@ test("data-only source at the default address gets no BASIC stub", () => {
   assert.deepEqual([...assemblyToPrg(".byte 1,2,3")], [0x01, 0x08, 1, 2, 3]);
   // Data followed by code at the default address keeps the stub, which jumps to the first instruction.
   const mixed = assemblyToPrgDetailed(".byte 1\nstart: lda #1\n rts");
-  assert.equal(mixed.prg.subarray(2, 6).toString("hex"), "0c080a00");
+  assert.equal(Buffer.from(mixed.prg.subarray(2, 6)).toString("hex"), "0c080a00");
   assert.equal(mixed.entryAddress, mixed.symbols.get("start"));
   // Data at the default address followed by code at an explicit origin has no entry point at $0801.
   assert.deepEqual([...assemblyToPrg(".byte 1\n*=$c000\n nop")].slice(0, 3), [0x01, 0x08, 1]);
@@ -529,7 +529,7 @@ test("gap validation handles many adjacent reservations without blocking for sec
     assert.ok(performance.now() - started < 3000, "reservation checks must not scan every reservation for every byte");
   }
   assert.equal(prg.length, count + 4);
-  assert.equal(prg.readUInt16LE(0), 0x0200);
+  assert.equal((prg[0] | (prg[1] << 8)), 0x0200);
   assert.equal(prg[2], 1);
   assert.ok(prg.subarray(3, -1).every((byte) => byte === 0));
   assert.equal(prg.at(-1), 2);

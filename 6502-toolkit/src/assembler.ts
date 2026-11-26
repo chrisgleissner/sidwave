@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Christian Gleissner
 
-import { Buffer } from "node:buffer";
 import { rangeOverlapsIo } from "./ioRange.js";
 import { parseBraceToken } from "./petscii.js";
 import { OPCODE_INVENTORY } from "./opcodeInventory.js";
@@ -332,7 +331,7 @@ const RELATIVE_ONLY = new Set<string>(["BCC", "BCS", "BEQ", "BMI", "BNE", "BPL",
 
 
 export interface AssemblyResult {
-  readonly prg: Buffer;
+  readonly prg: Uint8Array;
   /**
    * Address to SYS: the target of a leading BASIC SYS line at $0801 (the
    * automatic stub or the source's own), otherwise the first instruction,
@@ -348,7 +347,7 @@ export interface AssemblyResult {
   readonly warnings: readonly string[];
 }
 
-export function assemblyToPrg(source: string, options?: AssembleOptions): Buffer {
+export function assemblyToPrg(source: string, options?: AssembleOptions): Uint8Array {
   return assemblyToPrgDetailed(source, options).prg;
 }
 
@@ -372,7 +371,7 @@ export function assemblyToPrgDetailed(source: string, options?: AssembleOptions)
   assembler.runPass(1);
 
   const prg = assembler.buildPrg();
-  const loadAddressOfPrg = prg.length >= 2 ? prg.readUInt16LE(0) : loadAddress;
+  const loadAddressOfPrg = prg.length >= 2 ? prg[0]! | (prg[1]! << 8) : loadAddress;
   const stubTarget = prg.length >= 2 ? prgEntryAddress(prg) : loadAddressOfPrg;
   const entryAddress = stubTarget !== loadAddressOfPrg
     ? stubTarget
@@ -1887,12 +1886,12 @@ class Assembler {
     return false;
   }
 
-  buildPrg(): Buffer {
+  buildPrg(): Uint8Array {
     // The PRG spans the bytes actually emitted, so org blocks that only define
     // labels neither move the load address nor add padding.
     if (this.lowestWritten > this.highestWritten) {
       this.warnings.push("The source emits no bytes (only labels, equates or .res); the PRG is empty");
-      return Buffer.alloc(0);
+      return new Uint8Array(0);
     }
     let start = this.lowestWritten;
     let end = this.highestWritten;
@@ -1951,9 +1950,11 @@ class Assembler {
       }
     }
     const body = this.memory.subarray(start, end + 1);
-    const header = Buffer.alloc(2);
-    header.writeUInt16LE(start, 0);
-    return Buffer.concat([header, Buffer.from(body)]);
+    const prg = new Uint8Array(2 + body.length);
+    prg[0] = start & 0xff;
+    prg[1] = start >> 8;
+    prg.set(body, 2);
+    return prg;
   }
 
   getFirstInstructionAddress(): number | undefined {

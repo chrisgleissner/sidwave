@@ -1,0 +1,81 @@
+name: Release
+
+# Runs only when a tag of the form 6502-toolkit@<version> or sidwave@<version> is pushed. It does not run on pushes
+# to branches or on pull requests. The tag version must equal the version in the package's package.json.
+on:
+  push:
+    tags:
+      - "6502-toolkit@*"
+      - "sidwave@*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.1
+      - name: Validate the tag and resolve the package
+        id: tag
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -eu
+          name="${REF_NAME%%@*}"
+          version="${REF_NAME#*@}"
+          case "$name" in 6502-toolkit|sidwave) ;; *) echo "bad tag" >&2; exit 1;; esac
+          if ! printf '%s' "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+            echo "bad tag: version is not semver" >&2
+            exit 1
+          fi
+          have="$(PKG_DIR="$name" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKG_DIR + "/package.json", "utf8")).version)')"
+          if [ "$version" != "$have" ]; then
+            echo "Tag version $version does not match $name/package.json version $have" >&2
+            exit 1
+          fi
+          dist_tag=latest
+          case "$version" in *-*) dist_tag=next;; esac
+          {
+            echo "name=$name"
+            echo "dist_tag=$dist_tag"
+          } >> "$GITHUB_OUTPUT"
+      - name: Require the tagged commit to be on main
+        run: |
+          set -eu
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "tagged commit is not an ancestor of origin/main" >&2; exit 1; }
+      - name: Require the 6502-toolkit range of sidwave to resolve on npm
+        if: steps.tag.outputs.name == 'sidwave'
+        run: |
+          set -eu
+          range="$(node -e 'console.log(JSON.parse(require("fs").readFileSync("sidwave/package.json", "utf8")).dependencies["6502-toolkit"])')"
+          found="$(npm view "6502-toolkit@$range" version)"
+          if [ -z "$found" ]; then
+            echo "6502-toolkit@$range is not published on npm" >&2
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:bun
+      - run: npm run check:consumer
+      - run: npm run check:types
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PKG: ${{ steps.tag.outputs.name }}
+          DIST_TAG: ${{ steps.tag.outputs.dist_tag }}
+        run: npm publish --workspace "$PKG" --provenance --access public --tag "$DIST_TAG"

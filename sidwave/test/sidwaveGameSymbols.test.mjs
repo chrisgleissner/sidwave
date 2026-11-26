@@ -236,7 +236,7 @@ test("the README example assembles with 6502-toolkit and calls init and play at 
     return b.symbols.acme;
   } });
   const prg = assembled.prg;
-  assert.equal(prg.readUInt16LE(0), 0x0801);
+  assert.equal((prg[0] | (prg[1] << 8)), 0x0801);
   const start = assembled.symbols.get("start");
   assert.equal(start, 0x080d);
   const at = (address) => prg[2 + address - 0x0801];

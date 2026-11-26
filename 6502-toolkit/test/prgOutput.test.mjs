@@ -100,7 +100,6 @@ test("symbols: global labels and constants after both passes, local labels exclu
   const result = detailed("  * = $c000\nstart: nop\n.loop: jmp .loop\nend: rts\nvalue = $1234\n.local = 5");
   assert.deepEqual([...result.symbols], [["start", 0xc000], ["end", 0xc004], ["value", 0x1234]]);
   assert.ok(result.prg instanceof Uint8Array);
-  assert.equal(Buffer.isBuffer(result.prg), true);
 });
 
 test("assemblyToPrg returns the same bytes as assemblyToPrgDetailed", () => {

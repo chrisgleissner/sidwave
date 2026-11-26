@@ -12,7 +12,7 @@ Contents: [assembler](#assembler), [disassembler](#disassembler), [opcode invent
 ### assemblyToPrg
 
 ```ts
-function assemblyToPrg(source: string, options?: AssembleOptions): Buffer
+function assemblyToPrg(source: string, options?: AssembleOptions): Uint8Array
 ```
 
 Assembles `source` and returns the PRG file: two load-address bytes, low byte first, followed by the program bytes. Throws [AssemblyError](#assemblyerror) when the source is wrong.
@@ -22,7 +22,7 @@ The language is described in [syntax.md](syntax.md), the PRG rules in [commodore
 import { assemblyToPrg } from "6502-toolkit";
 
 const prg = assemblyToPrg("* = $c000\n  lda #$01\n  sta $d020\n  rts\n");
-console.log(prg.toString("hex"));
+console.log(Buffer.from(prg).toString("hex"));
 console.log(prg.length);
 ```
 
@@ -31,7 +31,7 @@ console.log(prg.length);
 8
 ```
 
-The result is a Node.js `Buffer`, which is a `Uint8Array`. In a browser, the bundler has to provide `Buffer` (see the README).
+The result is a `Uint8Array`. The package does not use `Buffer` and runs in browsers without polyfills. In Node.js, `Buffer.from(prg)` gives a `Buffer` if you need its methods.
 
 ### assemblyToPrgDetailed
 
@@ -45,7 +45,7 @@ Same as `assemblyToPrg`, and also returns the entry address, the symbols and the
 import { assemblyToPrgDetailed } from "6502-toolkit";
 
 const result = assemblyToPrgDetailed("* = $c000\nstart: ldx #8\n.loop: dex\n  bne .loop\n  rts\nbuffer: .res 2\n");
-console.log(result.prg.toString("hex"));
+console.log(Buffer.from(result.prg).toString("hex"));
 console.log(result.entryAddress.toString(16));
 console.log(JSON.stringify([...result.symbols]));
 console.log(result.warnings.length);
@@ -87,7 +87,7 @@ const files = new Map([["border.asm", "border = $d020\n"]]);
 const prg = assemblyToPrg('.include "border.asm"\n* = $c000\n  inc border\n', {
   resolveInclude: (path, fromFile) => files.get(path),
 });
-console.log(prg.toString("hex"));
+console.log(Buffer.from(prg).toString("hex"));
 ```
 
 ```output
@@ -98,7 +98,7 @@ console.log(prg.toString("hex"));
 
 ```ts
 interface AssemblyResult {
-  readonly prg: Buffer;
+  readonly prg: Uint8Array;
   readonly entryAddress: number;
   readonly symbols: ReadonlyMap<string, number>;
   readonly warnings: readonly string[];

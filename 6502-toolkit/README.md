@@ -2,7 +2,6 @@
 
 An assembler and a disassembler for the NMOS 6502 and 6510 (Commodore 64), written in TypeScript, with all 256 opcodes, PRG output and PETSCII text.
 
-[![npm version](https://img.shields.io/npm/v/6502-toolkit)](https://www.npmjs.com/package/6502-toolkit)
 [![CI](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml/badge.svg)](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml)
 [![Codecov](https://codecov.io/gh/chrisgleissner/sidwave/graph/badge.svg?flag=6502-toolkit)](https://codecov.io/gh/chrisgleissner/sidwave)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -13,9 +12,9 @@ An assembler and a disassembler for the NMOS 6502 and 6510 (Commodore 64), writt
 - **A disassembler in the same package.** It decodes every opcode byte. Its output is text that the assembler accepts again.
 - **PRG output with an automatic BASIC `SYS` stub.** Code at $0801 gets a `10 SYS` line in front of it. The result reports the entry address, and `prgEntryAddress` finds it in any PRG.
 - **PETSCII text with brace tokens.** `.text "{clear}{red}HELLO"` writes the control codes by name, by hex value or by decimal value. ACME's `!pet` and `!scr` are included.
-- **`include` and `incbin` go through callbacks that you provide.** The package never reads a file. Its only import from Node.js is `node:buffer`, and a test checks that no other module is imported.
+- **`include` and `incbin` go through callbacks that you provide.** The package never reads a file. It imports nothing from Node.js, and a test runs the built package with `Buffer` removed and every `node:` import blocked.
 - **A symbol table, warnings and exact error locations.** `AssemblyError` carries the file name and line, also for errors in included files and macro expansions.
-- **Synchronous, pure and without dependencies.** Same input, same output. It runs on Node.js 24 and Bun; CI runs the tests on both.
+- **Synchronous, pure and without dependencies.** Same input, same output. It runs on Node.js (see Versioning and support), Bun and in browsers; CI runs the tests on Node.js and Bun.
 - **Directive spellings from ACME, 64tass, ca65 and Kick Assembler,** compared with bytes that those assemblers produced, and more than 1,000 tests (1072 in the last Node run: 1070 passed, 1 skipped, 1 to do). CI enforces at least 98 % line coverage and 95 % branch coverage.
 
 ## Install
@@ -24,7 +23,7 @@ An assembler and a disassembler for the NMOS 6502 and 6510 (Commodore 64), writt
 npm install 6502-toolkit
 ```
 
-Node.js 24 or later, or Bun. The package is ESM only and ships its TypeScript declarations. In a browser, use a bundler. The assembler returns a `Buffer`, so the bundler has to provide one.
+Node.js 20.19 or later, or Bun 1.3.1 or later. The package is ESM only and ships its TypeScript declarations. It uses no Node.js modules and no `Buffer`, so a bundler needs no polyfills for it. The assembler returns a `Uint8Array`.
 
 ## Quick start
 
@@ -44,8 +43,8 @@ loop:   inc $d020
 `;
 const result = assemblyToPrgDetailed(source);
 writeFileSync("border.prg", result.prg);
-console.log(`${result.prg.length} bytes, load address $${result.prg.readUInt16LE(0).toString(16)}, entry $${result.entryAddress.toString(16)}`);
-console.log(result.prg.toString("hex"));
+console.log(`${result.prg.length} bytes, load address $${(result.prg[0] | (result.prg[1] << 8)).toString(16)}, entry $${result.entryAddress.toString(16)}`);
+console.log(Buffer.from(result.prg).toString("hex"));
 ```
 
 ```output
@@ -80,7 +79,7 @@ All functions are synchronous. Details and examples: [doc/api.md](doc/api.md).
 
 | Export | Purpose |
 | --- | --- |
-| [`assemblyToPrg(source, options?)`](doc/api.md#assemblytoprg) | Assemble source text to a PRG `Buffer`. |
+| [`assemblyToPrg(source, options?)`](doc/api.md#assemblytoprg) | Assemble source text to a PRG `Uint8Array`. |
 | [`assemblyToPrgDetailed(source, options?)`](doc/api.md#assemblytoprgdetailed) | Same, plus entry address, symbols and warnings. |
 | [`AssembleOptions`](doc/api.md#assembleoptions) | `loadAddress`, `fileName`, `resolveInclude`, `resolveIncbin`. |
 | [`AssemblyResult`](doc/api.md#assemblyresult) | `prg`, `entryAddress`, `symbols`, `warnings`. |
@@ -174,11 +173,18 @@ The README of @moonbase-machines/mos6502 describes its assembler as one "for Moo
 - The disassembler prints absolute operands in the form `$00nn`, and the assembler uses the zero-page instruction for such an operand. A disassembled `LDA $0012` assembles to the two-byte form. The syntax has no way to force the absolute form.
 - Several undocumented opcodes are aliases of each other (the six one-byte `NOP`s, for example). The assembler emits one opcode of each group, so disassembling and assembling an alias gives an equivalent instruction with another opcode byte. [doc/opcodes.md](doc/opcodes.md) lists them.
 - No command line tool. The package is a library.
-- The PRG is a Node.js `Buffer`.
+- The PRG is a `Uint8Array`. In Node.js, call `Buffer.from(prg)` if you need `Buffer` methods.
 
 ## Used by
 
 [SIDWave](https://github.com/chrisgleissner/sidwave) (package `sidwave`) uses the assembler to build its music player, and [c64bridge](https://github.com/chrisgleissner/c64bridge) uses it to assemble programs for VICE and Ultimate devices.
+
+## Versioning and support
+
+- The package follows semantic versioning from 1.0.0. Before 1.0.0, a minor version may contain breaking changes. They are listed in [CHANGELOG.md](CHANGELOG.md).
+- A deprecated export or option is announced in the changelog one minor release before it is removed.
+- Supported runtimes: Node.js 20.19 or later (the oldest version in CI is 20), Bun 1.3.1 or later, and current browsers through a bundler or native ES modules.
+- The package is ESM only. On Node.js 20.19 and later, 22.12 and later, and all later versions, `require("6502-toolkit")` loads it through `require(esm)`. On older versions, use `await import("6502-toolkit")`.
 
 ## Documentation
 

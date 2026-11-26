@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "6502 assembler and disassembler with all 256 NMOS opcodes, plus Commodore PRG and PETSCII support",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -40,6 +41,7 @@
     "dist/**",
     "!dist/.tsbuildinfo",
     "doc",
+    "CHANGELOG.md",
     "LICENSE",
     "README.md"
   ],
@@ -69,7 +71,7 @@
     "directory": "6502-toolkit"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=20.19"
   },
   "homepage": "https://github.com/chrisgleissner/sidwave/tree/main/6502-toolkit#readme",
   "bugs": {

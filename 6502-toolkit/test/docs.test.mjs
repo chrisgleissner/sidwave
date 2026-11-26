@@ -75,7 +75,7 @@ test("README.md mentions every runtime export", () => {
 });
 
 test("package.json publishes README.md, LICENSE, doc and dist, and exports the documented subpaths", () => {
-  assert.deepEqual(manifest.files, ["dist/**", "!dist/.tsbuildinfo", "doc", "LICENSE", "README.md"]);
+  assert.deepEqual(manifest.files, ["dist/**", "!dist/.tsbuildinfo", "doc", "CHANGELOG.md", "LICENSE", "README.md"]);
   assert.deepEqual(Object.keys(manifest.exports), [".", "./assembler", "./disassembler", "./opcodeInventory", "./petscii", "./ioRange", "./package.json"]);
   const api = read("doc/api.md");
   for (const subpath of Object.keys(manifest.exports).filter((key) => key.startsWith("./") && key !== "./package.json")) {

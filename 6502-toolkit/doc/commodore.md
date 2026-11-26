@@ -12,13 +12,13 @@ A PRG file is the format that the C64 loads from disk, tape and cartridge-less l
 - Several `* =` blocks give one PRG that spans from the lowest to the highest address. The gap between blocks is zero-filled.
 - A gap of 1024 zero bytes or more adds a warning. A gap that touches $D000-$DFFF is an error, because loading it would write zeros to the VIC-II, SID, CIA and colour RAM.
 - Two blocks that write the same address are an error. Output past $FFFF is an error.
-- A source that writes nothing gives an empty `Buffer` (not even a load address) and the warning `The source emits no bytes (only labels, equates or .res); the PRG is empty`.
+- A source that writes nothing gives an empty `Uint8Array` (not even a load address) and the warning `The source emits no bytes (only labels, equates or .res); the PRG is empty`.
 
 ```js
 import { assemblyToPrgDetailed } from "6502-toolkit";
 
 const result = assemblyToPrgDetailed("* = $c000\n  .byte 1\n* = $c010\n  .byte 2\n");
-console.log(result.prg.toString("hex"));
+console.log(Buffer.from(result.prg).toString("hex"));
 console.log(result.prg.length);
 ```
 
@@ -52,7 +52,7 @@ Start such a program with `SYS 2062` (the number in the stub), not with `RUN`, b
 import { assemblyToPrgDetailed, prgEntryAddress } from "6502-toolkit";
 
 const result = assemblyToPrgDetailed("  lda #$01\n  sta $d020\n  rts\n");
-console.log(result.prg.toString("hex"));
+console.log(Buffer.from(result.prg).toString("hex"));
 console.log(result.entryAddress, prgEntryAddress(result.prg));
 console.log(Buffer.from(result.prg.subarray(7, 12)).toString("latin1"));
 ```
