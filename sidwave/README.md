@@ -206,12 +206,12 @@ mergeSidwave(base, base.replace("C4", "E4"), theirs).conflicts;
 
 ## Transformations
 
-`sidwave/transform` changes a score and returns `{ text, report }`. The text is canonical (see above). `report.changed` lists the paths that were edited, `report.preserved` names what the operation keeps, and `report.warnings` names the parts it left alone. A precondition that does not hold throws `SidwaveTransformError` with `code` `precondition`, `out_of_range` or `unsupported`; the score is not partly changed.
+`sidwave/transform` changes a score and returns `{ text, report }`. The text is canonical (see above). `report.changed` lists the paths that were edited, `report.preserved` names what the operation keeps, and `report.warnings` names the parts it left alone. Every transformation first checks that its input is a valid score, then parses and compiles its result. A transformation never returns a score that does not parse or compile: it throws `SidwaveTransformError` instead. The `code` is `input` (the text is not a valid score), `precondition` (an argument or the result is not acceptable, with the parser or compiler message), `out_of_range` or `unsupported`. Pass `validate: "parse"` to check only parsing, or `validate: "none"` to skip the checks for a fragment that is not a complete score.
 
 | Function | Effect |
 | --- | --- |
-| `transpose(text, { semitones, scope? })` | Shifts notes, slides, bends, chord symbols and motifs. Drum voices and `kitNote` entries stay. `scope` selects voices (by id or name) and sections. A section scope is refused when a selected pattern is also played by another section. |
-| `setTempo(text, { bpm })`, `scaleTempo(text, { factor })` | Set or multiply the tempo (30 to 220 BPM). Notes stay the same. A faster tempo can make a score invalid, for example when a note becomes shorter than the player allows; validate the result with `parseSidwave`. |
+| `transpose(text, { semitones, scope? })` | Shifts notes, slides, bends, chord symbols and motifs. Drum voices and `kitNote` entries stay. Notes (and the wavetable offsets built on them) must stay in the playable SID range of the score's clock, otherwise `precondition`. `scope` selects voices (by id or name) and sections. A section scope is refused when a selected pattern is also played by another section. |
+| `setTempo(text, { bpm })`, `scaleTempo(text, { factor })` | Set or multiply the tempo (30 to 220 BPM). Notes stay the same. A tempo at which a note becomes shorter than the player allows makes the result invalid, and the call throws `precondition`. |
 | `substituteInstrument(text, { from, to })` | Replaces `instrument` and `inst` references. `to` is a defined instrument or a `lib:` recipe. |
 | `quantise(text, { grid })` | Rounds explicit `len` values to the grid. Each bar group keeps its length. |
 | `restructure(text, { order })` | Sets the timeline to the named sections or entries in the given order. |

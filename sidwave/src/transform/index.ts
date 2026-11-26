@@ -3,7 +3,7 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 import YAML from "yaml";
 import { parseSidwave, SIDWAVE_NOTE_RANGE, SIDWAVE_TEMPO_RANGE, noteNameToMidi, midiToNoteName } from "../sidwave.js";
-import { maxSidwaveMidi } from "../sidwaveCompiler.js";
+import { compileSidwaveToPrg, maxSidwaveMidi } from "../sidwaveCompiler.js";
 import { formatSidwave } from "../format/sidwaveFormat.js";
 
 export class SidwaveTransformError extends Error {
@@ -11,17 +11,36 @@ export class SidwaveTransformError extends Error {
 }
 export interface TransformReport { changed: string[]; preserved: string[]; warnings: string[] }
 export interface TransformResult { text: string; report: TransformReport }
+/**
+ * How a transformation checks its input and result: "compile" (default) parses the score and compiles it to a PRG,
+ * "parse" only parses it, "none" skips the check (for fragments that are not complete scores). The input must parse
+ * (otherwise code "input"); a result that does not pass the check is never returned, the transformation throws
+ * code "precondition" with the message of the parser or compiler instead.
+ */
+export type TransformValidation = "compile" | "parse" | "none";
+export interface TransformOptions { validate?: TransformValidation }
 const esc = (s: string) => s.replace(/~/g, "~0").replace(/\//g, "~1");
 const ptr = (p: string[]) => "/" + p.map(esc).join("/");
 type AnyDoc = YAML.Document<any>;
-function docFor(text: string): AnyDoc {
+function docFor(text: string, validate: TransformValidation = "compile"): AnyDoc {
   const doc = YAML.parseDocument(text, { version: "1.2", keepSourceTokens: true });
   if (doc.errors.length) throw new SidwaveTransformError("input", doc.errors[0]!.message);
   if (!YAML.isMap(doc.contents)) throw new SidwaveTransformError("input", "The input is not a SIDWave score: expected a YAML mapping at the top level");
+  if (validate !== "none") {
+    try { parseSidwave(text); } catch (e) { throw new SidwaveTransformError("input", `The input is not a valid SIDWave score: ${e instanceof Error ? e.message : String(e)}`); }
+  }
   return doc;
 }
-function finish(doc: AnyDoc, changed: string[], preserved: string[], warnings: string[] = []): TransformResult {
-  return { text: formatSidwave(doc.toString()), report: { changed, preserved, warnings } };
+function finish(doc: AnyDoc, changed: string[], preserved: string[], warnings: string[] = [], validate: TransformValidation = "compile"): TransformResult {
+  const text = formatSidwave(doc.toString());
+  if (validate !== "none") {
+    let parsed;
+    try { parsed = parseSidwave(text); } catch (e) { throw new SidwaveTransformError("precondition", `The result is not a valid SIDWave score: ${e instanceof Error ? e.message : String(e)}`); }
+    if (validate === "compile") {
+      try { compileSidwaveToPrg(parsed, { loop: false }); } catch (e) { throw new SidwaveTransformError("precondition", `The result does not compile: ${e instanceof Error ? e.message : String(e)}`); }
+    }
+  }
+  return { text, report: { changed, preserved, warnings } };
 }
 function js(doc: AnyDoc): any { return doc.toJS(); }
 function nodeAt(doc: AnyDoc, path: (string | number)[]): any { return doc.getIn(path, true) as any; }
@@ -95,10 +114,10 @@ function entryGroups(entries: any[]): number[] {
 }
 const tidy = (x: number) => Number(x.toPrecision(12));
 
-/** Preconditions: semitones is an integer; every shifted pitched note stays in SIDWAVE_NOTE_RANGE and the selected clock's SID frequency range. Preserves rhythm, percussion encodings, instruments, and voices outside scope. Scope is restricted to patterns used only in selected named sections; ambiguous shared/inline/sequence scoping is unsupported. */
-export function transpose(text: string, options: { semitones: number; scope?: { voices?: string[]; sections?: string[] } }): TransformResult {
+/** Preconditions: the input is a valid score; semitones is an integer; every shifted pitched note stays in SIDWAVE_NOTE_RANGE and the selected clock's SID frequency range. Preserves rhythm, percussion encodings, instruments, and voices outside scope. Scope is restricted to patterns used only in selected named sections; ambiguous shared/inline/sequence scoping is unsupported. The result must parse and compile (see TransformValidation); otherwise code "precondition" with the compiler message. */
+export function transpose(text: string, options: TransformOptions & { semitones: number; scope?: { voices?: string[]; sections?: string[] } }): TransformResult {
   if (!Number.isInteger(options?.semitones)) throw new SidwaveTransformError("precondition", "semitones must be an integer");
-  const doc = docFor(text), root = js(doc), changed: string[] = [], max = maxSidwaveMidi(root.mode === "NTSC" ? "NTSC" : "PAL");
+  const doc = docFor(text, options.validate), root = js(doc), changed: string[] = [], max = maxSidwaveMidi(root.mode === "NTSC" ? "NTSC" : "PAL");
   const selectedSections = new Set(options.scope?.sections ?? []);
   for (const name of selectedSections) if (!(root.sections?.[name]) && !(root.timeline ?? []).some((e: any) => e?.section === name)) throw new SidwaveTransformError("precondition", `Unknown section ${name}`);
   for (const [vi, voice] of (root.voices ?? []).entries()) {
@@ -145,24 +164,24 @@ export function transpose(text: string, options: { semitones: number; scope?: { 
       void pnames;
     }
   }
-  return finish(doc, changed, ["rhythm", "percussion", "instruments", "voices outside scope"]);
+  return finish(doc, changed, ["rhythm", "percussion", "instruments", "voices outside scope"], [], options.validate);
 }
 
-/** Preconditions: bpm is finite and within SIDWAVE_TEMPO_RANGE. Preserves all note and pitch fields. */
-export function setTempo(text:string,{bpm}:{bpm:number}):TransformResult {
+/** Preconditions: the input is a valid score; bpm is finite and within SIDWAVE_TEMPO_RANGE. Preserves all note and pitch fields. The result must parse and compile (see TransformValidation); otherwise code "precondition" with the compiler message. */
+export function setTempo(text:string,{bpm,validate}:TransformOptions&{bpm:number}):TransformResult {
   if(!Number.isFinite(bpm)||bpm<SIDWAVE_TEMPO_RANGE.min||bpm>SIDWAVE_TEMPO_RANGE.max) throw new SidwaveTransformError("out_of_range",`bpm must be ${SIDWAVE_TEMPO_RANGE.min}..${SIDWAVE_TEMPO_RANGE.max}`);
-  const doc=docFor(text), root=js(doc), changed=[setTempoNode(doc,root,bpm)]; return finish(doc,changed,["notes","pitches"]);
+  const doc=docFor(text,validate), root=js(doc), changed=[setTempoNode(doc,root,bpm)]; return finish(doc,changed,["notes","pitches"],[],validate);
 }
-/** Preconditions: factor is finite and positive and the resulting tempo is within SIDWAVE_TEMPO_RANGE. Preserves all note and pitch fields. */
-export function scaleTempo(text:string,{factor}:{factor:number}):TransformResult {
+/** Preconditions: the input is a valid score; factor is finite and positive and the resulting tempo is within SIDWAVE_TEMPO_RANGE. Preserves all note and pitch fields. The result must parse and compile (see TransformValidation); otherwise code "precondition" with the compiler message. */
+export function scaleTempo(text:string,{factor,validate}:TransformOptions&{factor:number}):TransformResult {
   if(!Number.isFinite(factor)||factor<=0) throw new SidwaveTransformError("precondition","factor must be positive and finite");
-  const root=js(docFor(text)), current=numericTempo(root), bpm=current*factor;
+  const root=js(docFor(text,validate)), current=numericTempo(root), bpm=current*factor;
   if(!Number.isFinite(bpm)||bpm<SIDWAVE_TEMPO_RANGE.min||bpm>SIDWAVE_TEMPO_RANGE.max) throw new SidwaveTransformError("out_of_range",`scaled tempo ${bpm} is outside ${SIDWAVE_TEMPO_RANGE.min}..${SIDWAVE_TEMPO_RANGE.max}`);
-  return setTempo(text,{bpm});
+  return setTempo(text,{bpm,validate});
 }
-/** Preconditions: target is a named instrument defined in instruments or an accepted lib: recipe; the source reference exists. Preserves all other instrument definitions and references. */
-export function substituteInstrument(text:string,{from,to}:{from:string;to:string}):TransformResult {
-  const doc=docFor(text), root=js(doc);
+/** Preconditions: the input is a valid score; target is a named instrument defined in instruments or an accepted lib: recipe; the source reference exists. Preserves all other instrument definitions and references. The result must parse and compile (see TransformValidation); otherwise code "precondition" with the compiler message. */
+export function substituteInstrument(text:string,{from,to,validate}:TransformOptions&{from:string;to:string}):TransformResult {
+  const doc=docFor(text,validate), root=js(doc);
   const exists=!!root.instruments?.[to] || (to.startsWith("lib:") && /^(kick|snare|hat|bass_pluck|filter_bass|lead_pwm|chip_arp_major|chip_arp_minor|bell_ring|sync_lead|pad_slow)$/.test(to.slice(4)));
   if(!exists) throw new SidwaveTransformError("precondition",`Instrument ${to} does not exist`);
   const changed:string[]=[];
@@ -170,12 +189,12 @@ export function substituteInstrument(text:string,{from,to}:{from:string;to:strin
     for(const [k,v] of Object.entries(node)) { const p=[...path,k]; if((k==="instrument"||k==="inst")&&v===from){setAt(doc,p,to);changed.push(ptr(p.map(String)));} else walk(v,p); }
   }; walk(root,[]);
   if(!changed.length) throw new SidwaveTransformError("precondition",`Instrument reference ${from} does not exist`);
-  return finish(doc,changed,["instrument definitions", "all references other than the selected source"]);
+  return finish(doc,changed,["instrument definitions", "all references other than the selected source"],[],validate);
 }
-/** Preconditions: grid is a positive finite number of beats; supported duration-bearing groove/arpeggio entries use explicit len. Preserves total length of every pattern; reports unsupported tokenized grooves rather than changing their grammar. */
-export function quantise(text:string,{grid}:{grid:number}):TransformResult {
+/** Preconditions: the input is a valid score; grid is a positive finite number of beats; supported duration-bearing groove/arpeggio entries use explicit len. Preserves total length of every pattern; reports unsupported tokenized grooves rather than changing their grammar. The result must parse and compile (see TransformValidation); otherwise code "precondition" with the compiler message. */
+export function quantise(text:string,{grid,validate}:TransformOptions&{grid:number}):TransformResult {
   if(!Number.isFinite(grid)||grid<=0) throw new SidwaveTransformError("precondition","grid must be positive and finite");
-  const doc=docFor(text), root=js(doc), changed:string[]=[], warnings:string[]=[];
+  const doc=docFor(text,validate), root=js(doc), changed:string[]=[], warnings:string[]=[];
   for(const [vi,voice] of (root.voices??[]).entries()) for(const [pn,pat] of Object.entries<any>(voice.patterns??{})) {
     const where=`/voices/${vi}/patterns/${esc(pn)}`;
     if(typeof pat.groove==="string") { warnings.push(`${where}/groove uses implicit entry lengths; unchanged`); continue; }
@@ -199,12 +218,12 @@ export function quantise(text:string,{grid}:{grid:number}):TransformResult {
     if(unsupported) { warnings.push(`${where} has no second explicit duration for length-preserving quantisation; unchanged`); continue; }
     for(const [i,len] of next) if(len!==entries[i].len) { const path=["voices",vi,"patterns",pn,key,i,"len"] as (string|number)[]; setAt(doc,path,len); changed.push(ptr(path.map(String))); }
   }
-  return finish(doc,changed,["total length of every pattern"],warnings);
+  return finish(doc,changed,["total length of every pattern"],warnings,validate);
 }
-/** Preconditions: every requested name exists as a named section or sequence item. Preserves section definitions and their contents; order may duplicate sections. */
-export function restructure(text:string,{order}:{order:string[]}):TransformResult {
+/** Preconditions: the input is a valid score; every requested name exists as a named section or sequence item. Preserves section definitions and their contents; order may duplicate sections. The result must parse and compile (see TransformValidation); otherwise code "precondition" with the compiler message. */
+export function restructure(text:string,{order,validate}:TransformOptions&{order:string[]}):TransformResult {
   if(!Array.isArray(order)||order.some(x=>typeof x!=="string")) throw new SidwaveTransformError("precondition","order must be an array of names");
-  const doc=docFor(text), root=js(doc), entries:any[]=root.timeline??[];
+  const doc=docFor(text,validate), root=js(doc), entries:any[]=root.timeline??[];
   const entryName=(x:any):string|undefined=>typeof x==="string"?x.split(/[+*]/)[0]:x?.section??x?.use;
   const names=new Set([...Object.keys(root.sections??{}),...entries.map(entryName).filter(Boolean)]);
   const missing=order.find(n=>!names.has(n));if(missing)throw new SidwaveTransformError("precondition",`Unknown section or sequence item ${missing}`);
@@ -218,15 +237,15 @@ export function restructure(text:string,{order}:{order:string[]}):TransformResul
     used.add(name);return entry;
   });
   doc.set("timeline",values as any);
-  return finish(doc,["/timeline"],["section definitions and contents"]);
+  return finish(doc,["/timeline"],["section definitions and contents"],[],validate);
 }
-/** Preconditions: seed is an integer; maxShift is finite and nonnegative. Uses seeded bounded variation of per-note len values (beats), a language-supported duration field. Preserves note pitches, instrument references, and each pattern's total length. Notes without explicit len are unsupported and named in warnings. */
-export function humanise(text:string,{seed,maxShift,scope}:{seed:number;maxShift:number;scope?:{voices?:string[]}}):TransformResult {
+/** Preconditions: the input is a valid score; seed is an integer; maxShift is finite and nonnegative. Uses seeded bounded variation of per-note len values (beats), a language-supported duration field. Preserves note pitches, instrument references, and each pattern's total length. Notes without explicit len are unsupported and named in warnings. The result must parse and compile (see TransformValidation); otherwise code "precondition" with the compiler message. */
+export function humanise(text:string,{seed,maxShift,scope,validate}:TransformOptions&{seed:number;maxShift:number;scope?:{voices?:string[]}}):TransformResult {
   if(!Number.isInteger(seed)) throw new SidwaveTransformError("precondition","seed must be an integer");
   if(!Number.isFinite(maxShift)||maxShift<0) throw new SidwaveTransformError("precondition","maxShift must be finite and nonnegative");
-  const doc=docFor(text), root=js(doc), changed:string[]=[], warnings:string[]=[]; let state=seed>>>0;
+  const doc=docFor(text,validate), root=js(doc), changed:string[]=[], warnings:string[]=[]; let state=seed>>>0;
   const rand=()=>{state=(state+0x6D2B79F5)>>>0;let t=state;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
-  if(maxShift===0) return finish(doc,changed,["pitches","pattern lengths"],["maxShift is zero; no variation applied."]);
+  if(maxShift===0) return finish(doc,changed,["pitches","pattern lengths"],["maxShift is zero; no variation applied."],validate);
   for(const [vi,voice] of (root.voices??[]).entries()) {
     const id=String(voice.id??vi+1), name=String(voice.name??"");if(scope?.voices&&!scope.voices.includes(id)&&!scope.voices.includes(name))continue;
     for(const [pn,pat] of Object.entries<any>(voice.patterns??{})) {
@@ -239,5 +258,5 @@ export function humanise(text:string,{seed,maxShift,scope}:{seed:number;maxShift
       for(const ix of explicit){if(!deltas.has(ix))continue;const old=entries[ix].len, next=old+deltas.get(ix)!;if(next<=0)throw new SidwaveTransformError("unsupported",`Bounded variation would make duration nonpositive at /voices/${vi}/patterns/${esc(pn)}/${key}/${ix}/len`);if(next!==old){setAt(doc,["voices",vi,"patterns",pn,key,ix,"len"],next);changed.push(ptr(["voices",String(vi),"patterns",pn,key,String(ix),"len"]));}}
     }
   }
-  return finish(doc,changed,["note pitches","instrument references","pattern lengths"],warnings);
+  return finish(doc,changed,["note pitches","instrument references","pattern lengths"],warnings,validate);
 }

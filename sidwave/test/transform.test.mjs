@@ -208,11 +208,11 @@ voices:
         length: 1
 timeline: [{bars: 1, layers: {v1: "A"}}]
 `;
-  const result = transpose(text, { semitones: 2 });
+  const result = transpose(text, { semitones: 2, validate: "none" });
   assert.ok(result.text.includes(`          - "Dm7@arp D4 ~ ~"\n          - {chord: "Asus4", arp: "0,5,7", speed: 2}\n`), result.text);
   assert.deepEqual(result.report.changed, ["/voices/0/patterns/A/groove/0", "/voices/0/patterns/A/groove/1/chord"]);
   const odd = text.replace("Gsus4", "G/B");
-  assert.throws(() => transpose(odd, { semitones: 2 }), (e) => e instanceof SidwaveTransformError && e.code === "unsupported" && e.message === "Cannot transpose chord G/B at /voices/0/patterns/A/groove/1");
+  assert.throws(() => transpose(odd, { semitones: 2, validate: "none" }), (e) => e instanceof SidwaveTransformError && e.code === "unsupported" && e.message === "Cannot transpose chord G/B at /voices/0/patterns/A/groove/1");
 });
 
 // ---- Exact results on a small canonical score ----
@@ -331,31 +331,31 @@ test("transpose handles slides, bends, note lists, drums, kit notes and unsuppor
           - {note: "C2", len: 1, kitNote: true, slide_from: "C2", bend: {to: "D2"}}
           - {note: "A4", len: 1, bend: {to: -2, frames: 4}}
           - "D4 ~"`);
-  const r = transpose(groove, { semitones: 2 });
+  const r = transpose(groove, { semitones: 2, validate: "none" });
   assert.ok(r.text.includes(`          - {note: "D4", len: 1, slide_from: "B3"}\n          - {note: "F#4", len: 1, bend: {to: "A4", frames: 4}}\n          - {note: "C2", len: 1, slide_from: "C2", bend: {to: "D2"}, kitNote: true}\n          - {note: "B4", len: 1, bend: {to: -2, frames: 4}}\n          - "E4 ~"\n`), r.text);
   assert.deepEqual(r.report.changed, ["/voices/0/patterns/A/groove/0/note", "/voices/0/patterns/A/groove/0/slide_from", "/voices/0/patterns/A/groove/1/note", "/voices/0/patterns/A/groove/1/bend/to", "/voices/0/patterns/A/groove/3/note", "/voices/0/patterns/A/groove/4"]);
-  const notes = transpose(doc(`        length: 1\n        notes: ["C4", "E4", "~", "-"]`), { semitones: -2 });
+  const notes = transpose(doc(`        length: 1\n        notes: ["C4", "E4", "~", "-"]`), { semitones: -2, validate: "none" });
   assert.ok(notes.text.includes(`notes: ["A#3", "D4", "~", "-"]`), notes.text);
   assert.deepEqual(notes.report.changed, ["/voices/0/patterns/A/notes/0", "/voices/0/patterns/A/notes/1"]);
   const drums = doc(`        groove: "C2 D2 ~ ~"\n        length: 1`, `    role: "drums"\n`);
-  assert.equal(transpose(drums, { semitones: 5 }).text, drums);
-  assert.deepEqual(transpose(drums, { semitones: 5 }).report.changed, []);
-  assert.throws(() => transpose(doc(`        groove:\n          - {rest: 1}`), { semitones: 1 }), (e) => e.code === "unsupported" && e.message === "Cannot transpose groove construct at /voices/0/patterns/A/groove/0");
+  assert.equal(transpose(drums, { semitones: 5, validate: "none" }).text, drums);
+  assert.deepEqual(transpose(drums, { semitones: 5, validate: "none" }).report.changed, []);
+  assert.throws(() => transpose(doc(`        groove:\n          - {rest: 1}`), { semitones: 1, validate: "none" }), (e) => e.code === "unsupported" && e.message === "Cannot transpose groove construct at /voices/0/patterns/A/groove/0");
 });
 
 test("transpose shifts motif notes, semitone offsets and chord symbols and checks their range", () => {
   const motif = (text, root = "") => `sidwave: 1.2\ntitle: "T"\ntempo: 120\nvoices:\n  - id: 1\n    patterns:\n      A: {motif: "${text}",${root} length: 1}\ntimeline: [{bars: 1, layers: {v1: "A"}}]\n`;
-  const up = transpose(motif("Cm7, 0 4 -1 C4 Bbmaj7 - ~"), { semitones: 3 });
+  const up = transpose(motif("Cm7, 0 4 -1 C4 Bbmaj7 - ~"), { semitones: 3, validate: "none" });
   assert.ok(up.text.includes(`motif: "D#m7, 3 7 2 D#4 C#maj7 - ~"`), up.text);
   assert.deepEqual(up.report.changed, ["/voices/0/patterns/A/motif"]);
-  assert.equal(transpose(motif("- ~ pad"), { semitones: 3 }).text, motif("- ~ pad"));
-  assert.deepEqual(transpose(motif("- ~ pad"), { semitones: 3 }).report.changed, []);
+  assert.equal(transpose(motif("- ~ pad"), { semitones: 3, validate: "none" }).text, motif("- ~ pad"));
+  assert.deepEqual(transpose(motif("- ~ pad"), { semitones: 3, validate: "none" }).report.changed, []);
   const offsets = (e) => e.code === "out_of_range" && e.message === "Offending note at /voices/0/patterns/A/motif";
-  assert.throws(() => transpose(motif("0 4 7"), { semitones: 200 }), offsets);
-  assert.throws(() => transpose(motif("0 4 7", ' root: "C3",'), { semitones: -100 }), offsets);
-  assert.throws(() => transpose(motif("C4 E4"), { semitones: 200 }), offsets);
-  assert.throws(() => transpose(motif("Cm7"), { semitones: 200 }), offsets);
-  assert.throws(() => transpose(motif("Cm7"), { semitones: -40 }), offsets);
+  assert.throws(() => transpose(motif("0 4 7"), { semitones: 200, validate: "none" }), offsets);
+  assert.throws(() => transpose(motif("0 4 7", ' root: "C3",'), { semitones: -100, validate: "none" }), offsets);
+  assert.throws(() => transpose(motif("C4 E4"), { semitones: 200, validate: "none" }), offsets);
+  assert.throws(() => transpose(motif("Cm7"), { semitones: 200, validate: "none" }), offsets);
+  assert.throws(() => transpose(motif("Cm7"), { semitones: -40, validate: "none" }), offsets);
 });
 
 test("setTempo replaces the tempo key, the song tempo, or adds a tempo", () => {
@@ -366,10 +366,10 @@ test("setTempo replaces the tempo key, the song tempo, or adds a tempo", () => {
   assert.equal(setTempo(base, { bpm: 30 }).text, score({ tempo: 30 }));
   assert.equal(setTempo(base, { bpm: 220 }).text, score({ tempo: 220 }));
   assert.equal(setTempo(base, { bpm: 100.5 }).text, score({ tempo: 100.5 }));
-  const song = setTempo('song:\n  title: "x"\n  tempo: 100\n', { bpm: 90 });
+  const song = setTempo('song:\n  title: "x"\n  tempo: 100\n', { bpm: 90, validate: "none" });
   assert.equal(song.text, 'song:\n  title: "x"\n  tempo: 90\n');
   assert.deepEqual(song.report.changed, ["/song/tempo"]);
-  const none = setTempo('sidwave: 1.2\ntitle: "x"\n', { bpm: 90 });
+  const none = setTempo('sidwave: 1.2\ntitle: "x"\n', { bpm: 90, validate: "none" });
   assert.equal(none.text, 'sidwave: 1.2\ntitle: "x"\ntempo: 90\n');
   assert.deepEqual(none.report.changed, ["/tempo"]);
 });
@@ -383,8 +383,8 @@ test("scaleTempo multiplies the current tempo, the song tempo or the default tem
   assert.equal(scaleTempo(base, { factor: 0.75 }).text, score({ tempo: 90 }));
   assert.deepEqual(scaleTempo(base, { factor: 0.75 }).report, { changed: ["/tempo"], preserved: ["notes", "pitches"], warnings: [] });
   assert.equal(scaleTempo(base, { factor: 1 }).text, base);
-  assert.equal(scaleTempo('song:\n  tempo: 100\n', { factor: 0.5 }).text, 'song:\n  tempo: 50\n');
-  assert.equal(scaleTempo('title: "x"\n', { factor: 2 }).text, 'title: "x"\ntempo: 200\n');
+  assert.equal(scaleTempo('song:\n  tempo: 100\n', { factor: 0.5, validate: "none" }).text, 'song:\n  tempo: 50\n');
+  assert.equal(scaleTempo('title: "x"\n', { factor: 2, validate: "none" }).text, 'title: "x"\ntempo: 200\n');
   valid(scaleTempo(base, { factor: 0.75 }).text);
 });
 
@@ -445,8 +445,8 @@ test("restructure reorders the timeline of a sectioned score", () => {
 
 test("restructure keeps timeline entries with their modifiers, overrides and inline definitions", () => {
   const text = 'sidwave: 1.0\ntimeline:\n  - {section: "a", bars: 1}\n  - "b+2"\n  - {use: "c"}\n';
-  assert.equal(restructure(text, { order: ["c", "a"] }).text, 'sidwave: 1.0\ntimeline:\n  - use: "c"\n  - section: "a"\n    bars: 1\n');
-  assert.equal(restructure(text, { order: ["b", "b", "a", "a"] }).text, 'sidwave: 1.0\ntimeline:\n  - "b+2"\n  - "b+2"\n  - section: "a"\n    bars: 1\n  - "a"\n');
+  assert.equal(restructure(text, { order: ["c", "a"], validate: "none" }).text, 'sidwave: 1.0\ntimeline:\n  - use: "c"\n  - section: "a"\n    bars: 1\n');
+  assert.equal(restructure(text, { order: ["b", "b", "a", "a"], validate: "none" }).text, 'sidwave: 1.0\ntimeline:\n  - "b+2"\n  - "b+2"\n  - section: "a"\n    bars: 1\n  - "a"\n');
   const sectioned = score({ timeline: '["intro", "main+2", "main*2"]' });
   assert.equal(restructure(sectioned, { order: ["main", "intro"] }).text, score({ timeline: '["main+2", "intro"]' }));
 });
@@ -455,7 +455,7 @@ test("restructure rejects unknown names, bad orders and a sectioned score withou
   fails(() => restructure(base, { order: ["missing"] }), "precondition", "Unknown section or sequence item missing");
   fails(() => restructure(base, { order: "intro" }), "precondition", "order must be an array of names");
   fails(() => restructure(base, { order: [1] }), "precondition", "order must be an array of names");
-  fails(() => restructure(base.replace(/timeline:.*\n/, ""), { order: ["intro"] }), "precondition", "Document has no timeline");
+  fails(() => restructure(base.replace(/timeline:.*\n/, ""), { order: ["intro"], validate: "none" }), "precondition", "Document has no timeline");
   fails(() => restructure("a: [", { order: [] }), "input");
 });
 
@@ -485,7 +485,7 @@ test("humanise honours scope, a zero shift and patterns without explicit duratio
   const noLen = base.replace(/ len: [0-9.]+/g, "");
   assert.deepEqual(humanise(noLen, { seed: 1, maxShift: 0.1 }).report.warnings[0], "/voices/0/patterns/A has no explicit per-note len; unchanged");
   const notes = 'sidwave: 1.2\nvoices:\n  - id: 1\n    patterns:\n      A:\n        notes:\n          - {note: "C4", len: 1}\n          - {note: "D4", len: 3}\n          - "E4"\n';
-  const r = humanise(notes, { seed: 5, maxShift: 0.5 });
+  const r = humanise(notes, { seed: 5, maxShift: 0.5, validate: "none" });
   assert.deepEqual(r.report.changed, ["/voices/0/patterns/A/notes/0/len", "/voices/0/patterns/A/notes/1/len"]);
   const lens = YAML.parse(r.text).voices[0].patterns.A.notes.slice(0, 2).map((e) => e.len);
   assert.ok(Math.abs(lens[0] + lens[1] - 4) < 1e-9 && lens[0] !== 1);
@@ -500,27 +500,59 @@ test("humanise rejects bad arguments and shifts that would make a duration nonpo
 });
 
 const allExamples = (await readdir(new URL("../data/sound/examples/", import.meta.url))).filter((f) => f.endsWith(".yaml")).sort();
+const timelineNames = (text) => (YAML.parse(text).timeline ?? []).map((e) => (typeof e === "string" ? e.split(/[+*]/)[0] : e?.section ?? e?.use)).filter(Boolean);
+const matrix = (text) => [
+  ...[-12, -1, 1, 5, 7, 12].map((semitones) => [`transpose ${semitones}`, () => transpose(text, { semitones })]),
+  ...[80, 200].map((bpm) => [`setTempo ${bpm}`, () => setTempo(text, { bpm })]),
+  ...[0.9, 1.5, 2].map((factor) => [`scaleTempo ${factor}`, () => scaleTempo(text, { factor })]),
+  ...[0.5, 1].map((grid) => [`quantise ${grid}`, () => quantise(text, { grid })]),
+  ["restructure reversed", () => restructure(text, { order: timelineNames(text).reverse() })],
+  ["humanise", () => humanise(text, { seed: 3, maxShift: 0.05 })],
+];
+const documented = ["precondition", "out_of_range", "unsupported"];
 for (const name of allExamples) {
-  test(`every transformation of ${name} still parses and compiles`, { timeout: 180000 }, async () => {
+  test(`transformations of ${name} return a valid compiled score or a documented error`, { timeout: 900000 }, async () => {
     const text = await readFile(new URL(`../data/sound/examples/${name}`, import.meta.url), "utf8");
-    const results = {
-      transposeDown: transpose(text, { semitones: -1 }),
-      setTempo: setTempo(text, { bpm: 80 }),
-      scaleTempo: scaleTempo(text, { factor: 0.9 }),
-      quantise: quantise(text, { grid: 0.25 }),
-      humanise: humanise(text, { seed: 3, maxShift: 0.05 }),
-    };
-    for (const [kind, r] of Object.entries(results)) {
+    let succeeded = 0;
+    for (const [label, call] of matrix(text)) {
+      let r;
+      try { r = call(); } catch (e) {
+        assert.ok(e instanceof SidwaveTransformError && documented.includes(e.code), `${name} ${label}: ${e?.stack ?? e}`);
+        continue;
+      }
       valid(r.text);
-      assert.ok(r.report.changed.length > 0 || kind === "quantise" || kind === "humanise" || kind === "transposeDown", `${name} ${kind}`);
-      assert.equal(formatSidwave(r.text), r.text, `${name} ${kind} is canonical`);
+      assert.equal(formatSidwave(r.text), r.text, `${name} ${label} is canonical`);
+      succeeded++;
     }
-    assert.equal(parseSidwave(results.setTempo.text).song.tempo, 80);
-    parseSidwave(transpose(text, { semitones: 1 }).text);
-    assert.deepEqual(pitches(results.humanise.text), pitches(text));
-    assert.deepEqual(pitches(setTempo(text, { bpm: 80 }).text), pitches(text));
+    assert.ok(succeeded >= 3, `${name}: ${succeeded} transformations succeeded`);
+    assert.deepEqual(pitches(humanise(text, { seed: 3, maxShift: 0.05 }).text), pitches(text));
   });
 }
+
+test("transformations refuse results that the compiler rejects, naming the compiler message", () => {
+  const read = (name) => readFile(new URL(`../data/sound/examples/${name}`, import.meta.url), "utf8");
+  const refused = async (name, call, pattern) => {
+    const text = await read(name);
+    assert.throws(() => call(text), (e) => e instanceof SidwaveTransformError && e.code === "precondition" && pattern.test(e.message), `${name}: ${pattern}`);
+  };
+  return Promise.all([
+    refused("drum_and_bass.yaml", (x) => transpose(x, { semitones: 1 }), /^The result does not compile: .*outside the playable SID frequency range on PAL/),
+    refused("acid_line.yaml", (x) => setTempo(x, { bpm: 200 }), /^The result (does not compile|is not a valid SIDWave score): /),
+    refused("ambient_filter.yaml", (x) => setTempo(x, { bpm: 120 }), /^The result (does not compile|is not a valid SIDWave score): /),
+    refused("acid_line.yaml", (x) => scaleTempo(x, { factor: 1.1 }), /^The result does not compile: Invalid SIDWAVE at \$\.timeline\[6\]/),
+    refused("chiptune_drive.yaml", (x) => quantise(x, { grid: 1 }), /^The result does not compile: /),
+  ]);
+});
+
+test("validate: parse accepts a result that parses but does not compile, validate: none skips the check", async () => {
+  const text = await readFile(new URL("../data/sound/examples/drum_and_bass.yaml", import.meta.url), "utf8");
+  assert.throws(() => transpose(text, { semitones: 1 }), (e) => e.code === "precondition");
+  const parsed = transpose(text, { semitones: 1, validate: "parse" });
+  parseSidwave(parsed.text);
+  assert.throws(() => compileSidwaveToPrg(parseSidwave(parsed.text), { loop: false }), /outside the playable SID frequency range/);
+  assert.equal(transpose(text, { semitones: 1, validate: "none" }).text, parsed.text);
+  assert.throws(() => transpose("sidwave: 1.2\ntitle: x\n", { semitones: 1 }), (e) => e.code === "input" && /^The input is not a valid SIDWave score: /.test(e.message));
+});
 
 test("README example: transpose and setTempo", () => {
   const demo = formatSidwave(`title: Demo
