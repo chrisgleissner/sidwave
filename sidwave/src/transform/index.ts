@@ -32,7 +32,7 @@ function setTempoNode(doc: AnyDoc, root: any, bpm: number): string {
 }
 function noteTokens(raw: string): Array<{ value: string; start: number; end: number }> {
   const out: Array<{value:string;start:number;end:number}> = [];
-  const re = /(?<![A-Za-z0-9_])([A-Ga-g](?:#|b)?-?\d+)(?![A-Za-z0-9_])/g;
+  const re = /(?<![A-Za-z0-9_@])([A-Ga-g](?:#|b)?-?\d+)(?![A-Za-z0-9_])/g;
   for (let m; (m = re.exec(raw));) if (noteNameToMidi(m[1]!) !== undefined) out.push({ value: m[1]!, start: m.index, end: m.index + m[1]!.length });
   return out;
 }

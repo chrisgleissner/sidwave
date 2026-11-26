@@ -50,3 +50,25 @@ test("SIDWave deterministic score transformations", () => {
   assert.ok(a.report.changed.length > 0);
   assert.throws(() => humanise(source, { seed: 4, maxShift: -1 }), SidwaveTransformError);
 });
+
+test("transpose leaves @instrument references that look like note names unchanged", () => {
+  const text = `sidwave: 1.2
+title: "T"
+tempo: 120
+sids: [{id: "sid1", address: "$D400", model: "8580"}]
+instruments:
+  a1: {waveform: "saw", adsr: [0, 4, 10, 4]}
+voices:
+  - id: 1
+    instrument: "a1"
+    patterns:
+      A: {groove: "B3@a1 ~ C3@a1 ~", length: 0.5}
+sections:
+  s: {bars: 1, layers: {v1: "A"}}
+timeline: ["s"]
+`;
+  const result = transpose(text, { semitones: 1 });
+  assert.ok(result.text.includes(`groove: "C4@a1 ~ C#3@a1 ~"`), result.text);
+  assert.deepEqual(result.report.changed, ["/voices/0/patterns/A/groove"]);
+  valid(result.text);
+});
