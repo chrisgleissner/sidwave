@@ -5,6 +5,9 @@
 // PSID / RSID (v1-v4) reader and writer.
 // Source of truth: HVSC DOCUMENTS/SID_file_format.txt. Depends only on Node builtins.
 //
+// Speed bits: PSID v2 and v2NG share version 2 (spec lines 211-224), so a v2 file without the
+// PlaySID flag is ambiguous; songSpeed() clamps songs above 32 to bit 31 for such files.
+//
 // Error / warning policy
 // ----------------------
 // The spec uses MUST for the RSID constraints, the valid ranges of version, dataOffset,
@@ -304,6 +307,30 @@ export function parseSidFile(bytes: Uint8Array, options: ParseOptions = {}): Sid
     secondByte = bytes[0x7a];
     thirdByte = bytes[0x7b];
   }
+  // Lenient parsing: recoverable deviations become warnings and the offending value is ignored.
+  // The writer (validate) stays strict and rejects the same inputs.
+  let startSong = dv.getUint16(0x10);
+  if (startSong === 0) {
+    warnings.push("bad_start_song: startSong 0 is treated as 1");
+    startSong = 1;
+  }
+  if (version < 3 && secondByte !== 0) {
+    warnings.push(`bad_sid_address: second SID byte ${hex(secondByte, 2)} is ignored in version ${version}`);
+    secondByte = 0;
+  }
+  if (version < 4 && thirdByte !== 0) {
+    warnings.push(`bad_sid_address: third SID byte ${hex(thirdByte, 2)} is ignored in version ${version}`);
+    thirdByte = 0;
+  }
+  if (startPage === 0 || startPage === 0xff) {
+    if (pageLength !== 0) {
+      warnings.push(`bad_reloc: pageLength ${pageLength} with startPage ${hex(startPage, 2)} is ignored`);
+      pageLength = 0;
+    }
+  } else if (startPage + pageLength > 0x100) {
+    warnings.push(`bad_reloc: relocation range ${hex(startPage, 2)}+${pageLength} pages runs past page $FF and is ignored`);
+    pageLength = 0;
+  }
   if (flags & 0xfc00) warnings.push(`bad_field: reserved flag bits ${hex(flags & 0xfc00)} are set`);
   const sidAddr = (b: number, name: string): number | undefined => {
     if (b === 0) return undefined;
@@ -323,7 +350,7 @@ export function parseSidFile(bytes: Uint8Array, options: ParseOptions = {}): Sid
     initAddress: dv.getUint16(0x0a),
     playAddress: dv.getUint16(0x0c),
     songs: dv.getUint16(0x0e),
-    startSong: dv.getUint16(0x10),
+    startSong,
     speed: dv.getUint32(0x12),
     name: strings[0].text,
     author: strings[1].text,
@@ -340,8 +367,11 @@ export function parseSidFile(bytes: Uint8Array, options: ParseOptions = {}): Sid
     payload: data.slice(),
     warnings,
   };
+  if (file.secondSidAddress !== undefined && file.secondSidAddress === file.thirdSidAddress) {
+    warnings.push("bad_sid_address: third SID address equals the second and is ignored");
+    file.thirdSidAddress = undefined;
+  }
 
-  // Version 3 header with a third SID byte (or v2 with a second) is only a warning; validate() adds it.
   for (const issue of validate(file)) {
     if (issue.level === "error") throw new SidFileError(issue.code, issue.message);
     warnings.push(`${issue.code}: ${issue.message}`);
@@ -426,6 +456,10 @@ export function subtunes(file: Pick<SidFile, "songs">): number[] {
  * Speed of a song. Version 1 files and PSID v2+ files with the PlaySID-specific flag wrap
  * (song 33 uses bit 0). Other v2+ files (including RSID, whose speed must be 0) use bit 31
  * for every song above 32.
+ *
+ * Spec ambiguity: PSID v2 and v2NG share version number 2 (SID_file_format.txt, lines 211-224).
+ * A v2 file without the PlaySID flag may be either, so it cannot be told whether songs above 32
+ * wrap (v2) or share bit 31 (v2NG). This function keeps the clamp (bit 31) for such files.
  */
 export function songSpeed(
   file: Pick<SidFile, "version" | "magic" | "psidSpecific" | "speed" | "songs">,
@@ -442,7 +476,7 @@ export function effectiveInitAddress(file: Pick<SidFile, "initAddress" | "loadAd
   return file.initAddress === 0 ? file.loadAddress : file.initAddress;
 }
 
-/** HVSC Songlengths.md5 key: lower-case hex MD5 of the whole file (HVSC 68 and later). */
+/** Songlengths.md5 key: lower-case hex MD5 of the whole file (new-format Songlengths MD5, full file). */
 export function md5ForSonglengths(bytes: Uint8Array): string {
   return createHash("md5").update(bytes).digest("hex");
 }

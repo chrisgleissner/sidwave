@@ -34,7 +34,7 @@ export function parseDuration(token: string): number | undefined {
   return ((hours * 60 + Number(m[2])) * 60 + Number(m[3])) * 1000 + ms;
 }
 
-function parseInternal(text: string, maxBytes: number, paths?: Map<string, string>): SonglengthsDb {
+function parseInternal(text: string, maxBytes: number, paths?: Map<string, string[]>): SonglengthsDb {
   if (text.length > maxBytes || new TextEncoder().encode(text).length > maxBytes) {
     throw new SonglengthsError("too_large", `Songlengths text exceeds ${maxBytes} bytes`);
   }
@@ -46,7 +46,7 @@ function parseInternal(text: string, maxBytes: number, paths?: Map<string, strin
     const line = raw.trim();
     if (line === "" || line.startsWith("[")) continue;
     if (line.startsWith(";")) {
-      lastPath = line.slice(1).trim();
+      if (line.startsWith("; /")) lastPath = line.slice(1).trim();
       continue;
     }
     const eq = line.indexOf("=");
@@ -58,8 +58,13 @@ function parseInternal(text: string, maxBytes: number, paths?: Map<string, strin
       if (d === undefined) throw new SonglengthsError("bad_line", `line ${lineNo}: bad duration ${JSON.stringify(token)}`);
       durations.push(d);
     }
-    db.set(key, durations);
-    if (paths && lastPath) paths.set(key, lastPath);
+    // A duplicate MD5 keeps the first entry; every path that carries the MD5 is recorded.
+    if (!db.has(key)) db.set(key, durations);
+    if (paths && lastPath) {
+      const known = paths.get(key);
+      if (known === undefined) paths.set(key, [lastPath]);
+      else known.push(lastPath);
+    }
   }
   return db;
 }
@@ -69,12 +74,12 @@ export function parseSonglengths(text: string, options: SonglengthsOptions = {})
   return parseInternal(text, options.maxBytes ?? DEFAULT_SONGLENGTHS_MAX_BYTES);
 }
 
-/** Like parseSonglengths, also returning md5 -> the "; /path" comment preceding each entry. */
+/** Like parseSonglengths, also returning md5 -> every "; /path" comment preceding an entry with that md5. */
 export function parseSonglengthsWithPaths(
   text: string,
   options: SonglengthsOptions = {},
-): { db: SonglengthsDb; paths: Map<string, string> } {
-  const paths = new Map<string, string>();
+): { db: SonglengthsDb; paths: Map<string, string[]> } {
+  const paths = new Map<string, string[]>();
   const db = parseInternal(text, options.maxBytes ?? DEFAULT_SONGLENGTHS_MAX_BYTES, paths);
   return { db, paths };
 }

@@ -8,7 +8,7 @@ import {
 } from "../src/sidFile.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const HVSC = "/home/chris/dev/c64/C64Music";
+const HVSC = process.env.HVSC_DIR ?? "/home/chris/dev/c64/C64Music";
 const PAYLOAD = Uint8Array.from([0xa9, 0x00, 0x60, 0x60, 0x4c, 0xe8, 0x07]); // 7 bytes of code
 
 function psid(over = {}) {
@@ -122,7 +122,6 @@ test("songs and startSong boundaries", () => {
   bad("bad_song_count", () => parseSidFile(patched(psid(), (_b, dv) => dv.setUint16(0x0e, 257))));
   bad("bad_song_count", () => writeSidFile(psid({ songs: 0 })));
   bad("bad_song_count", () => writeSidFile(psid({ songs: 257 })));
-  bad("bad_start_song", () => parseSidFile(patched(psid(), (_b, dv) => dv.setUint16(0x10, 0))));
   bad("bad_start_song", () => parseSidFile(patched(psid({ songs: 3 }), (_b, dv) => dv.setUint16(0x10, 4))));
   bad("bad_start_song", () => writeSidFile(psid({ songs: 3, startSong: 4 })));
   assert.equal(parseSidFile(writeSidFile(psid({ songs: 3, startSong: 3 }))).startSong, 3);
@@ -184,11 +183,48 @@ test("SID address version requirements and uniqueness", () => {
   bad("bad_sid_address", () => writeSidFile(psid({ version: 2, secondSidAddress: 0xd420 })));
   bad("bad_sid_address", () => writeSidFile(psid({ version: 3, secondSidAddress: 0xd420, thirdSidAddress: 0xd440 })));
   bad("bad_sid_address", () => writeSidFile(psid({ version: 4, secondSidAddress: 0xd420, thirdSidAddress: 0xd420 })));
-  bad("bad_sid_address", () => parseSidFile(patched(psid({ version: 4 }), (b) => { b[0x7a] = 0x42; b[0x7b] = 0x42; })));
-  // Non-strict write allows a v2 file carrying a second SID; the parse reports a warning.
-  const p = parseSidFile(writeSidFile(psid({ version: 2, secondSidAddress: 0xd420 }), { strict: false }));
-  assert.equal(p.secondSidAddress, 0xd420);
-  assert.ok(p.warnings.some((w) => w.startsWith("bad_sid_address")));
+  // Parsing is lenient: equal second and third addresses give a warning and the third SID is ignored.
+  const same = parseSidFile(patched(psid({ version: 4 }), (b) => { b[0x7a] = 0x42; b[0x7b] = 0x42; }));
+  assert.equal(same.secondSidAddress, 0xd420);
+  assert.equal(same.thirdSidAddress, undefined);
+  assert.deepEqual(same.warnings, ["bad_sid_address: third SID address equals the second and is ignored"]);
+});
+
+test("version < 3 ignores the second SID byte and version < 4 the third", () => {
+  const v2 = parseSidFile(writeSidFile(psid({ version: 2, secondSidAddress: 0xd420 }), { strict: false }));
+  assert.equal(v2.secondSidAddress, undefined);
+  assert.deepEqual(v2.warnings, ["bad_sid_address: second SID byte $42 is ignored in version 2"]);
+  const v3 = parseSidFile(patched(psid({ version: 3, secondSidAddress: 0xd420 }), (b) => (b[0x7b] = 0x44)));
+  assert.equal(v3.secondSidAddress, 0xd420);
+  assert.equal(v3.thirdSidAddress, undefined);
+  assert.deepEqual(v3.warnings, ["bad_sid_address: third SID byte $44 is ignored in version 3"]);
+  assert.deepEqual(parseSidFile(patched(psid({ version: 2 }), (b) => (b[0x7a] = 0))).warnings, []);
+});
+
+test("parse: startSong 0 is a warning and becomes 1; the writer still rejects it", () => {
+  const p = parseSidFile(patched(psid(), (b, dv) => dv.setUint16(0x10, 0)));
+  assert.equal(p.startSong, 1);
+  assert.deepEqual(p.warnings, ["bad_start_song: startSong 0 is treated as 1"]);
+  bad("bad_start_song", () => writeSidFile(psid({ startSong: 0 })));
+});
+
+test("parse: invalid relocation ranges are warnings and the range is ignored", () => {
+  const a = parseSidFile(patched(psid(), (b) => { b[0x78] = 0; b[0x79] = 4; }));
+  assert.equal(a.pageLength, 0);
+  assert.deepEqual(a.warnings, ["bad_reloc: pageLength 4 with startPage $00 is ignored"]);
+  const b2 = parseSidFile(patched(psid(), (b) => { b[0x78] = 0xff; b[0x79] = 1; }));
+  assert.equal(b2.pageLength, 0);
+  assert.deepEqual(b2.warnings, ["bad_reloc: pageLength 1 with startPage $FF is ignored"]);
+  const c = parseSidFile(patched(psid(), (b) => { b[0x78] = 0xf0; b[0x79] = 0x20; }));
+  assert.equal(c.pageLength, 0);
+  assert.equal(c.startPage, 0xf0);
+  assert.deepEqual(c.warnings, ["bad_reloc: relocation range $F0+32 pages runs past page $FF and is ignored"]);
+});
+
+test("songSpeed clamps songs above 32 to bit 31 for PSID v2 without the PlaySID flag", () => {
+  const f = { version: 2, magic: "PSID", psidSpecific: false, speed: 0x80000000, songs: 40 };
+  assert.equal(songSpeed(f, 40), "CIA");
+  assert.equal(songSpeed({ ...f, psidSpecific: true }, 40), "VBI");
 });
 
 test("startPage / pageLength rules and load_overlap", () => {
@@ -209,7 +245,6 @@ test("startPage / pageLength rules and load_overlap", () => {
   bad("bad_reloc", () => writeSidFile(rsid({ startPage: 0xcf, pageLength: 2 })));
   writeSidFile(rsid({ startPage: 0x20, pageLength: 4 }));
   writeSidFile(psid({ startPage: 0xa0, pageLength: 2 })); // PSID may use that range
-  bad("bad_reloc", () => parseSidFile(patched(psid(), (b) => { b[0x78] = 0; b[0x79] = 3; })));
 });
 
 test("error: too_large", () => {
@@ -334,7 +369,7 @@ test("md5ForSonglengths is the MD5 of the whole file", () => {
   assert.equal(md5ForSonglengths(new TextEncoder().encode("abc")), "900150983cd24fb0d6963f7d28e17f72");
 });
 
-const hvscPresent = fs.existsSync(HVSC);
+const hvscPresent = fs.existsSync(HVSC) && fs.statSync(HVSC).isDirectory();
 function listSid(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((x, y) => (x.name < y.name ? -1 : 1))) {
     const p = path.join(dir, e.name);
@@ -354,6 +389,7 @@ test("HVSC corpus: parse and rewrite a deterministic sample of 500 files", { ski
   const noncanonical = [];
   let withWarnings = 0;
   for (const file of sample) {
+    if (!fs.existsSync(file)) continue;
     const bytes = new Uint8Array(fs.readFileSync(file));
     let parsed;
     try {
@@ -373,6 +409,7 @@ test("HVSC corpus: parse and rewrite a deterministic sample of 500 files", { ski
   assert.deepEqual(failures, []);
   for (const f of noncanonical) {
     // Non-canonical means the header carries something the model drops (reserved bits, invalid SID bytes, bytes after a string terminator).
+    if (!fs.existsSync(f)) continue;
     const p = parseSidFile(new Uint8Array(fs.readFileSync(f)));
     assert.ok(p.warnings.length > 0, `${f} differs after rewrite without any warning`);
   }

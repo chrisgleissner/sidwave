@@ -34,11 +34,14 @@ writeFileSync("song.sid", sid);
 
 ```ts
 import { readFileSync } from "node:fs";
-import { parseSidFile, subtunes } from "sidwave/sid-file";
+import { parseSidFile } from "sidwave/sid-file";
 
 const sid = parseSidFile(new Uint8Array(readFileSync("tune.sid")));
-console.log(sid.name, sid.author, subtunes(sid).length);
+console.log(sid.name, sid.author, sid.songs);
+// Fixture ä Generated 2 (for test/fixtures/sidfile/psid_v2_basic.sid)
 ```
+
+Text fields (`name`, `author`, `released`) are Windows-1252. Parsing is lenient and reports recoverable deviations in `warnings`; `writeSidFile` is strict. `songSpeed` clamps songs above 32 to bit 31 for PSID v2 files without the PlaySID flag, because v2 and v2NG share version 2 and cannot be told apart.
 
 ## Command line
 

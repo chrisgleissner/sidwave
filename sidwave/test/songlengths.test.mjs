@@ -7,7 +7,7 @@ import {
   SonglengthsError, parseDuration, parseSonglengths, parseSonglengthsWithPaths, lookupSonglength,
 } from "../src/songlengths.js";
 
-const HVSC = "/home/chris/dev/c64/C64Music";
+const HVSC = process.env.HVSC_DIR ?? "/home/chris/dev/c64/C64Music";
 const DB = path.join(HVSC, "DOCUMENTS", "Songlengths.md5");
 const A = "5f08a730b280e54fd1e75a7046b93fdc";
 const B = "2727236ead44a62f0c6e01f6dd4dc484";
@@ -32,9 +32,18 @@ test("parseSonglengths: comments, CRLF, multiple subtunes, attributes", () => {
   assert.deepEqual(db.get(A), [77000]);
   assert.deepEqual(db.get(B), [56000, 60500, 123000, 184001]);
   const { paths } = parseSonglengthsWithPaths(text);
-  assert.equal(paths.get(A), "/DEMOS/0-9/10_Orbyte.sid");
-  assert.equal(paths.get(B), "/X/Y.sid");
+  assert.deepEqual(paths.get(A), ["/DEMOS/0-9/10_Orbyte.sid"]);
+  assert.deepEqual(paths.get(B), ["/X/Y.sid"]);
   assert.equal(parseSonglengths(`${A.toUpperCase()}=0:01`).get(A)?.[0], 1000);
+});
+
+test("duplicate MD5 keeps the first entry and records all paths; only '; /' comments set the path", () => {
+  const text = `[Database]\n; /A/One.sid\n${A}=0:10\n; Songlengths updated 2026\n${B}=0:20\n; /B/Two.sid\n${A}=0:99 0:98\n`;
+  const { db, paths } = parseSonglengthsWithPaths(text);
+  assert.deepEqual(db.get(A), [10000]);
+  assert.deepEqual(db.get(B), [20000]);
+  assert.deepEqual(paths.get(A), ["/A/One.sid", "/B/Two.sid"]);
+  assert.deepEqual(paths.get(B), ["/A/One.sid"]);
 });
 
 test("parseSonglengths errors", () => {
@@ -55,7 +64,7 @@ test("lookupSonglength uses the MD5 of the file bytes", () => {
   assert.equal(lookupSonglength(db, new Uint8Array(1), 1), undefined);
 });
 
-const present = fs.existsSync(DB);
+const present = fs.existsSync(HVSC) && fs.existsSync(DB);
 test("real Songlengths.md5: MD5 of sampled tunes matches the path comment", { skip: present ? false : `Songlengths.md5 not found at ${DB}` }, () => {
   const text = fs.readFileSync(DB, "latin1");
   const { db, paths } = parseSonglengthsWithPaths(text);
@@ -65,7 +74,7 @@ test("real Songlengths.md5: MD5 of sampled tunes matches the path comment", { sk
   let checked = 0;
   const mismatches = [];
   for (let i = 0; i < entries.length && checked < 200; i += Math.floor(entries.length / 200)) {
-    const [md5, p] = entries[i];
+    const [md5, [p]] = entries[i];
     const file = path.join(HVSC, p);
     if (!fs.existsSync(file)) continue;
     const bytes = new Uint8Array(fs.readFileSync(file));
@@ -76,7 +85,8 @@ test("real Songlengths.md5: MD5 of sampled tunes matches the path comment", { sk
   assert.ok(checked >= 100, `only ${checked} files found`);
   assert.deepEqual(mismatches, []);
   // Three named tunes from the head of the database.
-  for (const [md5, p] of entries.slice(0, 3)) {
+  for (const [md5, [p]] of entries.slice(0, 3)) {
+    if (!fs.existsSync(path.join(HVSC, p))) continue;
     const bytes = new Uint8Array(fs.readFileSync(path.join(HVSC, p)));
     assert.equal(md5ForSonglengths(bytes), md5, p);
     const sid = parseSidFile(bytes);
