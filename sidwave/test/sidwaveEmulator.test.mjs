@@ -170,7 +170,7 @@ test("the bundled emulator matches the test helper emulator on a program that us
     const writes = [];
     const mem = new Uint8Array(65536);
     const image = assemblyToPrg(PROGRAM);
-    const load = image.readUInt16LE(0);
+    const load = (image[0] | (image[1] << 8));
     mem.set(image.subarray(2), load);
     const cpu = make(mem, { write: (a, v) => writes.push([a, v]), read: (a) => (a === 0xd012 ? 0x77 : undefined) });
     return { cpu, mem, writes };
@@ -192,9 +192,9 @@ test("call counts a taken branch and a page crossing the way the NMOS 6502 does"
   const run = (source, registers = {}) => {
     const image = assemblyToPrg(source);
     const mem = new Uint8Array(65536);
-    mem.set(image.subarray(2), image.readUInt16LE(0));
+    mem.set(image.subarray(2), (image[0] | (image[1] << 8)));
     const cpu = new Cpu6502(mem);
-    return cpu.call(image.readUInt16LE(0), registers);
+    return cpu.call((image[0] | (image[1] << 8)), registers);
   };
   assert.equal(run("* = $3000\n lda $30ff,x\n rts"), 4 + 6, "no crossing with X = 0");
   assert.equal(run("* = $3000\n lda $30ff,x\n rts", { x: 1 }), 4 + 1 + 6, "a read that crosses a page takes a cycle more");

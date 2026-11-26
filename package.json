@@ -10,7 +10,7 @@
     "6502-toolkit"
   ],
   "engines": {
-    "node": ">=24"
+    "node": ">=20.19"
   },
   "scripts": {
     "build": "tsc -b 6502-toolkit sidwave",
@@ -18,7 +18,9 @@
     "test:bun": "npm run build && npm run test:bun --workspaces",
     "coverage": "npm run build && node scripts/run-package-coverage.mjs",
     "pack": "npm run build && node --eval \"import('node:fs').then((fs) => fs.mkdirSync('artifacts', { recursive: true }))\" && npm pack --workspaces --pack-destination ./artifacts",
-    "check:consumer": "node scripts/check-consumer.mjs"
+    "check:consumer": "node scripts/check-consumer.mjs",
+    "check:types": "node scripts/check-types-consumer.mjs",
+    "check:fresh-clone": "node scripts/check-fresh-clone.mjs"
   },
   "devDependencies": {
     "@types/node": "^25.9.5",

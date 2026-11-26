@@ -86,7 +86,7 @@ The compiler measures the player's cost and reports it. `worstCaseCyclesPerCall`
 
 ## Install and first tune
 
-SIDWave has not been published to npm. Build it from this repository. It needs Node.js 24 or later.
+SIDWave has not been published to npm. Build it from this repository. It needs Node.js 20.19 or later.
 
 ```sh
 git clone https://github.com/chrisgleissner/sidwave.git && cd sidwave
@@ -183,6 +183,18 @@ npm run test:bun
 
 `npm test` runs the Node test runner in both packages. `npm run test:bun` runs the same tests with Bun. Tests that render with `sidplayfp` are skipped when it is not installed.
 
+### Releases
+
+Each package is released separately by pushing a tag. The tag is `<package>@<version>` and the version must equal `version` in that package's `package.json`:
+
+```sh
+git tag 6502-toolkit@1.0.0
+git tag sidwave@1.0.0
+git push origin 6502-toolkit@1.0.0
+```
+
+`.github/workflows/release.yaml` runs only for these tags. It builds, runs the Node and Bun tests and the consumer checks, and publishes the package with `npm publish --provenance --access public`, using the repository secret `NPM_TOKEN`. Pushes to branches and pull requests do not start it. Before tagging, move the package's "Unreleased" changelog entries under the new version.
+
 ## Repository layout
 
 | Path | Contents |
@@ -190,7 +202,7 @@ npm run test:bun
 | `sidwave/` | npm package `sidwave`: language, parser, lint, compiler, generator, examples and the `sidwave` command. GPL-2.0-or-later with the player exception. |
 | `6502-toolkit/` | npm package `6502-toolkit`: 6502 assembler, disassembler, opcode table, PETSCII, I/O range and PRG helpers. MIT. |
 | `doc/` | Repository-level documentation. See [repository structure](doc/repository-structure.md). |
-| `scripts/` | Per-package coverage gate and the clean-consumer check. |
+| `scripts/` | Per-package coverage gate, the clean-consumer check, the type check of a consumer project and the fresh-clone check. |
 
 ## Status and roadmap
 

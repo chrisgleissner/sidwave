@@ -258,7 +258,7 @@ function compilePlayer(doc: ParsedSidwave, options: { loop?: boolean; compress?:
   }
   const asm = buildPlayerAsm(arrangement, streams, loop, turboOnly);
   const assembled = assemblyToPrgDetailed(asm, { fileName: "sidwave_player.asm", loadAddress: SIDWAVE_LOAD_ADDRESS });
-  const prg = assembled.prg;
+  const prg = Buffer.from(assembled.prg);
   const endAddress = SIDWAVE_LOAD_ADDRESS + prg.length - 2;
   for (const [label, expected] of [["install", SIDWAVE_PRG_ENTRY], ["init_vec", SIDWAVE_INIT_ADDRESS], ["play_vec", SIDWAVE_PLAY_ADDRESS], ["prg_end", endAddress]] as const) {
     if (assembled.symbols.get(label) !== expected) throw new Error(`SIDWAVE player layout error: ${label} is not at $${expected.toString(16)}`);
@@ -470,7 +470,7 @@ export function compileSidwaveGameImage(doc: ParsedSidwave, layout: SidwaveGameL
   }
   const asm = buildPlayerAsm(arrangement, streams, loop, turboOnly, true, layout);
   const assembled = assemble(asm);
-  const load = assembled.prg.readUInt16LE(0);
+  const load = assembled.prg[0]! | (assembled.prg[1]! << 8);
   const bytes = (from: number, to: number) => new Uint8Array(assembled.prg.subarray(2 + from - load, 2 + to - load));
   const imageEnd = assembled.symbols.get("game_image_end")!;
   const dataStart = layout.dataOrigin;
@@ -613,7 +613,7 @@ export function validateSidwavePsidMap(doc: ParsedSidwave): void {
  */
 export function compileSidwaveToSid(
   doc: ParsedSidwave,
-  prg: Buffer,
+  prg: Uint8Array,
   options?: { entryAddress?: number; initAddress?: number; playAddress?: number; relocation?: { startPage: number; pageLength: number } },
 ): { sid: Buffer } {
   validateSidwavePsidMap(doc);

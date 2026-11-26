@@ -599,7 +599,7 @@ const prg = assemblyToPrg(files["main.asm"], {
   fileName: "main.asm",
   resolveInclude: (path, fromFile) => ({ contents: files[path], fileName: path }),
 });
-console.log(prg.toString("hex"));
+console.log(Buffer.from(prg).toString("hex"));
 ```
 
 ```output
@@ -658,7 +658,7 @@ import { assemblyToPrgDetailed } from "6502-toolkit";
 const result = assemblyToPrgDetailed('* = $c000\n  .incbin "data.bin", 1, 2\n  !binary "data.bin", 5, 2', {
   resolveIncbin: (path, fromFile) => Uint8Array.of(1, 2, 3, 4),
 });
-console.log(result.prg.toString("hex"));
+console.log(Buffer.from(result.prg).toString("hex"));
 console.log(result.warnings.join("\n"));
 ```
 

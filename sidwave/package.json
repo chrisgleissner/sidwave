@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "sidwave": "./dist/bin.js"
+    "sidwave": "./bin/sidwave.js"
   },
   "exports": {
     ".": {
@@ -93,10 +93,12 @@
     "#test/runner": "./test/helpers/test.js"
   },
   "files": [
+    "bin",
     "dist/**",
     "!dist/.tsbuildinfo",
     "data/**",
     "doc/licensing.md",
+    "CHANGELOG.md",
     "LICENSE",
     "LICENSE-EXCEPTION.md",
     "README.md"
@@ -123,10 +125,10 @@
     "directory": "sidwave"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=20.19"
   },
   "dependencies": {
-    "6502-toolkit": "0.1.0",
+    "6502-toolkit": "^0.1.0",
     "yaml": "^2.9.0"
   },
   "homepage": "https://github.com/chrisgleissner/sidwave/tree/main/sidwave#readme",

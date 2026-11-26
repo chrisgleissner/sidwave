@@ -10,17 +10,20 @@ permissions:
 
 jobs:
   test:
-    name: Test (${{ matrix.runtime }})
+    name: Test (${{ matrix.runtime }}${{ matrix.node && format(' {0}', matrix.node) || '' }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        runtime: [node, bun]
+        include:
+          - { runtime: node, node: 20 }
+          - { runtime: node, node: 24 }
+          - { runtime: bun, node: 24 }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: npm
       - uses: oven-sh/setup-bun@v2
         with:
@@ -38,8 +41,8 @@ jobs:
     name: Coverage gate and Codecov upload
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -51,7 +54,7 @@ jobs:
       - name: Upload 6502-toolkit coverage to Codecov
         # Pull requests from forks get no secrets; their coverage gate still runs.
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: 6502-toolkit/coverage/lcov.info
@@ -61,7 +64,7 @@ jobs:
       - name: Upload sidwave coverage to Codecov
         # Pull requests from forks get no secrets; their coverage gate still runs.
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: sidwave/coverage/lcov.info
@@ -73,8 +76,8 @@ jobs:
     name: Pack and clean-install smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -85,3 +88,7 @@ jobs:
       - run: npm run build
       - name: Pack both packages, install them in an empty project, compile on Node and Bun
         run: npm run check:consumer
+      - name: Type-check a consumer project that imports every exported subpath
+        run: npm run check:types
+      - name: The sidwave command resolves after npm ci and npm run build in a fresh checkout
+        run: npx --no-install sidwave --help

@@ -10,7 +10,7 @@ Status: pre-release. This package has not been published to npm yet. Build it fr
 npm install sidwave
 ```
 
-Requires Node.js 24 or later. Runtime dependencies: `yaml` and `6502-toolkit`. Optional peer dependency: `libsidplayfp-wasm` (see Engine).
+Requires Node.js 20.19 or later. Runtime dependencies: `yaml` and `6502-toolkit`. Optional peer dependency: `libsidplayfp-wasm` (see Engine).
 
 ## Library
 
@@ -216,6 +216,13 @@ if (result.firstDifference) {
 - A0: identical SIDLite PCM.
 - A trace with no writes inside the horizon fails T0 and T1 with category `empty_trace`.
 - The clock is taken from the PSID header of the reference tune unless `clock` is given. Every difference carries `cycle` and `timeSeconds` on that clock.
+
+## Versioning and support
+
+- The package follows semantic versioning from 1.0.0. Before 1.0.0, a minor version may contain breaking changes. They are listed in [CHANGELOG.md](CHANGELOG.md).
+- A deprecated export or option is announced in the changelog one minor release before it is removed.
+- Supported runtimes: Node.js 20.19 or later (the oldest version in CI is 20) and Bun 1.3.1 or later. The package uses Node.js modules (`node:fs`, `node:buffer`) and is not meant for browsers; the player it compiles runs on a C64.
+- The package is ESM only. On Node.js 20.19 and later, 22.12 and later, and all later versions, `require("sidwave")` loads it through `require(esm)`. On older versions, use `await import("sidwave")`.
 
 ## More
 
