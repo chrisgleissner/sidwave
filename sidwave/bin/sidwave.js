@@ -5,4 +5,12 @@
 
 // Committed launcher. npm creates the bin link when it installs the workspace, which happens before dist/ exists in a
 // fresh clone; a link whose target is missing is not created. This file exists in the clone, so the link is always made.
-import "../dist/bin.js";
+try {
+  await import("../dist/bin.js");
+} catch (error) {
+  if (error?.code === "ERR_MODULE_NOT_FOUND" && String(error.message).includes("bin.js")) {
+    process.stderr.write("sidwave is not built: run npm run build\n");
+    process.exit(2);
+  }
+  throw error;
+}

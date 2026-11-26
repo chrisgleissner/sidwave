@@ -2,7 +2,6 @@
 
 An assembler and a disassembler for the NMOS 6502 and 6510 (Commodore 64), written in TypeScript, with all 256 opcodes, PRG output and PETSCII text.
 
-[![npm version](https://img.shields.io/npm/v/6502-toolkit)](https://www.npmjs.com/package/6502-toolkit)
 [![CI](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml/badge.svg)](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml)
 [![Codecov](https://codecov.io/gh/chrisgleissner/sidwave/graph/badge.svg?flag=6502-toolkit)](https://codecov.io/gh/chrisgleissner/sidwave)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)

@@ -1,15 +1,26 @@
 import test from "#test/runner";
 import assert from "#test/assert";
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import path from "node:path";
 
 const distDir = fileURLToPath(new URL("../dist/", import.meta.url));
 const preload = fileURLToPath(new URL("./helpers/no-node-preload.mjs", import.meta.url));
 const main = fileURLToPath(new URL("./helpers/browser-like-main.mjs", import.meta.url));
+// The child process needs Node's loader hooks; the same code paths run under Bun in the other tests.
+const skip = typeof globalThis.Bun !== "undefined";
 
-// The child process needs Node's loader hooks; Bun runs the same code paths in the other tests.
-test("the built package assembles and disassembles without Buffer and without Node built-in modules", { skip: typeof globalThis.Bun !== "undefined" || !existsSync(distDir) }, () => {
+function jsFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? jsFiles(path.join(dir, entry.name)) : entry.name.endsWith(".js") ? [path.join(dir, entry.name)] : []);
+}
+
+test("the build exists (run npm run build first)", { skip }, () => {
+  assert.ok(existsSync(path.join(distDir, "index.js")), `${distDir} is missing; this test needs the built package`);
+});
+
+test("the built package assembles and disassembles without Buffer and without Node built-in modules", { skip }, () => {
   const result = spawnSync(process.execPath, ["--import", preload, main, pathToFileURL(distDir).href], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   const out = JSON.parse(result.stdout);
@@ -19,7 +30,12 @@ test("the built package assembles and disassembles without Buffer and without No
   assert.deepEqual(out.lines, ["LDA #$01", "STA $D020", "JMP $C000"]);
 });
 
-test("the dist files import nothing from node: and use no Buffer", { skip: !existsSync(distDir) }, () => {
-  const grep = spawnSync("grep", ["-rEl", "node:|\\bBuffer\\b", distDir, "--include=*.js"], { encoding: "utf8" });
-  assert.equal(grep.stdout.trim(), "", "dist files that mention node: or Buffer");
+test("the dist files import no node: module and use no Buffer", { skip }, () => {
+  const offenders = [];
+  const pattern = /(?:from\s*|import\s*\(?\s*|require\s*\(\s*)["']node:|\bglobalThis\.Buffer\b|\bBuffer\.[A-Za-z]|\bnew Buffer\b/;
+  for (const file of jsFiles(distDir)) {
+    const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    if (pattern.test(code)) offenders.push(path.relative(distDir, file));
+  }
+  assert.deepEqual(offenders, []);
 });

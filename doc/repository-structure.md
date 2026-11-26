@@ -2,7 +2,7 @@
 
 | Path | Contents |
 | --- | --- |
-| `LICENSE.md` | Which licence applies to which directory. `COPYING` holds the GPL-2.0 text. |
+| `LICENSES.md` | Which licence applies to which directory. `COPYING` holds the GPL-2.0 text. |
 | `README.md` | Overview for musicians and developers, status and roadmap. |
 | `CHANGELOG.md` | Changes by release. |
 | `sidwave/` | npm package `sidwave`: language, parser, lint, compiler, generator, examples, CLI `sidwave`. |

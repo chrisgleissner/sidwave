@@ -4,8 +4,8 @@ Write Commodore 64 SID music as text. Compile it to a C64 program or a SID file.
 
 [![CI](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml)
 [![Codecov](https://codecov.io/gh/chrisgleissner/sidwave/graph/badge.svg)](https://codecov.io/gh/chrisgleissner/sidwave)
-[![sidwave license: GPL-2.0-or-later + player exception](https://img.shields.io/badge/sidwave-GPL--2.0--or--later%20%2B%20player%20exception-blue.svg)](sidwave/LICENSE-EXCEPTION.md)
-[![6502-toolkit license: MIT](https://img.shields.io/badge/6502--toolkit-MIT-blue.svg)](6502-toolkit/LICENSE)
+[![sidwave licence: GPL-2.0-or-later with the SIDWave Player Exception](https://img.shields.io/badge/sidwave-GPL--2.0--or--later%20with%20Player%20Exception-blue.svg)](sidwave/LICENSE-EXCEPTION.md)
+[![6502-toolkit licence: MIT](https://img.shields.io/badge/6502--toolkit-MIT-blue.svg)](6502-toolkit/LICENSE)
 [![Status](https://img.shields.io/badge/status-pre--release-orange.svg)](#status-and-roadmap)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-forestgreen)](#for-developers)
 
@@ -247,4 +247,4 @@ Known limitations of the language: no per-note velocity, no multiple subtunes, n
 
 ## License
 
-The `sidwave/` package and everything outside `6502-toolkit/` is licensed under GPL-2.0-or-later with the [SIDWave Player Exception](sidwave/LICENSE-EXCEPTION.md). The exception allows compiled tunes, and games that embed the generated player, to be released under any terms. Read the [licensing notes](sidwave/doc/licensing.md). The `6502-toolkit/` package is licensed under the MIT licence. See [LICENSE.md](LICENSE.md).
+The `sidwave/` package and everything outside `6502-toolkit/` is licensed under GPL-2.0-or-later with the [SIDWave Player Exception](sidwave/LICENSE-EXCEPTION.md). The exception allows compiled tunes, and games that embed the generated player, to be released under any terms. Read the [licensing notes](sidwave/doc/licensing.md). The `6502-toolkit/` package is licensed under the MIT licence. See [LICENSES.md](LICENSES.md), [COPYING](COPYING) (GPL-2.0 text), [the exception](sidwave/LICENSE-EXCEPTION.md) and [the MIT licence](6502-toolkit/LICENSE).
