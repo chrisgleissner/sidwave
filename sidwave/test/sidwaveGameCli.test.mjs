@@ -145,3 +145,16 @@ test("the help text names the game options", () => {
     assert.ok(help.includes(text), text);
   }
 });
+
+test("a -o name ending in .sid selects PSID for the game target, as for the PRG; --format overrides it", () => {
+  const { dir, done } = sandbox();
+  try {
+    const r = run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0x1000", "--no-measure", "-o", "out/tune.SID");
+    assert.equal(r.code, EXIT_OK, r.err);
+    assert.deepEqual(fs.readdirSync(path.join(dir, "out")), ["tune.sid"]);
+    assert.equal(fs.readFileSync(path.join(dir, "out", "tune.sid")).subarray(0, 4).toString("ascii"), "PSID");
+    const bin = run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0x1000", "--no-measure", "--format", "bin", "-o", "out/raw.sid");
+    assert.equal(bin.code, EXIT_OK, bin.err);
+    assert.deepEqual(fs.readdirSync(path.join(dir, "out")).sort(), ["raw.bin", "tune.sid"]);
+  } finally { done(); }
+});

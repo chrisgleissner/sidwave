@@ -251,7 +251,7 @@ const SYMBOL_EXTENSIONS: Record<SidwaveSymbolFormat, string> = {
 /** `compile --target game`: raw binaries at the origin, symbol files and the contract. */
 function compileGame(io: CliIo, options: Options, file: string): number {
   if (options.origin === undefined) throw new UsageError("--target game needs --origin");
-  const format = options.format ?? "bin";
+  const format = options.format ?? (options.output !== undefined && extname(options.output).toLowerCase() === ".sid" ? "sid" : "bin");
   if (format !== "bin" && format !== "sid") throw new UsageError(`--format for --target game must be bin or sid, not ${format}`);
   if (options.output === "-") throw new UsageError("-o - is not available with --target game (the build has several files)");
   const symbols = options.symbols.map((name) => {
