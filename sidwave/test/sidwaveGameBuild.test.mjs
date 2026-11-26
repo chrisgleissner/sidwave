@@ -206,8 +206,8 @@ test("invalid layouts are rejected with the option that is wrong", () => {
       return true;
     });
   };
-  fails({ origin: 0x01ff }, "$.origin", /must lie in \$0200-\$CFFF/);
-  fails({ origin: 0xd000 }, "$.origin", /must lie in \$0200-\$CFFF/);
+  fails({ origin: 0x01ff }, "$.origin", /must lie in \$0200-\$CFF4/);
+  fails({ origin: 0xd000 }, "$.origin", /must lie in \$0200-\$CFF4/);
   fails({ origin: 0xcff5 }, "$.origin", /must lie in/);
   fails({ origin: 1.5 }, "$.origin", /integer/);
   fails({ origin: 0x1000, dataOrigin: 0x100 }, "$.dataOrigin", /must lie in/);
@@ -294,4 +294,20 @@ test("the PRG build of the same score is unchanged by the game build existing", 
   const before = compileSidwaveToPrg(doc).prg;
   compileSidwave(doc, { target: "game", origin: 0x1000, measure: false });
   assert.deepEqual(compileSidwaveToPrg(doc).prg, before);
+});
+
+test("the 12 byte entry table must fit below $D000 for the origin only; a data block is checked against its own size", () => {
+  const doc = load("fuer_elise");
+  const error = (options) => {
+    try { compileSidwave(doc, { target: "game", measure: false, ...options }); } catch (e) { return e; }
+    return undefined;
+  };
+  // $CFF5 is a valid data address (the table is not there); the data does not fit, which the size check reports.
+  const data = error({ origin: 0x1000, dataOrigin: 0xcff5 });
+  assert.equal(data.path, "$.timeline");
+  assert.match(data.message, /the data would end at \$D6\w\w, past the \$D000 limit/);
+  // The same address is rejected as an origin.
+  assert.equal(error({ origin: 0xcff5 }).path, "$.origin");
+  assert.equal(error({ origin: 0x1000, dataOrigin: 0xd000 }).path, "$.dataOrigin");
+  assert.equal(error({ origin: 0x1000, dataOrigin: 0x1ff }).path, "$.dataOrigin");
 });

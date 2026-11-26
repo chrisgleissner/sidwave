@@ -412,14 +412,15 @@ ${stop}  pla
 
 /** Checks the layout options that do not depend on the score. */
 function checkGameLayout(layout: SidwaveGameLayout): void {
-  const address = (value: number, path: string) => {
+  // The entry table (12 bytes) must fit below $D000 at the origin; the data block only has to start there.
+  const address = (value: number, path: string, span: number) => {
     if (!Number.isInteger(value)) throw new SidwaveValidationError(path, "must be an integer address");
-    if (value < SIDWAVE_GAME_MIN_ORIGIN || value + SIDWAVE_GAME_TABLE_BYTES > SIDWAVE_MEMORY_END) {
-      throw new SidwaveValidationError(path, `must lie in $${hex4(SIDWAVE_GAME_MIN_ORIGIN)}-$${hex4(SIDWAVE_MEMORY_END - 1)}; the player and its data must end below $D000 (a KERNAL banked out build is not supported)`);
+    if (value < SIDWAVE_GAME_MIN_ORIGIN || value + span > SIDWAVE_MEMORY_END) {
+      throw new SidwaveValidationError(path, `must lie in $${hex4(SIDWAVE_GAME_MIN_ORIGIN)}-$${hex4(SIDWAVE_MEMORY_END - span)}; the player and its data must end below $D000 (a KERNAL banked out build is not supported)`);
     }
   };
-  address(layout.origin, "$.origin");
-  if (layout.dataOrigin !== undefined) address(layout.dataOrigin, "$.dataOrigin");
+  address(layout.origin, "$.origin", SIDWAVE_GAME_TABLE_BYTES);
+  if (layout.dataOrigin !== undefined) address(layout.dataOrigin, "$.dataOrigin", 1);
   if (!Number.isInteger(layout.zeroPage) || layout.zeroPage < 0x02 || layout.zeroPage > 0xfe) {
     throw new SidwaveValidationError("$.zeroPage", "must be a zero page address from $02 to $FE ($00 and $01 are the processor port)");
   }

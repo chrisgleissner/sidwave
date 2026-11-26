@@ -93,7 +93,7 @@ test("a score or layout that cannot be built exits 1 with the path of the proble
   try {
     const bad = run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0x100");
     assert.equal(bad.code, EXIT_FAILED);
-    assert.match(bad.err, /song\.yaml: Invalid SIDWAVE at \$\.origin: must lie in \$0200-\$CFFF/);
+    assert.match(bad.err, /song\.yaml: Invalid SIDWAVE at \$\.origin: must lie in \$0200-\$CFF4/);
     const json = run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0x1000", "--zp", "0", "--json");
     assert.equal(json.code, EXIT_FAILED);
     assert.equal(JSON.parse(json.out).error.path, "$.zeroPage");
