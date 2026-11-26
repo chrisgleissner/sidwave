@@ -39,6 +39,7 @@
   "files": [
     "dist/**",
     "!dist/.tsbuildinfo",
+    "doc",
     "LICENSE",
     "README.md"
   ],
