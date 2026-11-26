@@ -71,23 +71,36 @@ Planned and not yet available: SID file reader and writer, `sidwave verify`, for
 
 ## Engine
 
-`sidwave/engine` renders and traces SID files with [libsidplayfp-wasm](https://www.npmjs.com/package/libsidplayfp-wasm) (reSIDfp or SIDLite). `sidwave/verify` compares the SID register writes of two tunes (levels T0, T1) and, with a SIDLite engine, their PCM (level A0). The package is an optional peer dependency: install it yourself when you use these two entry points.
+`sidwave/engine` renders and traces SID files with [libsidplayfp-wasm](https://www.npmjs.com/package/libsidplayfp-wasm) (reSIDfp or SIDLite). `sidwave/verify` compares the SID register writes of two tunes (levels T0 and T1) and, with a SIDLite engine, their PCM (level A0). The package is an optional peer dependency (`^1.1.1`): install it yourself when you use these two entry points.
 
 ```bash
 npm install libsidplayfp-wasm
 ```
 
-Without it, `createLibsidplayfpEngine(...).render()` and `.trace()` throw `SidEngineUnavailableError` with a message that names the package and this install command. The rest of sidwave does not need it.
+Without it, `createLibsidplayfpEngine(...).render()` and `.trace()` throw `SidEngineUnavailableError` with a message that names the package and this install command; the original error is in `cause`. The rest of sidwave does not need the package. `engine.version` is the installed package version and reads "unknown" until the first render or trace has loaded it.
 
 ```ts
 import { createLibsidplayfpEngine } from "sidwave/engine";
 
 const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
 const { samples, md5 } = await engine.render({ sid, seconds: 10 });
-const trace = await engine.trace({ sid, seconds: 10, onChunk: (records) => {} });
+const trace = await engine.trace({ sid, seconds: 10 });
 ```
 
-`trace` returns the SID writes as groups of four numbers (SID number, register, value, cycle). It never drops writes: if the trace buffer or `maxRecords` would be exceeded it throws `TraceOverflowError`. `onChunk` delivers the records as they are produced. Tracing does not change the audio; `trace` returns the same PCM that `render` returns.
+### Trace
+
+`trace` returns the SID writes as groups of four numbers (SID number, register, value, cycle). Cycles are counted from engine start. It never drops writes: if the trace buffer or `maxRecords` would be exceeded it throws `TraceOverflowError`.
+
+- `maxRecords` defaults to 4,194,304 (2^22 records, 128 MB of Float64). Raise it explicitly for longer traces.
+- With `onChunk`, records are delivered as they are produced and are not accumulated: the result has an empty `records` array and `count` gives the number of records delivered. An error thrown by `onChunk` or `onProgress` ends the call and propagates unchanged.
+- `clock` defaults to the clock flag in the PSID header (PAL if the header gives none). It determines the slice length, the horizon and all cycle-to-time conversions.
+- `horizonCycles` is `originCycle` plus the requested duration, where `originCycle` is the cycle at which the first PCM sample is produced. Records after the horizon are discarded, so traces of equal duration end at the same cycle. `cycles` is the end of the last rendered slice and can exceed `horizonCycles` by up to one slice (about 20 ms).
+
+### Tracing and audio
+
+`trace` also returns the PCM it rendered. With SIDLite this PCM is bit-identical to the PCM of `render` with the same request; the test suite compares SHA-256 hashes of both. With reSIDfp only the length and the RMS level are checked (within one percent), because the PCM of reSIDfp is not reproducible across freshly created engines, so a bit-exact comparison is not possible.
+
+### ROMs
 
 ROMs are optional. No ROMs are downloaded or bundled. Pass your own KERNAL, BASIC and character ROM images in the `roms` field of a request:
 
@@ -95,7 +108,27 @@ ROMs are optional. No ROMs are downloaded or bundled. Pass your own KERNAL, BASI
 await engine.render({ sid, seconds: 10, roms: { kernal, basic, chargen } }); // Uint8Array images
 ```
 
-Tunes that call the KERNAL or BASIC (RSID tunes, for example) may not advance without them. Tunes that only use the SID chip and their own code, such as the ones sidwave compiles, play without ROMs.
+Tunes that call the KERNAL or BASIC (RSID tunes, for example) may not advance without them. The test suite renders and traces the SID files that sidwave compiles without any ROM and finds SID writes at the expected play rate; other tunes are untested without ROMs.
+
+### Verify
+
+```ts
+import { createLibsidplayfpEngine } from "sidwave/engine";
+import { verifySid } from "sidwave/verify";
+
+const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+const result = await verifySid(referenceSid, candidateSid, { engine, pcmEngine: engine, seconds: 10 });
+// result.level is "T0", "T1", "A0" or "none"; result.levels holds pass or fail per level.
+if (result.firstDifference) {
+  const { category, call, voice, register, cycle, timeSeconds } = result.firstDifference;
+}
+```
+
+- T0: both tunes make the same writes in the same order in every player call.
+- T1: the same writes with every write within `toleranceCycles` (default 0) of the reference. Cycles are compared from engine start, so a tune that starts writing later than the reference fails at its first write.
+- A0: identical SIDLite PCM.
+- A trace with no writes inside the horizon fails T0 and T1 with category `empty_trace`.
+- The clock is taken from the PSID header of the reference tune unless `clock` is given. Every difference carries `cycle` and `timeSeconds` on that clock.
 
 ## More
 
