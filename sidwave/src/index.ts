@@ -4,6 +4,7 @@
 
 export * from "./sidwave.js";
 export * from "./sidwaveCompiler.js";
+export * from "./sidwaveGame.js";
 export * from "./sidwaveDigi.js";
 export * from "./sidwavePcm.js";
 export * from "./sidwaveForm.js";

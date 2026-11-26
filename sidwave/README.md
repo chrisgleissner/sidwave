@@ -53,6 +53,8 @@ sidwave examples [<name>] [-o <dir>] [--force] [--json]
 sidwave --help | --version
 ```
 
+`compile --target game` has further options, described in [Using the player in a game](#using-the-player-in-a-game).
+
 - `validate` parses the score. Exit 0 when valid; exit 1 and the path of the first error (`Invalid SIDWAVE at $.voices[0].adsr: ...`) otherwise.
 - `compile` writes a PRG (default) or PSID. Without `-o` the file is named after the input, with `.prg` or `.sid`, in the current directory. A `-o` name ending in `.sid` selects PSID unless `--format` is given. `-o -` writes the bytes to standard output and the summary to standard error. `--json` prints the format, sizes, load, entry, init and play addresses, SID count, duration, frame counts and lint count. `--loop` (the default) and `--no-loop` select whether the song restarts at its end. The input file is never overwritten.
 - `lint` prints the lint findings. It exits 0 for a valid score, whatever the findings; with `--strict` it exits 1 when there is a finding that is not an informational note.
@@ -61,13 +63,98 @@ sidwave --help | --version
 
 Exit codes: 0 success; 1 invalid input or failed verdict; 2 usage or operational error (unknown option, unreadable or unwritable file, refusing to overwrite). Every command is a library function (`compileSidwaveBytes`, `lintSidwave`, `confinedFileReader`, ...); the command line only translates arguments and output.
 
+## Using the player in a game
+
+A game build is the player assembled at an address you choose. It has no BASIC stub, installs no interrupt, touches no CIA or KERNAL vector and leaves the call timing to your program. You call it from your own raster interrupt or main loop.
+
+### Compile
+
+```sh
+sidwave compile song.sidwave.yaml --target game --origin 0x1000 --symbols acme -o song
+```
+
+This writes `song.bin`, the player and music at `$1000` (raw bytes, no load address), and `song.acme`, the symbol file. Load `song.bin` at `$1000` with your loader or include it in your build with `!binary` or `.incbin`. The summary line reports the cycles of one `play` call. `--json` prints the contract, the cycles and the exported labels.
+
+| Option | Effect |
+| --- | --- |
+| `--origin <addr>` | Address of the entry table, `$0200` to `$CFFF`. The player, its variables and its data must end below `$D000`. Required. |
+| `--data-origin <addr>` | Put the streams and tables in a second file, `song.data.bin`, at this address. The player file then holds only code, constants and the entry table. Both files belong together; the contract records a SHA-256 of the data, and `init` does not check it. |
+| `--zp <addr>` | Zero page base of the player's pointers, `$02` to `$FE` (default `$FB`). A score with several SIDs needs four bytes, so the base must be at most `$FC`. |
+| `--symbols <list>` | Symbol files to write next to the output, separated by commas: `acme` (`song.acme`), `kickass` (`.kickass`), `ca65` (`.ca65`), `vice` (`.vice`), `json` (`.symbols.json`). `acme` also loads in 64tass. |
+| `--symbols-all` | Export every internal label too, as `sidwave_int_<label>`. |
+| `--no-measure` | Skip the measurement run (see below). |
+| `--format sid` | Write a PSID file of the same player instead. Its start routine passes the clock to `init`, and the header records the largest free page range of `$0400`-`$CFFF`. |
+
+In the library, `compileSidwave(doc, { target: "game", origin, dataOrigin, zeroPage, symbols })` returns `player`, `data`, `combined` (`Uint8Array`), `symbols`, `contract` and `cycles`.
+
+### Call it from a raster interrupt
+
+This program uses the symbol file written above. It starts the music at `$1000` and plays one frame per raster interrupt. It is assembled with ACME syntax; 64tass accepts the symbol file as it is.
+
+```asm
+        !source "song.acme"              ; sidwave_init, sidwave_play, sidwave_stop, ...
+
+        * = $0801
+        !byte $0b,$08,$0a,$00,$9e,$32,$30,$36,$31,$00,$00,$00   ; 10 SYS2061
+
+start:  sei
+        lda #$7f
+        sta $dc0d                        ; CIA1 interrupts off
+        lda $dc0d
+        lda #$01
+        sta $d01a                        ; raster interrupt on
+        lda #$fa
+        sta $d012                        ; at raster line $FA
+        lda $d011
+        and #$7f
+        sta $d011
+        lda #0                           ; A = subtune 0
+        ldx #$ff                         ; X = $FF: PAL or NTSC from the KERNAL flag at $02A6
+        jsr sidwave_init
+        lda #<irq
+        sta $0314
+        lda #>irq
+        sta $0315
+        cli
+main:   jmp main                         ; your game goes here
+
+irq:    lda #$01
+        sta $d019                        ; acknowledge the raster interrupt
+        jsr sidwave_play                 ; one play call per frame
+        jmp $ea81                        ; restore A, X, Y and return from the interrupt
+```
+
+Call `sidwave_stop` to silence the voices when the game state changes. `stop` leaves interrupts alone; to start the music again, call `init`.
+
+A score with multispeed (`speed` above 1) needs `speed` play calls per video frame, evenly spaced over the frame. Use `speed` raster interrupts per frame, for example one every `312 / speed` lines on PAL (263 lines on NTSC), and call `play` from each. The contract field `playCallsPerFrame` holds the number.
+
+### Contract
+
+| Item | Guarantee |
+| --- | --- |
+| Entry points | `origin+0` init, `+3` play, `+6` stop, `+9` sfx. Each is a three byte jump. `sfx` is a one byte `rts` stub until sound effects exist; the table never changes its layout. |
+| `init` input | `A` = subtune index, 0-based; only 0 exists and other values are ignored. `X` = clock: 0 PAL, 1 NTSC (any other value counts as NTSC), `$FF` reads the KERNAL flag at `$02A6` (nonzero on PAL); do not place the player over `$02A6` if you pass `$FF` (the build warns). `init` silences the SID registers and resets the song. |
+| `play`, `stop` input | None. Call `play` once per play period. |
+| Registers | `init`, `play` and `stop` clobber A, X and Y. The interrupt and decimal flags are never changed; the other flags are undefined on return. |
+| Processor port `$01` | Saved on entry, set to `$36` while the routine runs (I/O and KERNAL visible, BASIC ROM off), restored on return. |
+| Zero page | `--zp` base and the byte after it (`ptr`); with several SIDs also the next two bytes (`sid_io`). Saved and restored by `play`. |
+| SID registers | `$D400`-`$D418` of every SID of the score, written in the same order as the PRG player. The PRG, the PSID and the game build produce identical register writes. |
+| RAM written | Only the ranges in `contract.ram`, which lie inside the player image and in the variable block that follows it (`sidwave_ram` to `sidwave_ram_end`). The variable block is not part of the file; keep it free. A score with a voice `detune` also patches four operand bytes inside the image (listed in `contract.patchedCode`), so the player cannot run from ROM then. Nothing else is written. |
+| Interrupts | None used. No interrupt vector, CIA or VIC timer is touched. |
+| Stack | `contract.maxStackBytes` bytes at most, return address included, measured over the whole song. |
+| Cycles | `cycles.worst` is measured: the build runs every play call of the song plus one more pass of the loop on the bundled 6502 emulator, with the call through the entry table. `cycles.estimatedWorst` is the compiler's upper bound. The build fails when the measured value exceeds the estimate. The average is `cycles.average`. VIC and DMA stalls are not included. |
+| Not supported | CIA2 digi samples (`samples:`), which need an installed NMI. A build with a KERNAL that is banked out is not offered; the player sets `$01` to `$36` itself. `cpu: turbo` builds, but the build does not switch the CPU speed. |
+
+The symbol files export `sidwave_init`, `sidwave_play`, `sidwave_stop`, `sidwave_sfx`, `sidwave_ram`, `sidwave_ram_end`, `sidwave_data` and `sidwave_data_end` (with `--data-origin`), `sidwave_zp_ptr`, `sidwave_zp_sid_io` (several SIDs) and `sidwave_play_calls_per_frame`. The ACME, KickAssembler and ca65 files also carry the contract as comments.
+
 ## What you get
 
+- The player as a library for games and demos: any origin, separate data, symbol files and a documented contract (see [Using the player in a game](#using-the-player-in-a-game)).
 - Language versions 1.0 to 1.3: wave, pulse and filter tables, hard restart, sync and ring, echo, unison, follower voices, multispeed, sections, up to 10 SIDs and 30 voices in a PRG (PSID: up to 3 SIDs), CIA2 volume digis in a PRG.
 - Lint checks and error messages that name the failing path in the score.
 - 14 example scores in [`data/sound/examples`](data/sound/examples).
 
-Planned and not yet available: SID file reader and writer, `sidwave verify`, formatter and diff, a relocatable player and sound effects for games, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
+Planned and not yet available: `sidwave verify`, formatter and diff, subtunes and sound effects for games, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
 
 ## Engine
 
