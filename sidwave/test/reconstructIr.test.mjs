@@ -112,6 +112,20 @@ test("buildIr removes dense sample writes and reports their rate and share", () 
   assert.equal(short.unsupported.writes, 0);
 });
 
+test("buildIr ignores writes to $D419-$D41F and counts them", () => {
+  const ir = buildIr(packed([[0, 0, 1, 100], [0, 0x19, 7, 110], [0, 0x1f, 8, 120], [0, 1, 2, 130], [0, 0x1c, 9, 999_999]]), {
+    horizonCycles: 500,
+  });
+  assert.equal(ir.ignoredWrites, 2);
+  assert.equal(ir.totalWrites, 2);
+  assert.equal(ir.calls.length, 1);
+  assert.equal(ir.calls[0].writes, 2);
+  assert.equal(ir.calls[0].sids[0].written, 0b11);
+  assert.equal(buildIr(packed([[0, 0, 1, 100]])).ignoredWrites, 0);
+  // Higher offsets are still rejected as invalid traces.
+  assert.throws(() => buildIr(packed([[0, 0x20, 1, 100]])), /Invalid SID write/);
+});
+
 test("buildIr validates its options and traces", () => {
   assert.throws(() => buildIr(new Float64Array(3)), /groups of four/);
   assert.throws(() => buildIr(new Float64Array(0), { clock: "SECAM" }), /PAL or NTSC/);

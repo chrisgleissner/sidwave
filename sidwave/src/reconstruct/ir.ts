@@ -89,6 +89,8 @@ export interface FrameIr {
   sidCount: number;
   /** Writes inside the horizon, including the unsupported ones. */
   totalWrites: number;
+  /** Writes inside the horizon to register offsets $19 to $1F, which no SID register implements. They are not part of the IR. */
+  ignoredWrites: number;
   calls: IrCall[];
   /** Median spacing of call starts in cycles, 0 with fewer than two calls. */
   periodCycles: number;
@@ -201,8 +203,20 @@ export function buildIr(trace: Float64Array, options: IrOptions = {}): FrameIr {
   const frameCycles = IR_FRAME_CYCLES[clock];
   const origin = options.originCycle ?? 0;
 
-  const all = traceWrites(trace);
   const limit = options.horizonCycles ?? Infinity;
+  // Tunes sometimes write to $D419-$D41F; the trace holds these, but they are not registers of the SID.
+  const wide: number[] = [];
+  let ignoredWrites = 0;
+  let dropped = false;
+  for (let i = 0; i + 3 < trace.length; i += 4) {
+    if (trace[i + 1] > 0x18 && trace[i + 1] <= 0x1f) {
+      dropped = true;
+      if (trace[i + 3] <= limit) ignoredWrites++;
+    } else {
+      wide.push(trace[i], trace[i + 1], trace[i + 2], trace[i + 3]);
+    }
+  }
+  const all = traceWrites(trace.length % 4 || !dropped ? trace : Float64Array.from(wide));
   const inside = all.filter((w) => w.cycle <= limit);
   const lastCycle = inside.length ? inside[inside.length - 1].cycle : origin;
   const horizonCycles = options.horizonCycles ?? lastCycle;
@@ -273,6 +287,7 @@ export function buildIr(trace: Float64Array, options: IrOptions = {}): FrameIr {
     seconds,
     sidCount,
     totalWrites: inside.length,
+    ignoredWrites,
     calls,
     periodCycles,
     callsPerFrame: periodCycles ? Math.round(frameCycles / periodCycles) : 0,

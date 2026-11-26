@@ -313,3 +313,54 @@ export function featureBins(features: Features): string[] {
   bins.push(t.introSeconds < 8 ? "intro:short" : t.introSeconds < 30 ? "intro:medium" : "intro:long");
   return bins.sort();
 }
+
+/** Style features of a tune as measured by the SIDFlow export, reduced to the fields used for bins. */
+export interface StyleFeatures {
+  bpm?: number;
+  arpeggio?: number;
+  pwm?: number;
+  filterMotion?: number;
+  polyphony?: number;
+  pluck?: number;
+  /** True for tunes with a key estimate (`sidTonalVariant` is "tonal"). */
+  tonal?: boolean;
+  keyIsMinor?: boolean;
+}
+
+/** Reads the style fields from the `features` object of a SIDFlow export record; missing or non-numeric fields are left out. */
+export function styleFromSidflow(record: Record<string, unknown>): StyleFeatures {
+  const num = (key: string): number | undefined => {
+    const v = record[key];
+    return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  };
+  const style: StyleFeatures = {};
+  const set = <K extends keyof StyleFeatures>(key: K, value: StyleFeatures[K] | undefined): void => {
+    if (value !== undefined) style[key] = value;
+  };
+  set("bpm", num("bpm"));
+  set("arpeggio", num("sidArpeggioActivity"));
+  set("pwm", num("sidPwmActivity"));
+  set("filterMotion", num("sidFilterMotion"));
+  set("polyphony", num("sidPolyphonyMean"));
+  set("pluck", num("sidAdsrPluckRatio"));
+  set("tonal", record.sidTonalVariant === "tonal");
+  const minor = num("sidKeyIsMinor");
+  set("keyIsMinor", minor === undefined ? undefined : minor >= 0.5);
+  return style;
+}
+
+/** Bins of SIDFlow style features, sorted. The thresholds are roughly the upper quartile of the HVSC 85 export. */
+export function styleBins(style: StyleFeatures): string[] {
+  const bins: string[] = [];
+  if (style.bpm !== undefined) bins.push(style.bpm < 90 ? "style:tempo-slow" : style.bpm <= 150 ? "style:tempo-mid" : "style:tempo-fast");
+  if ((style.arpeggio ?? 0) >= 0.2) bins.push("style:arpeggio");
+  if ((style.pwm ?? 0) >= 0.03) bins.push("style:pwm");
+  if ((style.filterMotion ?? 0) >= 0.15) bins.push("style:filter-motion");
+  if (style.polyphony !== undefined) {
+    if (style.polyphony >= 0.6) bins.push("style:dense");
+    else if (style.polyphony < 0.2) bins.push("style:sparse");
+  }
+  if ((style.pluck ?? 0) >= 0.36) bins.push("style:pluck");
+  if (style.tonal && style.keyIsMinor !== undefined) bins.push(style.keyIsMinor ? "style:minor" : "style:major");
+  return bins.sort();
+}

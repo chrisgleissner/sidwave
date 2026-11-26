@@ -8,6 +8,8 @@ import {
   featureBins,
   FEATURE_CODE_VERSION,
   headerFeatures,
+  styleBins,
+  styleFromSidflow,
   traceFeatures,
 } from "../src/reconstruct/features.ts";
 import { buildFixture } from "./helpers/reconstructFixtures.mjs";
@@ -277,4 +279,40 @@ test("bins follow the thresholds", () => {
     trace: { ...t, callsPerFrame: 0, writesPerCall: 7, syncWrites: 2, gateOns: 3, hardRestartRate: 1, introSeconds: 7.9, sampleShare: 0.21, notePrograms: { distinct: 1, perMinute: 19.9 }, waveformWrites: {}, filterRoutedShare: [0, 0, 0], filterModeCalls: { lp: 0, bp: 0, hp: 0 }, filterMultiModeCalls: 0, testBitWrites: 0, ringWrites: 0 },
   });
   assert.deepEqual(low, ["cpf:slow", "hr:none", "intro:short", "sample:heavy", "tables:low", "wpc:low"]);
+});
+
+test("style features are read from a SIDFlow record and binned", () => {
+  const style = styleFromSidflow({
+    bpm: 169.5,
+    sidArpeggioActivity: 0.2,
+    sidPwmActivity: 0.0299,
+    sidFilterMotion: 0.15,
+    sidPolyphonyMean: 0.6,
+    sidAdsrPluckRatio: 0.36,
+    sidTonalVariant: "tonal",
+    sidKeyIsMinor: 1,
+    other: "x",
+  });
+  assert.deepEqual(style, {
+    bpm: 169.5,
+    arpeggio: 0.2,
+    pwm: 0.0299,
+    filterMotion: 0.15,
+    polyphony: 0.6,
+    pluck: 0.36,
+    tonal: true,
+    keyIsMinor: true,
+  });
+  assert.deepEqual(styleBins(style), [
+    "style:arpeggio",
+    "style:dense",
+    "style:filter-motion",
+    "style:minor",
+    "style:pluck",
+    "style:tempo-fast",
+  ]);
+  const quiet = styleFromSidflow({ bpm: 89.9, sidPolyphonyMean: 0.19, sidTonalVariant: "insufficient", sidKeyIsMinor: 0, sidPwmActivity: 0.03 });
+  assert.deepEqual(styleBins(quiet), ["style:pwm", "style:sparse", "style:tempo-slow"]);
+  assert.deepEqual(styleBins(styleFromSidflow({ bpm: 150, sidTonalVariant: "tonal", sidKeyIsMinor: 0 })), ["style:major", "style:tempo-mid"]);
+  assert.deepEqual(styleBins({}), []);
 });
