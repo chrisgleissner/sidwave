@@ -72,6 +72,15 @@ function reorder(node: any, kind = "$"): void {
 export function formatSidwave(text: string): string {
   const doc = YAML.parseDocument(text, { version: "1.2", keepSourceTokens: true });
   if (doc.errors.length) throw doc.errors[0];
+  // A comment block that is separated from the first key by a blank line is a file header. It is attached to the
+  // first key by the YAML library and would otherwise move with that key when the keys are sorted.
+  const first: any = YAML.isMap(doc.contents) ? doc.contents.items[0]?.key : undefined;
+  const header: string | undefined = first?.commentBefore;
+  if (header?.includes("\n\n")) {
+    const cut = header.lastIndexOf("\n\n");
+    doc.commentBefore = doc.commentBefore ? `${doc.commentBefore}\n\n${header.slice(0, cut)}` : header.slice(0, cut);
+    first.commentBefore = header.slice(cut + 2) || undefined;
+  }
   reorder(doc.contents);
   const setFlow = (n: any): void => {
     if (YAML.isSeq(n)) {

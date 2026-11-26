@@ -142,3 +142,22 @@ sections:
 timeline: ["s"]
 `);
 });
+
+test("formatter keeps a file header comment at the top when keys are sorted", () => {
+  const source = `# Header comment
+
+# Comment on tempo
+tempo: 120 # beats per minute
+title: T
+sidwave: 1.2
+`;
+  const formatted = formatSidwave(source);
+  assert.equal(formatted, `# Header comment
+
+sidwave: 1.2
+title: "T"
+# Comment on tempo
+tempo: 120 # beats per minute
+`);
+  assert.equal(formatSidwave(formatted), formatted);
+});
