@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025-2026 Christian Gleissner
-// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+// See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
@@ -22,7 +22,7 @@ export interface CliIo {
   outBytes(bytes: Uint8Array): void;
 }
 
-export const HELP = `sidwave: compile SIDWAVE scores to C64 programs and SID files
+export const HELP = `sidwave: compile SIDWave scores to C64 programs and SID files
 
 Usage:
   sidwave validate <file> [--json] [--allow-dir <dir>]

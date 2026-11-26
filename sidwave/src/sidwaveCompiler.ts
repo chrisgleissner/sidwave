@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025-2026 Christian Gleissner
-// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
-// SIDWAVE to PRG Compiler
+// See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
+// SIDWave to PRG Compiler
 
 import { Buffer } from "node:buffer";
 import { cutoffHz, resolveCutoff } from "./sidwaveFilterModel.js";
@@ -42,7 +42,7 @@ export const SIDWAVE_MIN_NOTE_FRAMES = SIDWAVE_HARD_RESTART_FRAMES + 1;
 export const SIDWAVE_BASIC_END = 0xa000;
 
 /**
- * Fixed addresses and the IRQ handler shape of a standalone SIDWAVE player, for hosts that need to recognise
+ * Fixed addresses and the IRQ handler shape of a standalone SIDWave player, for hosts that need to recognise
  * a running player in C64 memory. The play vector at {@link SIDWAVE_PLAY_ADDRESS} is `JMP play`; the handler
  * installed at $0314 is `JSR play` followed by `JMP $EA31`.
  */
@@ -115,7 +115,7 @@ export interface CompileResult {
 }
 
 /**
- * Compiles SIDWAVE to a C64 program with a frame-based player.
+ * Compiles SIDWave to a C64 program with a frame-based player.
  *
  * The compiler arranges the timeline into per-voice note events with frame-exact onsets
  * (no tempo drift), then encodes them as compact command streams. The 6502 player reads the
@@ -422,7 +422,7 @@ export interface Instrument {
   vibRate: number; // phase increment per frame (256 = one cycle)
   vibDelay: number;
   /**
-   * SIDWAVE 1.3 vibrato fade: 16-bit increment per call of the fade level, ceil(65536 / fade calls). The player
+   * SIDWave 1.3 vibrato fade: 16-bit increment per call of the fade level, ceil(65536 / fade calls). The player
    * scales the triangle by the level's high byte / 256 until the level overflows, then plays the full depth.
    */
   vibFade?: number;
@@ -465,7 +465,7 @@ export interface ArrangedNote {
   release?: number;
   /** Fade window applied to this note's sustain level, if any. */
   fade?: { start: number; end: number };
-  /** SIDWAVE 1.3: a chord-arp entry and the accent flag, which a follower with its own instrument needs. */
+  /** SIDWave 1.3: a chord-arp entry and the accent flag, which a follower with its own instrument needs. */
   chord?: { offsets: number[]; speed: number };
   accented?: boolean;
 }
@@ -807,7 +807,7 @@ function arrangeDoubles(
 }
 
 /**
- * SIDWAVE 1.3 follower: the source voice's pitched notes, shifted by delay or delay_beats (as an echo) and by
+ * SIDWave 1.3 follower: the source voice's pitched notes, shifted by delay or delay_beats (as an echo) and by
  * transpose semitones, with the follower's own instrument and level when it sets them. Kit and drum notes and the
  * silent notes that drive a sync or ring source are not copied.
  */
@@ -940,7 +940,7 @@ function arrangeChip(
   const maxMidi = maxSidwaveMidi(system);
   const totalBars = doc.song.length_bars;
   const beatsPerBar = doc.song.meter;
-  // Expand the timeline, cycling it when length_bars exceeds it and truncating when shorter. A SIDWAVE 1.3
+  // Expand the timeline, cycling it when length_bars exceeds it and truncating when shorter. A SIDWave 1.3
   // section counts its bars in its own metre.
   const sections: Array<{ index: number; startBeat: number; endBeat: number; meter: number }> = [];
   for (let bar = 0, beat = 0, i = 0; bar < totalBars; i += 1) {
@@ -2778,7 +2778,7 @@ function omitUnusedVoiceEffects(code: string, insts: Instrument[], hasPortamento
 }
 
 /**
- * SIDWAVE 1.3 vibrato fade. A note start clears the 16-bit fade level and arms it when the instrument has a fade
+ * SIDWave 1.3 vibrato fade. A note start clears the 16-bit fade level and arms it when the instrument has a fade
  * step. While armed, the triangle factor (0..126) is scaled by the level's high byte / 256 with one 8x8 multiply.
  * The level advances with the vibrato phase, so it starts after the delay; its overflow disarms the fade and the
  * vibrato plays at full depth. The template without a fade is left untouched, so other scores keep their bytes.

@@ -1,4 +1,4 @@
-// Shared pieces of the SIDWAVE fuzz and soak tests: seeded PRNG, document grammar, a harness that parses,
+// Shared pieces of the SIDWave fuzz and soak tests: seeded PRNG, document grammar, a harness that parses,
 // compiles and plays a document in the 6502 emulator while checking invariants, and a document minimiser.
 import { compileSidwaveToPrg, compileSidwaveToSid, SIDWAVE_MEMORY_END } from "../../src/sidwaveCompiler.js";
 import { parseSidwave, SidwaveValidationError } from "../../src/sidwave.js";

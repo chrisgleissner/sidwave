@@ -1,4 +1,4 @@
-// SIDWAVE 1.2 round 2: every lint code has a document that triggers it and one that does not. Findings are
+// SIDWave 1.2 round 2: every lint code has a document that triggers it and one that does not. Findings are
 // returned from the compile operations as `lint` (structured) and `warnings` (one line each).
 import test from "#test/runner";
 import assert from "#test/assert";

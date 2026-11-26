@@ -1,4 +1,4 @@
-// SIDWAVE 1.2 round 2: arrangement (pattern text, sequences, named sections, timeline, loop_to), acceptance
+// SIDWave 1.2 round 2: arrangement (pattern text, sequences, named sections, timeline, loop_to), acceptance
 // fixtures A1 to A3, and the stream-subroutine memory fixture. Register writes come from the 6502 emulator.
 import test from "#test/runner";
 import assert from "#test/assert";

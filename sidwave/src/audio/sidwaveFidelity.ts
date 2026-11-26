@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025-2026 Christian Gleissner
-// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+// See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import { midiToHz, type ParsedSidwave, type SidwaveVoice } from "../sidwave.js";
 import { arrangeSidwave, OP, type Arrangement, type ArrangedNote } from "../sidwaveCompiler.js";
@@ -8,7 +8,7 @@ import { RELEASE_MS } from "../sidwaveLint.js";
 import { digiSpans } from "../sidwaveDigi.js";
 
 /**
- * Fidelity analysis of a captured Ultimate audio stream against the SIDWAVE schedule.
+ * Fidelity analysis of a captured Ultimate audio stream against the SIDWave schedule.
  * See doc/sidwave-hil.md for the method and its limits.
  */
 
@@ -69,7 +69,7 @@ export function expectedSchedule(doc: ParsedSidwave, options: ScheduleOptions = 
   const arr = options.arrangement ?? arrangeSidwave(doc);
   const atBeat = (beat: number) => (arr.clock?.frameAt(beat) ?? Math.round(beat * arr.framesPerBeat)) / arr.fps;
   const meter = doc.song.meter;
-  // Bar lines follow the metre of each section (SIDWAVE 1.3).
+  // Bar lines follow the metre of each section (SIDWave 1.3).
   const bars = arr.clock ? arr.clock.barStarts.map(atBeat) : Array.from({ length: doc.song.length_bars + 1 }, (_, i) => atBeat(i * meter));
   const sections: NonNullable<ExpectedSchedule["sections"]> = [];
   if (arr.clock) {

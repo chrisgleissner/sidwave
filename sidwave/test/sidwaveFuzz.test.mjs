@@ -1,4 +1,4 @@
-// Fuzz and soak tests for SIDWAVE: random valid documents, mutated examples, the song generator,
+// Fuzz and soak tests for SIDWave: random valid documents, mutated examples, the song generator,
 // resource limits and PSID headers. SIDWAVE_FUZZ_ITERATIONS=N scales the seeded case counts.
 // SIDWAVE_FUZZ_SOAK_SECONDS=600 with a "mixed round-2" test filter runs the mixed grammar for ten minutes.
 // SIDWAVE_FUZZ_SEED offsets the seeds. SIDWAVE_FUZZ_REPORT=file records the smallest input seen for each finding.

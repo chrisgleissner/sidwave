@@ -1,4 +1,4 @@
-// SIDWAVE 1.2 documents used by test/sidwave12*.test.mjs.
+// SIDWave 1.2 documents used by test/sidwave12*.test.mjs.
 
 /** The skeleton from the 1.2 quick reference. */
 export const SKELETON = `sidwave: 1.2

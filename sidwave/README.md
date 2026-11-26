@@ -2,9 +2,9 @@
 
 [![Codecov](https://codecov.io/gh/chrisgleissner/sidwave/graph/badge.svg?flag=sidwave)](https://codecov.io/gh/chrisgleissner/sidwave)
 
-SIDWAVE ("SID Wave") is a music language, compiler and toolkit for the Commodore 64 SID chip. Write a score as YAML or JSON; compile it to a self-playing C64 PRG or a PSID file that includes the 6502 player.
+SIDWave is a music language, compiler and toolkit for the Commodore 64 SID chip. Write a score as YAML or JSON. Compile it to a self-playing C64 PRG or to a PSID file that includes the 6502 player.
 
-Status: pre-release. This package has not been published to npm yet; the install command below is the intended one.
+Status: pre-release. This package has not been published to npm yet. Build it from the [repository](https://github.com/chrisgleissner/sidwave#install-and-first-tune). Once published, the install command is:
 
 ```sh
 npm install sidwave
@@ -30,7 +30,7 @@ writeFileSync("song.sid", sid);
 
 ## Command line
 
-```sh
+```text
 sidwave validate <file> [--json] [--allow-dir <dir>]
 sidwave compile  <file> [-o <out>] [--format prg|sid] [--loop|--no-loop] [--json] [--allow-dir <dir>]
 sidwave lint     <file> [--loop|--no-loop] [--strict] [--json] [--allow-dir <dir>]
@@ -60,4 +60,4 @@ Planned and not yet available: SID file reader and writer, `sidwave verify`, for
 - [Language specification](data/sound/sidwave.md) and [JSON Schema](data/sound/sidwave.schema.json)
 - [Licensing notes](doc/licensing.md): read this before releasing a tune or embedding the player in a game
 
-License: GPL-2.0-or-later with the [SIDWAVE Player Exception](LICENSE-EXCEPTION.md).
+License: GPL-2.0-or-later with the [SIDWave Player Exception](LICENSE-EXCEPTION.md).

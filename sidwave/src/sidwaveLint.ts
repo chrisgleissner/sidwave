@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025-2026 Christian Gleissner
-// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+// See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import type { Arrangement } from "./sidwaveCompiler.js";
 import { midiToHz, type ParsedSidwave, type SidwaveRamp } from "./sidwave.js";
@@ -472,7 +472,7 @@ export function arrangementReport(doc: ParsedSidwave, arr: Arrangement): string[
       : `${mark(s.level.from ?? 15)}>${mark(s.level.to)}`;
     const est = amplitude > 0 ? `${(20 * Math.log10(amplitude)).toFixed(1)} dB` : "silent";
     const ids = voices.map((slot) => `v${[...doc.voiceSlots].find(([, v]) => v === slot)?.[0] ?? slot + 1}`);
-    // SIDWAVE 1.3 names the metre of every entry, with its grouping when it is not one group per beat.
+    // SIDWave 1.3 names the metre of every entry, with its grouping when it is not one group per beat.
     const meter = s.meter ?? doc.song.meterSig ?? { sig: `${doc.song.meter}/4`, groups: [1] };
     const metre = doc.version === "1.3" ? ` meter ${meter.sig}${meter.groups.some((g) => g > 1) ? ` (${meter.groups.join("+")})` : ""}` : "";
     return `${i + 1} ${s.section || "section"} bars ${first}-${first + bars - 1}${metre} ${clockText(entry.startTime)}-${clockText(entry.endTime)} level ${level} est ${est} ${ids.join(",")}`;

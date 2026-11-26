@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025-2026 Christian Gleissner
-// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+// See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";

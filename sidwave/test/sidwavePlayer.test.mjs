@@ -1,5 +1,5 @@
-// Runs the compiled SIDWAVE player in a small 6502 emulator and checks the SID register writes
-// frame by frame against what the SIDWAVE document specifies. No external tools are needed.
+// Runs the compiled SIDWave player in a small 6502 emulator and checks the SID register writes
+// frame by frame against what the SIDWave document specifies. No external tools are needed.
 import test from "#test/runner";
 import { DEFAULT_MUSIC_SEED, generateSidwave } from "../src/audio/generateSidwave.js";
 import assert from "#test/assert";
