@@ -103,3 +103,10 @@ sections:
 timeline: ["intro"]
 `);
 });
+
+test("diff classifies instrument definition changes as synthesis", () => {
+  const score = (instruments) => `sidwave: 1.2\ntitle: "T"\ntempo: 120\n${instruments}voices:\n  - id: 1\n    patterns:\n      A: {groove: "C4 ~ ~ ~", length: 1}\nsections:\n  s: {bars: 1, layers: {v1: "A"}}\ntimeline: ["s"]\n`;
+  const plain = score(""), lead = score(`instruments:\n  lead: {waveform: "saw", portamento: 2}\n`), slow = score(`instruments:\n  lead: {waveform: "saw", portamento: 5}\n`);
+  assert.deepEqual(diffSidwave(plain, lead).changes, [{ class: "synthesis", path: "/instruments", after: { lead: { waveform: "saw", portamento: 2 } }, summary: "/instruments changed" }]);
+  assert.deepEqual(diffSidwave(lead, slow).changes, [{ class: "synthesis", path: "/instruments/lead/portamento", before: 2, after: 5, summary: "/instruments/lead/portamento changed" }]);
+});

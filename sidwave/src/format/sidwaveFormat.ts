@@ -23,7 +23,7 @@ const orders: Record<string, string[]> = {
   fx: ["vibrato", "pwm_sweep", "slide", "filter_mod"],
 };
 const musical = new Set(["groove", "notes", "motif", "length", "transpositions", "frame_rate", "bars", "layers", "tempo", "meter", "section", "sections", "timeline", "length_bars", "swing", "swing_unit", "transpose", "levels", "volume", "level", "accent", "end", "loop_to"]);
-const synthesis = new Set(["adsr", "waveform", "pulse_width", "wavetable", "pulsetable", "filtertable", "filter", "global_fx", "fx", "vibrato", "pwm_sweep", "filter_mod", "slide", "hard_restart", "sync", "ring", "instrument", "echo", "unison", "follow", "detune"]);
+const synthesis = new Set(["instruments", "adsr", "waveform", "pulse_width", "wavetable", "pulsetable", "filtertable", "filter", "global_fx", "fx", "vibrato", "pwm_sweep", "filter_mod", "slide", "hard_restart", "sync", "ring", "instrument", "echo", "unison", "follow", "detune"]);
 const hardware = new Set(["sids", "sid", "address", "model", "mode", "cpu", "speed", "layout", "overrides", "clock"]);
 function esc(s: string) { return s.replace(/~/g, "~0").replace(/\//g, "~1"); }
 function classify(path: string): ChangeClass {
