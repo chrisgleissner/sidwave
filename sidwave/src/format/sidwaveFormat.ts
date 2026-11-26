@@ -140,7 +140,7 @@ export function diffSidwave(a: string, b: string): SemanticDiff {
  * merge is written from the merged data; an edit that cannot be applied in place (for example below an alias) makes
  * the whole result be written from the merged data, which drops comments and expands aliases.
  */
-function applyToOurs(ours: string, oursValue: any, merged: any): string {
+function applyToOurs(ours: string, oursValue: any, merged: any): { text: string; preserved: boolean; reason?: string } {
   try {
     const doc = YAML.parseDocument(ours, { version: "1.2", keepSourceTokens: true });
     if (doc.errors.length) throw doc.errors[0];
@@ -161,13 +161,21 @@ function applyToOurs(ours: string, oursValue: any, merged: any): string {
     apply(oursValue, merged, []);
     const text = doc.toString();
     if (!equal(YAML.parse(text), JSON.parse(JSON.stringify(merged)))) throw new Error("in-place merge differs from the merged data");
-    return text;
-  } catch {
-    return YAML.stringify(merged);
+    return { text, preserved: true };
+  } catch (e) {
+    return { text: YAML.stringify(merged), preserved: false, reason: e instanceof Error ? e.message : String(e) };
   }
 }
 
-export function mergeSidwave(base: string, ours: string, theirs: string): { merged?: string; conflicts: Conflict[] } {
+export interface MergeResult {
+  merged?: string;
+  conflicts: Conflict[];
+  /** Present with `merged`: false when the result was written from plain data, which drops comments and expands anchors and aliases. */
+  preserved?: boolean;
+  /** Present with `merged` when `preserved` is false: why the edits could not be applied to the document of ours. */
+  warnings?: string[];
+}
+export function mergeSidwave(base: string, ours: string, theirs: string): MergeResult {
   const b: any = YAML.parse(base), o: any = YAML.parse(ours), t: any = YAML.parse(theirs), conflicts: Conflict[] = [];
   const merge = (bv: any, ov: any, tv: any, path: string): any => {
     if (equal(ov, tv)) return ov;
@@ -190,6 +198,10 @@ export function mergeSidwave(base: string, ours: string, theirs: string): { merg
   };
   const result = merge(b, o, t, "");
   if (conflicts.length) return { conflicts };
-  try { const merged = formatSidwave(applyToOurs(ours, o, result)); parseSidwave(merged); return { merged, conflicts }; }
+  try {
+    const applied = applyToOurs(ours, o, result), merged = formatSidwave(applied.text);
+    parseSidwave(merged);
+    return applied.preserved ? { merged, conflicts, preserved: true } : { merged, conflicts, preserved: false, warnings: [`Comments and aliases of the ours side were not kept: ${applied.reason}`] };
+  }
   catch (e) { return { conflicts: [{ path: "", summary: e instanceof Error ? e.message : String(e) }] }; }
 }

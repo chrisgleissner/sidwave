@@ -503,3 +503,25 @@ timeline: [{bars: 1, layers: {v1: "A"}}]
   const doc = YAML.parse(joined.merged);
   assert.deepEqual([doc.title, doc.tempo, doc.voices[0].patterns.B.groove], ["Ours", 100, "C4 ~ ~ ~"]);
 });
+
+test("merge reports whether comments and aliases were preserved", async () => {
+  const base = await readFile(join(exampleDir, "arp_ballad.yaml"), "utf8");
+  const count = (text, ch) => text.split(ch).length - 1;
+  // An edit outside any anchor is applied in place: nothing is lost.
+  const outside = mergeSidwave(base, base, base.replace("tempo: 125.31", "tempo: 120"));
+  assert.deepEqual(outside.conflicts, []);
+  assert.equal(outside.preserved, true);
+  assert.equal(outside.warnings, undefined);
+  assert.equal(count(outside.merged, "#"), count(base, "#"));
+  assert.equal(count(outside.merged, "&"), count(base, "&"));
+  // An edit to a value that ours reaches through an alias cannot be applied in place: the result comes from plain data.
+  const inside = mergeSidwave(base, base, base.replace("vibrato: &voicevib { depth: 0.32", "vibrato: &voicevib { depth: 0.4"));
+  assert.deepEqual(inside.conflicts, []);
+  assert.equal(inside.preserved, false);
+  assert.deepEqual(inside.warnings, ["Comments and aliases of the ours side were not kept: Expected YAML collection at vibrato. Remaining path: depth"]);
+  assert.ok(/depth: 0\.4(?![0-9])/.test(inside.merged) && !/depth: 0\.32(?![0-9])/.test(inside.merged), "the edit is applied");
+  assert.ok(count(inside.merged, "#") < count(base, "#") && count(inside.merged, "&") < count(base, "&"));
+  // A conflict has neither merged text nor a preserved flag.
+  const conflict = mergeSidwave(base, base.replace("tempo: 125.31", "tempo: 100"), base.replace("tempo: 125.31", "tempo: 120"));
+  assert.deepEqual([conflict.merged, conflict.preserved], [undefined, undefined]);
+});
