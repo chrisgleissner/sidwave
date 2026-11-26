@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2025-2026 Christian Gleissner
+// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+
 import { runCli } from "./cli.js";
 
 process.exitCode = runCli(process.argv.slice(2), {

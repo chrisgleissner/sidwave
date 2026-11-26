@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2025-2026 Christian Gleissner
+// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+
 import { midiToHz, type ParsedSidwave, type SidwaveVoice } from "../sidwave.js";
 import { arrangeSidwave, OP, type Arrangement, type ArrangedNote } from "../sidwaveCompiler.js";
 import { RELEASE_MS } from "../sidwaveLint.js";

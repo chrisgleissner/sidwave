@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2025-2026 Christian Gleissner
+// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+
 import { parseLayerSequence, patternBeats, sectionBarBeats, type ParsedSidwave, type SidwavePattern, type SidwaveRamp, type SidwaveTimelineSection } from "./sidwave.js";
 
 const EPSILON = 1e-9;

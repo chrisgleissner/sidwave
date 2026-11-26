@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2025-2026 Christian Gleissner
+// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+
 import { readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { parseSidwave, SidwaveValidationError, type ParsedSidwave } from "./sidwave.js";
