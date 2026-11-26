@@ -47,19 +47,19 @@ function replacements(raw: string, amount: number, max: number, path: string): s
   return result;
 }
 function patternNamesFor(root: any, voice: any): string[] { return Object.keys(voice.patterns ?? {}); }
-function sectionPatternUse(root: any, sectionNames: Set<string>, voiceId: string): Set<string> | undefined {
-  if (!sectionNames.size) return undefined;
+/** Pattern names that voice `voiceId` plays in the sections accepted by `pick`. Inline timeline entries have no name (undefined). */
+function sectionPatternUse(root: any, pick: (name: string | undefined) => boolean, voiceId: string): Set<string> {
   const defs = root.sections ?? {};
   const result = new Set<string>();
-  for (const [name, def] of Object.entries<any>(defs)) if (sectionNames.has(name)) {
-    const v = def.layers?.[`v${voiceId}`]; if (typeof v === "string") for (const part of v.split(/[\s()*]+/)) result.add(part.replace(/[+-]\d+$/,""));
-  }
-  for (const [i, entry] of (root.timeline ?? []).entries()) {
-    const name = typeof entry === "string" ? entry.split(/[+*]/)[0] : entry?.use;
-    if (name && sectionNames.has(name)) {
-      const layers = typeof entry === "object" ? { ...(defs[name]?.layers ?? {}), ...(entry.layers ?? {}) } : defs[name]?.layers;
-      const v = layers?.[`v${voiceId}`]; if (typeof v === "string") for (const part of v.split(/[\s()*]+/)) result.add(part.replace(/[+-]\d+$/,""));
-    }
+  const add = (layers: any) => {
+    const v = layers?.[`v${voiceId}`];
+    if (typeof v === "string") for (const part of v.split(/[\s()*]+/)) result.add(part.replace(/[+-]\d+$/, ""));
+  };
+  for (const [name, def] of Object.entries<any>(defs)) if (pick(name)) add(def?.layers);
+  for (const entry of root.timeline ?? []) {
+    const name = typeof entry === "string" ? entry.split(/[+*]/)[0] : entry?.use ?? entry?.section;
+    if (!pick(name)) continue;
+    add(typeof entry === "object" ? { ...(name !== undefined ? defs[name]?.layers ?? {} : {}), ...(entry.layers ?? {}) } : defs[name!]?.layers);
   }
   return result;
 }
@@ -74,11 +74,12 @@ export function transpose(text: string, options: { semitones: number; scope?: { 
     const id = String(voice.id ?? vi + 1), name = String(voice.name ?? "");
     if (voice.role === "drums") continue;
     if (options.scope?.voices && !options.scope.voices.includes(id) && !options.scope.voices.includes(name)) continue;
-    const allowed = sectionPatternUse(root, selectedSections, id);
-    if (selectedSections.size && !allowed) continue;
+    const allowed = selectedSections.size ? sectionPatternUse(root, (n) => n !== undefined && selectedSections.has(n), id) : undefined;
+    const outside = allowed ? sectionPatternUse(root, (n) => n === undefined || !selectedSections.has(n), id) : undefined;
     const pnames = patternNamesFor(root, voice);
     for (const [pname, pattern] of Object.entries<any>(voice.patterns ?? {})) {
       if (allowed && !allowed.has(pname)) continue;
+      if (outside?.has(pname)) throw new SidwaveTransformError("unsupported", `Pattern ${pname} of voice ${id} is also played outside the selected sections`);
       const base = ["voices", vi, "patterns", pname] as (string|number)[];
       const mutateString = (path: (string|number)[], val: string, exempt = false) => {
         if (exempt || !noteTokens(val).length) return;

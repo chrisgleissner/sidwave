@@ -72,3 +72,32 @@ timeline: ["s"]
   assert.deepEqual(result.report.changed, ["/voices/0/patterns/A/groove"]);
   valid(result.text);
 });
+
+test("transpose with a section scope refuses a pattern that other sections also play", () => {
+  const text = `sidwave: 1.2
+title: "T"
+tempo: 120
+sids: [{id: "sid1", address: "$D400", model: "8580"}]
+instruments:
+  lead: {waveform: "saw", adsr: [0, 4, 10, 4]}
+voices:
+  - id: 1
+    instrument: "lead"
+    patterns:
+      A: {groove: "C3 ~ D3 ~ E3 ~ F3 ~", length: 0.5}
+      B: {groove: "G3 ~ A3 ~ B3 ~ C4 ~", length: 0.5}
+sections:
+  intro: {bars: 1, layers: {v1: "A"}}
+  main: {bars: 1, layers: {v1: "A"}}
+  coda: {bars: 1, layers: {v1: "B"}}
+timeline: ["intro", "main", "coda"]
+`;
+  assert.throws(
+    () => transpose(text, { semitones: 2, scope: { sections: ["main"] } }),
+    (e) => e instanceof SidwaveTransformError && e.code === "unsupported" && e.message === "Pattern A of voice 1 is also played outside the selected sections",
+  );
+  const coda = transpose(text, { semitones: 2, scope: { sections: ["coda"] } });
+  assert.deepEqual(coda.report.changed, ["/voices/0/patterns/B/groove"]);
+  assert.ok(coda.text.includes(`B: {groove: "A3 ~ B3 ~ C#4 ~ D4 ~", length: 0.5}`), coda.text);
+  assert.ok(coda.text.includes(`A: {groove: "C3 ~ D3 ~ E3 ~ F3 ~", length: 0.5}`), coda.text);
+});
