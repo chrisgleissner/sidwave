@@ -404,7 +404,7 @@ function lintPlan(doc: ParsedSidwave, arrangement: Arrangement): void {
     arrangement.songs.forEach((part, k) => {
       const own = part.arrangement.findings!;
       lintArrangement(songDoc(doc, k), part.arrangement, own);
-      findings.merge(own.list(), `song "${part.name}": `);
+      findings.merge(own.all(), `song "${part.name}": `);
     });
   } else {
     lintArrangement(doc, arrangement, findings);
@@ -820,7 +820,7 @@ export function validateSidwavePsidMap(doc: ParsedSidwave): void {
 export function compileSidwaveToSid(
   doc: ParsedSidwave,
   prg: Uint8Array,
-  options?: { entryAddress?: number; initAddress?: number; playAddress?: number; relocation?: { startPage: number; pageLength: number } },
+  options?: { entryAddress?: number; initAddress?: number; playAddress?: number; startSong?: number; relocation?: { startPage: number; pageLength: number } },
 ): { sid: Buffer } {
   validateSidwavePsidMap(doc);
   const primary = doc.sids.find(({ address }) => address === 0xd400)!;
@@ -836,7 +836,7 @@ export function compileSidwaveToSid(
   header.writeUInt16BE(options?.initAddress ?? SIDWAVE_INIT_ADDRESS, 10);
   header.writeUInt16BE(options?.playAddress ?? SIDWAVE_PLAY_ADDRESS, 12);
   header.writeUInt16BE(doc.songs?.length ?? 1, 14); // songs
-  header.writeUInt16BE(1, 16); // start song: the first song
+  header.writeUInt16BE((options?.startSong ?? 0) + 1, 16); // start song (1-based); the first song by default
   header.writeUInt32BE(psidSpeedBits(doc), 18); // bit n selects CIA timer timing for song n+1
   writeLatin1(header, doc.song.title ?? "Untitled", 0x16);
   writeLatin1(header, doc.song.author ?? "SIDWAVE", 0x36);
@@ -3026,7 +3026,7 @@ turbo_required: .byte ${turboOnly & 1}, ${turboOnly >> 1}`);
 }
 
 /** 1.2 owns the actual level per chip. g_vol remains the musical target. */
-function addSoftVolume(code: string, count: number, speed: number, loop: boolean, speedFromSong = false): string {
+function addSoftVolume(code: string, count: number, speed: number, loop: boolean, speedFromSong = false, resetParity = false): string {
   // The chip starts silent and ramps to its configured volume (one step per call, the 1.2 start-up behaviour);
   // every later change slews one step per two video frames.
   code = code.replace("  lda chip_volume,x\n  ldy #$18\n  sta (sid_io),y\n", "")
@@ -3035,7 +3035,7 @@ function addSoftVolume(code: string, count: number, speed: number, loop: boolean
   sta soft_level,x
   sta soft_mode,x
   sta soft_phase
-  sta soft_last,x
+${resetParity ? "  sta soft_odd\n" : ""}  sta soft_last,x
   lda #1
   sta soft_boot,x
   lda #0
@@ -3699,7 +3699,7 @@ c_ret:
     if (hasFade) playerCode = addVibratoFade(playerCode);
     playerCode = multiplexSids(playerCode, arr.chips, Boolean(hasFilterTable), stateBytes);
     if (arr.mirrors) playerCode = addCenterMirrors(playerCode, arr);
-    if (arr.softVolume) playerCode = gateBeforeEnvelope(addSoftVolume(playerCode, arr.chips.length, arr.speed, loop || !!arr.explicitEnd, speedsDiffer));
+    if (arr.softVolume) playerCode = gateBeforeEnvelope(addSoftVolume(playerCode, arr.chips.length, arr.speed, loop || !!arr.explicitEnd, speedsDiffer, !!songs));
     if (arr.turbo && !game) {
       playerCode = addTurboInit(playerCode, arr.speed, turboOnly, arr.softVolume);
       if (arr.softVolume) playerCode = measureTurboStartup(playerCode);

@@ -89,10 +89,10 @@ export interface CompiledScore {
   result: CompileResult;
 }
 
-export function compileSidwaveBytes(doc: ParsedSidwave, options: { format?: SidwaveOutputFormat; loop?: boolean } = {}): CompiledScore {
+export function compileSidwaveBytes(doc: ParsedSidwave, options: { format?: SidwaveOutputFormat; loop?: boolean; song?: number } = {}): CompiledScore {
   const format = options.format ?? "prg";
-  const result = compileSidwaveToPrg(doc, options.loop === undefined ? {} : { loop: options.loop });
-  const bytes = format === "sid" ? compileSidwaveToSid(doc, result.prg).sid : result.prg;
+  const result = compileSidwaveToPrg(doc, { ...(options.loop === undefined ? {} : { loop: options.loop }), ...(options.song === undefined ? {} : { song: options.song }) });
+  const bytes = format === "sid" ? compileSidwaveToSid(doc, result.prg, { startSong: result.startSong ?? 0 }).sid : result.prg;
   const summary: CompileSummary = {
     format,
     outputBytes: bytes.length,

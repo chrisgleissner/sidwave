@@ -981,8 +981,11 @@ share. A `songs` list states the sharing.
 - Game build (`compileSidwave(doc, { target: "game", ... })`): `init` takes the song in A. The contract lists every
   song with its `playCallsPerFrame`, `loop` and length, and the cycles are measured for every song.
 - An index beyond the last song plays song 0 (in the PRG `init`, the PSID and the game build).
-- `init` resets all player state, so a song started after any other song writes the same registers as after a
-  fresh start (tested for every song of a five-song score with differing tempo, speed and loop behaviour).
+- `init` resets every register-visible state of the player, so a song started after any other song writes the same
+  registers as after a fresh start, in the `init` call and in every later play call (tested for every song of a
+  five-song score with differing tempo, speed and loop behaviour). Three scratch bytes, `chip_last`,
+  `soft_target` and `soft_step`, may still hold the previous song's values right after `init`: every play call
+  writes each of them before it reads it, so after the first play call the player's RAM is identical to a fresh start.
 - A song with `loop: false` ends by itself and writes no further registers; call `init` to play another song.
 
 **Lint.** `UNUSED-PATTERN` (a voice pattern that no song plays), `UNUSED-SECTION` (a named section that no song
@@ -1000,8 +1003,12 @@ document (full song and one loop of each, `init` of each song included); the 1.3
 | 2 | 2561 | 102 | 1805 | 4445 |
 | 8 | 4763 | 216 | 1797 | 4370 |
 
-The song selector costs about 100 bytes plus about 19 bytes per song, and nothing per play call (the 10-cycle
-difference of the two-song row was measured; its cause was not investigated). The selector runs only in `init`. A value
+The song selector costs about 100 bytes plus about 19 bytes per song, and nothing per play call. A two-song
+document that plays the same song twice has the same peak per call as one song. The 10-cycle difference in the
+table comes from page-crossing penalties: indexed reads and taken branches cost one cycle more when they cross a
+page, and they cross differently when the code and tables move by 102 bytes (about 4 cycles on 8 of 600 calls). The
+estimator uses the union of the features of all songs, so a song that does not use a feature of another song is
+still estimated with it. The selector runs only in `init`. A value
 that differs between songs (the filter sweep step, the live voices, the play-once length, the CIA latch) is copied
 into the player's own location by `init`; a value that is the same in every song is not copied and costs nothing.
 

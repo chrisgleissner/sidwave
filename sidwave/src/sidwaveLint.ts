@@ -55,9 +55,14 @@ export class SidwaveFindings {
     }
   }
 
-  list(): SidwaveFinding[] {
+  /** Every finding, most severe first, without the limit of {@link list}. */
+  all(): SidwaveFinding[] {
     const rank = (code: string) => { const i = SEVERITY.indexOf(code); return i < 0 ? SEVERITY.length : i; };
-    return [...this.byCode.values()].sort((a, b) => rank(a.code) - rank(b.code)).slice(0, MAX_FINDINGS);
+    return [...this.byCode.values()].sort((a, b) => rank(a.code) - rank(b.code));
+  }
+
+  list(): SidwaveFinding[] {
+    return this.all().slice(0, MAX_FINDINGS);
   }
 }
 

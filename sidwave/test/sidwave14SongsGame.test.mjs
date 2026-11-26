@@ -21,7 +21,7 @@ function prgTrace(song, frames, source = doc) {
   let writes = [];
   const cpu = new Cpu(mem, { write(a, v) { if (a >= 0xd400 && a < 0xd800) writes.push([a, v]); } });
   cpu.call(compiled.initAddress, song);
-  const out = [];
+  const out = [JSON.stringify(writes)];
   for (let i = 0; i < frames; i++) { writes = []; cpu.call(compiled.playAddress); out.push(JSON.stringify(writes)); }
   return out;
 }
@@ -31,7 +31,8 @@ function gameTrace(m, song, frames, clock = 0) {
   m.init(song, clock);
   for (let i = 0; i < frames; i++) m.play();
   const t = sidTrace(m);
-  return Array.from({ length: frames }, (_, i) => JSON.stringify(t[start + 2 + i] ?? []));
+  // the init call's own writes come first, then the play calls
+  return Array.from({ length: frames + 1 }, (_, i) => JSON.stringify(t[start + 1 + i] ?? []));
 }
 
 test("the game build selects the song with A in init and matches the PRG build of that song, from any previous song", () => {
@@ -120,7 +121,7 @@ test("the game PSID keeps the host's song in A, records the song count and progr
       cpu.call(sid.readUInt16BE(10), k);
       const frames = 300;
       for (let i = 0; i < frames; i++) { call += 1; cpu.call(sid.readUInt16BE(12)); }
-      const got = Array.from({ length: frames }, (_, i) => JSON.stringify(writes.filter((w) => w.call === i + 2).map((w) => [w.a, w.v])));
+      const got = Array.from({ length: frames + 1 }, (_, i) => JSON.stringify(writes.filter((w) => w.call === i + 1).map((w) => [w.a, w.v])));
       const expected = prgTrace(k, frames, timed);
       assert.deepEqual(got, expected, `speeds ${speeds} song ${k}`);
       if (speeds[1] > 1) assert.equal(latches.length, 2, "the latch is written at init");

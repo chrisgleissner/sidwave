@@ -12,6 +12,8 @@ import { parseSidFile } from "../src/sidFile.js";
 import { lintSidwave } from "../src/sidwaveOps.js";
 import { SIDWAVE_SCORE_RESOURCES, readSidwaveExample } from "../src/sidwaveExamples.js";
 import { Cpu } from "./helpers/sidwaveEmulator.mjs";
+import os from "node:os";
+import { runCli, EXIT_OK, EXIT_FAILED, EXIT_USAGE } from "../src/cli.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sha = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -382,7 +384,7 @@ test("songs with play-once and looping songs mixed, all looping, and all playing
   assert.deepEqual(compileSidwaveToPrg(parse(obj), { loop: false }).songs.map((s) => s.loop), [false, false]);
 });
 
-test("songs with CIA2 digi samples in the PRG share one sample table", () => {
+test("songs with CIA2 digi voices compile as a PRG with samples, play the pitched voice and reject sample schedules tied to one timeline", () => {
   const digi = make({
     sids: [{ id: "sid1", address: "$D400", model: "8580" }, { id: "sid2", address: "$D420", model: "8580" }],
     samples: { rate: 4000, defs: { kick: { hex: "fe18" }, snare: { hex: "0f0f" } } },
@@ -423,6 +425,75 @@ test("the instrument table is shared and limited to 63 entries for all songs tog
   assert.throws(() => compileSidwaveToPrg(doc), /more than 63 distinct/);
 });
 
+// ---------------------------------------------------------------- init: its own writes and the reset
+
+/** Every SID and CIA 1 latch write of the init call that starts `song`, after playing `before` (if given) for 150 calls. */
+function initWrites(compiled, bytes, song, before) {
+  const m = player(compiled, bytes);
+  if (before !== undefined) { m.init(before); for (let i = 0; i < 150; i++) m.play(); }
+  const call = m.call + 1;
+  m.init(song);
+  return m.writes.filter((w) => w.call === call).map((w) => [w.a, w.v]);
+}
+
+/** A copy of the PRG with the first occurrence of `pattern` (bytes, null matches any byte) overwritten by `patch`. */
+function mutated(compiled, pattern, patch) {
+  const prg = Buffer.from(compiled.prg);
+  for (let at = 2; at + pattern.length <= prg.length; at++) {
+    if (pattern.every((b, i) => b === null || prg[at + i] === b)) {
+      patch.forEach((b, i) => { if (b !== null) prg[at + i] = b; });
+      return { ...compiled, prg };
+    }
+  }
+  throw new Error("pattern not found");
+}
+
+test("the init call writes the same SID and CIA 1 latch values after any other song as from a fresh start", () => {
+  const doc = parse(MIX);
+  const compiled = compileSidwaveToPrg(doc);
+  const sid = compileSidwaveToSid(doc, compiled.prg).sid;
+  for (const [c, bytes] of [[compiled, undefined], [compiled, sid]]) {
+    for (let k = 0; k < 5; k++) {
+      const fresh = initWrites(c, bytes, k, undefined);
+      assert.ok(fresh.some(([a]) => a >= 0xd400), "init clears the SID");
+      for (let before = 0; before < 5; before++) assert.deepEqual(initWrites(c, bytes, k, before), fresh, `${bytes ? "psid" : "prg"} song ${k} after ${before}`);
+    }
+  }
+  // The PSID init of a song with several play calls per frame writes the CIA 1 latch, and the PRG init the same value.
+  assert.equal(initWrites(compiled, sid, 1, 0).filter(([a]) => a === 0xdc04 || a === 0xdc05).length, 2);
+});
+
+test("mutation check: the comparisons fail when init skips the SID clear or the clear of the player variables", () => {
+  const doc = parse(MIX);
+  const compiled = compileSidwaveToPrg(doc);
+  // ini_sid: lda #0 / ldy #$18 / sta (sid_io),y / dey / bpl  ->  the store becomes two NOPs
+  const noSidClear = mutated(compiled, [0xa9, 0x00, 0xa0, 0x18, 0x91, 0xfd, 0x88, 0x10], [0xa9, 0x00, 0xa0, 0x18, 0xea, 0xea, 0x88, 0x10]);
+  assert.notDeepEqual(initWrites(noSidClear, undefined, 1, 0), initWrites(compiled, undefined, 1, undefined), "the init writes differ");
+  // ini_vars: lda #0 / ldx #n / sta vars,x / dex / cpx #$FF / bne  ->  the store becomes three NOPs
+  const noVarsClear = mutated(compiled, [0xa9, 0x00, 0xa2, null, 0x9d, null, null, 0xca, 0xe0, 0xff, 0xd0], [0xa9, 0x00, 0xa2, null, 0xea, 0xea, 0xea, 0xca, 0xe0, 0xff, 0xd0]);
+  const pairs = [[0, 1], [1, 2], [4, 0], [2, 3], [3, 4]];
+  assert.ok(pairs.some(([before, song]) => JSON.stringify([...ramAfter(noVarsClear, before, song)]) !== JSON.stringify([...ramAfter(noVarsClear, undefined, song)])),
+    "the RAM after a switch differs from a fresh start");
+  // and the unmutated player matches for the same pairs
+  for (const [before, song] of pairs) assert.deepEqual(ramAfter(compiled, before, song), ramAfter(compiled, undefined, song));
+});
+
+/** The player's RAM after init of `song` (after `before` if given) and one play call. */
+function ramAfter(compiled, before, song) {
+  const m = player(compiled);
+  if (before !== undefined) { m.init(before); for (let i = 0; i < 150; i++) m.play(); }
+  m.init(song);
+  m.play();
+  return m.mem.slice(compiled.loadAddress, compiled.endAddress);
+}
+
+test("after the first play call the player's RAM after a song switch equals that of a fresh start", () => {
+  const compiled = compileSidwaveToPrg(parse(MIX));
+  for (const [before, song] of [[0, 1], [1, 2], [4, 0], [2, 3], [3, 4]]) {
+    assert.deepEqual(ramAfter(compiled, before, song), ramAfter(compiled, undefined, song), `song ${song} after ${before}`);
+  }
+});
+
 // ---------------------------------------------------------------- lint and reports
 
 test("lint: patterns and sections that no song uses, and songs that play nothing", () => {
@@ -445,6 +516,16 @@ test("lint: patterns and sections that no song uses, and songs that play nothing
   // a document with one song is checked as well
   const single = parse(make({ songs: [{ name: "s", timeline: ["x"] }] }));
   assert.ok(lintSidwave(single).findings.some((f) => f.code === "UNUSED-SECTION" && f.first === 'section "y"'));
+});
+
+test("the finding limit applies after the findings of all songs are merged", () => {
+  const doc = parse(make({ songs: TWO }));
+  const compiled = compileSidwaveToPrg(doc);
+  assert.ok(compiled.lint.length <= 12);
+  // a song's own list is cut at 12 findings; merging uses every finding of every song, so a code that only
+  // the second song reports is still present
+  const second = compileSidwaveToPrg(parse(make({ tempo: 125.31, songs: [{ name: "a", timeline: ["x"], tempo: 120 }, { name: "b", timeline: ["x"], tempo: 133 }] })));
+  assert.ok(second.lint.some((f) => f.code === "TEMPO-GRID" && f.count >= 2));
 });
 
 test("lint findings of the songs carry the song name and are merged by code", () => {
@@ -533,5 +614,37 @@ test("every YAML example in the 1.4 chapter of the specification compiles to a d
     const compiled = compileSidwaveToPrg(parseSidwave(source));
     assert.deepEqual(compiled.songs.map((s) => s.name), ["title", "ingame", "gameover"]);
     assert.deepEqual(compiled.songs.map((s) => s.loop), [true, true, false]);
+  }
+});
+
+test("sidwave compile --song n selects the PRG start song and the PSID start song", () => {
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-songs-")));
+  try {
+    fs.writeFileSync(path.join(dir, "g.sidwave.yaml"), readSidwaveExample("game_songs"));
+    fs.writeFileSync(path.join(dir, "one.sidwave.yaml"), text(standalone(make({ songs: TWO }), 0)));
+    const cli = (...args) => {
+      const out = []; const err = [];
+      const code = runCli(args, { cwd: dir, out: (t) => out.push(t), err: (t) => err.push(t), outBytes: () => {} });
+      return { code, out: out.join(""), err: err.join("") };
+    };
+    const doc = parseSidwave(readSidwaveExample("game_songs"));
+    assert.equal(cli("compile", "g.sidwave.yaml", "--song", "2", "-o", "a.prg").code, EXIT_OK);
+    assert.equal(sha(fs.readFileSync(path.join(dir, "a.prg"))), sha(compileSidwaveToPrg(doc, { song: 2 }).prg));
+    assert.notEqual(sha(fs.readFileSync(path.join(dir, "a.prg"))), sha(compileSidwaveToPrg(doc).prg));
+    assert.equal(cli("compile", "g.sidwave.yaml", "--song=1", "-o", "b.sid").code, EXIT_OK);
+    const sid = fs.readFileSync(path.join(dir, "b.sid"));
+    assert.deepEqual([sid.readUInt16BE(14), sid.readUInt16BE(16)], [3, 2]);
+    assert.equal(cli("compile", "g.sidwave.yaml", "-o", "c.sid").code, EXIT_OK);
+    assert.equal(fs.readFileSync(path.join(dir, "c.sid")).readUInt16BE(16), 1);
+    // errors: a song that does not exist, a bad value, the game target, a score without songs
+    assert.equal(cli("compile", "g.sidwave.yaml", "--song", "3", "-o", "d.prg").code, EXIT_FAILED);
+    assert.match(cli("compile", "g.sidwave.yaml", "--song", "3", "-o", "d.prg").err, /song 3 does not exist/);
+    assert.equal(cli("compile", "g.sidwave.yaml", "--song", "x").code, EXIT_USAGE);
+    assert.equal(cli("compile", "g.sidwave.yaml", "--song").code, EXIT_USAGE);
+    assert.match(cli("compile", "g.sidwave.yaml", "--target", "game", "--origin", "0x1000", "--song", "1").err, /--song is not available with --target game/);
+    assert.equal(cli("compile", "one.sidwave.yaml", "--song", "0", "-o", "e.prg").code, EXIT_OK);
+    assert.equal(cli("compile", "one.sidwave.yaml", "--song", "1", "-o", "f.prg").code, EXIT_FAILED);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
