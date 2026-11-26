@@ -7,8 +7,8 @@ See <https://www.gnu.org/licenses/> for details.
 */
 
 import { Buffer } from "node:buffer";
-import { rangeOverlapsIo } from "../../ioRange.js";
-import { parseBraceToken } from "../../petscii.js";
+import { rangeOverlapsIo } from "./ioRange.js";
+import { parseBraceToken } from "./petscii.js";
 import { OPCODE_INVENTORY } from "./opcodeInventory.js";
 import type { OpcodeAddressingMode } from "./opcodeInventory.js";
 

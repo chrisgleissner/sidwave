@@ -4,15 +4,16 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "esModuleInterop": true,
-    "experimentalDecorators": false,
-    "emitDecoratorMetadata": false,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
+    "declaration": true,
+    "composite": true,
+    "rootDir": "src",
     "outDir": "dist",
-    "incremental": true,
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "types": ["node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "generated/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../asm6502" }]
 }
