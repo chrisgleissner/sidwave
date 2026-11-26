@@ -15,5 +15,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../asm6502" }]
+  "references": [{ "path": "../6502-toolkit" }]
 }

@@ -1,10 +1,5 @@
-/*
-C64 Bridge - An MCP Server for the Commodore 64 Ultimate
-Copyright (C) 2025 Christian Gleissner
-
-Licensed under the GNU General Public License v2.0 or later.
-See <https://www.gnu.org/licenses/> for details.
-*/
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025-2026 Christian Gleissner
 
 import { Buffer } from "node:buffer";
 import { rangeOverlapsIo } from "./ioRange.js";

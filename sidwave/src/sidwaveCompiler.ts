@@ -1,10 +1,7 @@
-/*
-C64 Bridge - SIDWAVE to PRG Compiler
-Copyright (C) 2025 Christian Gleissner
-
-Licensed under the GNU General Public License v2.0 or later.
-See <https://www.gnu.org/licenses/> for details.
-*/
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2025-2026 Christian Gleissner
+// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+// SIDWAVE to PRG Compiler
 
 import { Buffer } from "node:buffer";
 import { cutoffHz, resolveCutoff } from "./sidwaveFilterModel.js";
@@ -12,7 +9,7 @@ import { RELEASE_MS, SidwaveFindings, lintArrangement, arrangementReport, format
 import { digiTriggers, makeTimelineClock, rampValue, timelinePatternPasses, type TimelineClock } from "./sidwaveForm.js";
 import type { SampleStats } from "./sidwavePcm.js";
 import { addDigiPlayer, digiCyclesPerCall, digiDataAsm, digiPeakCycles, digiPeriod, validateDigiRate } from "./sidwaveDigi.js";
-import { assemblyToPrgDetailed } from "c64-asm6502/assembler";
+import { assemblyToPrgDetailed } from "6502-toolkit/assembler";
 import { isModern, patternBeats, sectionBarBeats } from "./sidwave.js";
 import type { ParsedSidwave, SystemMode, SidwaveVoice, SidwavePattern, SidwavePatternGroove, MotifEntry, SidwaveRegisterTable, FilterModSpec, SidwaveSamples, SidwaveGrooveNote } from "./sidwave.js";
 import {

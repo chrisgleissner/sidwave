@@ -78,6 +78,7 @@
     "data/**",
     "doc/licensing.md",
     "LICENSE",
+    "LICENSE-EXCEPTION.md",
     "README.md"
   ],
   "scripts": {
@@ -95,7 +96,7 @@
     "sidwave"
   ],
   "author": "Christian Gleissner",
-  "license": "GPL-2.0-only",
+  "license": "GPL-2.0-or-later",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/chrisgleissner/sidwave.git",
@@ -105,7 +106,7 @@
     "node": ">=24"
   },
   "dependencies": {
-    "c64-asm6502": "0.1.0",
+    "6502-toolkit": "0.1.0",
     "yaml": "^2.9.0"
   },
   "homepage": "https://github.com/chrisgleissner/sidwave/tree/main/sidwave#readme",

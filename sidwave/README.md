@@ -8,7 +8,7 @@ Status: pre-release. This package has not been published to npm yet; the install
 npm install sidwave
 ```
 
-Requires Node.js 24 or later. Runtime dependencies: `yaml` and `c64-asm6502`.
+Requires Node.js 24 or later. Runtime dependencies: `yaml` and `6502-toolkit`.
 
 ## Library
 
@@ -58,4 +58,4 @@ Planned and not yet available: SID file reader and writer, `sidwave verify`, for
 - [Language specification](data/sound/sidwave.md) and [JSON Schema](data/sound/sidwave.schema.json)
 - [Licensing notes](doc/licensing.md): read this before releasing a tune or embedding the player in a game
 
-License: GPL-2.0-only.
+License: GPL-2.0-or-later with the [SIDWAVE Player Exception](LICENSE-EXCEPTION.md).

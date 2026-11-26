@@ -2,19 +2,18 @@
   "name": "sidwave-monorepo",
   "private": true,
   "version": "0.0.0",
-  "description": "Workspace root of the SIDWAVE repository: packages sidwave and c64-asm6502",
+  "description": "Workspace root of the SIDWAVE repository: packages sidwave and 6502-toolkit",
   "type": "module",
-  "license": "GPL-2.0-only",
   "author": "Christian Gleissner",
   "workspaces": [
     "sidwave",
-    "asm6502"
+    "6502-toolkit"
   ],
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -b asm6502 sidwave",
+    "build": "tsc -b 6502-toolkit sidwave",
     "test": "npm run build && npm run test --workspaces",
     "test:bun": "npm run build && npm run test:bun --workspaces",
     "coverage": "npm run build && node scripts/run-package-coverage.mjs",

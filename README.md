@@ -123,7 +123,7 @@ The repository ships 14 example scores in [`sidwave/data/sound/examples`](sidwav
 npm install sidwave
 ```
 
-`sidwave` has not been published to npm yet; until the first release, build it from this repository. It requires Node.js 24 or later and has two runtime dependencies: `yaml` and [`c64-asm6502`](asm6502/README.md), the 6502 assembler that builds the player.
+`sidwave` has not been published to npm yet; until the first release, build it from this repository. It requires Node.js 24 or later and has two runtime dependencies: `yaml` and [`6502-toolkit`](6502-toolkit/README.md), the 6502 assembler and disassembler that builds the player.
 
 ### Library
 
@@ -196,4 +196,4 @@ Known limitations of the language: no per-note velocity, no multiple subtunes, n
 
 ## License
 
-SIDWAVE is licensed under [GPL-2.0-only](LICENSE). The compiled output contains generated player code, which affects how you can distribute tunes and games; read the [licensing notes](sidwave/doc/licensing.md).
+SIDWAVE (`sidwave/` and everything outside `6502-toolkit/`) is licensed under GPL-2.0-or-later with the [SIDWAVE Player Exception](sidwave/LICENSE-EXCEPTION.md). The exception allows compiled tunes and games that embed the generated player to be distributed under terms of your choice; read the [licensing notes](sidwave/doc/licensing.md). The `6502-toolkit/` package is licensed under the MIT licence. See [LICENSE.md](LICENSE.md).

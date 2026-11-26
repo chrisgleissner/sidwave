@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Clean-consumer check. Packs c64-asm6502 and sidwave, installs the two tarballs in an empty project with npm,
+ * Clean-consumer check. Packs 6502-toolkit and sidwave, installs the two tarballs in an empty project with npm,
  * then parses and compiles an example score to PRG and PSID with an ESM program on Node and on Bun, and with the
  * installed `sidwave` command. The byte hashes must agree between runtimes and, with --baseline, equal the
  * values recorded for that example in the S0 baseline file.
@@ -35,7 +35,7 @@ const work = fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-consumer-"));
 const result = { example, runtimes: {}, checks: [] };
 try {
   const tarballs = [];
-  for (const dir of ["asm6502", "sidwave"]) {
+  for (const dir of ["6502-toolkit", "sidwave"]) {
     const pkgDir = path.join(packagesRoot, dir);
     if (!fs.existsSync(path.join(pkgDir, "dist"))) throw new Error(`${dir}/dist is missing; run the build first`);
     const [info] = JSON.parse(run("npm", ["pack", "--json", "--pack-destination", work], { cwd: pkgDir }));
@@ -47,7 +47,7 @@ try {
   fs.writeFileSync(path.join(consumer, "package.json"), JSON.stringify({ name: "consumer", private: true, type: "module" }));
   run("npm", ["install", "--no-audit", "--no-fund", "--no-package-lock", ...tarballs], { cwd: consumer });
 
-  for (const name of ["sidwave", "c64-asm6502"]) {
+  for (const name of ["sidwave", "6502-toolkit"]) {
     const dir = path.join(consumer, "node_modules", name);
     if (fs.lstatSync(dir).isSymbolicLink()) throw new Error(`${name} is a symbolic link in the consumer project`);
     const stack = [dir];
