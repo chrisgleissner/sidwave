@@ -175,3 +175,21 @@ test("quantise leaves a pattern untouched when a bar group cannot keep its lengt
   assert.deepEqual(result.report.changed, []);
   assert.deepEqual(result.report.warnings, ["/voices/0/patterns/A has no second explicit duration for length-preserving quantisation; unchanged"]);
 });
+
+const motifScore = (motif) => `sidwave: 1.2
+title: "T"
+tempo: 120
+voices:
+  - id: 1
+    patterns:
+      A: {motif: "${motif}", length: 1}
+timeline: [{bars: 1, layers: {v1: "A"}}]
+`;
+
+test("transpose writes motif chord symbols without an octave", () => {
+  for (const [semitones, expected] of [[0, "Cm7 G 0 4"], [2, "Dm7 A 2 6"], [-1, "Bm7 F# -1 3"]]) {
+    const result = transpose(motifScore("Cm7 G 0 4"), { semitones });
+    assert.ok(result.text.includes(`motif: "${expected}"`), result.text);
+    valid(result.text);
+  }
+});

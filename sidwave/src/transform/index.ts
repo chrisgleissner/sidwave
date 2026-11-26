@@ -113,7 +113,7 @@ export function transpose(text: string, options: { semitones: number; scope?: { 
           if (/^[+-]?\d+$/.test(tok)) { did=true; const n=Number(tok)+options.semitones; const rootMidi=noteNameToMidi(pattern.root??"C3")??48; if(rootMidi+n<SIDWAVE_NOTE_RANGE.min||rootMidi+n>max) throw new SidwaveTransformError("out_of_range",`Offending note at ${ptr([...base,"motif"].map(String))}`); return String(n); }
           if (/^[A-Ga-g](?:#|b)?\d+$/.test(tok)) { did=true; return shiftedNote(tok,options.semitones,max,ptr([...base,"motif"].map(String))); }
           const chord=/^([A-Ga-g](?:#|b)?)(.*)$/.exec(tok);
-          if (chord && /^(?:m|min|maj|dim|aug|sus2|sus4|sus|6|m6|min6|7|maj7|m7|min7|dim7|m7b5|9|maj9|m9|min9|add9)?$/.test(chord[2]!)) { did=true; const pitch=noteNameToMidi(`${chord[1]}3`)!+options.semitones; if(pitch<12||pitch>max) throw new SidwaveTransformError("out_of_range",`Offending note at ${ptr([...base,"motif"].map(String))}`); return midiToNoteName(pitch).replace(/-1$/,"")+chord[2]; }
+          if (chord && /^(?:m|min|maj|dim|aug|sus2|sus4|sus|6|m6|min6|7|maj7|m7|min7|dim7|m7b5|9|maj9|m9|min9|add9)?$/.test(chord[2]!)) { did=true; const pitch=noteNameToMidi(`${chord[1]}3`)!+options.semitones; if(pitch<12||pitch>max) throw new SidwaveTransformError("out_of_range",`Offending note at ${ptr([...base,"motif"].map(String))}`); return midiToNoteName(pitch).replace(/-?\d+$/,"")+chord[2]; }
           return tok;
         }).join("");
         if(did&&next!==pattern.motif){setAt(doc,[...base,"motif"],next);changed.push(ptr([...base,"motif"].map(String)));}
