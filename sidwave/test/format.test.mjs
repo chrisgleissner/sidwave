@@ -17,8 +17,8 @@ const yaml = (o) => import("yaml").then(({ default: Y }) => Y.stringify(o));
 const exampleFiles = (await readdir(exampleDir)).filter((f) => f.endsWith(".yaml")).sort();
 const fixtureFiles = await (async function walk(dir) { const out = []; for (const e of await readdir(dir, { withFileTypes: true })) { const p = join(dir, e.name); if (e.isDirectory()) out.push(...await walk(p)); else if (p.endsWith(".yaml")) out.push(p); } return out; })(fixtureDir);
 
-test("the bundled example directory holds the 14 scores the formatter tests cover", () => {
-  assert.equal(exampleFiles.length, 14);
+test("the bundled example directory holds the 15 scores the formatter tests cover", () => {
+  assert.equal(exampleFiles.length, 15);
 });
 
 for (const name of exampleFiles) {
