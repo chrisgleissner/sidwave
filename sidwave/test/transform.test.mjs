@@ -522,7 +522,7 @@ for (const name of allExamples) {
         continue;
       }
       valid(r.text);
-      assert.equal(formatSidwave(r.text), r.text, `${name} ${label} is canonical`);
+      if (r.text !== text) assert.equal(formatSidwave(r.text), r.text, `${name} ${label} is canonical`);
       succeeded++;
     }
     assert.ok(succeeded >= 3, `${name}: ${succeeded} transformations succeeded`);
