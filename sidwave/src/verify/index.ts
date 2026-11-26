@@ -2,13 +2,24 @@
 // Copyright (C) 2025-2026 Christian Gleissner
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 import { createHash } from "node:crypto";
-import type { EngineIdentity, SidEngine, SidEmulation } from "../engine/types.js";
+import { psidClock } from "../engine/libsidplayfp.js";
+import type { EngineIdentity, SidClock, SidEngine, SidEmulation } from "../engine/types.js";
 
 export type Difference = {
   level: "T0" | "T1" | "A0";
-  category: "missing_write" | "extra_write" | "value" | "order" | "timing" | "length" | "pcm";
+  category:
+    | "missing_write"
+    | "extra_write"
+    | "value"
+    | "order"
+    | "timing"
+    | "length"
+    | "pcm"
+    | "empty_trace";
   call?: number;
+  /** Cycles from engine start. 0 for empty_trace, which has no write to point at. */
   cycle?: number;
+  /** cycle divided by the clock frequency used for the comparison. */
   timeSeconds?: number;
   sid?: number;
   voice?: number;
@@ -19,12 +30,27 @@ export type Difference = {
 
 export type TraceComparison = {
   t0: { equal: boolean; calls: number; firstDifference?: Difference };
-  t1: { equal: boolean; maxOffsetCycles: number; toleranceCycles: number; firstDifference?: Difference };
+  t1: {
+    equal: boolean;
+    /** Largest absolute cycle offset between matching writes, up to the first order or value mismatch. */
+    maxOffsetCycles: number;
+    toleranceCycles: number;
+    /** Observed first write cycle minus expected first write cycle. */
+    firstWriteOffsetCycles: number;
+    firstDifference?: Difference;
+  };
   horizon: { calls: number; cycles: number };
   playPeriodCycles: number;
 };
 
-export type CompareOptions = { horizonCycles?: number; toleranceCycles?: number; burstGapCycles?: number };
+export type CompareOptions = {
+  /** Last cycle, counted from engine start, that is compared. Default: the last write of either trace. */
+  horizonCycles?: number;
+  toleranceCycles?: number;
+  burstGapCycles?: number;
+  /** CPU clock for timeSeconds. Default PAL, 985,248 Hz. */
+  clockHz?: number;
+};
 
 export type VerifyResult = {
   level: "T0" | "T1" | "A0" | "none";
@@ -39,7 +65,7 @@ export type VerifyResult = {
   engines: { trace: EngineIdentity; pcm?: EngineIdentity };
 };
 
-const PAL = 985_248;
+const CLOCK_HZ = { PAL: 985_248, NTSC: 1_022_727 } as const;
 const DEFAULT_BURST_GAP = 2_000;
 const DEFAULT_TOLERANCE = 0;
 
@@ -80,7 +106,7 @@ function median(xs: number[]): number {
 
 function callGroups(ws: W[], gap: number): W[][] {
   const bs = bursts(ws, gap);
-  const starts = bs.slice(1).map((x) => x[0].cycle - bs[bs.indexOf(x) - 1][0].cycle);
+  const starts = bs.slice(1).map((burst, i) => burst[0].cycle - bs[i][0].cycle);
   const period = median(starts);
   if (!bs.length) return [];
   const threshold = period ? Math.max(gap, period * 0.5) : gap;
@@ -92,7 +118,14 @@ function callGroups(ws: W[], gap: number): W[][] {
   return calls;
 }
 
-function diff(level: Difference["level"], category: Difference["category"], a?: W, b?: W, call?: number): Difference {
+function diff(
+  clockHz: number,
+  level: Difference["level"],
+  category: Difference["category"],
+  a?: W,
+  b?: W,
+  call?: number,
+): Difference {
   const w = a ?? b;
   const d: Difference = { level, category };
   if (call !== undefined) d.call = call;
@@ -109,6 +142,7 @@ function diff(level: Difference["level"], category: Difference["category"], a?: 
     d.observed = b.value;
     d.cycle ??= b.cycle;
   }
+  if (d.cycle !== undefined) d.timeSeconds = d.cycle / clockHz;
   return d;
 }
 
@@ -129,29 +163,48 @@ export function compareTraces(
 ): TraceComparison {
   const gap = options.burstGapCycles ?? DEFAULT_BURST_GAP;
   const tolerance = options.toleranceCycles ?? DEFAULT_TOLERANCE;
+  const clockHz = options.clockHz ?? CLOCK_HZ.PAL;
   const badHorizon =
     options.horizonCycles !== undefined && (!Number.isFinite(options.horizonCycles) || options.horizonCycles <= 0);
   if (!Number.isFinite(gap) || gap < 1 || !Number.isFinite(tolerance) || tolerance < 0 || badHorizon) {
     throw new VerifyError("invalid_options", "Cycle options must be finite and nonnegative (horizon must be positive)");
+  }
+  if (!Number.isFinite(clockHz) || clockHz <= 0) {
+    throw new VerifyError("invalid_options", "clockHz must be a positive number");
   }
   if (expected.length / 4 > 2_000_000 || observed.length / 4 > 2_000_000) {
     throw new VerifyError("trace_limit", "Trace comparison is limited to 2,000,000 writes per input");
   }
   const a = records(expected);
   const b = records(observed);
-  const originA = a[0]?.cycle ?? 0;
-  const originB = b[0]?.cycle ?? 0;
+  // All cycles are counted from engine start. They are not rebased to each trace's first write,
+  // so a tune that starts writing later than the reference is a timing difference.
   const horizonCycles =
-    options.horizonCycles ??
-    Math.max((a[a.length - 1]?.cycle ?? originA) - originA, (b[b.length - 1]?.cycle ?? originB) - originB);
-  const within = (ws: W[], origin: number) => ws.filter((w) => w.cycle - origin <= horizonCycles);
-  const aa = within(a, originA);
-  const bb = within(b, originB);
+    options.horizonCycles ?? Math.max(a[a.length - 1]?.cycle ?? 0, b[b.length - 1]?.cycle ?? 0);
+  const aa = a.filter((w) => w.cycle <= horizonCycles);
+  const bb = b.filter((w) => w.cycle <= horizonCycles);
   const ca = callGroups(aa, gap);
   const cb = callGroups(bb, gap);
   const starts = [...bursts(aa, gap), ...bursts(bb, gap)].map((c) => c[0].cycle).sort((x, y) => x - y);
   const period = median(starts.slice(1).map((x, i) => x - starts[i]));
   const n = Math.max(ca.length, cb.length);
+
+  if (!aa.length || !bb.length) {
+    // A trace without writes in the horizon proves nothing, whatever the other trace holds.
+    const empty: Difference = { level: "T0", category: "empty_trace", cycle: 0, timeSeconds: 0 };
+    return {
+      t0: { equal: false, calls: n, firstDifference: empty },
+      t1: {
+        equal: false,
+        maxOffsetCycles: 0,
+        toleranceCycles: tolerance,
+        firstWriteOffsetCycles: 0,
+        firstDifference: { ...empty, level: "T1" },
+      },
+      horizon: { calls: n, cycles: horizonCycles },
+      playPeriodCycles: period,
+    };
+  }
 
   let d0: Difference | undefined;
   for (let c = 0; c < n && !d0; c++) {
@@ -161,19 +214,19 @@ export function compareTraces(
       const p = x[i];
       const q = y[i];
       if (!p) {
-        d0 = diff("T0", "extra_write", undefined, q, c);
+        d0 = diff(clockHz, "T0", "extra_write", undefined, q, c);
         break;
       }
       if (!q) {
-        d0 = diff("T0", "missing_write", p, undefined, c);
+        d0 = diff(clockHz, "T0", "missing_write", p, undefined, c);
         break;
       }
       if (p.sid !== q.sid || p.reg !== q.reg) {
-        d0 = diff("T0", "order", p, q, c);
+        d0 = diff(clockHz, "T0", "order", p, q, c);
         break;
       }
       if (p.value !== q.value) {
-        d0 = diff("T0", "value", p, q, c);
+        d0 = diff(clockHz, "T0", "value", p, q, c);
         break;
       }
     }
@@ -185,24 +238,23 @@ export function compareTraces(
   for (let i = 0; i < m; i++) {
     const p = aa[i];
     const q = bb[i];
+    // Offsets keep accumulating after a timing difference, but the first difference found is never replaced.
     if (!p || !q) {
       const category = i === Math.min(aa.length, bb.length) ? "length" : p ? "missing_write" : "extra_write";
-      d1 = diff("T1", category, p, q);
+      d1 ??= diff(clockHz, "T1", category, p, q);
       break;
     }
     if (p.sid !== q.sid || p.reg !== q.reg) {
-      d1 = diff("T1", "order", p, q);
+      d1 ??= diff(clockHz, "T1", "order", p, q);
       break;
     }
     if (p.value !== q.value) {
-      d1 = diff("T1", "value", p, q);
+      d1 ??= diff(clockHz, "T1", "value", p, q);
       break;
     }
-    const offset = Math.abs(p.cycle - originA - (q.cycle - originB));
+    const offset = Math.abs(p.cycle - q.cycle);
     maxOffsetCycles = Math.max(maxOffsetCycles, offset);
-    if (offset > tolerance && !d1) {
-      d1 = { ...diff("T1", "timing", p, q), cycle: p.cycle, timeSeconds: (p.cycle - originA) / PAL };
-    }
+    if (offset > tolerance) d1 ??= diff(clockHz, "T1", "timing", p, q);
   }
 
   return {
@@ -211,6 +263,7 @@ export function compareTraces(
       equal: !d1,
       maxOffsetCycles,
       toleranceCycles: tolerance,
+      firstWriteOffsetCycles: bb[0].cycle - aa[0].cycle,
       ...(d1 ? { firstDifference: d1 } : {}),
     },
     horizon: { calls: n, cycles: horizonCycles },
@@ -233,29 +286,30 @@ export async function verifySid(
     song?: number;
     toleranceCycles?: number;
     pcmEngine?: SidEngine;
+    /** Clock for both tunes. Default: the clock flag of the expected tune's PSID header, else PAL. */
+    clock?: SidClock;
   },
 ): Promise<VerifyResult> {
   const { engine, seconds, song, toleranceCycles = 0, pcmEngine } = options;
   if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 60) {
     throw new VerifyError("invalid_options", "seconds must be in (0, 60]");
   }
-  const clock = PAL;
+  const clock = options.clock ?? psidClock(expected) ?? "PAL";
+  const clockHz = CLOCK_HZ[clock];
   const [a, b] = await Promise.all([
-    engine.trace({ sid: expected, seconds, song, maxRecords: 2_000_000 }),
-    engine.trace({ sid: observed, seconds, song, maxRecords: 2_000_000 }),
+    engine.trace({ sid: expected, seconds, song, clock, maxRecords: 2_000_000 }),
+    engine.trace({ sid: observed, seconds, song, clock, maxRecords: 2_000_000 }),
   ]);
-  const cmp = compareTraces(a.records, b.records, {
-    horizonCycles: Math.min(a.cycles, b.cycles),
-    toleranceCycles,
-  });
+  const horizonCycles = Math.min(a.horizonCycles, b.horizonCycles);
+  const cmp = compareTraces(a.records, b.records, { horizonCycles, toleranceCycles, clockHz });
 
   let A0: VerifyResult["levels"]["A0"] = "not evaluated";
   let audioDiff: Difference | undefined;
   let pcmIdentity: EngineIdentity | undefined;
   if (pcmEngine) {
     const [x, y] = await Promise.all([
-      pcmEngine.render({ sid: expected, seconds, song }),
-      pcmEngine.render({ sid: observed, seconds, song }),
+      pcmEngine.render({ sid: expected, seconds, song, clock }),
+      pcmEngine.render({ sid: observed, seconds, song, clock }),
     ]);
     const emulationOf = (identity: EngineIdentity & { emulation?: SidEmulation }) => identity.emulation;
     if (emulationOf(x.engine) !== "sidlite" || emulationOf(y.engine) !== "sidlite") {
@@ -268,13 +322,16 @@ export async function verifySid(
       A0 = "fail";
       let i = 0;
       while (i < Math.min(x.samples.length, y.samples.length) && x.samples[i] === y.samples[i]) i++;
+      // PCM starts at the origin cycle of the traces, so cycle and timeSeconds are counted from engine start
+      // like the trace differences.
+      const cycle = a.originCycle + Math.floor((i / (x.sampleRate * x.channels)) * clockHz);
       audioDiff = {
         level: "A0",
         category: "pcm",
         expected: x.samples[i],
         observed: y.samples[i],
-        cycle: Math.floor((i * clock) / x.sampleRate),
-        timeSeconds: i / x.sampleRate,
+        cycle,
+        timeSeconds: cycle / clockHz,
       };
     }
   }
@@ -286,7 +343,7 @@ export async function verifySid(
   return {
     level,
     levels: { T0, T1, A0, A1: "not evaluated" },
-    horizon: { seconds, cycles: Math.min(a.cycles, b.cycles), calls: cmp.horizon.calls },
+    horizon: { seconds, cycles: horizonCycles, calls: cmp.horizon.calls },
     ...(firstDifference ? { firstDifference } : {}),
     engines: { trace: a.engine, ...(pcmIdentity ? { pcm: pcmIdentity } : {}) },
   };
