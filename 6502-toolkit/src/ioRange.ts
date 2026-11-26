@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025-2026 Christian Gleissner
+
 // The I/O area of the C64 memory map. Memory access here reaches device registers, not RAM.
 export const IO_RANGE_START = 0xD000;
 export const IO_RANGE_END = 0xDFFF;

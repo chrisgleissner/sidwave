@@ -61,6 +61,19 @@ export function summarise(files) {
   return { covered, total, pct: total ? Math.round((covered * 10000) / total) / 100 : 0, perFile };
 }
 
+/** Standard LCOV text for the given files (relative to the package), with SF paths relative to the repository root. */
+export function formatLcov(files, packageDir, repoRoot = packagesRoot) {
+  const prefix = path.relative(repoRoot, packageDir).split(path.sep).join("/");
+  const out = [];
+  for (const [rel, lines] of [...files].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const entries = [...lines].sort(([a], [b]) => a - b);
+    out.push(`SF:${prefix ? `${prefix}/` : ""}${rel}`);
+    for (const [no, hits] of entries) out.push(`DA:${no},${hits}`);
+    out.push(`LF:${entries.length}`, `LH:${entries.filter(([, hits]) => hits > 0).length}`, "end_of_record");
+  }
+  return out.length ? `${out.join("\n")}\n` : "";
+}
+
 function listTests(packageDir) {
   const dir = path.join(packageDir, "test");
   return fs.readdirSync(dir).filter((name) => name.endsWith(".test.mjs")).sort().map((name) => `test/${name}`);
@@ -84,7 +97,9 @@ export function coverPackage(packageDir) {
       for (const [no, hits] of lines) target.set(no, Math.max(target.get(no) ?? 0, hits));
     }
   }
-  const summary = summarise(codeLinesOnly(merged, packageDir));
+  const codeLines = codeLinesOnly(merged, packageDir);
+  fs.writeFileSync(path.join(outDir, "lcov.info"), formatLcov(codeLines, packageDir));
+  const summary = summarise(codeLines);
   return { name: path.basename(packageDir), minimum, ...summary };
 }
 

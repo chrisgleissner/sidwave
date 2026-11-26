@@ -4,7 +4,10 @@
 
 SIDWAVE ("SID Wave") is a music language, compiler and toolkit for the Commodore 64 SID sound chip. A score is a YAML (or JSON) file that describes instruments, patterns and a timeline of sections. The compiler turns it into a self-playing C64 program (PRG) or a PSID file, including the 6502 player that runs on the C64. It is for chip musicians who prefer a text editor and version control to a tracker, for game and demo developers who need a small, scriptable music pipeline, and for tool authors who want a documented, testable description of SID music. It runs without a network, an AI assistant, or a C64.
 
-[![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
+[![CI](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml)
+[![Codecov](https://codecov.io/gh/chrisgleissner/sidwave/graph/badge.svg)](https://codecov.io/gh/chrisgleissner/sidwave)
+[![sidwave license: GPL-2.0-or-later + player exception](https://img.shields.io/badge/sidwave-GPL--2.0--or--later%20%2B%20player%20exception-blue.svg)](sidwave/LICENSE-EXCEPTION.md)
+[![6502-toolkit license: MIT](https://img.shields.io/badge/6502--toolkit-MIT-blue.svg)](6502-toolkit/LICENSE)
 [![Status](https://img.shields.io/badge/status-pre--release-orange.svg)](#status-and-roadmap)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-forestgreen)](#for-developers)
 
@@ -123,7 +126,7 @@ The repository ships 14 example scores in [`sidwave/data/sound/examples`](sidwav
 npm install sidwave
 ```
 
-`sidwave` has not been published to npm yet; until the first release, build it from this repository. It requires Node.js 24 or later and has two runtime dependencies: `yaml` and [`c64-asm6502`](asm6502/README.md), the 6502 assembler that builds the player.
+`sidwave` has not been published to npm yet; until the first release, build it from this repository. It requires Node.js 24 or later and has two runtime dependencies: `yaml` and [`6502-toolkit`](6502-toolkit/README.md), the 6502 assembler and disassembler that builds the player.
 
 ### Library
 
@@ -196,4 +199,4 @@ Known limitations of the language: no per-note velocity, no multiple subtunes, n
 
 ## License
 
-SIDWAVE is licensed under [GPL-2.0-only](LICENSE). The compiled output contains generated player code, which affects how you can distribute tunes and games; read the [licensing notes](sidwave/doc/licensing.md).
+SIDWAVE (`sidwave/` and everything outside `6502-toolkit/`) is licensed under GPL-2.0-or-later with the [SIDWAVE Player Exception](sidwave/LICENSE-EXCEPTION.md). The exception allows compiled tunes and games that embed the generated player to be distributed under terms of your choice; read the [licensing notes](sidwave/doc/licensing.md). The `6502-toolkit/` package is licensed under the MIT licence. See [LICENSE.md](LICENSE.md).

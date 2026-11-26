@@ -4,7 +4,7 @@ This page explains how the SIDWAVE licence applies to the things people make wit
 
 ## Code licence
 
-The SIDWAVE code (the parser, compiler, player generator, CLI and tools) is licensed under **GPL-2.0-only**. It is not available under any later GPL version, and there is no relicensing.
+The SIDWAVE code (the parser, compiler, player generator, CLI and tools) is licensed under **GPL-2.0-or-later**, with the **SIDWAVE Player Exception** (version 1.0) in [LICENSE-EXCEPTION.md](../LICENSE-EXCEPTION.md). The exception is a separate file because a custom exception has no SPDX identifier; every source file names it in its header.
 
 ## What a compiled PRG or SID contains
 
@@ -13,25 +13,28 @@ The compiler's output contains two things:
 1. **Your music data**: the note, instrument and timing streams generated from your score.
 2. **The player**: a 6502 program, produced from assembly that is part of the compiler's source, that reads those streams and drives the SID.
 
-The score you write is yours. Music data derived from your score is your work.
+The score you write is yours. Music data derived from your score is your work. The player is generated from GPL code, and the Player Exception defines what that means for the output.
 
-The player is different. It is generated from code that is licensed under GPL-2.0-only, so a PRG or SID file that includes it contains a GPL-2.0-only program. Under the plain GPL text this has these consequences:
+## The Player Exception
 
-- **Musicians releasing tunes.** You may distribute the compiled file. If you do, the player part is GPL-2.0-only: you need to be able to offer its corresponding source, which is the SIDWAVE source at the version you used together with your score. Keeping the score and naming the SIDWAVE version in the release notes satisfies this in practice. Your music remains yours, but whether the whole PRG or SID counts as one combined work under the GPL is a question the GPL text does not answer clearly for generated binaries.
-- **Game and demo developers embedding the player.** If the player is linked into or distributed together with your program as one work, the GPL-2.0-only terms for the player may extend to the combination, which would require releasing your program's source under compatible terms. No relocatable or separable player exists yet, so this mostly concerns the standalone player today, but the question will matter when one is added.
+The exception covers the "Player Code": the 6502 machine code and data that the compiler places into its output to play a score, including code produced by a version of SIDWAVE that you modified. A larger work that contains part or all of the Player Code may be distributed under terms of your choice, as long as that work is not itself a music compiler, player generator or tracker that uses the Player Code as the player it generates.
 
-## Open decision: a player exception
+- **Musicians releasing tunes.** You may release compiled PRG and SID files under any terms, including closed or commercial terms. You do not have to publish your score or the SIDWAVE source.
+- **Game and demo developers embedding the player.** You may embed the player in a closed program and distribute that program under terms of your choice.
 
-A project in this position can add a runtime exception to the licence for the generated player, similar to the GCC Runtime Library Exception: output that contains the player may be distributed under terms of your choice, while the compiler itself stays GPL-2.0-only. This would remove the uncertainty above for musicians and game developers.
+## What the exception does not cover
 
-**This decision has not been made.** It belongs to the copyright holder. Until the copyright holder adds an exception, no exception exists and the plain GPL-2.0 text governs everything described above. The recommendation is to grant a narrow exception that covers only the player code emitted into compiled output and leaves the rest of the code unchanged.
+- The compiler, the library, the command-line tools and their source code stay under the GPL. If you distribute them, or a modified version, the GPL applies.
+- A music compiler, player generator or tracker that uses the Player Code (or a modified version) as the player it generates is not covered. The exception does not allow building a competing music compiler from the player.
+
+If you modify SIDWAVE, you may extend the exception to your version, but you are not obliged to. If you do not want to, delete the exception statement from your version.
 
 ## Dependencies
 
 | Component | Licence | Use |
 | --- | --- | --- |
+| `6502-toolkit` | MIT (same author) | Required. Assembles the player. |
 | `yaml` 2.9.0 | ISC | Required. Parses YAML scores. |
-| `c64-asm6502` | GPL-2.0-only (same author) | Required. Assembles the player. |
 | `libsidplayfp-wasm` 1.1.1 | GPL-2.0-or-later | Optional, planned for rendering and tracing. Wraps libsidplayfp 3.1.1 and reSIDfp, both GPL-2.0-or-later. |
 
 `sidplayfp` and VICE are separate programs that you install and run yourself. SIDWAVE calls them as external processes and does not include or link their code.

@@ -1,10 +1,7 @@
-/*
-C64 Bridge - SIDWAVE Parser and Types
-Copyright (C) 2025 Christian Gleissner
-
-Licensed under the GNU General Public License v2.0 or later.
-See <https://www.gnu.org/licenses/> for details.
-*/
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2025-2026 Christian Gleissner
+// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+// SIDWAVE Parser and Types
 
 import { Buffer } from 'node:buffer';
 import pkg from 'yaml';

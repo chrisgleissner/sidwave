@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025-2026 Christian Gleissner
+
 /**
  * Shared 6502/6510 opcode inventory.
  *

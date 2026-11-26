@@ -2,13 +2,14 @@
 
 | Path | Contents |
 | --- | --- |
+| `LICENSE.md` | Which licence applies to which directory. `COPYING` holds the GPL-2.0 text. |
 | `README.md` | Overview for musicians and developers, status and roadmap. |
 | `CHANGELOG.md` | Changes by release. |
 | `sidwave/` | npm package `sidwave`: language, parser, lint, compiler, generator, examples, CLI `sidwave`. |
 | `sidwave/doc/` | Package documentation, including `licensing.md`. |
-| `asm6502/` | npm package `c64-asm6502`: the 6502 assembler used by the compiler. |
+| `6502-toolkit/` | npm package `6502-toolkit` (MIT): 6502 assembler, disassembler, opcode table, PETSCII, I/O range and PRG helpers. |
 | `scripts/` | Repository scripts: per-package coverage gate (`run-package-coverage.mjs`) and the clean-consumer check (`check-consumer.mjs`). |
-| `package.json` | Private workspace root (`sidwave`, `asm6502`): `build`, `test`, `test:bun`, `coverage`, `pack`, `check:consumer`. |
+| `package.json` | Private workspace root (`sidwave`, `6502-toolkit`): `build`, `test`, `test:bun`, `coverage`, `pack`, `check:consumer`. |
 | `.github/workflows/ci.yaml` | CI: tests on Node 24 and Bun, coverage gate, pack and clean-install smoke test. |
 | `doc/` | Repository-level documentation (this file). |
 
