@@ -93,6 +93,10 @@
       "types": "./dist/transform/index.d.ts",
       "default": "./dist/transform/index.js"
     },
+    "./reconstruct": {
+      "types": "./dist/reconstruct/index.d.ts",
+      "default": "./dist/reconstruct/index.js"
+    },
     "./data/*": "./data/*",
     "./package.json": "./package.json"
   },
