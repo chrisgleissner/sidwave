@@ -47,6 +47,22 @@ export interface SidwaveGameCycles {
   measuredCalls: number;
   /** Which values were measured on the emulator and which are computed. */
   kinds: { worst: "measured"; average: "measured"; estimatedWorst: "estimated" };
+  /** SIDWave 1.4, several songs: the measured values of each song. `worst` and `average` above cover all songs. */
+  songs?: Array<{ name: string; worst: number | null; average: number | null; calls: number; estimatedWorst: number }>;
+}
+
+/** What the contract says about one song of a document with songs. */
+export interface SidwaveGameSongContract {
+  index: number;
+  name: string;
+  /** Play calls per video frame while this song plays; the game calls `play` this many times per frame. */
+  playCallsPerFrame: number;
+  playCallsPerSecond: number;
+  /** False for a song that plays once and then writes no more registers. */
+  loop: boolean;
+  /** Play calls of one pass of the song. */
+  frames: number;
+  durationSeconds: number;
 }
 
 export interface SidwaveGameContract {
@@ -77,8 +93,10 @@ export interface SidwaveGameContract {
   interrupts: string;
   /** Deepest stack use of init, play and stop in bytes, return address included; measured, or null without measurement. */
   maxStackBytes: number | null;
-  /** The game calls `play` this many times per video frame, evenly spaced. */
+  /** The game calls `play` this many times per video frame, evenly spaced (song 0's value with several songs; see `songs`). */
   playCallsPerFrame: number;
+  /** Present when the document has more than one song: `init` selects the song with A. */
+  songs?: SidwaveGameSongContract[];
   /** Play calls per second of music and the clock the score was written for. */
   playCallsPerSecond: number;
   system: SystemMode;
@@ -116,7 +134,9 @@ const addr = (n: number) => `$${hex(n, n < 0x100 ? 2 : 4)}`;
 function publicLabels(image: SidwaveGameImage): Array<[string, number, string]> {
   const sym = (label: string) => image.symbols.get(label)!;
   const labels: Array<[string, number, string]> = [
-    ["sidwave_init", image.origin + SIDWAVE_GAME_ENTRY.init, "init: A = subtune (0), X = clock (0 PAL, 1 NTSC, $FF read $02A6)"],
+    ["sidwave_init", image.origin + SIDWAVE_GAME_ENTRY.init, image.songs
+      ? `init: A = song (0-${image.songs.length - 1}, anything else plays song 0), X = clock (0 PAL, 1 NTSC, $FF read $02A6)`
+      : "init: A = subtune (0), X = clock (0 PAL, 1 NTSC, $FF read $02A6)"],
     ["sidwave_play", image.origin + SIDWAVE_GAME_ENTRY.play, "play: one call per play period"],
     ["sidwave_stop", image.origin + SIDWAVE_GAME_ENTRY.stop, "stop: silence all voices"],
     ["sidwave_sfx", image.origin + SIDWAVE_GAME_ENTRY.sfx, "sfx: stub (rts) until sound effects exist"],
@@ -128,7 +148,8 @@ function publicLabels(image: SidwaveGameImage): Array<[string, number, string]> 
   }
   labels.push(["sidwave_zp_ptr", image.zeroPage, "zero page: stream pointer (2 bytes)"]);
   if (image.zeroPageRanges.length > 1) labels.push(["sidwave_zp_sid_io", image.zeroPage + 2, "zero page: SID pointer (2 bytes)"]);
-  labels.push(["sidwave_play_calls_per_frame", image.playCallsPerFrame, "play calls per video frame"]);
+  labels.push(["sidwave_play_calls_per_frame", image.playCallsPerFrame, image.songs ? "play calls per video frame of song 0 (see the contract for the others)" : "play calls per video frame"]);
+  if (image.songs) labels.push(["sidwave_songs", image.songs.length, "number of songs"]);
   return labels;
 }
 
@@ -138,6 +159,7 @@ function contractLines(contract: SidwaveGameContract, build: { cycles: SidwaveGa
     "SIDWave game build contract",
     `entry points: init $${hex(contract.entryPoints.init)}, play $${hex(contract.entryPoints.play)}, stop $${hex(contract.entryPoints.stop)}, sfx $${hex(contract.entryPoints.sfx)} (3 bytes each)`,
     `init: A = ${contract.registers.init.in.A}; X = ${contract.registers.init.in.X}; clobbers ${contract.registers.init.clobbers.join(", ")}`,
+    ...(contract.songs ? contract.songs.map((song) => `song ${song.index} "${song.name}": ${song.playCallsPerFrame} play call(s) per frame, ${song.loop ? "loops" : "plays once"}, ${song.frames} calls, ${song.durationSeconds.toFixed(1)} s`) : []),
     `play, stop: no input; clobber ${contract.registers.play.clobbers.join(", ")}`,
     `sfx: ${contract.registers.sfx.note}`,
     `flags: ${contract.flags}`,
@@ -180,25 +202,41 @@ function symbolFile(format: SidwaveSymbolFormat, entries: Array<[string, number,
 }
 
 /** Runs the compiled score on the bundled emulator: init, every play call of the song plus one loop, then stop. */
-function measure(image: SidwaveGameImage): { worst: number; average: number; calls: number; stack: number } {
+interface Measured { worst: number; average: number; calls: number; stack: number; songs?: Array<{ worst: number; average: number; calls: number }> }
+
+function measure(image: SidwaveGameImage): Measured {
   const mem = new Uint8Array(0x10000);
   mem.set(image.player, image.origin);
   if (image.data) mem.set(image.data, image.dataOrigin!);
   const cpu = new Cpu6502(mem);
   const clock = image.system === "NTSC" ? 1 : 0;
-  cpu.call(image.origin + SIDWAVE_GAME_ENTRY.init, { a: 0, x: clock });
-  let stack = cpu.lastStackDepth;
-  const calls = image.totalFrames + (image.loop ? image.totalFrames - (image.loopFrame ?? 0) : 0) + 4;
-  let worst = 0;
-  let total = 0;
-  for (let i = 0; i < calls; i++) {
-    const cycles = cpu.call(image.origin + SIDWAVE_GAME_ENTRY.play);
-    worst = Math.max(worst, cycles);
-    total += cycles;
+  let stack = 0;
+  const run = (song: number, totalFrames: number, loop: boolean, loopFrame: number | undefined) => {
+    cpu.call(image.origin + SIDWAVE_GAME_ENTRY.init, { a: song, x: clock });
     stack = Math.max(stack, cpu.lastStackDepth);
-  }
-  cpu.call(image.origin + SIDWAVE_GAME_ENTRY.stop);
-  return { worst, average: total / calls, calls, stack: Math.max(stack, cpu.lastStackDepth) };
+    const calls = totalFrames + (loop ? totalFrames - (loopFrame ?? 0) : 0) + 4;
+    let worst = 0;
+    let total = 0;
+    for (let i = 0; i < calls; i++) {
+      const cycles = cpu.call(image.origin + SIDWAVE_GAME_ENTRY.play);
+      worst = Math.max(worst, cycles);
+      total += cycles;
+      stack = Math.max(stack, cpu.lastStackDepth);
+    }
+    cpu.call(image.origin + SIDWAVE_GAME_ENTRY.stop);
+    return { worst, average: total / calls, calls };
+  };
+  const runs = image.songs
+    ? image.songs.map((song, k) => run(k, song.totalFrames, song.loop, song.loopFrame))
+    : [run(0, image.totalFrames, image.loop, image.loopFrame)];
+  const calls = runs.reduce((sum, r) => sum + r.calls, 0);
+  return {
+    worst: Math.max(...runs.map((r) => r.worst)),
+    average: runs.reduce((sum, r) => sum + r.average * r.calls, 0) / calls,
+    calls,
+    stack: Math.max(stack, cpu.lastStackDepth),
+    ...(image.songs ? { songs: runs } : {}),
+  };
 }
 
 /**
@@ -233,9 +271,15 @@ export function compileSidwave(doc: ParsedSidwave, options: SidwaveGameOptions):
     worst: measured?.worst ?? null,
     average: measured?.average ?? null,
     estimatedWorst: image.estimatedWorstCycles,
-    measuredOverSeconds: measured ? measured.calls / image.framesPerSecond : null,
+    measuredOverSeconds: measured ? (measured.songs && image.songs
+      ? measured.songs.reduce((sum, run, k) => sum + run.calls / image.songs![k]!.framesPerSecond, 0)
+      : measured.calls / image.framesPerSecond) : null,
     measuredCalls: measured?.calls ?? 0,
     kinds: { worst: "measured", average: "measured", estimatedWorst: "estimated" },
+    ...(image.songs ? { songs: image.songs.map((song, k) => ({
+      name: song.name, worst: measured?.songs?.[k]!.worst ?? null, average: measured?.songs?.[k]!.average ?? null,
+      calls: measured?.songs?.[k]!.calls ?? 0, estimatedWorst: song.worstCaseCycles,
+    })) } : {}),
   };
   const entryPoints = {
     init: image.origin + SIDWAVE_GAME_ENTRY.init, play: image.origin + SIDWAVE_GAME_ENTRY.play,
@@ -249,7 +293,9 @@ export function compileSidwave(doc: ParsedSidwave, options: SidwaveGameOptions):
     entryTableBytes: SIDWAVE_GAME_TABLE_BYTES,
     registers: {
       init: {
-        in: { A: "subtune index, 0-based (only 0 exists; the value is ignored)", X: "clock: 0 PAL, 1 NTSC, $FF reads the KERNAL flag at $02A6" },
+        in: { A: image.songs
+          ? `song index, 0-based (0-${image.songs.length - 1}); a larger value plays song 0. init resets all player state, so it can start any song at any time`
+          : "subtune index, 0-based (only 0 exists; the value is ignored)", X: "clock: 0 PAL, 1 NTSC, $FF reads the KERNAL flag at $02A6" },
         clobbers,
       },
       play: { in: "none", clobbers },
@@ -270,6 +316,10 @@ export function compileSidwave(doc: ParsedSidwave, options: SidwaveGameOptions):
     interrupts: "none: no interrupt vector, CIA or VIC timer is touched and the I flag is not changed; the game calls play itself",
     maxStackBytes: measured?.stack ?? null,
     playCallsPerFrame: image.playCallsPerFrame,
+    ...(image.songs ? { songs: image.songs.map((song, index) => ({
+      index, name: song.name, playCallsPerFrame: song.speed, playCallsPerSecond: song.framesPerSecond, loop: song.loop,
+      frames: song.totalFrames, durationSeconds: song.durationSeconds,
+    })) } : {}),
     playCallsPerSecond: image.framesPerSecond,
     system: image.system,
     ...(image.data ? { data: { origin: image.dataOrigin!, bytes: image.data.length, sha256: createHash("sha256").update(image.data).digest("hex") } } : {}),
@@ -341,10 +391,24 @@ export function sidwaveGamePsid(doc: ParsedSidwave, build: SidwaveGameBuild): Bu
   const high = Math.max(image.ramEnd, image.dataEnd ?? 0);
   // A score with several play calls per frame is timed by CIA1 timer A (the header says so): the start routine
   // programs the latch like the PRG installer does. The player itself never touches the CIA.
-  const latch = Math.round((image.system === "NTSC" ? 1_022_727 : 985_248) / image.framesPerSecond) - 1;
-  const start = [
-    ...(image.playCallsPerFrame > 1 ? [0xa9, latch & 0xff, 0x8d, 0x04, 0xdc, 0xa9, latch >> 8, 0x8d, 0x05, 0xdc] : []),
-    0xa2, image.system === "NTSC" ? 1 : 0, 0x4c, image.origin & 0xff, image.origin >> 8,
+  const hz = image.system === "NTSC" ? 1_022_727 : 985_248;
+  const latch = Math.round(hz / image.framesPerSecond) - 1;
+  const clockByte = image.system === "NTSC" ? 1 : 0;
+  const songs = image.songs;
+  // With several songs the host passes the song in A, so the start routine must leave A alone; when the songs differ in
+  // speed it looks the latch of the song up in a table behind the routine.
+  const timed = songs ? songs.some((song) => song.speed > 1) : image.playCallsPerFrame > 1;
+  const start = songs && timed ? (() => {
+    const latches = songs.map((song) => Math.round(hz / song.framesPerSecond) - 1);
+    const table = high + 19;
+    return [
+      0xa8, 0xb9, table & 0xff, table >> 8, 0x8d, 0x04, 0xdc, 0xb9, (table + songs.length) & 0xff, (table + songs.length) >> 8, 0x8d, 0x05, 0xdc,
+      0x98, 0xa2, clockByte, 0x4c, image.origin & 0xff, image.origin >> 8,
+      ...latches.map((value) => value & 0xff), ...latches.map((value) => value >> 8),
+    ];
+  })() : [
+    ...(timed ? [0xa9, latch & 0xff, 0x8d, 0x04, 0xdc, 0xa9, latch >> 8, 0x8d, 0x05, 0xdc] : []),
+    0xa2, clockByte, 0x4c, image.origin & 0xff, image.origin >> 8,
   ];
   if (high + start.length > SIDWAVE_MEMORY_END) {
     throw new SidwaveValidationError("$.origin", "the PSID start routine would end past $D000; lower the origin");

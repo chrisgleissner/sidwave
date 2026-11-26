@@ -12,7 +12,7 @@ import { gameMachine, sidTrace } from "./helpers/sidwaveGameHarness.mjs";
 // filled with pseudo-random bytes, so the player may not depend on anything outside what init sets.
 // The run is limited to CALL_LIMIT play calls (the whole song plus one loop for the shorter scores).
 const CALL_LIMIT = 4000;
-const NAMES = SIDWAVE_SCORE_RESOURCES.map(({ name }) => name).filter((name) => name !== "digi_groove");
+const NAMES = SIDWAVE_SCORE_RESOURCES.map(({ name }) => name).filter((name) => name !== "digi_groove" && name !== "game_songs"); // game_songs: see sidwaveSongsGame.test.mjs
 
 function buildExample(doc) {
   for (const dataOrigin of [0x9001, 0x5001]) {

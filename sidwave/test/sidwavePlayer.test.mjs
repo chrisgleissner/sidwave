@@ -1884,14 +1884,15 @@ for (const { name } of SIDWAVE_EXAMPLES) {
     assert.ok(techniques, `${name} header documents its techniques`);
     assert.ok(header.some((line) => line.startsWith("# Learn: ")), `${name} header documents what to hear`);
     const arrangement = arrangeSidwave(doc);
-    assert.equal(doc.version, "1.3");
+    assert.ok(["1.3", "1.4"].includes(doc.version));
     assert.equal(doc.sids.length, Number(sids[1]));
     if (sids[2]) assert.equal(doc.voices.length, Number(sids[2]));
     assert.ok(new Set(arrangement.clock.sections.map(({ section }) => section.section)).size >= 2);
-    assert.ok(doc.end || doc.loopTo !== undefined);
+    assert.ok(doc.end || doc.loopTo !== undefined || doc.songs, "the score ends or loops, or has songs that do");
     const compiled = compileSidwaveToPrg(doc);
     const seconds = compiled.durationSeconds;
-    const [min, maxSeconds] = name === "title_fanfare" ? [12, 20] : [90, 240];
+    // game_songs: the length is that of its first song, a title tune of a few bars
+    const [min, maxSeconds] = name === "title_fanfare" ? [12, 20] : name === "game_songs" ? [12, 30] : [90, 240];
     assert.ok(seconds >= min && seconds <= maxSeconds, `${seconds.toFixed(2)}s outside ${min}–${maxSeconds}s`);
     assert.ok(compiled.endAddress + 3 <= SIDWAVE_MEMORY_END);
     assert.ok(compiled.warnings.every((warning) => !/Sawtooth level/i.test(warning)), compiled.warnings.join("\n"));

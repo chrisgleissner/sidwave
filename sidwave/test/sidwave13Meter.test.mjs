@@ -166,7 +166,7 @@ test("sample bars and beats follow the metre of each section", () => {
 
 test("every example in the SIDWAVE 1.3 chapter of the spec compiles, and the schema lists the metre", () => {
   const spec = fs.readFileSync(new URL("../data/sound/sidwave.md", import.meta.url), "utf8");
-  const chapter = spec.slice(spec.indexOf("## SIDWave 1.3"), spec.indexOf("## Playable examples"));
+  const chapter = spec.slice(spec.indexOf("## SIDWave 1.3"), spec.indexOf("## SIDWave 1.4"));
   const examples = [...chapter.matchAll(/```yaml\n([\s\S]*?)```/g)].map((m) => m[1]);
   assert.ok(examples.length >= 1);
   for (const yaml of examples) assert.ok(compileSidwaveToPrg(parseSidwave(yaml)).prg.length > 0);

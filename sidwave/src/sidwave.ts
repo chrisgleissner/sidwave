@@ -239,6 +239,8 @@ export interface SidwaveDocument {
   instruments?: Record<string, Record<string, unknown>>;
   voices?: SidVoiceSource[];
   timeline?: SidwaveTimelineSection[];
+  /** SIDWave 1.4: several songs that share the voices, patterns, sections and instruments. */
+  songs?: Array<{ name: string; timeline: unknown[]; loop?: boolean | string | number; tempo?: number; speed?: number }>;
   // Legacy CPG compatibility
   song?: {
     title?: string;
@@ -250,8 +252,22 @@ export interface SidwaveDocument {
   };
 }
 
+/** SIDWave 1.4: one song of a document with `songs`, resolved against the document defaults. */
+export interface ParsedSong {
+  name: string;
+  timeline: SidwaveTimelineSection[];
+  /** False for a song that plays once (`loop: false`). */
+  loop: boolean;
+  /** Index into `timeline` the song returns to when it loops; undefined loops from the start. */
+  loopTo?: number;
+  tempo: number;
+  speed: number;
+  /** Bars of the timeline (the sum of the entries). */
+  length_bars: number;
+}
+
 export interface ParsedSidwave {
-  version: "1.0" | "1.1" | "1.2" | "1.3";
+  version: "1.0" | "1.1" | "1.2" | "1.3" | "1.4";
   song: Required<Pick<SidwaveSongMeta, "title" | "tempo" | "mode">> & {
     author?: string;
     length_bars: number;
@@ -270,6 +286,13 @@ export interface ParsedSidwave {
   /** Zero based physical voice slot for each declared voice ID. */
   voiceSlots: Map<number, number>;
   timeline: SidwaveTimelineSection[];
+  /**
+   * SIDWave 1.4: the songs of a document with `songs`. The document-level `timeline`, `loopTo`, `speed` and
+   * `song.tempo` then describe song 0, so code that knows only one song still sees a complete score.
+   */
+  songs?: ParsedSong[];
+  /** SIDWave 1.4, documents with songs only: the names of the `sections` definitions, for the lint. */
+  definedSections?: string[];
   accent?: number;
   swing?: number;
   swingUnit?: number;
@@ -281,9 +304,14 @@ export interface ParsedSidwave {
   ignoredFields?: string[];
 }
 
-/** SIDWave 1.2 and 1.3 share the modern compiler path; a 1.2 document compiles to the same bytes under 1.3. */
+/** SIDWave 1.2, 1.3 and 1.4 share the modern compiler path; a 1.2 document compiles to the same bytes under 1.3 and 1.4. */
 export function isModern(doc: Pick<ParsedSidwave, "version">): boolean {
-  return doc.version === "1.2" || doc.version === "1.3";
+  return doc.version === "1.2" || doc.version === "1.3" || doc.version === "1.4";
+}
+
+/** True for SIDWave 1.3 and later, which accept the 1.3 fields. */
+export function isV13(doc: Pick<ParsedSidwave, "version">): boolean {
+  return doc.version === "1.3" || doc.version === "1.4";
 }
 
 /** Raised for SIDWave documents that cannot be played as written. The message names the offending path. */
@@ -302,7 +330,7 @@ export const SIDWAVE_TEMPO_RANGE = { min: 30, max: 220 } as const;
 /** MIDI numbers of C0 and B7, the note range of the player's frequency table. */
 export const SIDWAVE_NOTE_RANGE = { min: 12, max: 107 } as const;
 
-const TOP_LEVEL_KEYS = new Set(["sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit"]);
+const TOP_LEVEL_KEYS = new Set(["sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs"]);
 const LEGACY_KEYS = new Set(["song", "voices", "timeline"]);
 const LEGACY_SONG_KEYS = new Set(["title", "author", "tempo", "mode", "length_bars", "global_fx"]);
 const VOICE_KEYS = new Set(["id", "sid", "channel", "name", "waveform", "pulse_width", "adsr", "patterns", "instrument", "echo", "unison", "detune", "level", "role", "center"]);
@@ -343,12 +371,14 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     checkKeys(obj.song, LEGACY_SONG_KEYS, "$.song");
   } else {
     checkKeys(obj, TOP_LEVEL_KEYS, "$");
-    if (obj.sidwave !== undefined && !["1", "1.0", "1.1", "1.2", "1.3"].includes(scalarText(obj.sidwave, "$.sidwave"))) {
-      throw new SidwaveValidationError("$.sidwave", `unsupported version ${describeValue(obj.sidwave)}; use 1.0, 1.1, 1.2 or 1.3`);
+    if (obj.sidwave !== undefined && !["1", "1.0", "1.1", "1.2", "1.3", "1.4"].includes(scalarText(obj.sidwave, "$.sidwave"))) {
+      throw new SidwaveValidationError("$.sidwave", `unsupported version ${describeValue(obj.sidwave)}; use 1.0, 1.1, 1.2, 1.3 or 1.4`);
     }
   }
-  // SIDWave 1.3 accepts everything that 1.2 accepts and compiles it to the same bytes.
-  const v13 = obj.sidwave === 1.3 || obj.sidwave === "1.3";
+  // SIDWave 1.3 accepts everything that 1.2 accepts and compiles it to the same bytes. 1.4 does the same for 1.3.
+  const v14 = obj.sidwave === 1.4 || obj.sidwave === "1.4";
+  const v13 = obj.sidwave === 1.3 || obj.sidwave === "1.3" || v14;
+  if (obj.songs !== undefined && !v14) throw new SidwaveValidationError("$.songs", "songs require sidwave: 1.4");
   const modern = obj.sidwave === 1.2 || obj.sidwave === "1.2" || v13;
   const header = (legacy ? obj.song : obj) as Record<string, unknown>;
   const headerPath = legacy ? "$.song" : "$";
@@ -431,17 +461,36 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     return [voice];
   });
 
-  if (!Array.isArray(obj.timeline) || obj.timeline.length === 0) {
-    throw new SidwaveValidationError("$.timeline", "missing timeline (expected a list of sections)");
-  }
-  if (obj.timeline.length > MAX_SIDWAVE_BARS) {
-    throw new SidwaveValidationError("$.timeline", `at most ${MAX_SIDWAVE_BARS} sections can fit in the bar limit`);
-  }
   if (digiVoices.length && obj.samples === undefined) throw new SidwaveValidationError("$.samples", "digi voices need samples.defs for the samples their kits name");
-  const timeline = modern
-    ? normalizeForm(obj.timeline, obj.sections, voices, digiVoices, sids, meter, v13)
-    : obj.timeline.map((t: unknown, i: number) => normalizeTimelineSection(t, `$.timeline[${i}]`, voices));
-  if (v13) checkSectionBarLines(timeline, voices, digiVoices, meterSig ?? meterOf(meter));
+  const songMetre = meterSig ?? meterOf(meter);
+  let songs: ParsedSong[] | undefined;
+  let timeline: SidwaveTimelineSection[];
+  if (obj.songs !== undefined) {
+    for (const key of ["timeline", "loop_to", "end", "length_bars"]) {
+      if (header[key] !== undefined) {
+        throw new SidwaveValidationError(`${headerPath}.${key}`, key === "timeline"
+          ? "a document with songs has no top-level timeline; every song has its own timeline"
+          : `a document with songs has no top-level ${key}; use ${key === "loop_to" ? "the loop field of a song" : key === "end" ? "loop: false and a closing bar of rests in a song" : "the bars of a song"}`);
+      }
+    }
+    if (isPlainObject(obj.samples) && (obj.samples.voices !== undefined || obj.samples.triggers !== undefined)) {
+      throw new SidwaveValidationError("$.samples", "samples.voices and samples.triggers are positioned on one timeline; with songs, play samples from digi voices instead");
+    }
+    songs = parseSongs(obj.songs, obj.sections, voices, digiVoices, sids, meter, tempo, obj.speed);
+    checkSectionBarLines(songs.map((song, k) => ({ timeline: song.timeline, path: `$.songs[${k}].timeline` })), voices, digiVoices, songMetre);
+    timeline = songs[0]!.timeline;
+  } else {
+    if (!Array.isArray(obj.timeline) || obj.timeline.length === 0) {
+      throw new SidwaveValidationError("$.timeline", "missing timeline (expected a list of sections)");
+    }
+    if (obj.timeline.length > MAX_SIDWAVE_BARS) {
+      throw new SidwaveValidationError("$.timeline", `at most ${MAX_SIDWAVE_BARS} sections can fit in the bar limit`);
+    }
+    timeline = modern
+      ? normalizeForm(obj.timeline, obj.sections, voices, digiVoices, sids, meter, v13)
+      : obj.timeline.map((t: unknown, i: number) => normalizeTimelineSection(t, `$.timeline[${i}]`, voices));
+    if (v13) checkSectionBarLines([{ timeline, path: "$.timeline" }], voices, digiVoices, songMetre);
+  }
   if (Number(obj.loop_to !== undefined) + Number(obj.end !== undefined) + Number(obj.length_bars !== undefined) > 1) {
     throw new SidwaveValidationError("$.timeline", "loop_to, end and length_bars are mutually exclusive");
   }
@@ -453,6 +502,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     else if (typeof target === "string" && !/^\s*\d+\s*$/.test(target)) throw new SidwaveValidationError("$.loop_to", "unknown timeline section");
     else loopTo = requireNumber(target, "$.loop_to", { min: 1, max: timeline.length, integer: true }) - 1;
   }
+  if (songs) loopTo = songs[0]!.loopTo;
   const endDef = obj.end === true ? {} : obj.end === undefined ? undefined : requireObject(obj.end, "$.end", ["hold_beats", "release"]);
   if (endDef?.release !== undefined && typeof endDef.release !== "boolean") throw new SidwaveValidationError("$.end.release", "expected a boolean");
   const end = endDef && { holdBeats: requireNumber(endDef.hold_beats ?? 0, "$.end.hold_beats", { min: 0, max: 64 }), release: endDef.release ?? true };
@@ -470,12 +520,12 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   }
 
   const samples = normalizeSamples(obj.samples, sids, modern, barStartBeats(timeline, length_bars, meter), digiVoices.length > 0, options);
-  const song: ParsedSidwave["song"] = { title, tempo, mode, length_bars, meter, global_fx, ...(meterSig ? { meterSig } : {}) };
+  const song: ParsedSidwave["song"] = { title, tempo: songs ? songs[0]!.tempo : tempo, mode, length_bars, meter, global_fx, ...(meterSig ? { meterSig } : {}) };
   if (author !== undefined) song.author = author;
-  const speed = obj.speed === undefined ? 1 : requireNumber(obj.speed, "$.speed", { min: 1, max: 4, integer: true });
+  const speed = songs ? songs[0]!.speed : obj.speed === undefined ? 1 : requireNumber(obj.speed, "$.speed", { min: 1, max: 4, integer: true });
   if (obj.cpu !== undefined && obj.cpu !== "turbo") throw new SidwaveValidationError("$.cpu", "expected turbo");
   const declaredVersion = String(obj.sidwave);
-  const version = declaredVersion === "1.1" || declaredVersion === "1.2" || declaredVersion === "1.3" ? declaredVersion : "1.0";
+  const version = declaredVersion === "1.1" || declaredVersion === "1.2" || declaredVersion === "1.3" || declaredVersion === "1.4" ? declaredVersion : "1.0";
   for (const [chip, sid] of sids.entries()) {
     const owner = sid.filter?.owner;
     if (owner === undefined) continue;
@@ -484,7 +534,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     sid.filter!.route ??= [slot % 3 + 1];
   }
   return { version, song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,
-    accent, swing, swingUnit, loopTo, end, layout, digiVoices, ...(ignoredFields.length ? { ignoredFields } : {}) };
+    accent, swing, swingUnit, loopTo, end, layout, digiVoices, ...(songs ? { songs, definedSections: isPlainObject(obj.sections) ? Object.keys(obj.sections) : [] } : {}), ...(ignoredFields.length ? { ignoredFields } : {}) };
 
 }
 
@@ -1320,7 +1370,7 @@ export function barStartBeats(timeline: SidwaveTimelineSection[], lengthBars: nu
 }
 
 /** SIDWave 1.3: checks the bar lines and `bars` of every pattern against the metre of each section that plays it. */
-function checkSectionBarLines(timeline: SidwaveTimelineSection[], voices: SidwaveVoice[],
+function checkSectionBarLines(timelines: Array<{ timeline: SidwaveTimelineSection[]; path: string }>, voices: SidwaveVoice[],
   digis: NonNullable<ParsedSidwave["digiVoices"]>, songMeter: SidwaveMeter): void {
   const owners = [
     ...voices.map((voice) => ({ key: `v${voice.id}`, patterns: voice.patterns ?? {} })),
@@ -1329,20 +1379,20 @@ function checkSectionBarLines(timeline: SidwaveTimelineSection[], voices: Sidwav
   const seen = new Set<string>();
   for (const owner of owners) {
     const used = new Set<string>();
-    timeline.forEach((section, i) => {
+    timelines.forEach(({ timeline, path }) => timeline.forEach((section, i) => {
       const ref = section.layers[owner.key];
       if (ref === undefined) return;
       const meter = section.meter ?? songMeter;
-      for (const item of parseLayerSequence(ref, Object.keys(owner.patterns), `$.timeline[${i}].layers.${owner.key}`).items) {
+      for (const item of parseLayerSequence(ref, Object.keys(owner.patterns), `${path}[${i}].layers.${owner.key}`).items) {
         if (!item.pattern) continue;
         used.add(item.pattern);
         const key = `${owner.key}:${item.pattern}:${meter.sig}`;
         if (seen.has(key)) continue;
         seen.add(key);
         checkBarsInMeter(owner.patterns[item.pattern]!, item.pattern, meter,
-          `section ${JSON.stringify(section.section || `#${i + 1}`)} ($.timeline[${i}]) plays it in ${meter.sig}`);
+          `section ${JSON.stringify(section.section || `#${i + 1}`)} (${path}[${i}]) plays it in ${meter.sig}`);
       }
-    });
+    }));
     for (const [name, pattern] of Object.entries(owner.patterns)) {
       if (!used.has(name)) checkBarsInMeter(pattern, name, songMeter, `the song metre is ${songMeter.sig}`);
     }
@@ -1404,8 +1454,65 @@ export function parseLayerSequence(ref: string, patterns: string[], path: string
   return { items, sequence };
 }
 
+/** The most songs one document can hold: the PSID speed field has one bit per song. */
+export const SIDWAVE_MAX_SONGS = 32;
+const SONG_KEYS = new Set(["name", "timeline", "loop", "tempo", "speed"]);
+
+/**
+ * SIDWave 1.4: parses `songs`. Every song has its own timeline over the shared voices, patterns and named sections,
+ * and may set its own tempo, speed and loop behaviour; tempo and speed default to the document values.
+ */
+function parseSongs(raw: unknown, definitions: unknown, voices: SidwaveVoice[], digis: NonNullable<ParsedSidwave["digiVoices"]>,
+  sids: SidMapEntry[], meter: number, defaultTempo: number, defaultSpeed: unknown): ParsedSong[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new SidwaveValidationError("$.songs", `expected a list of 1 to ${SIDWAVE_MAX_SONGS} songs`);
+  }
+  if (raw.length > SIDWAVE_MAX_SONGS) {
+    throw new SidwaveValidationError("$.songs", `at most ${SIDWAVE_MAX_SONGS} songs are supported (the PSID speed field has one bit per song); ${raw.length} were given`);
+  }
+  const channels = sids.length * 3;
+  if (raw.length * channels > 255) {
+    throw new SidwaveValidationError("$.songs", `${raw.length} songs of ${channels} voice channels exceed the player's 255 stream pointers; use at most ${Math.floor(255 / channels)} songs`);
+  }
+  const docSpeed = defaultSpeed === undefined ? 1 : requireNumber(defaultSpeed, "$.speed", { min: 1, max: 4, integer: true });
+  const names = new Set<string>();
+  return raw.map((entry: unknown, k: number) => {
+    const path = `$.songs[${k}]`;
+    if (!isPlainObject(entry)) throw new SidwaveValidationError(path, "expected a song mapping with name and timeline");
+    checkKeys(entry, SONG_KEYS, path);
+    const name = requireText(entry.name, path + ".name");
+    if (name.length > 32) throw new SidwaveValidationError(path + ".name", "expected at most 32 characters");
+    if (names.has(name)) throw new SidwaveValidationError(path + ".name", `song name ${JSON.stringify(name)} is used more than once`);
+    names.add(name);
+    if (!Array.isArray(entry.timeline) || entry.timeline.length === 0) {
+      throw new SidwaveValidationError(path + ".timeline", "missing timeline (expected a list of sections)");
+    }
+    if (entry.timeline.length > MAX_SIDWAVE_BARS) {
+      throw new SidwaveValidationError(path + ".timeline", `at most ${MAX_SIDWAVE_BARS} sections can fit in the bar limit`);
+    }
+    const timeline = normalizeForm(entry.timeline, definitions, voices, digis, sids, meter, true, path + ".timeline");
+    const length_bars = timeline.reduce((sum, section) => sum + section.bars, 0);
+    if (length_bars > MAX_SIDWAVE_BARS) {
+      throw new SidwaveValidationError(path + ".timeline", `the sections add up to ${length_bars} bars, above the maximum ${MAX_SIDWAVE_BARS}`);
+    }
+    let loop = true;
+    let loopTo: number | undefined;
+    if (entry.loop === false) loop = false;
+    else if (entry.loop !== undefined && entry.loop !== true) {
+      const named = typeof entry.loop === "string" ? timeline.findIndex((section) => section.section === entry.loop) : -1;
+      if (named >= 0) loopTo = named;
+      else if (typeof entry.loop === "string" && !/^\s*\d+\s*$/.test(entry.loop)) {
+        throw new SidwaveValidationError(path + ".loop", "expected true, false, the name of a section of the timeline or a 1-based timeline position");
+      } else loopTo = requireNumber(entry.loop, path + ".loop", { min: 1, max: timeline.length, integer: true }) - 1;
+    }
+    const tempo = entry.tempo === undefined ? defaultTempo : parseTempo(entry.tempo, path + ".tempo");
+    const speed = entry.speed === undefined ? docSpeed : requireNumber(entry.speed, path + ".speed", { min: 1, max: 4, integer: true });
+    return { name, timeline, loop, ...(loopTo === undefined ? {} : { loopTo }), tempo, speed, length_bars };
+  });
+}
+
 function normalizeForm(raw: unknown[], definitions: unknown, voices: SidwaveVoice[],
-  digis: NonNullable<ParsedSidwave["digiVoices"]>, sids: SidMapEntry[], meter: number, v13 = false): SidwaveTimelineSection[] {
+  digis: NonNullable<ParsedSidwave["digiVoices"]>, sids: SidMapEntry[], meter: number, v13 = false, base = "$.timeline"): SidwaveTimelineSection[] {
   const names = definitions === undefined ? {} : definitions;
   if (!isPlainObject(names)) throw new SidwaveValidationError("$.sections", "expected named sections");
   for (const [name, value] of Object.entries(names)) {
@@ -1415,7 +1522,7 @@ function normalizeForm(raw: unknown[], definitions: unknown, voices: SidwaveVoic
   const timeline: SidwaveTimelineSection[] = [];
   let bars = 0;
   raw.forEach((entry, i) => {
-    const path = `$.timeline[${i}]`;
+    const path = `${base}[${i}]`;
     let name: string | undefined;
     let overrides: Record<string, any> = {};
     let count = 1;

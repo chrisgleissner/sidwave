@@ -133,7 +133,7 @@ A score with multispeed (`speed` above 1) needs `speed` play calls per video fra
 | Item | Guarantee |
 | --- | --- |
 | Entry points | `origin+0` init, `+3` play, `+6` stop, `+9` sfx. Each is a three byte jump. `sfx` is a one byte `rts` stub until sound effects exist; the table never changes its layout. |
-| `init` input | `A` = subtune index, 0-based; only 0 exists and other values are ignored. `X` = clock: 0 PAL, 1 NTSC (any other value counts as NTSC), `$FF` reads the KERNAL flag at `$02A6` (nonzero on PAL); do not place the player over `$02A6` if you pass `$FF` (the build warns). `init` silences the SID registers and resets the song. |
+| `init` input | `A` = song index, 0-based. A score without `songs` has only song 0 and ignores other values; with `songs` (SIDWave 1.4), an index beyond the last song plays song 0 (see [Songs](#songs-sidwave-14)). `X` = clock: 0 PAL, 1 NTSC (any other value counts as NTSC), `$FF` reads the KERNAL flag at `$02A6` (nonzero on PAL); do not place the player over `$02A6` if you pass `$FF` (the build warns). `init` silences the SID registers and resets the song. |
 | `play`, `stop` input | None. Call `play` once per play period. |
 | Registers | `init`, `play` and `stop` clobber A, X and Y. The interrupt and decimal flags are never changed; the other flags are undefined on return. |
 | Processor port `$01` | Saved on entry, set to `$36` while the routine runs (I/O and KERNAL visible, BASIC ROM off), restored on return. |
@@ -145,16 +145,31 @@ A score with multispeed (`speed` above 1) needs `speed` play calls per video fra
 | Cycles | `cycles.worst` is measured: the build runs every play call of the song plus one more pass of the loop on the bundled 6502 emulator, with the call through the entry table. `cycles.estimatedWorst` is the compiler's upper bound. The build fails when the measured value exceeds the estimate. The average is `cycles.average`. VIC and DMA stalls are not included. |
 | Not supported | CIA2 digi samples (`samples:`), which need an installed NMI. A build with a KERNAL that is banked out is not offered; the player sets `$01` to `$36` itself. `cpu: turbo` builds, but the build does not switch the CPU speed. |
 
-The symbol files export `sidwave_init`, `sidwave_play`, `sidwave_stop`, `sidwave_sfx`, `sidwave_ram`, `sidwave_ram_end`, `sidwave_data` and `sidwave_data_end` (with `--data-origin`), `sidwave_zp_ptr`, `sidwave_zp_sid_io` (several SIDs) and `sidwave_play_calls_per_frame`. The ACME, KickAssembler and ca65 files also carry the contract as comments.
+The symbol files export `sidwave_init`, `sidwave_play`, `sidwave_stop`, `sidwave_sfx`, `sidwave_ram`, `sidwave_ram_end`, `sidwave_data` and `sidwave_data_end` (with `--data-origin`), `sidwave_zp_ptr`, `sidwave_zp_sid_io` (several SIDs), `sidwave_play_calls_per_frame` and, with songs, `sidwave_songs`. The ACME, KickAssembler and ca65 files also carry the contract as comments.
+
+### Songs (SIDWave 1.4)
+
+A score can hold several songs that share one player, one instrument table and the same patterns and named sections. Each song has its own `timeline` and may set `loop`, `tempo` and `speed`. [`game_songs.yaml`](data/sound/examples/game_songs.yaml) has a title tune, an in-game loop and a game-over jingle:
+
+```yaml
+sidwave: 1.4
+# instruments, voices and sections as in any score
+songs:
+  - { name: title, timeline: [intro, verse, bridge, verse] }
+  - { name: ingame, tempo: 140, loop: drive, timeline: [intro, drive, rise, drive, bridge] }  # repeats from "drive"
+  - { name: gameover, tempo: 90, loop: false, timeline: [fallen, { bars: 2, layers: { v3: low } }] }  # plays once
+```
+
+The three songs compile to 3188 bytes as one player, against 6485 bytes as three separate PRGs. The game build starts a song when you call `sidwave_init` with its index in `A` (`lda #1 : ldx #0 : jsr sidwave_init`); `init` resets the player, so any song can start at any time. A song with `loop: false` stops writing registers when it ends. `contract.songs` lists the play calls per frame, the loop behaviour and the length of every song, and the cycles are measured for each song. A PRG plays song 0 (or the song given as the `song` option of `compileSidwaveToPrg`); a PSID records the song count and takes the song in `A` as the PSID format defines. At most 32 songs, and songs times voice channels (3 per SID) at most 255. The language rules are in [`sidwave.md`](data/sound/sidwave.md#sidwave-14).
 
 ## What you get
 
 - The player as a library for games and demos: any origin, separate data, symbol files and a documented contract (see [Using the player in a game](#using-the-player-in-a-game)).
-- Language versions 1.0 to 1.3: wave, pulse and filter tables, hard restart, sync and ring, echo, unison, follower voices, multispeed, sections, up to 10 SIDs and 30 voices in a PRG (PSID: up to 3 SIDs), CIA2 volume digis in a PRG.
+- Language versions 1.0 to 1.4: wave, pulse and filter tables, hard restart, sync and ring, echo, unison, follower voices, multispeed, sections, up to 10 SIDs and 30 voices in a PRG (PSID: up to 3 SIDs), CIA2 volume digis in a PRG.
 - Lint checks and error messages that name the failing path in the score.
-- 14 example scores in [`data/sound/examples`](data/sound/examples).
+- 15 example scores in [`data/sound/examples`](data/sound/examples).
 
-Planned and not yet available: `sidwave verify`, formatter and diff, subtunes and sound effects for games, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
+Planned and not yet available: `sidwave verify`, formatter and diff, sound effects for games, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
 
 ## Engine
 

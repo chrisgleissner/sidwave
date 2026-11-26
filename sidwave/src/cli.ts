@@ -27,7 +27,7 @@ export const HELP = `sidwave: compile SIDWave scores to C64 programs and SID fil
 
 Usage:
   sidwave validate <file> [--json] [--allow-dir <dir>]
-  sidwave compile  <file> [-o <out>] [--format prg|sid] [--loop|--no-loop] [--json] [--allow-dir <dir>]
+  sidwave compile  <file> [-o <out>] [--format prg|sid] [--loop|--no-loop] [--song <n>] [--json] [--allow-dir <dir>]
   sidwave compile  <file> --target game --origin <addr> [--data-origin <addr>] [--zp <addr>] [--symbols <list>]
                           [--symbols-all] [--no-measure] [--format bin|sid] [-o <out>] [--loop|--no-loop] [--json]
   sidwave lint     <file> [--loop|--no-loop] [--strict] [--json] [--allow-dir <dir>]
@@ -55,6 +55,7 @@ Commands:
 Options:
   --allow-dir <dir>   Allow "file:" sample sources below <dir>. Without it they must lie below the current
                       directory. May be repeated. The sidwave command never uses the network.
+  --song <n>          Score with songs (SIDWave 1.4): the song the PRG plays and the PSID starts with, 0-based (default 0).
   --symbols-all       With --target game: also export every internal label as sidwave_int_<label>.
   --json              Machine-readable output on standard output.
   -h, --help          Show this text.
@@ -77,6 +78,8 @@ interface Options {
   target?: string;
   origin?: number;
   dataOrigin?: number;
+  /** `compile --song n`: the song the PRG plays and the PSID starts with (0-based). */
+  song?: number;
   zeroPage?: number;
   symbols: string[];
   symbolsAll: boolean;
@@ -85,7 +88,7 @@ interface Options {
 
 class UsageError extends Error {}
 
-const VALUE_FLAGS = new Set(["-o", "--output", "--format", "--allow-dir", "--target", "--origin", "--data-origin", "--zp", "--symbols"]);
+const VALUE_FLAGS = new Set(["-o", "--output", "--format", "--allow-dir", "--target", "--origin", "--data-origin", "--zp", "--symbols", "--song"]);
 
 /** Options that only apply to `compile --target game`. */
 const GAME_FLAGS: Array<[keyof Options, string]> = [
@@ -120,6 +123,10 @@ function parseArgs(args: string[]): Options {
       else if (arg === "--origin") options.origin = parseAddress(arg, value);
       else if (arg === "--data-origin") options.dataOrigin = parseAddress(arg, value);
       else if (arg === "--zp") options.zeroPage = parseAddress(arg, value);
+      else if (arg === "--song") {
+        if (!/^\d+$/.test(value.trim())) throw new UsageError(`--song needs a song index such as 0 or 2, not "${value}"`);
+        options.song = Number(value);
+      }
       else if (arg === "--symbols") options.symbols.push(...value.split(",").map((name) => name.trim()).filter(Boolean));
       else options.output = value;
     } else if (inline !== undefined) throw new UsageError(`${arg} does not take a value`);
@@ -211,7 +218,10 @@ function compile(io: CliIo, options: Options): number {
   if (options.target !== undefined && options.target !== "prg" && options.target !== "game") {
     throw new UsageError(`--target must be prg or game, not ${options.target}`);
   }
-  if (options.target === "game") return compileGame(io, options, file);
+  if (options.target === "game") {
+    if (options.song !== undefined) throw new UsageError("--song is not available with --target game; the game passes the song to init in A");
+    return compileGame(io, options, file);
+  }
   rejectOptions(options, "compile without --target game", GAME_FLAGS.filter(([key]) => key !== "target"));
   const format = pickFormat(options);
   const { text, path } = readScore(io, file);
@@ -221,7 +231,7 @@ function compile(io: CliIo, options: Options): number {
   if (outPath !== undefined && sameFile(outPath, path)) throw new UsageError("the output file is the input file; refusing to overwrite it");
   let compiled;
   try {
-    compiled = compileSidwaveBytes(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs)), { format, ...(options.loop === undefined ? {} : { loop: options.loop }) });
+    compiled = compileSidwaveBytes(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs)), { format, ...(options.loop === undefined ? {} : { loop: options.loop }), ...(options.song === undefined ? {} : { song: options.song }) });
   } catch (error) {
     return invalid(io, options, file, error);
   }

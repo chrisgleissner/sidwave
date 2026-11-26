@@ -10,7 +10,8 @@ import { digiTriggers, makeTimelineClock, rampValue, timelinePatternPasses, type
 import type { SampleStats } from "./sidwavePcm.js";
 import { addDigiPlayer, digiCyclesPerCall, digiDataAsm, digiPeakCycles, digiPeriod, validateDigiRate } from "./sidwaveDigi.js";
 import { AssemblyError, assemblyToPrgDetailed } from "6502-toolkit/assembler";
-import { isModern, patternBeats, sectionBarBeats } from "./sidwave.js";
+import { isModern, isV13, patternBeats, sectionBarBeats } from "./sidwave.js";
+import { SongSelect, hasSongSelect, lintSongs, mergeSampleCommands, psidSpeedBits, songDoc } from "./sidwaveSongs.js";
 import type { ParsedSidwave, SystemMode, SidwaveVoice, SidwavePattern, SidwavePatternGroove, MotifEntry, SidwaveRegisterTable, FilterModSpec, SidwaveSamples, SidwaveGrooveNote } from "./sidwave.js";
 import {
   SidwaveValidationError,
@@ -112,6 +113,46 @@ export interface CompileResult {
   irqAddress: number;
   digiNmiAddress?: number;
   digiChainAddress?: number;
+  /** SIDWave 1.4, a document with several songs: the facts of each song, in the order of the document. */
+  songs?: SongSummary[];
+  /** SIDWave 1.4: the song the PRG plays (0-based). */
+  startSong?: number;
+}
+
+/** What the compile result says about one song of a document with songs. */
+export interface SongSummary {
+  name: string;
+  totalFrames: number;
+  durationSeconds: number;
+  framesPerSecond: number;
+  /** Play calls per video frame. */
+  speed: number;
+  /** False when the song plays once. */
+  loop: boolean;
+  /** Bytes of the song's voice streams. */
+  streamBytes: number;
+  /** Conservative cycle estimate of one play call while this song plays. */
+  worstCaseCycles: number;
+}
+
+/** The per-song summary of an arrangement with songs, or undefined. */
+function summarizeSongs(arrangement: Arrangement): SongSummary[] | undefined {
+  return arrangement.songs?.map((part) => ({
+    name: part.name,
+    totalFrames: part.arrangement.totalFrames,
+    durationSeconds: part.arrangement.totalFrames / part.arrangement.fps,
+    framesPerSecond: part.arrangement.fps,
+    speed: part.speed,
+    loop: part.loop,
+    streamBytes: part.streams.reduce((sum, stream) => sum + stream.length, 0),
+    worstCaseCycles: part.worstCaseCycles,
+  }));
+}
+
+/** The arrangement report lines of every song, each starting with the song's name. */
+function songsReport(doc: ParsedSidwave, arrangement: Arrangement): string[] | undefined {
+  if (!arrangement.songs) return arrangementReport(doc, arrangement);
+  return arrangement.songs.flatMap((part, k) => (arrangementReport(songDoc(doc, k), part.arrangement) ?? []).map((line) => `[${part.name}] ${line}`));
 }
 
 /**
@@ -122,7 +163,7 @@ export interface CompileResult {
  * streams once per frame and runs the per-note modulation itself: hard restart, fast arpeggio,
  * pitch slide, vibrato, pulse-width sweep, and per-SID filters with sweep and per-pattern ramp.
  */
-export function compileSidwaveToPrg(doc: ParsedSidwave, options: { loop?: boolean; compress?: boolean } = {}): CompileResult {
+export function compileSidwaveToPrg(doc: ParsedSidwave, options: SidwaveCompileOptions = {}): CompileResult {
   return compilePlayer(doc, options);
 }
 
@@ -145,7 +186,9 @@ function sawtoothWarning(arrangement: Arrangement): string | undefined {
 }
 
 interface PreparedPlayer {
+  /** True when the player loops; with several songs, true only when every song loops. */
   loop: boolean;
+  /** One stream per voice channel; with several songs, the streams of song 0 first, then song 1 and so on. */
   streams: StreamByte[][];
   arrangement: Arrangement;
   digiCycles: number;
@@ -153,11 +196,25 @@ interface PreparedPlayer {
   budgetAt: (system: SystemMode) => number;
   requiresTurbo: (system: SystemMode) => boolean;
   turboOnly: number;
+  /** The play call load that comes closest to the budget, for the error message that asks for a turbo CPU. */
+  tightest: { cycles: number; available: number; speed: number };
+}
+
+/** Options of the PRG compile and the shared preparation. */
+export interface SidwaveCompileOptions {
+  loop?: boolean;
+  compress?: boolean;
+  /** SIDWave 1.4, a document with several songs: the song the PRG plays (0-based, default 0). */
+  song?: number;
 }
 
 /** Arranges the score, packs the voice streams and estimates the cycles per call; shared by the PRG and the game build. */
-function preparePlayer(doc: ParsedSidwave, { loop = true, compress = true }: { loop?: boolean; compress?: boolean },
+function preparePlayer(doc: ParsedSidwave, { loop = true, compress = true, song = 0 }: SidwaveCompileOptions,
   planned?: Arrangement): PreparedPlayer {
+  if (song !== 0 && !hasSongSelect(doc)) {
+    throw new SidwaveValidationError("$.song", `song ${song} does not exist; the document has one song`);
+  }
+  if (hasSongSelect(doc)) return prepareSongs(doc, { loop, compress, song });
   loop = loop && !doc.end;
   const loopOffsets: number[] = [];
   let streamCalls = 0;
@@ -211,12 +268,153 @@ function preparePlayer(doc: ParsedSidwave, { loop = true, compress = true }: { l
     : stockPlayerBudget(system, doc.speed);
   const requiresTurbo = (system: SystemMode) => musicCycles + digiCyclesAt(system) > budgetAt(system);
   const turboOnly = Number(requiresTurbo("PAL")) | (Number(requiresTurbo("NTSC")) << 1);
-  return { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly };
+  return { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly,
+    tightest: { cycles: worstCaseCyclesPerCall, available: budgetAt(arrangement.system), speed: doc.speed } };
 }
 
-function compilePlayer(doc: ParsedSidwave, options: { loop?: boolean; compress?: boolean },
+/**
+ * SIDWave 1.4: arranges every song of the document against one shared instrument table, packs each song's voice
+ * streams, and builds the arrangement the player is generated from. The result's own fields are the union of the
+ * songs (every feature any song uses, the instruments of all songs); `songs` holds what is specific to each song.
+ */
+function prepareSongs(doc: ParsedSidwave, { loop = true, compress = true, song = 0 }: SidwaveCompileOptions): PreparedPlayer {
+  const songList = doc.songs!;
+  if (!Number.isInteger(song) || song < 0 || song >= songList.length) {
+    throw new SidwaveValidationError("$.song", `song ${song} does not exist; the document has ${songList.length} songs (0-${songList.length - 1})`);
+  }
+  const pool = createInstrumentPool();
+  const arranged = songList.map((entry, k) => {
+    const view = songDoc(doc, k);
+    return { entry, view, arrangement: arrangeSidwave(view, pool) };
+  });
+  const channels = doc.sids.length * 3;
+  // Songs share the sample table: renumber every song's sample commands into one.
+  const sampleCommands = mergeSampleCommands(arranged.map(({ arrangement }) => arrangement.samples?.commands),
+    arranged.map(({ arrangement }) => arrangement.voices.map(({ events }) => events)), OP.SAMPLE);
+  if (sampleCommands.length > 256) {
+    throw new SidwaveValidationError("$.samples", "at most 256 distinct start and stop commands fit in all songs together");
+  }
+  const withSamples = arranged.find(({ arrangement }) => arrangement.samples)?.arrangement.samples;
+  const samples: SidwaveSamples | undefined = withSamples && { rate: withSamples.rate, defs: withSamples.defs, commands: sampleCommands };
+
+  const streamLimit = SIDWAVE_MEMORY_END - SIDWAVE_LOAD_ADDRESS - 3;
+  let streamBytes = 0;
+  let streamCalls = 0;
+  const packed = arranged.map(({ entry, arrangement }, k) => {
+    const songLoop = loop && entry.loop;
+    const loopOffsets: number[] = [];
+    const streams: StreamByte[][] = [];
+    arrangement.voices.forEach((voice, i) => {
+      const loopFrame = songLoop ? arrangement.clock?.loopFrame : undefined;
+      const tokens = encodeVoiceTokens(voice.events, arrangement.totalFrames, loopFrame);
+      let bytes: StreamByte[];
+      if (!compress) {
+        bytes = [];
+        for (const token of tokens) { if (!token.length) loopOffsets[i] = bytes.length; bytes.push(...token); }
+      } else {
+        const result = compressVoiceTokens(tokens, k * channels + i, (offset) => { loopOffsets[i] = offset; });
+        streamCalls += result.calls;
+        bytes = result.bytes;
+      }
+      streamBytes += bytes.length;
+      if (streamBytes > streamLimit) {
+        throw new SidwaveValidationError(`$.songs[${k}].timeline`, "the compiled voice streams of all songs would end past the $D000 limit (about 50 KB); shorten a timeline or use longer note lengths");
+      }
+      streams[i] = bytes;
+    });
+    return { songLoop, loopOffsets, streams };
+  });
+
+  // The union of the per-SID facts: code for a feature that one song uses is part of the player for all of them.
+  const startArrangement = arranged[song]!.arrangement;
+  const unionChips: ChipArrangement[] = startArrangement.chips!.map((chip, i) => {
+    const own = arranged.map(({ arrangement }) => arrangement.chips![i]!);
+    return {
+      ...chip,
+      hasFilterTable: own.some((c) => c.hasFilterTable),
+      hasFilterMod: own.some((c) => c.hasFilterMod),
+      hasOffset: own.some((c) => c.hasOffset),
+      filter: { ...chip.filter, used: own.some((c) => c.filter.used), stepFixed: Math.max(...own.map((c) => c.filter.stepFixed)) },
+    };
+  });
+  const arrangement: Arrangement = {
+    ...startArrangement,
+    voices: startArrangement.voices.map((_, i) => ({
+      notes: arranged.flatMap((part) => part.arrangement.voices[i]!.notes),
+      events: arranged.flatMap((part) => part.arrangement.voices[i]!.events),
+    })),
+    chips: unionChips,
+    samples,
+    streamCalls,
+    loopOffsets: undefined,
+    startSong: song,
+    findings: new SidwaveFindings(),
+  };
+  if (samples) validateDigiRate(samples, Object.values(CLOCK_HZ));
+
+  const estimates = arranged.map(({ arrangement: part }, k) => {
+    const view: Arrangement = { ...part, chips: unionChips, samples, streamCalls };
+    const musicCycles = estimatePlayerCycles(view, packed[k]!.songLoop);
+    const digiAt = (system: SystemMode) => samples ? digiCyclesPerCall(samples, part.fps, CLOCK_HZ[system]) : 0;
+    const budgetAt = (system: SystemMode) => samples
+      ? Math.floor((CYCLES_PER_FRAME[system] - 1_100) * sidwaveFrameRate(system) / part.fps) - 500
+      : stockPlayerBudget(system, part.speed);
+    return { musicCycles, digiAt, budgetAt, speed: part.speed };
+  });
+  const system = arrangement.system;
+  const requiresTurbo = (at: SystemMode) => estimates.some((e) => e.musicCycles + e.digiAt(at) > e.budgetAt(at));
+  const turboOnly = Number(requiresTurbo("PAL")) | (Number(requiresTurbo("NTSC")) << 1);
+  const load = (e: typeof estimates[number]) => (e.musicCycles + e.digiAt(system)) / e.budgetAt(system);
+  const tight = estimates.reduce((a, b) => (load(b) > load(a) ? b : a));
+  const songs: ArrangedSong[] = arranged.map(({ entry, arrangement: part }, k) => ({
+    name: entry.name,
+    arrangement: part,
+    chips: part.chips!,
+    loop: packed[k]!.songLoop,
+    streams: packed[k]!.streams,
+    loopOffsets: packed[k]!.loopOffsets,
+    speed: part.speed,
+    worstCaseCycles: estimates[k]!.musicCycles + estimates[k]!.digiAt(system),
+  }));
+  arrangement.songs = songs;
+  arrangement.tuning = arranged.every(({ arrangement: part }) => JSON.stringify(part.tuning) === JSON.stringify(startArrangement.tuning))
+    ? startArrangement.tuning : (() => { throw new Error("SIDWAVE compiler defect: the voice detune differs between songs"); })();
+  const worstCaseCyclesPerCall = Math.max(...songs.map((part) => part.worstCaseCycles));
+  return {
+    loop: songs.every((part) => part.loop),
+    streams: songs.flatMap((part) => part.streams),
+    arrangement,
+    digiCycles: Math.max(...estimates.map((e) => e.digiAt(system))),
+    worstCaseCyclesPerCall,
+    budgetAt: (at) => Math.min(...estimates.map((e) => e.budgetAt(at))),
+    requiresTurbo,
+    turboOnly,
+    tightest: { cycles: tight.musicCycles + tight.digiAt(system), available: tight.budgetAt(system), speed: tight.speed },
+  };
+}
+
+/**
+ * Lint of the arrangement: the arrangement checks (per song for a document with songs, with the song's name in front
+ * of the position) and, for songs, the patterns, sections and songs that nothing plays.
+ */
+function lintPlan(doc: ParsedSidwave, arrangement: Arrangement): void {
+  const findings = arrangement.findings;
+  if (!findings) return;
+  if (arrangement.songs) {
+    arrangement.songs.forEach((part, k) => {
+      const own = part.arrangement.findings!;
+      lintArrangement(songDoc(doc, k), part.arrangement, own);
+      findings.merge(own.all(), `song "${part.name}": `);
+    });
+  } else {
+    lintArrangement(doc, arrangement, findings);
+  }
+  for (const found of lintSongs(doc)) findings.add(found.code, found.first, found.message);
+}
+
+function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
   planned?: Arrangement): CompileResult {
-  const { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly } =
+  const { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly, tightest } =
     preparePlayer(doc, options, planned);
   // Check the size before assembling the streams: the player and its tables are assembled once with
   // empty streams, which gives the exact start of the stream data. Songs larger than 64 KB would
@@ -240,18 +438,18 @@ function compilePlayer(doc: ParsedSidwave, options: { loop?: boolean; compress?:
   const warnings: string[] = [];
   for (const field of doc.ignoredFields ?? []) warnings.push(`${field} has no effect before sidwave: 1.2 and was ignored`);
   if (arrangement.findings) {
-    lintArrangement(doc, arrangement, arrangement.findings);
+    lintPlan(doc, arrangement);
     for (const finding of arrangement.findings.list()) warnings.push(formatFinding(finding));
   }
   if (arrangement.samples) {
     warnings.push(`CIA2 digi playback reserves up to ${digiCycles} CPU cycles per player call and temporarily replaces the sample SID's master volume.`);
   }
   if (arrangement.chips) {
-    const availableCycles = budgetAt(arrangement.system);
-    const required = worstCaseCyclesPerCall / availableCycles;
+    const availableCycles = tightest.available;
+    const required = tightest.cycles / availableCycles;
     if (!planned && requiresTurbo(arrangement.system) && !doc.cpu) {
       throw new SidwaveValidationError("$.cpu",
-        `the player needs up to ${worstCaseCyclesPerCall} cycles per call at speed ${doc.speed}${digiCycles ? ` including ${digiCycles} for the CIA2 digi NMI` : ""} (${availableCycles} available at 1 MHz ${arrangement.system}); use cpu: turbo for a CPU speed of at least ${Math.ceil(required)} MHz`);
+        `the player needs up to ${tightest.cycles} cycles per call at speed ${tightest.speed}${digiCycles ? ` including ${digiCycles} for the CIA2 digi NMI` : ""} (${availableCycles} available at 1 MHz ${arrangement.system}); use cpu: turbo for a CPU speed of at least ${Math.ceil(required)} MHz`);
     }
     const sawtooth = sawtoothWarning(arrangement);
     if (sawtooth) warnings.push(sawtooth);
@@ -284,9 +482,11 @@ function compilePlayer(doc: ParsedSidwave, options: { loop?: boolean; compress?:
     instrumentCount: arrangement.instruments.length - 1,
     streamBytes: streams.map((s) => s.length),
     durationSeconds: arrangement.totalFrames / arrangement.fps,
-    loopTo: doc.loopTo === undefined ? undefined : doc.loopTo + 1,
-    arrangement: planned ? undefined : arrangementReport(doc, arrangement),
+    loopTo: (arrangement.songs ? doc.songs![arrangement.startSong!]!.loopTo : doc.loopTo) === undefined ? undefined
+      : (arrangement.songs ? doc.songs![arrangement.startSong!]!.loopTo! : doc.loopTo!) + 1,
+    arrangement: planned ? undefined : songsReport(doc, arrangement),
     lint: arrangement.findings?.list(),
+    ...(arrangement.songs ? { songs: summarizeSongs(arrangement), startSong: arrangement.startSong } : {}),
 
     basicFreeBytes,
     warnings,
@@ -347,9 +547,11 @@ export interface SidwaveGameImage {
   totalFrames: number;
   /** First frame the song returns to when it loops, or undefined for a loop from the start. */
   loopFrame?: number;
-  /** Play calls per second of music, and play calls per video frame (the score's speed). */
+  /** Play calls per second of music, and play calls per video frame (the score's speed; song 0's with several songs). */
   framesPerSecond: number;
   playCallsPerFrame: number;
+  /** SIDWave 1.4, several songs: what is specific to each song. `totalFrames`, `loop` and `loopFrame` above are song 0's. */
+  songs?: Array<SongSummary & { loopFrame?: number }>;
   estimatedWorstCycles: number;
   streamBytes: number[];
   arrangement?: string[];
@@ -365,13 +567,13 @@ function hex4(n: number): string {
  * Rewrites the PRG player source for a game build: no installer, IRQ handler or CIA setup, an `init` that takes the
  * clock in X, a `stop` entry and a play-once ending that leaves the KERNAL IRQ alone.
  */
-function toGamePlayer(code: string, arr: Arrangement, loop: boolean): string {
+function toGamePlayer(code: string, arr: Arrangement, loop: boolean, selectSong: boolean): string {
   const installer = /^\ndo_install:[\s\S]*?\ninit_core:\n/;
   if (!installer.test(code)) throw new Error("SIDWAVE player code changed: the installer block was not found");
   // X = 0 PAL, 1 NTSC (any other value counts as NTSC), $FF = read the KERNAL flag at $02A6 (nonzero on PAL).
   const prelude = `
 game_init:
-  cpx #$FF
+${selectSong ? "  sta song_sel\n" : ""}  cpx #$FF
   bne gi_given
   lda $02A6
   and #1
@@ -433,7 +635,7 @@ function checkGameLayout(layout: SidwaveGameLayout): void {
 export function compileSidwaveGameImage(doc: ParsedSidwave, layout: SidwaveGameLayout, options: { loop?: boolean } = {}): SidwaveGameImage {
   checkGameLayout(layout);
   if (doc.samples) throw new SidwaveValidationError("$.samples", "CIA2 NMI digi samples need an installed interrupt and are not available in a game build");
-  const { loop, streams, arrangement, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly } = preparePlayer(doc, { loop: options.loop });
+  const { loop, streams, arrangement, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly, tightest } = preparePlayer(doc, { loop: options.loop });
   const sidPointer = Boolean(arrangement.chips);
   if (layout.zeroPage + (sidPointer ? 3 : 1) > 0xff) {
     throw new SidwaveValidationError("$.zeroPage", `a ${sidPointer ? "multi-SID" : "single-SID"} player needs ${sidPointer ? 4 : 2} zero page bytes; the highest base is $${hex2(0x100 - (sidPointer ? 4 : 2))}`);
@@ -478,7 +680,7 @@ export function compileSidwaveGameImage(doc: ParsedSidwave, layout: SidwaveGameL
   const warnings: string[] = [];
   for (const field of doc.ignoredFields ?? []) warnings.push(`${field} has no effect before sidwave: 1.2 and was ignored`);
   if (arrangement.findings) {
-    lintArrangement(doc, arrangement, arrangement.findings);
+    lintPlan(doc, arrangement);
     for (const finding of arrangement.findings.list()) warnings.push(formatFinding(finding));
   }
   if (arrangement.chips) {
@@ -489,7 +691,7 @@ export function compileSidwaveGameImage(doc: ParsedSidwave, layout: SidwaveGameL
     warnings.push("cpu: turbo is switched on by the PRG installer; a game build leaves the CPU speed to the game, which must run at the speed the score was written for.");
   }
   if (requiresTurbo(arrangement.system)) {
-    warnings.push(`The player needs up to ${worstCaseCyclesPerCall} cycles per call, more than the ${budgetAt(arrangement.system)} left in a stock ${arrangement.system} frame at speed ${doc.speed}; the game must budget for it.`);
+    warnings.push(`The player needs up to ${tightest.cycles} cycles per call, more than the ${tightest.available} left in a stock ${arrangement.system} frame at speed ${tightest.speed}; the game must budget for it.`);
   }
   return {
     origin: layout.origin,
@@ -505,17 +707,21 @@ export function compileSidwaveGameImage(doc: ParsedSidwave, layout: SidwaveGameL
     dataEnd,
     zeroPageRanges: [[layout.zeroPage, layout.zeroPage + 2], ...(sidPointer ? [[layout.zeroPage + 2, layout.zeroPage + 4] as [number, number]] : [])],
     sidAddresses: (arrangement.chips ?? [{ address: 0xd400 }]).map((chip) => chip.address),
-    loop,
+    loop: arrangement.songs ? arrangement.songs[0]!.loop : loop,
     system: arrangement.system,
     totalFrames: arrangement.totalFrames,
-    loopFrame: loop ? arrangement.clock?.loopFrame : undefined,
+    loopFrame: (arrangement.songs ? arrangement.songs[0]!.loop : loop) ? arrangement.clock?.loopFrame : undefined,
     framesPerSecond: arrangement.fps,
-    playCallsPerFrame: doc.speed,
+    playCallsPerFrame: arrangement.speed,
     estimatedWorstCycles: worstCaseCyclesPerCall,
     streamBytes: streams.map((stream) => stream.length),
-    arrangement: arrangementReport(doc, arrangement),
+    arrangement: songsReport(doc, arrangement),
     lint: arrangement.findings?.list(),
     warnings,
+    ...(arrangement.songs ? { songs: summarizeSongs(arrangement)!.map((summary, k) => ({
+      ...summary,
+      ...(summary.loop && arrangement.songs![k]!.arrangement.clock?.loopFrame !== undefined ? { loopFrame: arrangement.songs![k]!.arrangement.clock!.loopFrame } : {}),
+    })) } : {}),
   };
 }
 
@@ -614,7 +820,7 @@ export function validateSidwavePsidMap(doc: ParsedSidwave): void {
 export function compileSidwaveToSid(
   doc: ParsedSidwave,
   prg: Uint8Array,
-  options?: { entryAddress?: number; initAddress?: number; playAddress?: number; relocation?: { startPage: number; pageLength: number } },
+  options?: { entryAddress?: number; initAddress?: number; playAddress?: number; startSong?: number; relocation?: { startPage: number; pageLength: number } },
 ): { sid: Buffer } {
   validateSidwavePsidMap(doc);
   const primary = doc.sids.find(({ address }) => address === 0xd400)!;
@@ -629,9 +835,9 @@ export function compileSidwaveToSid(
   header.writeUInt16BE(0, 8); // load address taken from the first two data bytes
   header.writeUInt16BE(options?.initAddress ?? SIDWAVE_INIT_ADDRESS, 10);
   header.writeUInt16BE(options?.playAddress ?? SIDWAVE_PLAY_ADDRESS, 12);
-  header.writeUInt16BE(1, 14); // songs
-  header.writeUInt16BE(1, 16); // start song
-  header.writeUInt32BE(doc.speed > 1 ? 1 : 0, 18); // bit 0 selects CIA timer timing for the first song
+  header.writeUInt16BE(doc.songs?.length ?? 1, 14); // songs
+  header.writeUInt16BE((options?.startSong ?? 0) + 1, 16); // start song (1-based); the first song by default
+  header.writeUInt32BE(psidSpeedBits(doc), 18); // bit n selects CIA timer timing for song n+1
   writeLatin1(header, doc.song.title ?? "Untitled", 0x16);
   writeLatin1(header, doc.song.author ?? "SIDWAVE", 0x36);
   writeLatin1(header, "c64bridge SIDWAVE", 0x56);
@@ -765,7 +971,7 @@ type GlobalEvent =
   | { frame: number; kind: "volume"; value: number }
   | { frame: number; kind: "foffset"; value: number; res: number };
 
-interface ChipArrangement {
+export interface ChipArrangement {
   address: number;
   volume: number;
   filter: Arrangement["filter"];
@@ -792,6 +998,10 @@ export interface Arrangement {
   findings?: SidwaveFindings;
   loopOffsets?: number[];
   explicitEnd?: boolean;
+  /** SIDWave 1.4, several songs: every song's own arrangement and stream layout. The other fields are the union of the songs. */
+  songs?: ArrangedSong[];
+  /** SIDWave 1.4: the song the PRG plays and the PSID starts with (0-based). */
+  startSong?: number;
   /** CALL commands in the voice streams (stream subroutines). */
   streamCalls?: number;
   /** Centred voices as [source slot, mirror slot] pairs. */
@@ -801,6 +1011,24 @@ export interface Arrangement {
   tuning?: number[];
   samples?: SidwaveSamples;
   filter: { base: number; sweep: number; stepFixed: number; resonance: number; mode: number; used: boolean };
+}
+
+/** One song of a player with several songs, packed into streams. */
+export interface ArrangedSong {
+  name: string;
+  /** The song's own arrangement: its frames, clock, speed and voice events. `instruments` is the table all songs share. */
+  arrangement: Arrangement;
+  /** The song's own per-SID filter facts; the arrangement's `chips` is the union over all songs. */
+  chips: ChipArrangement[];
+  /** Whether the song loops after the user's loop option is applied; a song that does not loop plays once. */
+  loop: boolean;
+  /** One packed stream per voice channel. */
+  streams: StreamByte[][];
+  /** Offset in each stream the song returns to when it loops (0 for the start). */
+  loopOffsets: number[];
+  /** Play calls per video frame. */
+  speed: number;
+  worstCaseCycles: number;
 }
 
 export interface StreamEvent {
@@ -813,7 +1041,9 @@ const BEAT_EPS = 1e-9;
 /** A note costs at least 3 stream bytes (note, wait, hard restart) and the song has about 52,000 bytes: 20,000 notes in one voice can never fit. Rejecting early avoids arranging millions of notes first. */
 const MAX_NOTES_PER_VOICE = 20_000;
 
-function createInstrumentPool() {
+export type InstrumentPool = ReturnType<typeof createInstrumentPool>;
+
+export function createInstrumentPool() {
   // Instrument 0 is a neutral placeholder: voices that have not played a note yet use it, so they are not routed to the filter.
   const instruments: Instrument[] = [{ ad: 0, sr: 0, wave: 0, pw: 0, pwStep: 0, pwMin: 0, pwMax: 0, vibUp: [0, 0], vibDown: [0, 0], vibRate: 0, vibDelay: 0, arp: [], arpSpeed: 0, slideSemis: 0, slideSpeed: 0, slideRecip: 0, filter: 0 }];
   const instKeys = new Map<string, number>();
@@ -862,8 +1092,9 @@ function resolveCenterMirrors(doc: ParsedSidwave): Array<[number, number]> {
   return pairs;
 }
 
-export function arrangeSidwave(doc: ParsedSidwave): Arrangement {
-  if (!isModern(doc) || !doc.end) return arrangeAll(doc, 0);
+/** Arranges one song of a document. `pool` lets several songs share one instrument table (SIDWave 1.4 songs). */
+export function arrangeSidwave(doc: ParsedSidwave, pool?: InstrumentPool): Arrangement {
+  if (!isModern(doc) || !doc.end) return arrangeAll(doc, 0, undefined, pool);
   // The release tail depends on the instruments that sound at the last bar line, so arrange once to find it.
   const probe = arrangeAll(doc, 0);
   if (!doc.end.release) return probe;
@@ -886,13 +1117,14 @@ export function arrangeSidwave(doc: ParsedSidwave): Arrangement {
   return tail ? arrangeAll(doc, tail) : probe;
 }
 
-function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrangement, chip: number) => void): Arrangement {
+function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrangement, chip: number) => void,
+  sharedPool?: InstrumentPool): Arrangement {
   const first = doc.sids[0]!;
   const extended = isModern(doc) || doc.sids.length > 1 || first.address !== 0xd400 || first.volume !== 15 ||
     first.filter || doc.cpu || doc.voices.some(({ id }) => doc.voiceSlots.get(id) !== id - 1);
   if (!extended) return arrangeChip(doc, createInstrumentPool());
 
-  const pool = createInstrumentPool();
+  const pool = sharedPool ?? createInstrumentPool();
   const mirrors = resolveCenterMirrors(doc);
   const findings = isModern(doc) ? new SidwaveFindings() : undefined;
   const clock = isModern(doc) ? makeTimelineClock(doc, sidwaveFrameRate(doc.song.mode) * doc.speed) : undefined;
@@ -1503,8 +1735,8 @@ function arrangeChip(
             ...(modern ? { sustain: mark && !legato ? effective : legato ? previous?.sustain : undefined, beat: b,
               section: sec.index, path: `bar ${barOf(b)} v${voiceId}`,
               volume: rampValue(section.volume?.[sid?.id ?? ""], volume, b - sec.startBeat, sec.endBeat - sec.startBeat, sec.meter) } : {}),
-            ...(doc.version === "1.3" && entry.chord ? { chord: { offsets, speed: entry.chord.speed } } : {}),
-            ...(doc.version === "1.3" && entry.accented ? { accented: true } : {}),
+            ...(isV13(doc) && entry.chord ? { chord: { offsets, speed: entry.chord.speed } } : {}),
+            ...(isV13(doc) && entry.accented ? { accented: true } : {}),
 
           };
           out.push(arranged);
@@ -2794,7 +3026,7 @@ turbo_required: .byte ${turboOnly & 1}, ${turboOnly >> 1}`);
 }
 
 /** 1.2 owns the actual level per chip. g_vol remains the musical target. */
-function addSoftVolume(code: string, count: number, speed: number, loop: boolean): string {
+function addSoftVolume(code: string, count: number, speed: number, loop: boolean, speedFromSong = false, resetParity = false): string {
   // The chip starts silent and ramps to its configured volume (one step per call, the 1.2 start-up behaviour);
   // every later change slews one step per two video frames.
   code = code.replace("  lda chip_volume,x\n  ldy #$18\n  sta (sid_io),y\n", "")
@@ -2803,7 +3035,7 @@ function addSoftVolume(code: string, count: number, speed: number, loop: boolean
   sta soft_level,x
   sta soft_mode,x
   sta soft_phase
-  sta soft_last,x
+${resetParity ? "  sta soft_odd\n" : ""}  sta soft_last,x
   lda #1
   sta soft_boot,x
   lda #0
@@ -2820,7 +3052,7 @@ soft_clock:
   sta soft_slow
   rts
 soft_pulse:
-  lda #${speed - 1}
+  lda ${speedFromSong ? "soft_div" : `#${speed - 1}`}
   sta soft_phase
   lda #1
   sta soft_step
@@ -3228,6 +3460,15 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
   const fMin = Math.min(fBase, fEnd);
   const fMax = Math.max(fBase, fEnd);
   const fDir = f.sweep < 0 ? 1 : 0;
+  // SIDWave 1.4: with several songs, init selects the song and copies what differs between songs over the player's labels.
+  const songs = arr.songs;
+  const speeds = songs?.map((part) => part.speed) ?? [];
+  const speedsDiffer = speeds.some((speed) => speed !== speeds[0]);
+  const ciaOf = (hz: number, part: ArrangedSong) => Math.round(hz / part.arrangement.fps) - 1;
+  const select = songs && new SongSelect(songs.length, channels, arr.startSong ?? 0, songs && !game && speedsDiffer ? {
+    lo: songs.flatMap((part) => [CLOCK_HZ.PAL, CLOCK_HZ.NTSC].map((hz) => ciaOf(hz, part) & 255)),
+    hi: songs.flatMap((part) => [CLOCK_HZ.PAL, CLOCK_HZ.NTSC].map((hz) => ciaOf(hz, part) >> 8)),
+  } : undefined);
 
   if (game) {
     L.push(`ptr = $${hex2(game.zeroPage)}`);
@@ -3371,7 +3612,16 @@ vr_wt_integer:
     playerCode = playerCode.replace("init_core:\n", "init_core:\n  sta port_clock\n");
     playerCode += PORTAMENTO_CODE;
   }
-  if (arr.speed > 1 && !game) {
+  if (select) {
+    // init takes the song index in A (the PSID host passes the song number minus one); song_select reads it from song_sel.
+    // The PRG installer enters at init_core with song_sel as assembled, which is the start song.
+    if (!playerCode.includes("init:\n  lda doc_clock\n") || !playerCode.includes("  ldy #95\n  cpx #0\n")) {
+      throw new Error("SIDWAVE player code changed: the init patch points of the song selector were not found");
+    }
+    playerCode = playerCode.replace("init:\n  lda doc_clock\n", "init:\n  sta song_sel\n  lda doc_clock\n")
+      .replace("  ldy #95\n  cpx #0\n", "  jsr song_select\n  ldy #95\n  cpx #0\n");
+  }
+  if (arr.speed > 1 && !game && !speedsDiffer) {
     // PSID hosts use the CIA latch written by init when song 1 selects CIA timing.
     // The PRG installer already sets the latch and enters at init_core.
     playerCode = playerCode.replace("  lda doc_clock\ninit_core:", `  ldx doc_clock
@@ -3388,7 +3638,14 @@ init_core:`);
     if (!playerCode.includes("  jsr env_reset\n  pla") || !playerCode.includes("play:\n")) {
       throw new Error("SIDWAVE player code changed: the play-once patch points were not found");
     }
-    playerCode = playerCode.replace("  jsr env_reset\n  pla", `  jsr env_reset
+    if (songs) {
+      // A song that loops has the length $FFFFFF, which play_once recognises and never counts down.
+      select!.copy("song_left", songs.map((part) => {
+        const left = part.loop ? 0xffffff : part.arrangement.totalFrames + 1;
+        return [left & 255, (left >> 8) & 255, left >> 16];
+      }));
+    } else {
+      playerCode = playerCode.replace("  jsr env_reset\n  pla", `  jsr env_reset
   lda #${calls & 255}
   sta song_left
   lda #${(calls >> 8) & 255}
@@ -3396,8 +3653,13 @@ init_core:`);
   lda #${calls >> 16}
   sta song_left+2
   pla`);
+    }
     playerCode = playerCode.replace("play:\n", "play:\n  jmp play_once\nplay_tick:\n");
-    playerCode += arr.explicitEnd ? PLAY_ONCE_CODE.replace(/  lda #0\n  sta \$D404[\s\S]*?  sta \$D418\n/, "") : PLAY_ONCE_CODE;
+    let onceCode = arr.explicitEnd ? PLAY_ONCE_CODE.replace(/  lda #0\n  sta \$D404[\s\S]*?  sta \$D418\n/, "") : PLAY_ONCE_CODE;
+    if (songs?.some((part) => part.loop)) {
+      onceCode = onceCode.replace("play_once:\n", "play_once:\n  lda song_left+2\n  cmp #$FF\n  bne play_once_counting\n  jmp play_tick\nplay_once_counting:\n");
+    }
+    playerCode += onceCode;
   }
   if (arr.streamCalls) playerCode += `
 c_call:
@@ -3437,7 +3699,7 @@ c_ret:
     if (hasFade) playerCode = addVibratoFade(playerCode);
     playerCode = multiplexSids(playerCode, arr.chips, Boolean(hasFilterTable), stateBytes);
     if (arr.mirrors) playerCode = addCenterMirrors(playerCode, arr);
-    if (arr.softVolume) playerCode = gateBeforeEnvelope(addSoftVolume(playerCode, arr.chips.length, arr.speed, loop || !!arr.explicitEnd));
+    if (arr.softVolume) playerCode = gateBeforeEnvelope(addSoftVolume(playerCode, arr.chips.length, arr.speed, loop || !!arr.explicitEnd, speedsDiffer, !!songs));
     if (arr.turbo && !game) {
       playerCode = addTurboInit(playerCode, arr.speed, turboOnly, arr.softVolume);
       if (arr.softVolume) playerCode = measureTurboStartup(playerCode);
@@ -3445,13 +3707,16 @@ c_ret:
     if (arr.tuning) playerCode = addTunedLookup(playerCode, arr.tuning);
     if (arr.samples) playerCode = addDigiPlayer(playerCode, arr.samples, arr.chips, [CLOCK_HZ.PAL, CLOCK_HZ.NTSC]);
   }
-  if (loop && arr.clock?.loopFrame !== undefined) {
+  if (songs) {
+    // The song selector copies each song's loop targets into loop_lo and loop_hi.
+    playerCode = playerCode.replace("c_loop:\n  lda start_lo,x\n  sta ptr\n  lda start_hi,x", "c_loop:\n  lda loop_lo,x\n  sta ptr\n  lda loop_hi,x");
+  } else if (loop && arr.clock?.loopFrame !== undefined) {
     playerCode = playerCode.replace("c_loop:\n  lda start_lo,x\n  sta ptr\n  lda start_hi,x", "c_loop:\n  lda loop_lo,x\n  sta ptr\n  lda loop_hi,x");
     const targets = streams.map((stream, i) => `(stream${i}+${stream.length === 1 ? 0 : arr.loopOffsets?.[i] ?? 0})`);
     L.push(`loop_lo: .byte ${targets.map((t) => "<" + t).join(",")}`);
     L.push(`loop_hi: .byte ${targets.map((t) => ">" + t).join(",")}`);
   }
-  if (game) playerCode = toGamePlayer(playerCode, arr, loop);
+  if (game) playerCode = toGamePlayer(playerCode, arr, loop, !!songs);
   L.push(playerCode);
   // Constants
   if (!game) {
@@ -3467,11 +3732,15 @@ c_ret:
   L.push(`fmode: .byte ${f.mode}`);
   L.push(`voff: .byte ${streams.map((_, i) => (i % 3) * 7).join(", ")}`);
   L.push(`vbit: .byte ${streams.map((_, i) => 1 << (i % 3)).join(", ")}`);
-  L.push(`start_lo: .byte ${streams.map((_, i) => `<stream${i}`).join(", ")}`);
-  L.push(`start_hi: .byte ${streams.map((_, i) => `>stream${i}`).join(", ")}`);
+  if (!songs) {
+    L.push(`start_lo: .byte ${streams.map((_, i) => `<stream${i}`).join(", ")}`);
+    L.push(`start_hi: .byte ${streams.map((_, i) => `>stream${i}`).join(", ")}`);
+  }
+  if (select && speedsDiffer) L.push(select.column("soft_div", songs!.map((part) => [part.speed - 1])));
   if (arr.chips) {
     const chipColumn = (name: string, get: (chip: ChipArrangement, i: number) => number) =>
-      L.push(`chip_${name}: .byte ${arr.chips!.map(get).join(", ")}`);
+      L.push(select ? select.column(`chip_${name}`, songs!.map((part) => part.chips.map(get)))
+        : `chip_${name}: .byte ${arr.chips!.map(get).join(", ")}`);
     chipColumn("address_lo", (chip) => chip.address & 255);
     chipColumn("address_hi", (chip) => chip.address >> 8);
     chipColumn("first_slot", (_, i) => i * 3);
@@ -3498,8 +3767,19 @@ c_ret:
       chipColumn("res_route", ({ filter }) => filter.resonance << 4);
       chipColumn("fmode", ({ filter }) => filter.mode);
     }
-    L.push(`voice_live: .byte ${arr.voices.map(({ events }, i) =>
-      Number(events.length > 0 || (i % 3 === 0 && arr.chips![i / 3]!.filter.used))).join(", ")}`);
+    const live = (voices: Arrangement["voices"], chips: ChipArrangement[]) => voices.map(({ events }, i) =>
+      Number(events.length > 0 || (i % 3 === 0 && chips[i / 3]!.filter.used)));
+    L.push(select ? select.column("voice_live", songs!.map((part) => live(part.arrangement.voices, part.chips)))
+      : `voice_live: .byte ${live(arr.voices, arr.chips).join(", ")}`);
+  }
+  if (songs && select) {
+    // The selector goes last: it copies every constant above that differs between the songs.
+    const flat = songs.flatMap((part, k) => part.streams.map((stream, i) => ({ stream, at: k * channels + i,
+      offset: part.loop && part.arrangement.clock?.loopFrame !== undefined ? part.loopOffsets[i] ?? 0 : 0 })));
+    L.push(...select.asm(
+      flat.map(({ at }) => `stream${at}`),
+      flat.map(({ stream, at, offset }) => `(stream${at}+${stream.length === 1 ? 0 : offset})`),
+    ));
   }
   L.push(`cmd_tab:`);
   const commands = ["c_gateoff", "c_hr", "c_sr", "c_vol", "c_waitl", "c_fmod", "c_loop"];
