@@ -468,7 +468,8 @@ test("mutation check: the comparisons fail when init skips the SID clear or the 
   const compiled = compileSidwaveToPrg(doc);
   // ini_sid: lda #0 / ldy #$18 / sta (sid_io),y / dey / bpl  ->  the store becomes two NOPs
   const noSidClear = mutated(compiled, [0xa9, 0x00, 0xa0, 0x18, 0x91, 0xfd, 0x88, 0x10], [0xa9, 0x00, 0xa0, 0x18, 0xea, 0xea, 0x88, 0x10]);
-  assert.notDeepEqual(initWrites(noSidClear, undefined, 1, 0), initWrites(compiled, undefined, 1, undefined), "the init writes differ");
+  // Bun's node:assert has no notDeepEqual, so the two write lists are compared as JSON.
+  assert.notEqual(JSON.stringify(initWrites(noSidClear, undefined, 1, 0)), JSON.stringify(initWrites(compiled, undefined, 1, undefined)), "the init writes differ");
   // ini_vars: lda #0 / ldx #n / sta vars,x / dex / cpx #$FF / bne  ->  the store becomes three NOPs
   const noVarsClear = mutated(compiled, [0xa9, 0x00, 0xa2, null, 0x9d, null, null, 0xca, 0xe0, 0xff, 0xd0], [0xa9, 0x00, 0xa2, null, 0xea, 0xea, 0xea, 0xca, 0xe0, 0xff, 0xd0]);
   const pairs = [[0, 1], [1, 2], [4, 0], [2, 3], [3, 4]];
@@ -560,7 +561,7 @@ test("SongSelect: columns that do not differ cost nothing and a differing column
   assert.match(asm, /song_sel: \.byte 1/);
   assert.match(asm, /song_mul3: \.byte 0, 3, 6/);
   assert.match(asm, /ss_col0: \.byte 1, 0, 0, 1, 1, 0, 0, 1, 1/);
-  assert.doesNotMatch(asm, /ss_cia/);
+  assert.equal(/ss_cia/.test(asm), false, "no CIA latch column when every song has the same speed"); // Bun's node:assert has no doesNotMatch
   assert.match(new SongSelect(2, 3, 0, { lo: [1, 2, 3, 4], hi: [0, 0, 0, 0] }).asm(["a", "b", "c", "d", "e", "f"], ["a", "b", "c", "d", "e", "f"]).join("\n"), /ss_cia_lo: \.byte 1, 2, 3, 4/);
   assert.throws(() => new SongSelect(86, 3, 0), /indexed by one byte/);
 });
