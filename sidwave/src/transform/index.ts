@@ -7,7 +7,7 @@ import { maxSidwaveMidi } from "../sidwaveCompiler.js";
 import { formatSidwave } from "../format/sidwaveFormat.js";
 
 export class SidwaveTransformError extends Error {
-  constructor(public readonly code: "precondition" | "out_of_range" | "unsupported", message: string) { super(message); this.name = "SidwaveTransformError"; }
+  constructor(public readonly code: "input" | "precondition" | "out_of_range" | "unsupported", message: string) { super(message); this.name = "SidwaveTransformError"; }
 }
 export interface TransformReport { changed: string[]; preserved: string[]; warnings: string[] }
 export interface TransformResult { text: string; report: TransformReport }
@@ -16,7 +16,8 @@ const ptr = (p: string[]) => "/" + p.map(esc).join("/");
 type AnyDoc = YAML.Document<any>;
 function docFor(text: string): AnyDoc {
   const doc = YAML.parseDocument(text, { version: "1.2", keepSourceTokens: true });
-  if (doc.errors.length) throw new SidwaveTransformError("precondition", doc.errors[0]!.message);
+  if (doc.errors.length) throw new SidwaveTransformError("input", doc.errors[0]!.message);
+  if (!YAML.isMap(doc.contents)) throw new SidwaveTransformError("input", "The input is not a SIDWave score: expected a YAML mapping at the top level");
   return doc;
 }
 function finish(doc: AnyDoc, changed: string[], preserved: string[], warnings: string[] = []): TransformResult {
@@ -155,7 +156,7 @@ export function setTempo(text:string,{bpm}:{bpm:number}):TransformResult {
 /** Preconditions: factor is finite and positive and the resulting tempo is within SIDWAVE_TEMPO_RANGE. Preserves all note and pitch fields. */
 export function scaleTempo(text:string,{factor}:{factor:number}):TransformResult {
   if(!Number.isFinite(factor)||factor<=0) throw new SidwaveTransformError("precondition","factor must be positive and finite");
-  const root=YAML.parse(text) as any, current=numericTempo(root), bpm=current*factor;
+  const root=js(docFor(text)), current=numericTempo(root), bpm=current*factor;
   if(!Number.isFinite(bpm)||bpm<SIDWAVE_TEMPO_RANGE.min||bpm>SIDWAVE_TEMPO_RANGE.max) throw new SidwaveTransformError("out_of_range",`scaled tempo ${bpm} is outside ${SIDWAVE_TEMPO_RANGE.min}..${SIDWAVE_TEMPO_RANGE.max}`);
   return setTempo(text,{bpm});
 }

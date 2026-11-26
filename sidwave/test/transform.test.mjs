@@ -310,7 +310,7 @@ test("transpose rejects bad arguments and notes outside the playable range", () 
   fails(() => transpose(base, { semitones: Number.NaN }), "precondition", "semitones must be an integer");
   fails(() => transpose(base, { semitones: 200 }), "out_of_range", "Offending note at /voices/0/patterns/A/groove/0/note");
   fails(() => transpose(base, { semitones: -60 }), "out_of_range", "Offending note at /voices/0/patterns/A/groove/0/note");
-  fails(() => transpose("a: [", { semitones: 1 }), "precondition");
+  fails(() => transpose("a: [", { semitones: 1 }), "input");
 });
 
 test("transpose uses the SID frequency range of the selected clock", () => {
@@ -376,7 +376,7 @@ test("setTempo replaces the tempo key, the song tempo, or adds a tempo", () => {
 
 test("setTempo rejects tempos outside the SIDWave range", () => {
   for (const bpm of [29.9, 220.1, 0, -5, Number.NaN, Infinity]) fails(() => setTempo(base, { bpm }), "out_of_range", "bpm must be 30..220");
-  fails(() => setTempo("a: [", { bpm: 90 }), "precondition");
+  fails(() => setTempo("a: [", { bpm: 90 }), "input");
 });
 
 test("scaleTempo multiplies the current tempo, the song tempo or the default tempo of 100", () => {
@@ -410,7 +410,7 @@ test("substituteInstrument rejects unknown instruments", () => {
   fails(() => substituteInstrument(base, { from: "lead", to: "missing" }), "precondition", "Instrument missing does not exist");
   fails(() => substituteInstrument(base, { from: "lead", to: "lib:nothing" }), "precondition", "Instrument lib:nothing does not exist");
   fails(() => substituteInstrument(base, { from: "ghost", to: "pad" }), "precondition", "Instrument reference ghost does not exist");
-  fails(() => substituteInstrument("a: [", { from: "a", to: "b" }), "precondition");
+  fails(() => substituteInstrument("a: [", { from: "a", to: "b" }), "input");
 });
 
 test("quantise moves explicit durations to the grid and keeps every pattern length", () => {
@@ -431,7 +431,7 @@ test("quantise moves explicit durations to the grid and keeps every pattern leng
 test("quantise rejects a grid that is not positive and finite and a grid that cannot keep the length", () => {
   for (const grid of [0, -0.5, Number.NaN, Infinity]) fails(() => quantise(base, { grid }), "precondition", "grid must be positive and finite");
   fails(() => quantise(score({ lens: [1.25, 0.75, 1.5, 0.5] }), { grid: 0.5 }), "unsupported", "Grid cannot preserve pattern length at /voices/0/patterns/A");
-  fails(() => quantise("a: [", { grid: 1 }), "precondition");
+  fails(() => quantise("a: [", { grid: 1 }), "input");
 });
 
 test("restructure reorders the timeline of a sectioned score", () => {
@@ -456,7 +456,7 @@ test("restructure rejects unknown names, bad orders and a sectioned score withou
   fails(() => restructure(base, { order: "intro" }), "precondition", "order must be an array of names");
   fails(() => restructure(base, { order: [1] }), "precondition", "order must be an array of names");
   fails(() => restructure(base.replace(/timeline:.*\n/, ""), { order: ["intro"] }), "precondition", "Document has no timeline");
-  fails(() => restructure("a: [", { order: [] }), "precondition");
+  fails(() => restructure("a: [", { order: [] }), "input");
 });
 
 test("humanise varies explicit durations deterministically and keeps pitches and pattern lengths", () => {
@@ -496,7 +496,7 @@ test("humanise rejects bad arguments and shifts that would make a duration nonpo
   fails(() => humanise(base, { seed: 1, maxShift: -1 }), "precondition", "maxShift must be finite and nonnegative");
   fails(() => humanise(base, { seed: 1, maxShift: Number.NaN }), "precondition", "maxShift must be finite and nonnegative");
   fails(() => humanise(base, { seed: 1, maxShift: 10 }), "unsupported", "Bounded variation would make duration nonpositive at /voices/0/patterns/A/groove/1/len");
-  fails(() => humanise("a: [", { seed: 1, maxShift: 0.1 }), "precondition");
+  fails(() => humanise("a: [", { seed: 1, maxShift: 0.1 }), "input");
 });
 
 const allExamples = (await readdir(new URL("../data/sound/examples/", import.meta.url))).filter((f) => f.endsWith(".yaml")).sort();
@@ -537,4 +537,14 @@ timeline: [{ bars: 1, layers: { v1: A } }]
   assert.ok(up.text.includes('groove: "D4 ~ ~ ~"'));
   assert.deepEqual(setTempo(up.text, { bpm: 90 }).report.changed, ["/tempo"]);
   valid(up.text);
+});
+
+test("every transformation rejects text that is not a score mapping with code input", () => {
+  const calls = [
+    (x) => transpose(x, { semitones: 1 }), (x) => setTempo(x, { bpm: 90 }), (x) => scaleTempo(x, { factor: 1 }),
+    (x) => substituteInstrument(x, { from: "a", to: "lib:kick" }), (x) => quantise(x, { grid: 1 }),
+    (x) => restructure(x, { order: [] }), (x) => humanise(x, { seed: 1, maxShift: 0.1 }),
+  ];
+  for (const call of calls) for (const input of ["- a\n", "plain text\n", "", "a: [\n"]) fails(() => call(input), "input");
+  fails(() => transpose("- a\n", { semitones: 1 }), "input", "The input is not a SIDWave score: expected a YAML mapping at the top level");
 });
