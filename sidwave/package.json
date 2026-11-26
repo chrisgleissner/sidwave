@@ -85,6 +85,10 @@
       "types": "./dist/verify/index.d.ts",
       "default": "./dist/verify/index.js"
     },
+    "./format": {
+      "types": "./dist/format/sidwaveFormat.d.ts",
+      "default": "./dist/format/sidwaveFormat.js"
+    },
     "./data/*": "./data/*",
     "./package.json": "./package.json"
   },
