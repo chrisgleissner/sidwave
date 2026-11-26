@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { parseSidwave } from "../src/sidwave.js";
 import { compileSidwaveToPrg } from "../src/sidwaveCompiler.js";
 
-// SHA-256 of the PRG compiled from each example as shipped with c64bridge 1.3.2 (SIDWAVE 1.2, plus the
+// SHA-256 of the PRG compiled from each example as shipped with c64bridge 1.3.2 (SIDWave 1.2, plus the
 // 1.0 fuer_elise), without and with looping. The files under fixtures/sidwave-1.2 are frozen copies of
 // data/sound/examples at that release, so the pin survives a rewrite of the live examples.
 const EXPECTED = {

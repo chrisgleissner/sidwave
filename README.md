@@ -9,7 +9,11 @@ Write Commodore 64 SID music as text. Compile it to a C64 program or a SID file.
 [![Status](https://img.shields.io/badge/status-pre--release-orange.svg)](#status-and-roadmap)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-forestgreen)](#for-developers)
 
-SIDWave is a music language, compiler and toolkit for the SID sound chip of the Commodore 64. A score is a YAML or JSON file that describes instruments, patterns and a timeline of sections. The compiler turns it into a self-playing C64 program (PRG) or a PSID file, and includes the 6502 player code that runs on the C64. It is for chip musicians who prefer a text editor and version control to a tracker, for game and demo developers who need a small, scriptable music pipeline, and for tool authors who want a documented, testable description of SID music. It runs without a network connection, an AI assistant or a C64.
+SIDWave is a music language, compiler and toolkit for the SID sound chip of the Commodore 64. A score is a YAML or JSON file that describes instruments, patterns and a timeline of sections.
+
+The compiler turns a score into a self-playing C64 program (PRG) or a PSID file. Both include the 6502 player code that runs on the C64. The compiler runs without a network connection, an AI assistant or a C64.
+
+SIDWave is for chip musicians who prefer a text editor and version control to a tracker, for game and demo developers who need a small, scriptable music pipeline, and for tool authors who want a documented, testable description of SID music.
 
 ## Choose your path
 
@@ -90,7 +94,7 @@ npm ci && npm run build
 node sidwave/dist/bin.js examples chiptune_drive -o . && node sidwave/dist/bin.js compile chiptune_drive.yaml
 ```
 
-The last command writes `chiptune_drive.yaml` and `chiptune_drive.prg` into the repository root. Open the PRG with `x64sc chiptune_drive.prg`, or add `--format sid` to the compile command and play the SID file with `sidplayfp chiptune_drive.sid`.
+The last command writes `chiptune_drive.yaml` and `chiptune_drive.prg` into the repository root. The PRG is about 22 KB (22,205 bytes) and plays for about 2.5 minutes (154.5 s). The compiler also prints the warning `LEVEL-NOOP`. This is expected: it means that a level or volume change on a note has no effect because the instrument has sustain 0, so use chip volume or a kit variant for those sounds. Open the PRG with `x64sc chiptune_drive.prg`, or add `--format sid` to the compile command and play the SID file with `sidplayfp chiptune_drive.sid`.
 
 The rest of this README writes `sidwave` for the command. In a checkout, `sidwave` means `node sidwave/dist/bin.js`, run from the repository root. The `sidwave` command is on the `PATH` only after the package is installed from npm.
 
@@ -147,14 +151,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { parseSidwave, compileSidwaveToPrg, compileSidwaveToSid } from "sidwave";
 
 const doc = parseSidwave(readFileSync("song.sidwave.yaml", "utf8")); // throws SidwaveValidationError
-const result = compileSidwaveToPrg(doc);  // prg, addresses, duration, lint, warnings, cycle estimates
+const result = compileSidwaveToPrg(doc);  // prg, addresses, duration, lint findings, warnings, cycle estimate
 const { sid } = compileSidwaveToSid(doc, result.prg); // PSID built around the PRG's player
 
 writeFileSync("song.prg", result.prg);
 writeFileSync("song.sid", sid);
 ```
 
-`parseSidwave` rejects unknown fields, unknown pattern names and out-of-range values with an error that names the path in the score. The compile result also carries `entryAddress`, `initAddress`, `playAddress`, `loadAddress`, `endAddress`, `durationSeconds`, `lint` and `warnings`. A parser, lint, generator for new scores, and similarity and fidelity analysis also exist inside the code base. Their public names are not final and are not documented here.
+`parseSidwave` rejects unknown fields, unknown pattern names and out-of-range values with an error that names the path in the score. The compile result also carries `entryAddress`, `initAddress`, `playAddress`, `loadAddress`, `endAddress`, `totalFrames`, `framesPerSecond`, `durationSeconds`, `worstCaseCyclesPerCall`, `basicFreeBytes`, `warnings` and, when there are findings to report, `lint`. A parser, lint, generator for new scores, and similarity and fidelity analysis also exist inside the code base. Their public names are not final and are not documented here.
 
 ### Command line
 

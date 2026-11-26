@@ -1,4 +1,4 @@
-// Shared 6502 emulator and PSID runner for the SIDWAVE 1.2 tests (same model as test/sidwavePlayer.test.mjs).
+// Shared 6502 emulator and PSID runner for the SIDWave 1.2 tests (same model as test/sidwavePlayer.test.mjs).
 import { compileSidwaveToPrg, compileSidwaveToSid } from "../../src/sidwaveCompiler.js";
 import { parseSidwave } from "../../src/sidwave.js";
 

@@ -1,4 +1,4 @@
-// SIDWAVE 1.2 round 2: the spec, schema and filter model stay in step with the compiler.
+// SIDWave 1.2 round 2: the spec, schema and filter model stay in step with the compiler.
 import test from "#test/runner";
 import assert from "#test/assert";
 import fs from "node:fs";

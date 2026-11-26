@@ -1,4 +1,4 @@
-// SIDWAVE 1.2 round 2: emulator tests of the register writes (same 6502 model as test/sidwavePlayer.test.mjs).
+// SIDWave 1.2 round 2: emulator tests of the register writes (same 6502 model as test/sidwavePlayer.test.mjs).
 // Each test names the feature it covers; reverting that feature makes the test fail.
 import test from "#test/runner";
 import assert from "#test/assert";
