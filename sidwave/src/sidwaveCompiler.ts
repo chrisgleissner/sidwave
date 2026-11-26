@@ -9,7 +9,7 @@ import { RELEASE_MS, SidwaveFindings, lintArrangement, arrangementReport, format
 import { digiTriggers, makeTimelineClock, rampValue, timelinePatternPasses, type TimelineClock } from "./sidwaveForm.js";
 import type { SampleStats } from "./sidwavePcm.js";
 import { addDigiPlayer, digiCyclesPerCall, digiDataAsm, digiPeakCycles, digiPeriod, validateDigiRate } from "./sidwaveDigi.js";
-import { assemblyToPrgDetailed } from "6502-toolkit/assembler";
+import { AssemblyError, assemblyToPrgDetailed } from "6502-toolkit/assembler";
 import { isModern, patternBeats, sectionBarBeats } from "./sidwave.js";
 import type { ParsedSidwave, SystemMode, SidwaveVoice, SidwavePattern, SidwavePatternGroove, MotifEntry, SidwaveRegisterTable, FilterModSpec, SidwaveSamples, SidwaveGrooveNote } from "./sidwave.js";
 import {
@@ -126,8 +126,38 @@ export function compileSidwaveToPrg(doc: ParsedSidwave, options: { loop?: boolea
   return compilePlayer(doc, options);
 }
 
-function compilePlayer(doc: ParsedSidwave, { loop = true, compress = true }: { loop?: boolean; compress?: boolean },
-  planned?: Arrangement): CompileResult {
+/** Warning for a score whose sawtooth voices could clip one side of the mix, or undefined. */
+function sawtoothWarning(arrangement: Arrangement): string | undefined {
+  const level = arrangement.chips!.reduce((sum, chip, i) => {
+    const sustain = arrangement.voices.slice(i * 3, i * 3 + 3).reduce((total, voice) => {
+      const peak = voice.notes.reduce((max, { inst }) => {
+        const instrument = arrangement.instruments[inst]!;
+        const saw = (instrument.wave & 0x20) || instrument.wavetable?.some((step) => String(step.wave).includes("saw"));
+        return saw ? Math.max(max, instrument.sr >> 4) : max;
+      }, 0);
+      return total + peak;
+    }, 0);
+    return sum + chip.volume * sustain / 225;
+  }, 0);
+  return level > 10
+    ? `Sawtooth level could reach ${level.toFixed(1)} on one pan side (recommended maximum 10). Lower SID volume or sustain, or spread the SIDs across the mixer sides.`
+    : undefined;
+}
+
+interface PreparedPlayer {
+  loop: boolean;
+  streams: StreamByte[][];
+  arrangement: Arrangement;
+  digiCycles: number;
+  worstCaseCyclesPerCall: number;
+  budgetAt: (system: SystemMode) => number;
+  requiresTurbo: (system: SystemMode) => boolean;
+  turboOnly: number;
+}
+
+/** Arranges the score, packs the voice streams and estimates the cycles per call; shared by the PRG and the game build. */
+function preparePlayer(doc: ParsedSidwave, { loop = true, compress = true }: { loop?: boolean; compress?: boolean },
+  planned?: Arrangement): PreparedPlayer {
   loop = loop && !doc.end;
   const loopOffsets: number[] = [];
   let streamCalls = 0;
@@ -181,6 +211,13 @@ function compilePlayer(doc: ParsedSidwave, { loop = true, compress = true }: { l
     : stockPlayerBudget(system, doc.speed);
   const requiresTurbo = (system: SystemMode) => musicCycles + digiCyclesAt(system) > budgetAt(system);
   const turboOnly = Number(requiresTurbo("PAL")) | (Number(requiresTurbo("NTSC")) << 1);
+  return { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly };
+}
+
+function compilePlayer(doc: ParsedSidwave, options: { loop?: boolean; compress?: boolean },
+  planned?: Arrangement): CompileResult {
+  const { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly } =
+    preparePlayer(doc, options, planned);
   // Check the size before assembling the streams: the player and its tables are assembled once with
   // empty streams, which gives the exact start of the stream data. Songs larger than 64 KB would
   // otherwise wrap the address counter inside the assembler.
@@ -216,18 +253,8 @@ function compilePlayer(doc: ParsedSidwave, { loop = true, compress = true }: { l
       throw new SidwaveValidationError("$.cpu",
         `the player needs up to ${worstCaseCyclesPerCall} cycles per call at speed ${doc.speed}${digiCycles ? ` including ${digiCycles} for the CIA2 digi NMI` : ""} (${availableCycles} available at 1 MHz ${arrangement.system}); use cpu: turbo for a CPU speed of at least ${Math.ceil(required)} MHz`);
     }
-    const level = arrangement.chips.reduce((sum, chip, i) => {
-      const sustain = arrangement.voices.slice(i * 3, i * 3 + 3).reduce((total, voice) => {
-        const peak = voice.notes.reduce((max, { inst }) => {
-          const instrument = arrangement.instruments[inst]!;
-          const saw = (instrument.wave & 0x20) || instrument.wavetable?.some((step) => String(step.wave).includes("saw"));
-          return saw ? Math.max(max, instrument.sr >> 4) : max;
-        }, 0);
-        return total + peak;
-      }, 0);
-      return sum + chip.volume * sustain / 225;
-    }, 0);
-    if (level > 10) warnings.push(`Sawtooth level could reach ${level.toFixed(1)} on one pan side (recommended maximum 10). Lower SID volume or sustain, or spread the SIDs across the mixer sides.`);
+    const sawtooth = sawtoothWarning(arrangement);
+    if (sawtooth) warnings.push(sawtooth);
   }
   const asm = buildPlayerAsm(arrangement, streams, loop, turboOnly);
   const assembled = assemblyToPrgDetailed(asm, { fileName: "sidwave_player.asm", loadAddress: SIDWAVE_LOAD_ADDRESS });
@@ -274,6 +301,265 @@ function compilePlayer(doc: ParsedSidwave, { loop = true, compress = true }: { l
     digiNmiAddress: assembled.symbols.get("digi_nmi"),
     digiChainAddress: assembled.symbols.get("digi_chain"),
   };
+}
+
+/** Where a game build puts the player, its data and its zero page bytes (S4a). */
+export interface SidwaveGameLayout {
+  /** Address of the entry table: `origin+0` init, `+3` play, `+6` stop, `+9` sfx stub. */
+  origin: number;
+  /** Address of the separate data block (streams and tables); without it the data follows the player. */
+  dataOrigin?: number;
+  /** First of the two zero page bytes of the stream pointer (`ptr`); a multi-SID player also uses `zeroPage+2` and `+3`. */
+  zeroPage: number;
+}
+
+/** Entry points at fixed offsets from the origin. */
+export const SIDWAVE_GAME_ENTRY = { init: 0, play: 3, stop: 6, sfx: 9 } as const;
+/** Size of the entry table. */
+export const SIDWAVE_GAME_TABLE_BYTES = 12;
+export const SIDWAVE_GAME_MIN_ORIGIN = 0x0200;
+export const SIDWAVE_GAME_DEFAULT_ZERO_PAGE = 0xfb;
+
+/** What the compiler knows about a game build before measuring and formatting. */
+export interface SidwaveGameImage {
+  origin: number;
+  dataOrigin?: number;
+  zeroPage: number;
+  /** Player code, constants and, without a data origin, the data; the RAM variables are not part of it. */
+  player: Uint8Array;
+  /** Streams and tables when a data origin was given. */
+  data?: Uint8Array;
+  /** Every label of the assembled source (the equates `ptr` and `sid_io` included) with its address. */
+  symbols: ReadonlyMap<string, number>;
+  /** Half-open address ranges the player writes besides the zero page, the stack, $01 and the SID registers. */
+  ramRanges: Array<[number, number]>;
+  /** The part of `ramRanges` inside the player image: operand bytes of instructions the player patches (it cannot run from ROM). */
+  patchedCode: Array<[number, number]>;
+  /** First address behind the player image, behind the RAM, and behind the data. */
+  imageEnd: number;
+  ramEnd: number;
+  dataEnd?: number;
+  /** Half-open zero page ranges: the stream pointer and, with several SIDs, the SID pointer. */
+  zeroPageRanges: Array<[number, number]>;
+  sidAddresses: number[];
+  loop: boolean;
+  system: SystemMode;
+  totalFrames: number;
+  /** First frame the song returns to when it loops, or undefined for a loop from the start. */
+  loopFrame?: number;
+  /** Play calls per second of music, and play calls per video frame (the score's speed). */
+  framesPerSecond: number;
+  playCallsPerFrame: number;
+  estimatedWorstCycles: number;
+  streamBytes: number[];
+  arrangement?: string[];
+  lint?: SidwaveFinding[];
+  warnings: string[];
+}
+
+function hex4(n: number): string {
+  return n.toString(16).toUpperCase().padStart(4, "0");
+}
+
+/**
+ * Rewrites the PRG player source for a game build: no installer, IRQ handler or CIA setup, an `init` that takes the
+ * clock in X, a `stop` entry and a play-once ending that leaves the KERNAL IRQ alone.
+ */
+function toGamePlayer(code: string, arr: Arrangement, loop: boolean): string {
+  const installer = /^\ndo_install:[\s\S]*?\ninit_core:\n/;
+  if (!installer.test(code)) throw new Error("SIDWAVE player code changed: the installer block was not found");
+  // X = 0 PAL, 1 NTSC (any other value counts as NTSC), $FF = read the KERNAL flag at $02A6 (nonzero on PAL).
+  const prelude = `
+game_init:
+  cpx #$FF
+  bne gi_given
+  lda $02A6
+  and #1
+  eor #1
+  jmp init_core
+gi_given:
+  txa
+  beq gi_clock
+  lda #1
+gi_clock:
+init_core:
+`;
+  code = code.replace(installer, () => prelude);
+  if (!loop) {
+    const finish = /  lda \$0314\n[\s\S]*?(?=finish_done:)/;
+    if (!finish.test(code)) throw new Error("SIDWAVE player code changed: the play-once IRQ restore was not found");
+    code = code.replace(finish, () => "").replace(/kernal_cia_lo:.*\nkernal_cia_hi:.*\n/, () => "");
+  }
+  const addresses = (arr.chips ?? [{ address: 0xd400 }]).map((chip) => chip.address);
+  const stop = addresses.map((address, i) => `  lda #0
+  ldx #$18
+gs_${i}:
+  sta $${hex4(address)},x
+  dex
+  bpl gs_${i}
+`).join("");
+  return `${code}
+game_stop:
+  lda $01
+  pha
+  lda #$36
+  sta $01
+${stop}  pla
+  sta $01
+  rts
+`;
+}
+
+/** Checks the layout options that do not depend on the score. */
+function checkGameLayout(layout: SidwaveGameLayout): void {
+  // The entry table (12 bytes) must fit below $D000 at the origin; the data block only has to start there.
+  const address = (value: number, path: string, span: number) => {
+    if (!Number.isInteger(value)) throw new SidwaveValidationError(path, "must be an integer address");
+    if (value < SIDWAVE_GAME_MIN_ORIGIN || value + span > SIDWAVE_MEMORY_END) {
+      throw new SidwaveValidationError(path, `must lie in $${hex4(SIDWAVE_GAME_MIN_ORIGIN)}-$${hex4(SIDWAVE_MEMORY_END - span)}; the player and its data must end below $D000 (a KERNAL banked out build is not supported)`);
+    }
+  };
+  address(layout.origin, "$.origin", SIDWAVE_GAME_TABLE_BYTES);
+  if (layout.dataOrigin !== undefined) address(layout.dataOrigin, "$.dataOrigin", 1);
+  if (!Number.isInteger(layout.zeroPage) || layout.zeroPage < 0x02 || layout.zeroPage > 0xfe) {
+    throw new SidwaveValidationError("$.zeroPage", "must be a zero page address from $02 to $FE ($00 and $01 are the processor port)");
+  }
+}
+
+/**
+ * Compiles the player for use inside a game: assembled at `layout.origin` with no BASIC stub, IRQ or CIA setup and
+ * no KERNAL use. Returns the bytes and the facts the caller needs to measure and document them.
+ */
+export function compileSidwaveGameImage(doc: ParsedSidwave, layout: SidwaveGameLayout, options: { loop?: boolean } = {}): SidwaveGameImage {
+  checkGameLayout(layout);
+  if (doc.samples) throw new SidwaveValidationError("$.samples", "CIA2 NMI digi samples need an installed interrupt and are not available in a game build");
+  const { loop, streams, arrangement, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly } = preparePlayer(doc, { loop: options.loop });
+  const sidPointer = Boolean(arrangement.chips);
+  if (layout.zeroPage + (sidPointer ? 3 : 1) > 0xff) {
+    throw new SidwaveValidationError("$.zeroPage", `a ${sidPointer ? "multi-SID" : "single-SID"} player needs ${sidPointer ? 4 : 2} zero page bytes; the highest base is $${hex2(0x100 - (sidPointer ? 4 : 2))}`);
+  }
+  const split = layout.dataOrigin !== undefined;
+  const sourceName = { fileName: "sidwave_game.asm", loadAddress: layout.origin };
+  const assemble = (source: string) => {
+    try {
+      return assemblyToPrgDetailed(source, sourceName);
+    } catch (error) {
+      if (error instanceof AssemblyError && /Overlapping output/.test(error.message)) {
+        throw new SidwaveValidationError("$.dataOrigin", "the data block overlaps the player; move it or the origin");
+      }
+      throw error;
+    }
+  };
+  // The player and its tables are assembled once with empty streams to learn the layout, then for real.
+  const probe = assemble(buildPlayerAsm(arrangement, streams.map(() => [OP.LOOP]), loop, turboOnly, false, layout));
+  const growth = streams.reduce((sum, stream) => sum + stream.length, 0) - streams.length;
+  const probeAt = (label: string) => probe.symbols.get(label)!;
+  const ramEnd = probeAt("game_ram_end") + (split ? 0 : growth);
+  const dataEnd = split ? probeAt("game_data_end") + growth : undefined;
+  const fits = (end: number, what: string) => {
+    if (end > SIDWAVE_MEMORY_END) {
+      throw new SidwaveValidationError("$.timeline", `the ${what} would end at $${hex4(end)}, past the $D000 limit; lower the origin, shorten the timeline or use longer note lengths`);
+    }
+  };
+  fits(ramEnd, split ? "player" : "player and data");
+  if (dataEnd !== undefined) {
+    fits(dataEnd, "data");
+    if (layout.dataOrigin! < ramEnd && layout.origin < dataEnd) {
+      throw new SidwaveValidationError("$.dataOrigin", `the data block $${hex4(layout.dataOrigin!)}-$${hex4(dataEnd - 1)} overlaps the player and its variables $${hex4(layout.origin)}-$${hex4(ramEnd - 1)}`);
+    }
+  }
+  const asm = buildPlayerAsm(arrangement, streams, loop, turboOnly, true, layout);
+  const assembled = assemble(asm);
+  const load = assembled.prg.readUInt16LE(0);
+  const bytes = (from: number, to: number) => new Uint8Array(assembled.prg.subarray(2 + from - load, 2 + to - load));
+  const imageEnd = assembled.symbols.get("game_image_end")!;
+  const dataStart = layout.dataOrigin;
+  const { ranges: ramRanges, patched } = gameRamRanges(asm, assembled.symbols, imageEnd);
+  const warnings: string[] = [];
+  for (const field of doc.ignoredFields ?? []) warnings.push(`${field} has no effect before sidwave: 1.2 and was ignored`);
+  if (arrangement.findings) {
+    lintArrangement(doc, arrangement, arrangement.findings);
+    for (const finding of arrangement.findings.list()) warnings.push(formatFinding(finding));
+  }
+  if (arrangement.chips) {
+    const sawtooth = sawtoothWarning(arrangement);
+    if (sawtooth) warnings.push(sawtooth);
+  }
+  if (doc.cpu === "turbo") {
+    warnings.push("cpu: turbo is switched on by the PRG installer; a game build leaves the CPU speed to the game, which must run at the speed the score was written for.");
+  }
+  if (requiresTurbo(arrangement.system)) {
+    warnings.push(`The player needs up to ${worstCaseCyclesPerCall} cycles per call, more than the ${budgetAt(arrangement.system)} left in a stock ${arrangement.system} frame at speed ${doc.speed}; the game must budget for it.`);
+  }
+  return {
+    origin: layout.origin,
+    dataOrigin: layout.dataOrigin,
+    zeroPage: layout.zeroPage,
+    player: bytes(layout.origin, imageEnd),
+    data: dataStart === undefined ? undefined : bytes(dataStart, dataEnd!),
+    symbols: assembled.symbols,
+    ramRanges,
+    patchedCode: patched,
+    imageEnd,
+    ramEnd,
+    dataEnd,
+    zeroPageRanges: [[layout.zeroPage, layout.zeroPage + 2], ...(sidPointer ? [[layout.zeroPage + 2, layout.zeroPage + 4] as [number, number]] : [])],
+    sidAddresses: (arrangement.chips ?? [{ address: 0xd400 }]).map((chip) => chip.address),
+    loop,
+    system: arrangement.system,
+    totalFrames: arrangement.totalFrames,
+    loopFrame: loop ? arrangement.clock?.loopFrame : undefined,
+    framesPerSecond: arrangement.fps,
+    playCallsPerFrame: doc.speed,
+    estimatedWorstCycles: worstCaseCyclesPerCall,
+    streamBytes: streams.map((stream) => stream.length),
+    arrangement: arrangementReport(doc, arrangement),
+    lint: arrangement.findings?.list(),
+    warnings,
+  };
+}
+
+/**
+ * The address ranges the player writes, half-open and merged where they touch: every `name: .res n` of the source,
+ * every constant defined with `.byte` that an instruction stores to (the filter constants are reloaded per SID,
+ * `wt_clock` and `port_clock` hold the clock), and the operand bytes of instructions that the player patches
+ * (`sta label+n` into code, as the tuning lookup does), which are also returned separately in `patched`.
+ */
+function gameRamRanges(asm: string, symbols: ReadonlyMap<string, number>, imageEnd: number): { ranges: Array<[number, number]>; patched: Array<[number, number]> } {
+  const lines = asm.split("\n");
+  const bytes = new Map<string, number>();
+  const reservedNames = new Set<string>();
+  for (const line of lines) {
+    const definition = /^([A-Za-z_]\w*):\s*\.byte\s+(.*)$/.exec(line);
+    if (definition) bytes.set(definition[1]!, definition[2]!.split(",").length);
+    const reserved = /^([A-Za-z_]\w*):\s*\.res\s+\d+\s*$/.exec(line);
+    if (reserved) reservedNames.add(reserved[1]!);
+  }
+  const ranges: Array<[number, number]> = [];
+  const patched: Array<[number, number]> = [];
+  const stored = new Set<string>();
+  for (const line of lines) {
+    const reserved = /^([A-Za-z_]\w*):\s*\.res\s+(\d+)\s*$/.exec(line);
+    if (reserved) ranges.push([symbols.get(reserved[1]!)!, symbols.get(reserved[1]!)! + Number(reserved[2])]);
+    const store = /^\s+(?:sta|stx|sty|inc|dec|asl|lsr|rol|ror)\s+([A-Za-z_]\w*)(?:\+(\d+))?/.exec(line);
+    if (!store) continue;
+    const name = store[1]!;
+    const address = symbols.get(name);
+    if (bytes.has(name)) stored.add(name);
+    else if (address !== undefined && address >= 0x100 && address < imageEnd && !reservedNames.has(name)) patched.push([address + Number(store[2] ?? 0), address + Number(store[2] ?? 0) + 1]);
+  }
+  for (const name of stored) ranges.push([symbols.get(name)!, symbols.get(name)! + bytes.get(name)!]);
+  const merge = (list: Array<[number, number]>) => {
+    list.sort((a, b) => a[0] - b[0]);
+    const merged: Array<[number, number]> = [];
+    for (const range of list) {
+      const last = merged[merged.length - 1];
+      if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+      else merged.push([range[0], range[1]]);
+    }
+    return merged;
+  };
+  return { ranges: merge([...ranges, ...patched]), patched: merge(patched) };
 }
 
 /** Project a resolved arrangement to one SID. The source score keeps its original version. */
@@ -328,7 +614,7 @@ export function validateSidwavePsidMap(doc: ParsedSidwave): void {
 export function compileSidwaveToSid(
   doc: ParsedSidwave,
   prg: Buffer,
-  options?: { entryAddress?: number; initAddress?: number; playAddress?: number },
+  options?: { entryAddress?: number; initAddress?: number; playAddress?: number; relocation?: { startPage: number; pageLength: number } },
 ): { sid: Buffer } {
   validateSidwavePsidMap(doc);
   const primary = doc.sids.find(({ address }) => address === 0xd400)!;
@@ -353,6 +639,10 @@ export function compileSidwaveToSid(
   const flags = headerSids.reduce((bits, { model }, i) =>
     bits | ((model === "6581" ? 1 : model === "8580" ? 2 : 0) << (4 + 2 * i)), clockBits << 2);
   header.writeUInt16BE(flags, 0x76);
+  if (options?.relocation) {
+    header[0x78] = options.relocation.startPage;
+    header[0x79] = options.relocation.pageLength;
+  }
   if (version >= 3) header[0x7a] = (headerSids[1]!.address - 0xd000) >> 4;
   if (version >= 4) header[0x7b] = (headerSids[2]!.address - 0xd000) >> 4;
   const body = Buffer.isBuffer(prg) ? prg : Buffer.from(prg);
@@ -2906,7 +3196,8 @@ ${banks.join("\n")}
 `;
 }
 
-function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean, turboOnly: number, includeSamples = true): string {
+function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean, turboOnly: number, includeSamples = true,
+  game?: SidwaveGameLayout): string {
   const L: string[] = [];
   const insts = arr.instruments;
   const hasRestart = arr.voices.some(({ events }) => events.some(({ bytes }) => bytes[0] === OP.RESTART));
@@ -2938,16 +3229,30 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
   const fMax = Math.max(fBase, fEnd);
   const fDir = f.sweep < 0 ? 1 : 0;
 
-  L.push(`ptr = $FB`);
-  if (arr.chips) L.push(`sid_io = $FD`);
-  L.push(`* = $0801`);
-  L.push(`  .byte $0B,$08,$0A,$00,$9E,$32,$30,$36,$31,$00,$00,$00 ; 10 SYS2061`);
-  L.push(`install:`);
-  L.push(`  jmp do_install`);
-  L.push(`init_vec:`);
-  L.push(`  jmp init`);
-  L.push(`play_vec:`);
-  L.push(`  jmp play`);
+  if (game) {
+    L.push(`ptr = $${hex2(game.zeroPage)}`);
+    if (arr.chips) L.push(`sid_io = $${hex2(game.zeroPage + 2)}`);
+    L.push(`* = $${game.origin.toString(16).toUpperCase().padStart(4, "0")}`);
+    // The entry table never changes: init, play, stop and the sound effect stub, three bytes each.
+    L.push(`game_init_entry:`);
+    L.push(`  jmp game_init`);
+    L.push(`  jmp play`);
+    L.push(`  jmp game_stop`);
+    L.push(`  rts`);
+    L.push(`  nop`);
+    L.push(`  nop`);
+  } else {
+    L.push(`ptr = $FB`);
+    if (arr.chips) L.push(`sid_io = $FD`);
+    L.push(`* = $0801`);
+    L.push(`  .byte $0B,$08,$0A,$00,$9E,$32,$30,$36,$31,$00,$00,$00 ; 10 SYS2061`);
+    L.push(`install:`);
+    L.push(`  jmp do_install`);
+    L.push(`init_vec:`);
+    L.push(`  jmp init`);
+    L.push(`play_vec:`);
+    L.push(`  jmp play`);
+  }
   let playerCode = PLAYER_CODE;
   if (!hasWavetable) {
     playerCode = playerCode.replace(/  lda i_wtlen,y\n  beq vn_table_done\n  lda #0\n  sta v_wtpos,x\n  lda i_wtst,y\n  tay\n  lda wt_frames,y\n  sta v_wtleft,x\nvn_table_done:\n/, "");
@@ -3066,7 +3371,7 @@ vr_wt_integer:
     playerCode = playerCode.replace("init_core:\n", "init_core:\n  sta port_clock\n");
     playerCode += PORTAMENTO_CODE;
   }
-  if (arr.speed > 1) {
+  if (arr.speed > 1 && !game) {
     // PSID hosts use the CIA latch written by init when song 1 selects CIA timing.
     // The PRG installer already sets the latch and enters at init_core.
     playerCode = playerCode.replace("  lda doc_clock\ninit_core:", `  ldx doc_clock
@@ -3133,7 +3438,7 @@ c_ret:
     playerCode = multiplexSids(playerCode, arr.chips, Boolean(hasFilterTable), stateBytes);
     if (arr.mirrors) playerCode = addCenterMirrors(playerCode, arr);
     if (arr.softVolume) playerCode = gateBeforeEnvelope(addSoftVolume(playerCode, arr.chips.length, arr.speed, loop || !!arr.explicitEnd));
-    if (arr.turbo) {
+    if (arr.turbo && !game) {
       playerCode = addTurboInit(playerCode, arr.speed, turboOnly, arr.softVolume);
       if (arr.softVolume) playerCode = measureTurboStartup(playerCode);
     }
@@ -3146,11 +3451,14 @@ c_ret:
     L.push(`loop_lo: .byte ${targets.map((t) => "<" + t).join(",")}`);
     L.push(`loop_hi: .byte ${targets.map((t) => ">" + t).join(",")}`);
   }
+  if (game) playerCode = toGamePlayer(playerCode, arr, loop);
   L.push(playerCode);
   // Constants
-  L.push(`doc_clock: .byte ${clockIndex}`);
-  L.push(`cia_lo: .byte <${ciaLatch(CLOCK_HZ.PAL)}, <${ciaLatch(CLOCK_HZ.NTSC)}`);
-  L.push(`cia_hi: .byte >${ciaLatch(CLOCK_HZ.PAL)}, >${ciaLatch(CLOCK_HZ.NTSC)}`);
+  if (!game) {
+    L.push(`doc_clock: .byte ${clockIndex}`);
+    L.push(`cia_lo: .byte <${ciaLatch(CLOCK_HZ.PAL)}, <${ciaLatch(CLOCK_HZ.NTSC)}`);
+    L.push(`cia_hi: .byte >${ciaLatch(CLOCK_HZ.PAL)}, >${ciaLatch(CLOCK_HZ.NTSC)}`);
+  }
   L.push(`fenv_init: .byte <${fBase}, >${fBase}, ${fDir}`);
   L.push(`fenv_step: .byte <${f.stepFixed}, >${f.stepFixed}`);
   L.push(`fenv_min: .byte <${fMin}, >${fMin}`);
@@ -3206,7 +3514,9 @@ c_ret:
   if (arr.streamCalls) commands.push("c_call", "c_ret");
   for (const name of commands) L.push(`  .byte <(${name}-1), >(${name}-1)`);
 
-  // Instrument tables
+  // Instrument tables. A game build with a data origin collects the pure data (tables and streams) in a second block.
+  const split = game?.dataOrigin !== undefined;
+  const T: string[] = split ? [] : L;
   const arpTable: number[] = [];
   const arpStart = insts.map((inst) => {
     if (inst.arp.length === 0) return 0;
@@ -3218,7 +3528,7 @@ c_ret:
     return s;
   });
   if (arpTable.length > 256) throw new SidwaveValidationError("$.voices", "arpeggio tables exceed 256 entries");
-  const col = (name: string, values: number[]) => pushByteRows(L, name, values.map((v) => `$${hex2(v)}`));
+  const col = (name: string, values: number[]) => pushByteRows(T, name, values.map((v) => `$${hex2(v)}`));
   col("i_ad", insts.map((i) => i.ad));
   col("i_sr", insts.map((i) => i.sr));
   col("i_wave", insts.map((i) => i.wave));
@@ -3322,24 +3632,30 @@ c_ret:
     col(`${sys.toLowerCase()}_hi`, values.map((v) => v >> 8));
   }
 
-  // RAM
-  L.push(`ftlo: .res 96`);
-  L.push(`fthi: .res 96`);
-  L.push(`vars:`);
-  for (const name of voiceVars) L.push(`v_${name}: .res ${channels}`);
-  for (const name of GLOBAL_VARS) L.push(`${name}: .res 1`);
-  for (const name of pulseVars) L.push(`v_${name}: .res ${channels}`);
+  // RAM: right after the tables in a PRG; behind everything else in a game build, so the file can end where it starts.
+  const R: string[] = game ? [] : L;
+  R.push(`ftlo: .res 96`);
+  R.push(`fthi: .res 96`);
+  R.push(`vars:`);
+  for (const name of voiceVars) R.push(`v_${name}: .res ${channels}`);
+  for (const name of GLOBAL_VARS) R.push(`${name}: .res 1`);
+  for (const name of pulseVars) R.push(`v_${name}: .res ${channels}`);
   if (hasFilterTable) {
-    for (const name of filterVars) L.push(`v_${name}: .res ${channels}`);
-    L.push("g_ftactive: .res 1");
-    if (arr.chips?.some((chip) => chip.owner !== undefined)) L.push("g_fthold: .res 1");
+    for (const name of filterVars) R.push(`v_${name}: .res ${channels}`);
+    R.push("g_ftactive: .res 1");
+    if (arr.chips?.some((chip) => chip.owner !== undefined)) R.push("g_fthold: .res 1");
   }
-  if (arr.chips?.some((chip) => chip.hasOffset)) for (const name of ["g_so0", "g_so1", "g_so2", "g_sres"]) L.push(`${name}: .res 1`);
-  L.push(`vars_end:`);
+  if (arr.chips?.some((chip) => chip.hasOffset)) for (const name of ["g_so0", "g_so1", "g_so2", "g_sres"]) R.push(`${name}: .res 1`);
+  R.push(`vars_end:`);
 
-  streams.forEach((s, i) => pushByteRows(L, `stream${i}`, s.map((b) => typeof b === "string" ? b : `$${hex2(b)}`)));
+  streams.forEach((s, i) => pushByteRows(T, `stream${i}`, s.map((b) => typeof b === "string" ? b : `$${hex2(b)}`)));
   if (arr.samples) L.push(includeSamples ? digiDataAsm(arr.samples) :
     [...arr.samples.defs.keys()].map((_, i) => `digi_data${i}:`).join("\n"));
+  if (game) {
+    L.push(`game_image_end:`, ...R, `game_ram_end:`);
+    if (split) L.push(`* = $${game.dataOrigin!.toString(16).toUpperCase().padStart(4, "0")}`, `game_data:`, ...T, `game_data_end:`);
+    return L.join("\n");
+  }
   L.push(`prg_end:`);
   return L.join("\n");
 }

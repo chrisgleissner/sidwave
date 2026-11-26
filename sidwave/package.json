@@ -21,6 +21,10 @@
       "types": "./dist/sidwaveCompiler.d.ts",
       "default": "./dist/sidwaveCompiler.js"
     },
+    "./game": {
+      "types": "./dist/sidwaveGame.d.ts",
+      "default": "./dist/sidwaveGame.js"
+    },
     "./digi": {
       "types": "./dist/sidwaveDigi.d.ts",
       "default": "./dist/sidwaveDigi.js"

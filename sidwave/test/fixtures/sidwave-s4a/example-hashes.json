@@ -1,0 +1,72 @@
+{
+  "chiptune_drive": {
+    "prg": "b03bab7576b687f5ab66d40a7464c9ab7b4d5022e758860e960620b83bbece66",
+    "prgNoLoop": "b03bab7576b687f5ab66d40a7464c9ab7b4d5022e758860e960620b83bbece66",
+    "sid": "2ff6695f3b52cdd5ea3e215d47de69995a94f9c85b9481eb363d2fd6f58e504e"
+  },
+  "ambient_filter": {
+    "prg": "78f7dbb655a23bbda5761d74c91755946d41212fa6d0b93c5e1605eaded56002",
+    "prgNoLoop": "78f7dbb655a23bbda5761d74c91755946d41212fa6d0b93c5e1605eaded56002",
+    "sid": "ba02d27c37b12b902a5fbb5a4111365c230cd198a9a26f80cbb537da86cf2448"
+  },
+  "funk_bass": {
+    "prg": "3bec6212702105a526ff1d030715617445095dafa336a2bc9c9862c330aa21b5",
+    "prgNoLoop": "3bec6212702105a526ff1d030715617445095dafa336a2bc9c9862c330aa21b5",
+    "sid": "1dbb0b9e48d0c8c520d6c5821336179604c1033e7cb3f8314975735521cabea9"
+  },
+  "acid_line": {
+    "prg": "309a9e9414a1e075a19be4380353cdc4fc61ac189d46a877cb893d7d62130c7b",
+    "prgNoLoop": "309a9e9414a1e075a19be4380353cdc4fc61ac189d46a877cb893d7d62130c7b",
+    "sid": "09c37b3d5fae4e7445d964d50be64623be3a196686a202a5b6a3f059560b996c"
+  },
+  "arp_ballad": {
+    "prg": "10720e9814e438589598131aad7f40f8f14c867857ae9ab7a4ccde7f572ecb47",
+    "prgNoLoop": "10720e9814e438589598131aad7f40f8f14c867857ae9ab7a4ccde7f572ecb47",
+    "sid": "d3304c62b276d18c275952349bc6595f5d22dd6cb2ece517608dbb960ef6ac2d"
+  },
+  "drum_and_bass": {
+    "prg": "f331825ae3f3befbff4b8fb5e7c28dd51a5569b0241e1cd41191cf79bd93c3da",
+    "prgNoLoop": "f331825ae3f3befbff4b8fb5e7c28dd51a5569b0241e1cd41191cf79bd93c3da",
+    "sid": "0a373ea7a84ca7f2fe9b1b70af3fe4384c9e2961dff4401f2d974d6289f48878"
+  },
+  "digi_groove": {
+    "prg": "7b40ad8d474b1ccb9842a7d93ebe62cb53767419db01a559eeca744584d9b1a8",
+    "prgNoLoop": "7b40ad8d474b1ccb9842a7d93ebe62cb53767419db01a559eeca744584d9b1a8",
+    "sid": "error: Invalid SIDWAVE at $.samples: CIA2 NMI digi samples require standalone PRG output"
+  },
+  "metal_sync": {
+    "prg": "a4facd1999f476326a9284f75eb1510d2346e1f7f9e86d55c3f6bc7375b3a110",
+    "prgNoLoop": "a4facd1999f476326a9284f75eb1510d2346e1f7f9e86d55c3f6bc7375b3a110",
+    "sid": "12afb9c30e86604f71a057932cf7c76919c1b8744b7565ed4b9d890d841d6e61"
+  },
+  "stereo_echo": {
+    "prg": "c06ac544d44aa7e003a0f87fb7d2e7da8be75cb1e2499f6a28a4c14fb828bd0f",
+    "prgNoLoop": "c06ac544d44aa7e003a0f87fb7d2e7da8be75cb1e2499f6a28a4c14fb828bd0f",
+    "sid": "f95e488471c3c28c8ee5746134b30617d321c21cbebebd26e3fc6fef26318343"
+  },
+  "chamber_waltz": {
+    "prg": "c914b9489c9ac7cdc2e0ec74cb46fdfb4a11f366f8ea04b65047cb97984f7dae",
+    "prgNoLoop": "c914b9489c9ac7cdc2e0ec74cb46fdfb4a11f366f8ea04b65047cb97984f7dae",
+    "sid": "216c54068e8edfb69bdf163685b0aeace46b93a8b3c19f7eb517c23dbc39612d"
+  },
+  "title_fanfare": {
+    "prg": "f36053f3347f32e9253d4161ff4c895ad9c926ee9ba5ffad68c3f95345e3093b",
+    "prgNoLoop": "f36053f3347f32e9253d4161ff4c895ad9c926ee9ba5ffad68c3f95345e3093b",
+    "sid": "038f7893619b4b9c828aab877590af115d0a0baa4e4ab5fe60ec388fa016d8e7"
+  },
+  "ultisid_orchestra": {
+    "prg": "a13ef8a48611d6f01a3706e2d8fb760ba6d655379812e62141efdf181b845dac",
+    "prgNoLoop": "a13ef8a48611d6f01a3706e2d8fb760ba6d655379812e62141efdf181b845dac",
+    "sid": "error: Invalid SIDWAVE at $.sids: PSID supports at most 3 SID chips; use PRG output for more than 3 SIDs"
+  },
+  "wall_of_sid": {
+    "prg": "ab5d495f32e0e69d5106e45284a10eea5edf0be6348e8e4d3201e9853b666dc4",
+    "prgNoLoop": "ab5d495f32e0e69d5106e45284a10eea5edf0be6348e8e4d3201e9853b666dc4",
+    "sid": "error: Invalid SIDWAVE at $.sids: PSID supports at most 3 SID chips; use PRG output for more than 3 SIDs"
+  },
+  "fuer_elise": {
+    "prg": "eb6cfa38039cdf03348586528190bcbafae5fb1ca15373463e0c96f1c86c4121",
+    "prgNoLoop": "41b52252d93d029e0809cc5fdcd8de2de0078c226882e9e5dccc5de9a7cf9b55",
+    "sid": "277ac7eab5c53a63f3ee740455811eab50007fde0ea6e83462a5c994fcc5152b"
+  }
+}
