@@ -1,7 +1,7 @@
 {
   "name": "sidwave",
   "version": "0.1.0",
-  "description": "SIDWAVE music format for the SID chip: parser, compiler to C64 PRG and PSID, linter, generator and offline analysis",
+  "description": "SIDWave music format for the SID chip: parser, compiler to C64 PRG and PSID, linter, generator and offline analysis",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

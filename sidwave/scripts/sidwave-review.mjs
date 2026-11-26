@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Objective quality gate for a SIDWAVE rendering or capture (src/audio/sidwaveQuality.ts, doc/sidwave-hil.md).
+ * Objective quality gate for a SIDWave rendering or capture (src/audio/sidwaveQuality.ts, doc/sidwave-hil.md).
  *
  *   node packages/sidwave/scripts/sidwave-review.mjs --wav <file.wav> [--song <file.yaml|preset:<style>>] [--offset-ms N] [--out report.json]
  *

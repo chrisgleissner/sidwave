@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025-2026 Christian Gleissner
-// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+// See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import type { ParsedSidwave } from "../sidwave.js";
 import { expectedSchedule, fft, type ExpectedSchedule } from "./sidwaveFidelity.js";
 import { chromaSequence, type Stereo } from "./sidwaveSimilarity.js";
 
 /**
- * Objective quality gate for a rendering or a capture of a SIDWAVE song. Every check returns PASS, WARN or FAIL
+ * Objective quality gate for a rendering or a capture of a SIDWave song. Every check returns PASS, WARN or FAIL
  * with its metrics; thresholds are in DEFAULT_QUALITY_THRESHOLDS and are documented in doc/sidwave-hil.md.
  * With the score (schedule and document) and the time at which the song starts in the signal, the checks that depend
  * on scheduled events (glitches, dropouts, pitch stability, sections, bars) run too; without it they are SKIP.

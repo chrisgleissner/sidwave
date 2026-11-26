@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025-2026 Christian Gleissner
-// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
-// SIDWAVE Parser and Types
+// See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
+// SIDWave Parser and Types
 
 import { Buffer } from 'node:buffer';
 import pkg from 'yaml';
@@ -49,7 +49,7 @@ export interface SidwavePatternGroove extends SidwavePatternCommon {
 
 export interface SidwaveGrooveNote {
   note: string;
-  /** SIDWAVE 1.3: per-note vibrato fields merged over the instrument's or pattern's vibrato. */
+  /** SIDWave 1.3: per-note vibrato fields merged over the instrument's or pattern's vibrato. */
   vibrato?: { depth?: number; rate?: number; delay?: number; fade?: number };
   inst?: string;
   len?: number;
@@ -85,7 +85,7 @@ export interface SidwaveEcho {
   detune?: number;
 }
 
-/** SIDWAVE 1.3: plays the source voice's pitched notes later, transposed, with its own instrument and level. */
+/** SIDWave 1.3: plays the source voice's pitched notes later, transposed, with its own instrument and level. */
 export interface SidwaveFollow {
   voice: number;
   delay?: number;
@@ -180,7 +180,7 @@ export interface SidwaveMeter {
 export interface SidwaveTimelineSection {
   section?: string;
   bars: number;
-  /** SIDWAVE 1.3: the section's metre. Without it the section uses the song metre. */
+  /** SIDWave 1.3: the section's metre. Without it the section uses the song metre. */
   meter?: SidwaveMeter;
   tempo?: number | { to: number };
   swing?: number;
@@ -257,7 +257,7 @@ export interface ParsedSidwave {
     length_bars: number;
     /** Quarter notes per bar of the song metre. */
     meter: number;
-    /** SIDWAVE 1.3: the song metre with its signature and grouping. */
+    /** SIDWave 1.3: the song metre with its signature and grouping. */
     meterSig?: SidwaveMeter;
     global_fx: Record<string, unknown>;
   };
@@ -281,12 +281,12 @@ export interface ParsedSidwave {
   ignoredFields?: string[];
 }
 
-/** SIDWAVE 1.2 and 1.3 share the modern compiler path; a 1.2 document compiles to the same bytes under 1.3. */
+/** SIDWave 1.2 and 1.3 share the modern compiler path; a 1.2 document compiles to the same bytes under 1.3. */
 export function isModern(doc: Pick<ParsedSidwave, "version">): boolean {
   return doc.version === "1.2" || doc.version === "1.3";
 }
 
-/** Raised for SIDWAVE documents that cannot be played as written. The message names the offending path. */
+/** Raised for SIDWave documents that cannot be played as written. The message names the offending path. */
 export class SidwaveValidationError extends Error {
   readonly path: string;
 
@@ -335,7 +335,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     throw new SidwaveValidationError("$", "expected a mapping with voices and timeline");
   }
 
-  // Detect legacy CPG shape (song: {...}) vs SIDWAVE top-level fields.
+  // Detect legacy CPG shape (song: {...}) vs SIDWave top-level fields.
   const legacy = obj.song !== undefined;
   if (legacy) {
     checkKeys(obj, LEGACY_KEYS, "$", "legacy documents with a 'song' block may only contain song, voices and timeline");
@@ -347,7 +347,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
       throw new SidwaveValidationError("$.sidwave", `unsupported version ${describeValue(obj.sidwave)}; use 1.0, 1.1, 1.2 or 1.3`);
     }
   }
-  // SIDWAVE 1.3 accepts everything that 1.2 accepts and compiles it to the same bytes.
+  // SIDWave 1.3 accepts everything that 1.2 accepts and compiles it to the same bytes.
   const v13 = obj.sidwave === 1.3 || obj.sidwave === "1.3";
   const modern = obj.sidwave === 1.2 || obj.sidwave === "1.2" || v13;
   const header = (legacy ? obj.song : obj) as Record<string, unknown>;
@@ -379,7 +379,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     throw new SidwaveValidationError("$.voices", `the SID${sids.length > 1 ? " map" : ""} has ${capacity} voices; ${obj.voices.length} were given`);
   }
   const instruments = normalizeInstruments(obj.instruments, "$.instruments", modern, v13);
-  // SIDWAVE 1.1 (c64bridge 1.3.1) accepted hard_restart in an instrument without using it. Keep accepting
+  // SIDWave 1.1 (c64bridge 1.3.1) accepted hard_restart in an instrument without using it. Keep accepting
   // it so that such documents still compile, and report it as ignored.
   const ignoredFields = !modern && obj.instruments && typeof obj.instruments === "object"
     ? Object.entries(obj.instruments as Record<string, unknown>)
@@ -958,7 +958,7 @@ function normalizeVoice(v: Record<string, any>, path: string, id: number, modern
   };
 }
 
-/** `meter` is the bar length for bar-line checks; without it (SIDWAVE 1.3) the checks wait for the sections that play the pattern. */
+/** `meter` is the bar length for bar-line checks; without it (SIDWave 1.3) the checks wait for the sections that play the pattern. */
 function validatePattern(raw: unknown, path: string, modern: boolean, meter: number | undefined, defaultKit?: Record<string, string>, v13 = false): SidwavePattern {
   if (!isPlainObject(raw)) throw new SidwaveValidationError(path, "expected a pattern mapping (groove, motif or type: arpeggio)");
   // Copy first: numeric strings are stored as numbers, and the caller's object stays untouched.
@@ -1071,7 +1071,7 @@ function validatePattern(raw: unknown, path: string, modern: boolean, meter: num
 }
 
 /**
- * Checks a vibrato mapping. `fade` (SIDWAVE 1.3) is the number of frames over which the depth rises from 0 after
+ * Checks a vibrato mapping. `fade` (SIDWave 1.3) is the number of frames over which the depth rises from 0 after
  * the delay. A per-note override may omit depth and rate, which then come from the instrument or pattern.
  */
 export function parseVibrato(raw: unknown, path: string, v13: boolean, complete = true): Record<string, number> {
@@ -1231,7 +1231,7 @@ function compactTokens(text: string, path: string, kit?: Record<string, string>,
   return entries;
 }
 
-/** Beats of each `|` group of a SIDWAVE 1.3 pattern, kept until the sections that play the pattern are known. */
+/** Beats of each `|` group of a SIDWave 1.3 pattern, kept until the sections that play the pattern are known. */
 const barGroups = new WeakMap<object, number[]>();
 /** JSON path of each validated pattern, for errors raised after the timeline is known. */
 const patternPaths = new WeakMap<object, string>();
@@ -1319,7 +1319,7 @@ export function barStartBeats(timeline: SidwaveTimelineSection[], lengthBars: nu
   return starts;
 }
 
-/** SIDWAVE 1.3: checks the bar lines and `bars` of every pattern against the metre of each section that plays it. */
+/** SIDWave 1.3: checks the bar lines and `bars` of every pattern against the metre of each section that plays it. */
 function checkSectionBarLines(timeline: SidwaveTimelineSection[], voices: SidwaveVoice[],
   digis: NonNullable<ParsedSidwave["digiVoices"]>, songMeter: SidwaveMeter): void {
   const owners = [

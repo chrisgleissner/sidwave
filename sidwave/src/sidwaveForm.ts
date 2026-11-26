@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025-2026 Christian Gleissner
-// See LICENSE-EXCEPTION.md for the SIDWAVE Player Exception.
+// See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import { parseLayerSequence, patternBeats, sectionBarBeats, type ParsedSidwave, type SidwavePattern, type SidwaveRamp, type SidwaveTimelineSection } from "./sidwave.js";
 
@@ -9,7 +9,7 @@ const EPSILON = 1e-9;
 export function makeTimelineClock(doc: ParsedSidwave, fps: number) {
   const sections: Array<{ index: number; section: SidwaveTimelineSection; startBeat: number; endBeat: number; at: (beat: number) => number; startTime: number; endTime: number; endTempo: number }> = [];
   let seconds = 0;
-  // Bar lines in beats. Each section counts its bars in its own metre (SIDWAVE 1.3); a beat is a quarter note.
+  // Bar lines in beats. Each section counts its bars in its own metre (SIDWave 1.3); a beat is a quarter note.
   const barStarts = [0];
   let beat = 0;
   for (let bar = 0, i = 0; bar < doc.song.length_bars; i++) {

@@ -1,17 +1,17 @@
-# SIDWAVE Format Specification
+# SIDWave Format Specification
 
-This document defines **SIDWAVE**, a declarative format for describing structured C64 SID compositions.
-SIDWAVE files are authored in YAML (or JSON) and compiled by the MCP server (`music_compile_and_play`) into a `.PRG` or `.SID` binary with a built-in frame-based player.
+This document defines **SIDWave**, a declarative format for describing structured C64 SID compositions.
+SIDWave files are authored in YAML (or JSON) and compiled by the MCP server (`music_compile_and_play`) into a `.PRG` or `.SID` binary with a built-in frame-based player.
 
 Pipeline:
 
-LLM → SIDWAVE (YAML) → MCP compiler → PRG or PSID → C64 / Ultimate / VICE playback
+LLM → SIDWave (YAML) → MCP compiler → PRG or PSID → C64 / Ultimate / VICE playback
 
 ---
 
 ## File and Schema Conventions
 
-- **Format name:** SIDWAVE
+- **Format name:** SIDWave
 - **File suffix:** `.sidwave.yaml` (or `.sid.yaml` for brevity)
 - **Version field:** `sidwave: 1.0`, `sidwave: 1.1`, `sidwave: 1.2`, or `sidwave: 1.3`
 - **Schema file:** `sidwave.schema.json`
@@ -96,7 +96,7 @@ timeline:
 | `instruments` | Optional named instrument map. Voices may select an instrument; `lib:name` selects a built-in recipe. |
 | `speed` | Player calls per frame, from 1 to 4. |
 | `title`, `author` | Written to the PSID header (Latin-1, 32 characters). |
-| `meter` | Quarter notes per bar. Defaults to 4. In 1.2 use `meter: 3` for 3/4. 1.3 also accepts time signatures (see SIDWAVE 1.3). |
+| `meter` | Quarter notes per bar. Defaults to 4. In 1.2 use `meter: 3` for 3/4. 1.3 also accepts time signatures (see SIDWave 1.3). |
 | `tempo` | Beats (quarter notes) per minute, 30–220. Default 100. |
 | `mode` | `PAL` (985248 Hz clock, 50.12 frames/s) or `NTSC` (1022727 Hz clock, 59.83 frames/s). Default `PAL`. |
 | `length_bars` | Optional song length. Shorter than the timeline truncates it; longer repeats the timeline from the start. Default: the sum of the timeline's bars. |
@@ -230,7 +230,7 @@ Notes range from C0 to B7. At the PAL clock B7 exceeds the SID's 16-bit frequenc
 
 | Effect | Fields | Behaviour |
 | --- | --- | --- |
-| `vibrato` | `depth` (semitones, 0.03–6), `rate` (Hz, 0.2–12), `delay` (frames, optional), `fade` (1.3, frames, optional; see SIDWAVE 1.3) | Triangle pitch modulation of ±`depth` semitones around the note (the upward and downward swings are computed separately, so both reach `depth` to within the SID's frequency resolution, about 6 cents at C0 and 3 cents at C1 on PAL), starting `delay` frames after the note. The upward swing must stay within the SID's highest frequency: on PAL a vibrato on A#7 can be at most 0.54 semitones deep, on NTSC B7 at most 0.19; deeper vibratos on such notes (including the highest note of a chord arpeggio) are rejected. The player samples the vibrato once per frame, so rates are limited to 12 Hz (about a quarter of the frame rate); faster rates would alias or cancel out. |
+| `vibrato` | `depth` (semitones, 0.03–6), `rate` (Hz, 0.2–12), `delay` (frames, optional), `fade` (1.3, frames, optional; see SIDWave 1.3) | Triangle pitch modulation of ±`depth` semitones around the note (the upward and downward swings are computed separately, so both reach `depth` to within the SID's frequency resolution, about 6 cents at C0 and 3 cents at C1 on PAL), starting `delay` frames after the note. The upward swing must stay within the SID's highest frequency: on PAL a vibrato on A#7 can be at most 0.54 semitones deep, on NTSC B7 at most 0.19; deeper vibratos on such notes (including the highest note of a chord arpeggio) are rejected. The player samples the vibrato once per frame, so rates are limited to 12 Hz (about a quarter of the frame rate); faster rates would alias or cancel out. |
 | `pwm_sweep` | `depth` (fraction ≤ 1 or 12-bit units), `speed` (cycles per second) | Pulse width moves linearly between `pulse_width − depth` and `pulse_width + depth`, restarting at the base on each note. Pulse waveform only. |
 | `slide` | `depth` (semitones, ±24, non-zero), `speed` (frames, 1–255) | Each note starts `depth` semitones below the target (above when negative) and glides to it linearly in frequency, arriving after `speed` frames. The start note must itself be playable (C0..A#7 on PAL, C0..B7 on NTSC); otherwise the document is rejected. |
 | `filter_mod` | `sweep: "+500 over 8 steps"` (units: `steps`, `beats`, `bars`, `frames`; a step is one entry), or `{ sweep: 500, beats: 8 }` | Routes the voice through the filter while the pattern plays. At each repetition of the pattern the cutoff offset restarts at 0 and ramps to `sweep` (cutoff units, −2047..2047) over the given time, then holds. The resulting cutoff is clamped to 0..2047. The offset is removed when the section ends. |
@@ -265,7 +265,7 @@ Set either field on a named instrument or on a groove note object. Entry values 
 
 `c64_sound` with `op: generate` plays a seeded eight-bar piece once and returns
 a short summary and the resource URI for a bundled example in the chosen style.
-Set `includeScore: true` to receive the generated SIDWAVE source and lead timeline.
+Set `includeScore: true` to receive the generated SIDWave source and lead timeline.
 Like `play_preset`, it loads the song as a PRG with its own player,
 which replaces the program in memory. The styles are `chiptune` (130 BPM, speed 2), `ambient`
 (80 BPM) and `funk` (105 BPM). Use `seed` to reproduce the harmony and melody.
@@ -296,7 +296,7 @@ Use these names as voice defaults, groove note instruments, or drum kit entries.
 | `lib:sync_lead` | A hard synced saw with a short octave transient. |
 | `lib:pad_slow` | A slow triangle envelope with a cycling low-pass filter. |
 
-## SIDWAVE 1.1 authoring techniques
+## SIDWave 1.1 authoring techniques
 
 Share a voice between wavetable drums and filtered bass. Cycle chord tones quickly on a second voice and give the third voice a PWM lead with delayed vibrato and legato glides. Use hard restart for a fresh attack. Vary phrases with octave jumps or add a delayed copy to an otherwise free voice. The SID has one shared filter. The most recent active filter table controls its settings. Voice 1 takes its ring or sync source from voice 3, voice 2 from voice 1, and voice 3 from voice 2. Choose notes for that source voice when writing a ring or sync accent. Combined waveforms can be quieter and sound different on a 6581 and an 8580.
 
@@ -404,7 +404,7 @@ The compiler reports `worstCaseCyclesPerCall` and refuses a 1.2 score above the 
 
 For a turbo PRG, select `U64 Turbo Registers` on an Ultimate 64 or `C64U Turbo Registers` on a C64 Ultimate. The PRG requests top speed through `$D031` and counts loop iterations across a raster line. Playback begins when it measures more than about 1.5 MHz or reaches the 4.25-second cap. A reset can trigger the full startup hold, while a reset-free launch can begin on the first check. If the registers are unavailable and the score exceeds the stock budget, the PRG returns to BASIC without installing its IRQ. [Ultimate hardware turbo timing](../ultimate/hardware.md)
 
-The SIDWAVE 1.2 player clears each SID at init, then raises its master volume
+The SIDWave 1.2 player clears each SID at init, then raises its master volume
 from zero by one step per video frame (about 20 ms on PAL or 17 ms on NTSC),
 even with a multispeed score. At the end of a play-once score without `end`
 it releases the voice gates and lowers the master volume at the same rate before
@@ -415,8 +415,8 @@ temporarily write their raw four-bit values to the volume register on their SID.
 ### Playback setup
 
 On Ultimate backends, `compile_play`, `pipeline`, `play_preset`, and `generate`
-start a SIDWAVE PRG without a reset when BASIC is idle at `READY.` or the
-SIDWAVE player owns the IRQ and the keyboard queue is idle. The server detaches
+start a SIDWave PRG without a reset when BASIC is idle at `READY.` or the
+SIDWave player owns the IRQ and the keyboard queue is idle. The server detaches
 the previous player, clears the SID registers, DMA-writes the PRG body, and
 queues a BASIC `SYS` command. Other machine states use the normal PRG runner.
 
@@ -579,13 +579,13 @@ volume changes more audible. [SID specification](sid-spec.md) and
 
 ### Not supported
 
-Time signatures other than those listed under SIDWAVE 1.3, per-note velocity, multiple subtunes, and arbitrary memory/register writes. Instrument recipes are starting points rather than emulations of any commercial player or specific SID model.
+Time signatures other than those listed under SIDWave 1.3, per-note velocity, multiple subtunes, and arbitrary memory/register writes. Instrument recipes are starting points rather than emulations of any commercial player or specific SID model.
 
 ---
 
 ## Arrangement, dynamics and long form (1.2)
 
-Everything in this chapter applies to `sidwave: 1.2` and `sidwave: 1.3` documents only. SIDWAVE 1.0 and 1.1 documents compile to the same bytes as before (test/sidwaveCompat10). The 1.2 library drums, speed-independent timing and the stricter token parsing below are part of 1.2 and are not applied to older documents.
+Everything in this chapter applies to `sidwave: 1.2` and `sidwave: 1.3` documents only. SIDWave 1.0 and 1.1 documents compile to the same bytes as before (test/sidwaveCompat10). The 1.2 library drums, speed-independent timing and the stricter token parsing below are part of 1.2 and are not applied to older documents.
 
 ### Time units
 
@@ -762,7 +762,7 @@ The compile operations return `lint` (at most 12 aggregated entries, most severe
 
 Errors, not warnings: noise combined with another waveform in a wavetable `wave` (it can lock the noise register), a volume change on a digi SID, and a mirror or source channel that another voice scores.
 
-## SIDWAVE 1.3
+## SIDWave 1.3
 
 A `sidwave: 1.3` document accepts everything that 1.2 accepts and compiles it to the same PRG bytes
 (test/sidwave13Meter), so every statement about 1.2 documents in this file also holds for 1.3 documents. The
@@ -899,7 +899,7 @@ The result includes the resource URI and a short summary. Set `includeScore: tru
 to include the YAML in the result. Each original YAML has a technique and form
 guide in its header. [Composition index](c64://sound/examples)
 
-- Start with [chiptune](c64://sound/examples/chiptune_drive), [ambient](c64://sound/examples/ambient_filter), or [funk](c64://sound/examples/funk_bass). They were rewritten in SIDWAVE 1.2 for 1.3.2; their 1.3.1 (SIDWAVE 1.1) texts are kept as test fixtures that pin the 1.1 compiler output.
+- Start with [chiptune](c64://sound/examples/chiptune_drive), [ambient](c64://sound/examples/ambient_filter), or [funk](c64://sound/examples/funk_bass). They were rewritten in SIDWave 1.2 for 1.3.2; their 1.3.1 (SIDWave 1.1) texts are kept as test fixtures that pin the 1.1 compiler output.
 - Use [acid bass](c64://sound/examples/acid_line) for filter accents, [the ballad](c64://sound/examples/arp_ballad) for chord arps and PWM, [drum and bass](c64://sound/examples/drum_and_bass) for multispeed breakbeats, and [the digi groove](c64://sound/examples/digi_groove) for CIA2 samples.
 - Use [metal](c64://sound/examples/metal_sync) for sync, ring and bends, [the chamber waltz](c64://sound/examples/chamber_waltz) for 3/4 counterpoint, and [the fanfare](c64://sound/examples/title_fanfare) for filtered brass and a held cadence.
 - Use [stereo echo](c64://sound/examples/stereo_echo) for panning, [the orchestra](c64://sound/examples/ultisid_orchestra) for 24 voices, and [the nine-SID finale](c64://sound/examples/wall_of_sid) for the build to 27 voices. The last piece needs `configure: true` and a fitted SID in socket 1.
@@ -920,9 +920,9 @@ guide in its header. [Composition index](c64://sound/examples)
 
 ## LLM Prompt Template
 
-> Compose an original 2-4 minute SID piece as **SIDWAVE 1.2** YAML conforming to `sidwave.schema.json`. Quote silent layers as `"-"`. Check `lint`, `arrangement` and `durationSeconds` in the compile result and fix every warning.
+> Compose an original 2-4 minute SID piece as **SIDWave 1.2** YAML conforming to `sidwave.schema.json`. Quote silent layers as `"-"`. Check `lint`, `arrangement` and `durationSeconds` in the compile result and fix every warning.
 
-SIDWAVE 1.2 quick reference:
+SIDWave 1.2 quick reference:
 
 - Header: `sidwave: 1.2`, `title`, `tempo`; `sids: [{ id: sid1, address: "$D400", model: "8580", filter: { owner: v1, route: [1] } }]`; `kit: { k: lib:kick, s: lib:snare }`.
 - Durations of tables, vibrato, slides, portamento and hard restart count video frames at any `speed`.
