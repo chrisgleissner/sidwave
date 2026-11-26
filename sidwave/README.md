@@ -210,11 +210,11 @@ mergeSidwave(base, base.replace("C4", "E4"), theirs).conflicts;
 
 | Function | Effect |
 | --- | --- |
-| `transpose(text, { semitones, scope? })` | Shifts notes, slides, bends, chord symbols and motifs. Drum voices and `kitNote` entries stay. Notes (and the wavetable offsets built on them) must stay in the playable SID range of the score's clock, otherwise `precondition`. `scope` selects voices (by id or name) and sections. A section scope is refused when a selected pattern is also played by another section. |
+| `transpose(text, { semitones, scope? })` | Shifts notes, slides, bends, chord symbols and motifs. Drum voices and `kitNote` entries stay. Notes (and the wavetable offsets built on them) must stay in the playable SID range of the score's clock, otherwise `precondition`. `scope` selects voices (by id or name) and sections. A section scope is refused when a selected pattern is also played by another section. A note with an accidental keeps its style (flat stays flat); other notes follow the style the score uses more often. `semitones: 0` returns the input text. |
 | `setTempo(text, { bpm })`, `scaleTempo(text, { factor })` | Set or multiply the tempo (30 to 220 BPM). Notes stay the same. A tempo at which a note becomes shorter than the player allows makes the result invalid, and the call throws `precondition`. |
 | `substituteInstrument(text, { from, to })` | Replaces `instrument` and `inst` references. `to` is a defined instrument or a `lib:` recipe. |
 | `quantise(text, { grid })` | Rounds explicit `len` values to the grid. Each bar group keeps its length. |
-| `restructure(text, { order })` | Sets the timeline to the named sections or entries in the given order. |
+| `restructure(text, { order })` | Sets the timeline to the named sections or entries in the given order. Existing entries keep their modifiers and overrides. The same order returns the input text. |
 | `humanise(text, { seed, maxShift })` | Varies explicit `len` values by up to `maxShift` beats with a seeded generator, in pairs inside a bar group. The same seed gives the same text. |
 
 ```ts
