@@ -101,3 +101,34 @@ timeline: ["intro", "main", "coda"]
   assert.ok(coda.text.includes(`B: {groove: "A3 ~ B3 ~ C#4 ~ D4 ~", length: 0.5}`), coda.text);
   assert.ok(coda.text.includes(`A: {groove: "C3 ~ D3 ~ E3 ~ F3 ~", length: 0.5}`), coda.text);
 });
+
+test("humanise pairs durations inside one bar group so every bar keeps its length", () => {
+  const text = `sidwave: 1.2
+title: "T"
+tempo: 120
+sids: [{id: "sid1", address: "$D400", model: "8580"}]
+instruments:
+  lead: {waveform: "saw", adsr: [0, 4, 10, 4]}
+voices:
+  - id: 1
+    instrument: "lead"
+    patterns:
+      A:
+        groove:
+          - {note: "C4", len: 1}
+          - {note: "D4", len: 1}
+          - {note: "E4", len: 2}
+          - "|"
+          - {note: "F4", len: 4}
+sections:
+  s: {bars: 2, layers: {v1: "A"}}
+timeline: ["s"]
+`;
+  const result = humanise(text, { seed: 7, maxShift: 0.1 });
+  assert.deepEqual(result.report.changed, ["/voices/0/patterns/A/groove/0/len", "/voices/0/patterns/A/groove/1/len"]);
+  const groove = YAML.parse(result.text).voices[0].patterns.A.groove;
+  assert.equal(groove[0].len + groove[1].len, 2);
+  assert.notEqual(groove[0].len, 1);
+  assert.deepEqual([groove[2].len, groove[4].len], [2, 4]);
+  valid(result.text);
+});

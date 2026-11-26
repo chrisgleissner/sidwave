@@ -64,6 +64,17 @@ function sectionPatternUse(root: any, pick: (name: string | undefined) => boolea
   return result;
 }
 
+/** Bar group (count of preceding "|" separators in string entries) of each groove entry. Duration-bearing object entries belong to the group they appear in. */
+function entryGroups(entries: any[]): number[] {
+  let group = 0;
+  return entries.map((entry) => {
+    const at = group;
+    if (typeof entry === "string") group += entry.split(/\s+/).filter((token) => token === "|").length;
+    return at;
+  });
+}
+const tidy = (x: number) => Number(x.toPrecision(12));
+
 /** Preconditions: semitones is an integer; every shifted pitched note stays in SIDWAVE_NOTE_RANGE and the selected clock's SID frequency range. Preserves rhythm, percussion encodings, instruments, and voices outside scope. Scope is restricted to patterns used only in selected named sections; ambiguous shared/inline/sequence scoping is unsupported. */
 export function transpose(text: string, options: { semitones: number; scope?: { voices?: string[]; sections?: string[] } }): TransformResult {
   if (!Number.isInteger(options?.semitones)) throw new SidwaveTransformError("precondition", "semitones must be an integer");
@@ -183,8 +194,9 @@ export function humanise(text:string,{seed,maxShift,scope}:{seed:number;maxShift
       if(typeof pat.groove==="string") { warnings.push(`/voices/${vi}/patterns/${esc(pn)}/groove uses implicit note lengths; unchanged`); continue; }
       const key=Array.isArray(pat.groove)?"groove":"notes", entries=pat[key]??[];const explicit=entries.map((e:any,i:number)=>e&&typeof e==="object"&&typeof e.len==="number"?i:-1).filter((i:number)=>i>=0);
       if(!explicit.length) { warnings.push(`/voices/${vi}/patterns/${esc(pn)} has no explicit per-note len; unchanged`); continue; }
-      const deltas=new Map<number,number>();
-      for(let j=0;j+1<explicit.length;j+=2){const d=(rand()*2-1)*maxShift;deltas.set(explicit[j]!,d);deltas.set(explicit[j+1]!,-d);}
+      const groups=entryGroups(entries), deltas=new Map<number,number>(), open=new Map<number,number>();
+      // Pair consecutive explicit durations inside one "|" group so that every bar keeps its length.
+      for(const ix of explicit){const g=groups[ix]!;if(open.has(g)){const d=(rand()*2-1)*maxShift;deltas.set(open.get(g)!,d);deltas.set(ix,-d);open.delete(g);}else open.set(g,ix);}
       for(const ix of explicit){if(!deltas.has(ix))continue;const old=entries[ix].len, next=old+deltas.get(ix)!;if(next<=0)throw new SidwaveTransformError("unsupported",`Bounded variation would make duration nonpositive at /voices/${vi}/patterns/${esc(pn)}/${key}/${ix}/len`);if(next!==old){setAt(doc,["voices",vi,"patterns",pn,key,ix,"len"],next);changed.push(ptr(["voices",String(vi),"patterns",pn,key,String(ix),"len"]));}}
     }
   }
