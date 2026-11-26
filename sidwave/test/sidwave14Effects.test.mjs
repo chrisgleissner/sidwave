@@ -5,9 +5,8 @@ import assert from "#test/assert";
 import { parseSidwave, SIDWAVE_MAX_EFFECTS, SIDWAVE_MAX_EFFECT_STEPS } from "../src/sidwave.js";
 import { compileSidwaveToPrg, hzToSidFrequency } from "../src/sidwaveCompiler.js";
 import { compileSidwave } from "../src/sidwaveGame.js";
-import { effectRecords, effectFrames } from "../src/sidwaveEffects.js";
+import { SFX_CYCLES_BOUND, effectCyclesBound, effectRecords, effectFrames } from "../src/sidwaveEffects.js";
 import { readSidwaveExample } from "../src/sidwaveExamples.js";
-import { Cpu6502 } from "../src/sidwaveEmulator.js";
 import { E, EFFECTS, compileBoth, effectMachine, lockstep } from "./helpers/sidwaveEffectsKit.mjs";
 import { gameMachine } from "./helpers/sidwaveGameHarness.mjs";
 
@@ -207,7 +206,7 @@ test("the measured cost of the effect engine stays below the compiler's bound", 
   const compiledPlain = compileSidwave(parseSidwave(text), { target: "game", origin: 0x1000, measure: true });
   assert.equal(plain.cycles.withEffects, undefined);
   assert.ok(withFx.cycles.withEffects.worst <= withFx.cycles.estimatedWorst);
-  assert.ok(withFx.cycles.withEffects.sfxWorst > 0 && withFx.cycles.withEffects.sfxWorst < 500, `${withFx.cycles.withEffects.sfxWorst}`);
+  assert.ok(withFx.cycles.withEffects.sfxWorst > 0 && withFx.cycles.withEffects.sfxWorst <= SFX_CYCLES_BOUND, `sfx ${withFx.cycles.withEffects.sfxWorst} <= ${SFX_CYCLES_BOUND}`);
   assert.equal(compiledPlain.cycles.estimatedWorst, plain.cycles.estimatedWorst);
   assert.ok(withFx.cycles.estimatedWorst > plain.cycles.estimatedWorst);
   // overhead of 0, 1 and 3 effects playing, against the plain score, at several origins (page crossings differ)
@@ -225,8 +224,6 @@ test("the measured cost of the effect engine stays below the compiler's bound", 
     assert.ok(idle > 0 && idle < one && one < three && three <= bound, `origin ${origin.toString(16)}: idle +${idle}, 1 effect +${one}, 3 effects +${three}, bound +${bound}`);
     if (origin === 0x1000) console.log(`# effect engine overhead per play call: idle +${idle}, one effect +${one}, three effects +${three} cycles (bound +${bound})`);
   }
-  const cpu = new Cpu6502(new Uint8Array(65536));
-  assert.ok(cpu);
 });
 
 test("evidence for the need: a 1.3 player has no entry for events, and a song played as a sound effect restarts the music", () => {
@@ -264,11 +261,24 @@ test("sfx keeps the interrupt and decimal flags of the caller, and only the cont
   const { withFx } = compileBoth(BASE, { origin: 0x3001, dataOrigin: 0x9001, zeroPage: 0x40 }, EFFECTS);
   const m = gameMachine(withFx, { garbage: true });
   m.init(0, 0);
+  // The bundled emulator refuses to execute any instruction with D = 1. Each step runs with D = 0 and the flag is put back
+  // afterwards: php pushes the caller's D, plp takes it back from the stack, everything else leaves it as it was.
+  const step = m.cpu.step.bind(m.cpu);
+  m.cpu.step = () => {
+    const op = m.mem[m.cpu.pc];
+    const d = m.cpu.d;
+    m.cpu.d = 0;
+    step();
+    if (op === 0x08) m.mem[0x100 + m.cpu.sp + 1] |= d << 3;
+    else if (op !== 0x28) m.cpu.d = d;
+  };
   for (let n = 0; n < 700; n++) {
     m.cpu.y = [1, 2, 3, 0xff][n % 4];
-    m.cpu.i = n % 2; m.cpu.d = 0;
+    m.cpu.i = n % 2; m.cpu.d = n % 3 === 0 ? 1 : 0;
     m.cpu.call(withFx.contract.entryPoints.sfx, n % 7);
     assert.equal(m.cpu.i, n % 2, "the interrupt flag is as the caller left it");
+    assert.equal(m.cpu.d, n % 3 === 0 ? 1 : 0, "the decimal flag is as the caller left it");
+    m.cpu.d = 0; // the player itself runs with decimal mode off
     m.play();
   }
   m.stop();
@@ -299,4 +309,49 @@ test("every YAML example in the effects chapter of the specification and the REA
     }
   }
   assert.equal(count, 2);
+});
+
+const FULL_STEP = (filter) => `{ freq: C6, wave: tri+saw, pulse: 0.3, adsr: [1, 2, 3, 4], gate: true, ${filter ? "filter: off, " : ""}wait: 1 }, { freq: "440Hz", wave: pulse, pulse: 0.6, adsr: [2, 3, 4, 5], gate: false, wait: 1 }`;
+
+test("the bound of the effect engine is above every measured call and close to the worst one, with and without filter: off", () => {
+  for (const filter of [false, true]) {
+    const effects = `\neffects:\n${[1, 2, 3].map((n) => `  e${n}: { priority: ${n}, steps: [ ${FULL_STEP(filter)} ] }\n`).join("")}`;
+    let worst = 0;
+    let worstSfx = 0;
+    for (let origin = 0x1000; origin < 0x1000 + 256 * 3; origin += 41) {
+      const both = compileBoth(BASE, { origin }, effects);
+      const m = effectMachine(both.withFx);
+      const q = effectMachine(both.plain);
+      for (let song = 0; song < 3; song++) {
+        m.init(song, 0); q.init(song, 0);
+        for (let n = 0; n < 300; n++) {
+          for (const v of [1, 2, 3]) worstSfx = Math.max(worstSfx, m.sfx(v - 1, v).cycles);
+          worst = Math.max(worst, m.play() - q.play());
+        }
+      }
+    }
+    const bound = effectCyclesBound(3, filter);
+    assert.ok(worst <= bound && bound - worst <= 150, `filter ${filter}: measured +${worst}, bound +${bound}`);
+    assert.ok(worstSfx <= SFX_CYCLES_BOUND && worstSfx >= 340, `sfx ${worstSfx} cycles, bound ${SFX_CYCLES_BOUND}`);
+    console.log(`# filter ${filter}: engine overhead up to +${worst} cycles (bound +${bound}), sfx up to ${worstSfx} (bound ${SFX_CYCLES_BOUND})`);
+  }
+});
+
+test("every per-song estimate bounds a run of that song with three effects running", () => {
+  const effects = `\neffects:\n${[1, 2, 3].map((n) => `  e${n}: { priority: ${n}, steps: [ ${FULL_STEP(true)} ] }\n`).join("")}`;
+  const build = compileSidwave(parseSidwave(BASE + effects), { target: "game", origin: 0x1000, measure: false });
+  const plain = compileSidwave(parseSidwave(BASE), { target: "game", origin: 0x1000, measure: false });
+  const m = effectMachine(build);
+  build.cycles.songs.forEach((song, k) => {
+    assert.ok(song.estimatedWorst > plain.cycles.songs[k].estimatedWorst, `song ${k} includes the engine`);
+    let worst = 0;
+    m.init(k, 0);
+    const frames = build.contract.songs[k].frames * 2 + 4;
+    for (let n = 0; n < frames; n++) {
+      for (const v of [1, 2, 3]) m.sfx(v - 1, v);
+      worst = Math.max(worst, m.play());
+    }
+    assert.ok(worst <= song.estimatedWorst, `song ${k}: measured ${worst} <= estimate ${song.estimatedWorst}`);
+  });
+  assert.ok(build.cycles.estimatedWorst >= Math.max(...build.cycles.songs.map((song) => song.estimatedWorst)));
 });

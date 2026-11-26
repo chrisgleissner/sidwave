@@ -254,6 +254,8 @@ function preparePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions, plann
     return { ...effect, voices };
   });
   const extra = effectCyclesBound(arrangement.chips!.length * 3, doc.effects.some((e) => e.steps.some((s) => s.filter === "off")));
+  // Each song's own estimate includes the engine as well, so every per-song figure bounds a run with effects.
+  arrangement.songs?.forEach((part) => { part.worstCaseCycles += extra; });
   const requiresTurbo = (system: SystemMode) => prepared.requiresTurbo(system)
     || prepared.worstCaseCyclesPerCall + extra > prepared.budgetAt(system);
   return {

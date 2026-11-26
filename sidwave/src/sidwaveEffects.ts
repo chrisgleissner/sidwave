@@ -391,12 +391,23 @@ export function effectRam(channels: number, chips: number, filterOff: boolean): 
 }
 
 /**
- * Upper bound of the cycles the effect engine adds to one play call: the owned-voice check of every channel, the idle
- * pass over the three effect slots, and for each of the three voices the dearest of applying a step with all fields (about
- * 316 cycles measured, with the shadow copy of the music) and ending with the restore of the shadow registers. The
- * margin covers page crossings of indexed reads and taken branches. test/sidwave14Effects.test.mjs measures the real
- * overhead at several origins and checks that it stays below this bound.
+ * Upper bound of the cycles the effect engine adds to one play call. The longest path in a call is three voices that each
+ * apply a step with every field set (the first step: gate-off write, frequency, pulse width, envelope, control; with
+ * `filter: off` also the route mask update), plus the owned-voice check of every channel and the idle pass. Counted on the
+ * emulator that is at most 285 cycles per voice without `filter: off` and 318 with it (all three voices together: 958 cycles
+ * at the dearest of 100 origins). Indexed reads and taken branches can cross a page: the margin of 15 cycles per voice
+ * (290 and 335 in the formula) covers the up to 15 such sites on the path, and 40 cycles cover the loop and the owned-voice
+ * checks. test/sidwave14Effects.test.mjs measures both variants at many origins and checks the bound is above every
+ * measurement and within 150 cycles of the worst one.
  */
 export function effectCyclesBound(channels: number, filterOff: boolean): number {
-  return 100 + 7 * channels + 3 * (filterOff ? 390 : 360);
+  return 40 + 7 * channels + 3 * (filterOff ? 335 : 290);
 }
+
+/**
+ * Upper bound of one `sfx` call: `php`/`sei`, three scan passes over the three voices (free voice, lowest priority, same
+ * effect) and the start. The longest path measured at 256 consecutive origins (every third address) is 403 cycles (361 at the origin of the
+ * first tests; page crossings account for the difference); the 27 cycles of margin cover the up to
+ * 27 indexed reads and taken branches that may cross a page.
+ */
+export const SFX_CYCLES_BOUND = 430;

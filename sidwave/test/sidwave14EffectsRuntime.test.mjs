@@ -141,20 +141,44 @@ test("init cancels the running effects and starts like a fresh player", () => {
   assert.deepEqual(log[23].own, [0, 0, 0]);
 });
 
-test("effects during a multispeed song (two play calls per video frame)", () => {
+test("effects during a multispeed song (two play calls per video frame): steps are counted in play calls", () => {
   const text = BASE.replace("tempo: 140\n", "tempo: 140\n    speed: 2\n");
   const both = compileBoth(text);
   assert.equal(both.withFx.contract.songs[1].playCallsPerFrame, 2);
-  const actions = {};
-  for (let n = 5; n < 400; n += 7) actions[n] = [{ sfx: [(n >> 1) % 7, [1, 0xff, 3, 2][(n >> 2) % 4]] }];
-  const { log, accepted } = lockstep(both, { song: 1, calls: 420, actions });
-  assert.ok(accepted.length > 30);
-  assert.ok(log.some((entry) => entry.own.some((own) => own !== 0)));
+  const actions = merge(at(10, [E.zap, 1]), at(30, [E.boom, 2]), at(31, [E.blip, 3]), at(60, [E.drone, 1]), at(61, [E.low, 1]));
+  const { log } = lockstep(both, { song: 1, calls: 140, actions });
+  assert.equal(ownedCalls(log, 0, 10), EFFECT_FRAMES.zap + 1);
+  assert.equal(ownedCalls(log, 1, 30), EFFECT_FRAMES.boom + 1);
+  assert.equal(ownedCalls(log, 2, 31), EFFECT_FRAMES.blip + 1);
+  // low (priority 0) cannot take voice 1 from drone (7)
+  assert.deepEqual(log[60].sfx.map((s) => s.carry), [1]);
+  assert.deepEqual(log[100].own, [E.drone + 1, 0, 0], "drone, 765 calls long, still runs");
+  const random = {};
+  for (let n = 5; n < 400; n += 7) random[n] = [{ sfx: [(n >> 1) % 7, [1, 0xff, 3, 2][(n >> 2) % 4]] }];
+  assert.ok(lockstep(both, { song: 1, calls: 420, actions: random }).accepted.length > 30);
 });
 
-test("garbage in memory: the effect state is initialised by init alone", () => {
+test("garbage in memory: init alone initialises the effect state, and the first effect writes exactly its first step", () => {
   const { log } = lockstep(builds, { calls: 40, garbage: true, actions: at(8, [E.same, 3], [E.blip, 3]) });
-  assert.ok(log.some((entry) => entry.own.some((own) => own !== 0)));
+  assert.deepEqual(log[7].sfx.map((s) => [s.carry, s.voice]), [[0, 2], [1, -1]], "blip (2) cannot replace same (5)");
+  assert.equal(ownedCalls(log, 2, 8), EFFECT_FRAMES.same + 1);
+  const [lo, hi] = [builds.withFx.labels.sidwave_int_sfx, builds.withFx.labels.sidwave_int_sfx_so + 3];
+  const g4 = hzToSidFrequency(391.99543598174927, "PAL");
+  const engine = log[7].writesM.filter((w) => w.pc >= lo && w.pc < hi).map((w) => [w.address - 0xd400, w.value]);
+  assert.deepEqual(engine, [[18, 0], [14, g4 & 255], [15, g4 >> 8], [16, 0], [17, 8], [19, 0x00], [20, 0xf0], [18, 0x41]]);
+  assert.deepEqual(log[7].own, [0, 0, E.same + 1]);
+});
+
+test("NTSC: init with X = 1 makes the effects use the NTSC frequency registers", () => {
+  const { log } = lockstep(builds, { calls: 30, clock: 1, actions: at(5, [E.zap, 1]) });
+  const [lo, hi] = [builds.withFx.labels.sidwave_int_sfx, builds.withFx.labels.sidwave_int_sfx_so + 3];
+  const c6 = hzToSidFrequency(1046.5022612023945, "NTSC");
+  const first = log[4].writesM.filter((w) => w.pc >= lo && w.pc < hi && w.address <= 0xd401).map((w) => [w.address - 0xd400, w.value]);
+  assert.deepEqual(first, [[0, c6 & 255], [1, c6 >> 8]]);
+  assert.notEqual(c6, hzToSidFrequency(1046.5022612023945, "PAL"));
+  const second = log[6].writesM.filter((w) => w.pc >= lo && w.pc < hi).map((w) => [w.address - 0xd400, w.value]);
+  const h = hzToSidFrequency(1200, "NTSC");
+  assert.deepEqual(second, [[0, h & 255], [1, h >> 8]]);
 });
 
 test("sfx called before the first play call after init still starts at the next play call", () => {

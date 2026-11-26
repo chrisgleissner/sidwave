@@ -6,7 +6,7 @@ import assert from "#test/assert";
 import { parseSidwave, SidwaveValidationError } from "../src/sidwave.js";
 import { compileSidwaveToPrg, compileSidwaveToSid } from "../src/sidwaveCompiler.js";
 import { readSidwaveExample } from "../src/sidwaveExamples.js";
-import { Cpu } from "./helpers/sidwaveEmulator.mjs";
+import { Cpu, sampleHarness } from "./helpers/sidwaveEmulator.mjs";
 import { E, EFFECTS, EFFECT_FRAMES, compileBoth, exampleText, lockstep, ownedCalls } from "./helpers/sidwaveEffectsKit.mjs";
 import { hzToSidFrequency } from "../src/sidwaveCompiler.js";
 
@@ -186,4 +186,38 @@ test("filter: off also masks the routing that filter tables and a filter owner w
     if (route(entry.writesQ).some((value) => (value & ~mask) !== 0)) cleared += 1;
   });
   assert.ok(cleared >= 10, `the mask cleared a routed voice in ${cleared} calls`);
+});
+
+test("CIA2 digi samples with an effect on a pitched voice: the effect never writes the digi chip, and the sample writes are those of the plain score", () => {
+  const text = exampleText(readSidwaveExample("digi_groove"), { loop: false });
+  const effects = "\neffects:\n  zap: { priority: 5, steps: [ { freq: C6, wave: pulse, wait: 3 }, { gate: false, wait: 1 } ] }\n";
+  const docFx = parseSidwave(text + effects);
+  const digiAddress = docFx.sids[1].address;
+  const run = (source, trigger) => {
+    const h = sampleHarness(source);
+    h.writes.length = 0;
+    const frames = [];
+    for (let f = 0; f < 40; f++) {
+      if (trigger && f === 10) { h.cpu.y = 3; h.cpu.call(0x0816, 0); assert.equal(h.cpu.c, 0); }
+      const start = h.writes.length;
+      h.cpu.call(h.irq);
+      for (let t = 0; t < 40; t++) h.tick();
+      frames.push(h.writes.slice(start));
+    }
+    return frames;
+  };
+  const fx = run(docFx, true);
+  const plain = run(parseSidwave(text), false);
+  const inChip = (address, base) => address >= base && address < base + 0x20;
+  const first = docFx.sids[0].address;
+  const sidWrites = (frames, base) => frames.map((writes) => JSON.stringify(writes.filter(([a]) => inChip(a, base))));
+  assert.deepEqual(sidWrites(fx, digiAddress), sidWrites(plain, digiAddress), "every write to the digi chip, the samples included, is the plain score's");
+  const digiWrites = fx.flat().filter(([a]) => inChip(a, digiAddress));
+  assert.ok(digiWrites.length > 100, `${digiWrites.length} writes to the digi chip`);
+  // Voices 1 and 2 of the first SID and its filter and volume registers are unchanged; voice 3 differs in the calls of the effect only.
+  const voice3 = (frames) => frames.map((writes) => JSON.stringify(writes.filter(([a]) => a >= first + 14 && a <= first + 20)));
+  const others = (frames) => frames.map((writes) => JSON.stringify(writes.filter(([a]) => inChip(a, first) && !(a >= first + 14 && a <= first + 20))));
+  assert.deepEqual(others(fx), others(plain));
+  const different = voice3(fx).map((line, f) => (line !== voice3(plain)[f] ? f : -1)).filter((f) => f >= 0);
+  assert.deepEqual(different, [10, 11, 12, 13, 14], "voice 3 of the first SID differs for the effect's 4 calls and its restore call only");
 });

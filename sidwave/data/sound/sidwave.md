@@ -1143,9 +1143,9 @@ is separate from the streams.
   every play call starts, restarts or replaces an effect on a rotating voice request, with `sfxWorst` for the `sfx` call.
   `cycles.estimatedWorst` includes the effect engine and bounds both. The effect RAM (45 bytes for one SID, plus 4 with `filter: off`)
   is part of `contract.ram`.
-- The estimator charges every score with effects up to 1201 more cycles per play call with one SID (`100 + 7 x channels +
-  3 x 360`, with 390 instead of 360 when a step uses `filter: off`). A score whose music already uses most of the stock budget may therefore
-  need `cpu: turbo` with effects (the error message says so), although the effects themselves rarely cost that much.
+- The estimator charges every score with effects up to 931 more cycles per play call with one SID (`40 + 7 x channels +
+  3 x 290`; 1066 with 335 instead of 290 when a step uses `filter: off`). A score whose music already uses most of the stock budget may therefore
+  need `cpu: turbo` with effects (the error message says so). Of the bundled examples, `chiptune_drive` (estimate 8356 without effects, 9287 with one) and `metal_sync` (8234, 9165) exceed the 8778 cycles of a stock PAL frame at speed 2 once they define any effect, and need `cpu: turbo` (a game build only warns); `funk_bass`, `drum_and_bass` and the other examples stay within budget.
 
 **Schema.** `data/sound/sidwave.schema.json` has the property `effects` (an object of at most 32 properties whose names
 match `^[A-Za-z_][A-Za-z0-9_]{0,31}$`), with the effect and step fields above and the same ranges.
@@ -1194,9 +1194,11 @@ pass plus one loop of every song, with the given number of effects started on ev
 The first effect costs 604 bytes of engine code and tables, each further effect 4 bytes, each step 11 bytes, and `filter: off`
 74 bytes; the effect RAM is 45 bytes. Against the plain run at the same play call, the engine adds
 78 cycles while no effect runs (the owned-voice check of the three voices and the idle pass), 317 cycles with one effect
-starting a step on every call and 787 cycles with three (at origin $1000; the test repeats this at four origins, which differ
-in page crossings, and checks that all stay below the compiler's bound of 1201). A call of `sfx` takes at most 360
-cycles. The measured worst calls are well below the estimate (2584 without effects, 3785 with).
+starting a step on every call and 787 cycles with three (at origin $1000; the bound is checked at 19 origins, which differ
+in page crossings: the dearest call with three full steps adds 804 cycles, 958 with `filter: off`, against bounds of 931 and 1066). A call of `sfx` takes at most 361 cycles at
+the origin of these measurements and at most 403 at the dearest of 256 origins (page crossings); the bound is 430. The measured worst calls are
+well below the estimate (2584 without effects, 3785 with). The per-song estimates of a game build (`cycles.songs[k].estimatedWorst`)
+include the engine as well, so each bounds a run of that song with three effects running (tested).
 `test/sidwave14Effects.test.mjs` ("the measured cost of the effect engine stays below the compiler's bound") measures this
 on every run.
 

@@ -113,11 +113,11 @@ const list = (writes) => writes.map((w) => `${w.address.toString(16)}=${w.value}
  * Runs `calls` play calls of both builds after init(song). `actions` maps a call number (1-based) to the list of
  * { sfx: [a, y] } or { stop: true } actions that happen right before that call. Returns the log of every call.
  */
-export function lockstep({ withFx, plain }, { song = 0, calls, actions = {}, ignoreRoute = false, garbage = false }) {
+export function lockstep({ withFx, plain }, { song = 0, calls, actions = {}, ignoreRoute = false, garbage = false, clock = 0 }) {
   const m = effectMachine(withFx, { garbage });
   const q = effectMachine(plain, { garbage });
-  m.init(song, 0);
-  q.init(song, 0);
+  m.init(song, clock);
+  q.init(song, clock);
   const imageM = new Array(0x19).fill(0);
   const imageQ = new Array(0x19).fill(0);
   const log = [];
@@ -127,7 +127,7 @@ export function lockstep({ withFx, plain }, { song = 0, calls, actions = {}, ign
     const entry = { call: n, sfx: [], stopped: false };
     for (const action of actions[n] ?? []) {
       if (action.init !== undefined) {
-        m.init(action.init, 0); q.init(action.init, 0);
+        m.init(action.init, clock); q.init(action.init, clock);
         imageM.fill(0); imageQ.fill(0);
         entry.initialised = true;
         assert.deepEqual(m.own(), [0, 0, 0], `call ${n}: init cancels every effect`);

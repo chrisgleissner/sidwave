@@ -53,22 +53,27 @@ function runDemo(example, frames, joystick) {
   assert.equal(mem[0xd012], 20);
   let player = 0;
   let own = 0;
+  let waiting = 0;
+  const waitAt = example.symbols.get("wait"); // the loop that waits for a raster line: cmp $d012 / bne
+  const isWait = (pc) => waitAt !== undefined && pc >= waitAt && pc < waitAt + 5;
   const step = cpu.step.bind(cpu);
   cpu.step = () => {
     const pc = cpu.pc;
     const before = cpu.cycles;
     step();
-    if (pc >= lo && pc < hi) player += cpu.cycles - before; else own += cpu.cycles - before;
+    if (pc >= lo && pc < hi) player += cpu.cycles - before;
+    else if (isWait(pc)) waiting += cpu.cycles - before;
+    else own += cpu.cycles - before;
   };
   const log = [];
   for (let f = 0; f < frames; f++) {
     frame = f;
     frameStart = (f + 2) * FRAME_CYCLES;
     cpu.cycles = frameStart + 20 * 63 + 7; // the interrupt starts at raster line 20
-    player = 0; own = 0;
+    player = 0; own = 0; waiting = 0;
     const ownAtStart = [0, 1, 2].map((v) => mem[eff + v]);
     cpu.call(irq);
-    log.push({ frame: f, ownAtStart, ownAfter: [0, 1, 2].map((v) => mem[eff + v]), player, own, total: player + own });
+    log.push({ frame: f, ownAtStart, ownAfter: [0, 1, 2].map((v) => mem[eff + v]), player, own, waiting, total: player + own + waiting, free: FRAME_CYCLES - player - own });
   }
   return { log, writes, extras, mem };
 }
@@ -163,13 +168,13 @@ test("raster bars: fire starts pew on voice 3, the music of voices 1 and 2 never
     assert.deepEqual(border.slice(0, 64), Array.from({ length: 64 }, (_, i) => table[(i + (f & 255)) & 63]));
     assert.equal(border[64], 0);
   }
-  const worst = Math.max(...run.log.map((e) => e.total));
-  const worstPlayer = Math.max(...run.log.map((e) => e.player));
-  const worstOwn = Math.max(...run.log.map((e) => e.own));
-  assert.ok(worst < FRAME_CYCLES, `a frame takes ${worst} of ${FRAME_CYCLES} cycles`);
-  assert.ok(worstPlayer <= example.build.cycles.estimatedWorst, `player ${worstPlayer} <= bound ${example.build.cycles.estimatedWorst}`);
-  assert.ok(worstOwn + example.build.cycles.estimatedWorst < FRAME_CYCLES);
-  console.log(`# raster_bars: worst frame ${worst} cycles = player ${worstPlayer} + program ${worstOwn} (budget ${FRAME_CYCLES}, ${(100 * worst / FRAME_CYCLES).toFixed(1)} %)`);
+  // One frame, the one in which the player and the program together take the most (not the maxima of different frames).
+  const busiest = run.log.reduce((a, b) => (b.player + b.own > a.player + a.own ? b : a));
+  assert.ok(busiest.total < FRAME_CYCLES, `a frame takes ${busiest.total} of ${FRAME_CYCLES} cycles`);
+  assert.ok(run.log.every((e) => e.player <= example.build.cycles.estimatedWorst));
+  assert.ok(Math.max(...run.log.map((e) => e.own)) + example.build.cycles.estimatedWorst < FRAME_CYCLES);
+  assert.equal(busiest.free, FRAME_CYCLES - busiest.player - busiest.own);
+  console.log(`# raster_bars frame ${busiest.frame}: player ${busiest.player} + program ${busiest.own} + raster wait loop ${busiest.waiting} = ${busiest.total} of ${FRAME_CYCLES}; CPU time left for a game ${busiest.free}`);
 });
 
 /** A JavaScript model of sprite_bounce.asm: the sprite position and the hits of every frame for a joystick script. */
@@ -231,11 +236,9 @@ test("sprite bounce: the sprite follows the model, every edge hit starts its eff
   assert.ok(model.some((m) => m.hits.length === 0));
   assert.ok(both >= 1, "the script includes a corner hit");
   checkMusic(example, run, frames);
-  const worst = Math.max(...run.log.map((e) => e.total));
-  const worstPlayer = Math.max(...run.log.map((e) => e.player));
-  const worstOwn = Math.max(...run.log.map((e) => e.own));
-  assert.ok(worst < FRAME_CYCLES);
-  assert.ok(worstPlayer <= example.build.cycles.estimatedWorst);
-  assert.ok(worstOwn + example.build.cycles.estimatedWorst < FRAME_CYCLES);
-  console.log(`# sprite_bounce: worst frame ${worst} cycles = player ${worstPlayer} + program ${worstOwn} (budget ${FRAME_CYCLES}, ${(100 * worst / FRAME_CYCLES).toFixed(1)} %); ${xHits} x hits, ${yHits} y hits, ${both} in a corner`);
+  const busiest = run.log.reduce((a, b) => (b.player + b.own > a.player + a.own ? b : a));
+  assert.ok(busiest.total < FRAME_CYCLES);
+  assert.ok(run.log.every((e) => e.player <= example.build.cycles.estimatedWorst));
+  assert.ok(Math.max(...run.log.map((e) => e.own)) + example.build.cycles.estimatedWorst < FRAME_CYCLES);
+  console.log(`# sprite_bounce frame ${busiest.frame}: player ${busiest.player} + program ${busiest.own} = ${busiest.total} of ${FRAME_CYCLES}; CPU time left ${busiest.free}; ${xHits} x hits, ${yHits} y hits, ${both} in a corner`);
 });
