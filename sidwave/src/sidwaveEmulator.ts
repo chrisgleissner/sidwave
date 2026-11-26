@@ -38,7 +38,7 @@ const OPCODES: Record<string, Array<[number, Mode]>> = {
   TAY: [[0xa8, "imp"]], TYA: [[0x98, "imp"]], DEY: [[0x88, "imp"]], INY: [[0xc8, "imp"]],
   ROL: [[0x2a, "acc"], [0x26, "zp"], [0x36, "zpx"], [0x2e, "abs"], [0x3e, "abx"]],
   ROR: [[0x6a, "acc"], [0x66, "zp"], [0x76, "zpx"], [0x6e, "abs"], [0x7e, "abx"]],
-  RTS: [[0x60, "imp"]],
+  RTS: [[0x60, "imp"]], RTI: [[0x40, "imp"]], BRK: [[0x00, "imp"]],
   SBC: [[0xe9, "imm"], [0xe5, "zp"], [0xf5, "zpx"], [0xed, "abs"], [0xfd, "abx"], [0xf9, "aby"], [0xe1, "izx"], [0xf1, "izy"]],
   STA: [[0x85, "zp"], [0x95, "zpx"], [0x8d, "abs"], [0x9d, "abx"], [0x99, "aby"], [0x81, "izx"], [0x91, "izy"]],
   STX: [[0x86, "zp"], [0x96, "zpy"], [0x8e, "abs"]], STY: [[0x84, "zp"], [0x94, "zpx"], [0x8c, "abs"]],
@@ -49,7 +49,8 @@ const OPCODES: Record<string, Array<[number, Mode]>> = {
 const RMW = new Set(["ASL", "LSR", "ROL", "ROR", "INC", "DEC"]);
 
 function cycleCost(name: string, mode: Mode): number {
-  if (name === "JSR" || name === "RTS") return 6;
+  if (name === "JSR" || name === "RTS" || name === "RTI") return 6;
+  if (name === "BRK") return 7;
   if (name === "JMP") return mode === "ind" ? 5 : 3;
   if (name === "PHA" || name === "PHP") return 3;
   if (name === "PLA" || name === "PLP") return 4;
@@ -88,6 +89,20 @@ const HANDLERS: Record<string, Handler> = {
   BCC: (c) => c.branch(!c.c), BCS: (c) => c.branch(!!c.c), BNE: (c) => c.branch(!c.z), BEQ: (c) => c.branch(!!c.z),
   JMP: (c, ad) => { c.pc = ad; },
   JSR: (c, ad) => { const ret = (c.pc - 1) & 0xffff; c.push(ret >> 8); c.push(ret & 0xff); c.pc = ad; },
+  RTI: (c) => {
+    HANDLERS.PLP!(c, 0);
+    const low = c.pop();
+    c.pc = low | (c.pop() << 8);
+  },
+  // BRK pushes the address after its padding byte and the status with the break flag, then takes the IRQ vector.
+  BRK: (c) => {
+    const ret = (c.pc + 1) & 0xffff;
+    c.push(ret >> 8);
+    c.push(ret & 0xff);
+    HANDLERS.PHP!(c, 0);
+    c.i = 1;
+    c.pc = c.mem[0xfffe]! | (c.mem[0xffff]! << 8);
+  },
   RTS: (c) => { const low = c.pop(); c.pc = (((c.pop() << 8) | low) + 1) & 0xffff; },
 };
 
