@@ -65,6 +65,14 @@
       "types": "./dist/audio/sidwaveQuality.d.ts",
       "default": "./dist/audio/sidwaveQuality.js"
     },
+    "./sid-file": {
+      "types": "./dist/sidFile.d.ts",
+      "default": "./dist/sidFile.js"
+    },
+    "./songlengths": {
+      "types": "./dist/songlengths.d.ts",
+      "default": "./dist/songlengths.js"
+    },
     "./data/*": "./data/*",
     "./package.json": "./package.json"
   },

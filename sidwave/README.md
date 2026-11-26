@@ -28,6 +28,18 @@ writeFileSync("song.prg", result.prg);
 writeFileSync("song.sid", sid);
 ```
 
+## SID files
+
+`sidwave/sid-file` reads and writes PSID and RSID files (versions 1 to 4): `parseSidFile`, `writeSidFile`, `subtunes`, `songSpeed`, `effectiveInitAddress` and `md5ForSonglengths`. Invalid input throws `SidFileError` with a `code`. `sidwave/songlengths` parses the HVSC Songlengths database: `parseSonglengths`, `parseSonglengthsWithPaths`, `parseDuration` and `lookupSonglength`. Both are also exported from the package root.
+
+```ts
+import { readFileSync } from "node:fs";
+import { parseSidFile, subtunes } from "sidwave/sid-file";
+
+const sid = parseSidFile(new Uint8Array(readFileSync("tune.sid")));
+console.log(sid.name, sid.author, subtunes(sid).length);
+```
+
 ## Command line
 
 ```text
