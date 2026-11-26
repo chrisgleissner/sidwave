@@ -8,9 +8,10 @@ export const isSidWrite = (address) => address >= 0xd400 && address < 0xd800;
  * Returns { cpu, mem, writes, init(a, x), play(), stop() }. `writes` holds { call, address, value, port } for every write;
  * `call` counts the init, play and stop calls in order and `port` is the value of $01 at the time of the write.
  */
-export function gameMachine(build, { port = 0x35, clockFlag = 1 } = {}) {
+export function gameMachine(build, { port = 0x35, clockFlag = 1, garbage = false } = {}) {
   const { memory, entryPoints } = build.contract;
   const mem = new Uint8Array(65536);
+  if (garbage) { let seed = 0x1234567; for (let i = 0; i < mem.length; i++) { seed = (Math.imul(seed, 1103515245) + 12345) >>> 0; mem[i] = seed >>> 24; } }
   mem[0x2a6] = clockFlag; // a player placed over $02A6 overwrites it
   mem.set(build.player, memory.player.start);
   if (build.data) mem.set(build.data, memory.data.start);
