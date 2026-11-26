@@ -276,3 +276,29 @@ test("README example: init, then the raster interrupt routine's play call, run o
   const final = (machine) => { const r = new Uint8Array(25); for (const { address, value } of machine.writes) if (address >= 0xd400 && address <= 0xd418) r[address - 0xd400] = value; return [...r]; };
   assert.deepEqual(final(m), final(reference));
 });
+
+test("a multispeed game PSID programs CIA1 timer A in its start routine; the player itself never touches the CIA", () => {
+  const doc = load("chiptune_drive");
+  assert.equal(doc.speed, 2);
+  const b = compileSidwave(doc, { target: "game", origin: 0x1000, dataOrigin: 0x6000, measure: false });
+  const file = sidwaveGamePsid(doc, b);
+  assert.equal(file.readUInt32BE(18) & 1, 1, "the header selects CIA timing");
+  // PAL clock 985248 Hz over 100.249... play calls per second.
+  const latch = Math.round(985248 / b.contract.playCallsPerSecond) - 1;
+  assert.equal(latch, 9827);
+  const body = file.subarray(0x7c);
+  const m = gameMachine(b);
+  m.mem.fill(0);
+  m.mem.set(body.subarray(2), body.readUInt16LE(0));
+  m.cpu.call(file.readUInt16BE(10), 0);
+  const cia = m.writes.filter(({ address }) => address >= 0xdc00 && address < 0xde00).map(({ address, value }) => [address, value]);
+  assert.deepEqual(cia, [[0xdc04, latch & 255], [0xdc05, latch >> 8]]);
+  for (let i = 0; i < 5; i++) m.cpu.call(file.readUInt16BE(12), 0);
+  assert.equal(m.writes.filter(({ address }) => address >= 0xdc00 && address < 0xde00).length, 2, "play writes no CIA register");
+  // A score at normal speed gets the five byte routine without CIA writes.
+  const single = load("fuer_elise");
+  const plain = sidwaveGamePsid(single, elise());
+  assert.equal(plain.length, 0x7c + 2 + (0x1f73 - 0x1000) + 5);
+  // The player image alone (without the PSID routine) has no CIA access.
+  assert.ok(!b.player.some((_, i) => i + 2 < b.player.length && b.player[i] === 0x8d && (b.player[i + 2] === 0xdc) && (b.player[i + 1] === 0x04 || b.player[i + 1] === 0x05)));
+});

@@ -332,20 +332,27 @@ export function freePageRange(used: ReadonlyArray<readonly [number, number]>): {
 
 /**
  * A PSID file of a game build, for players such as sidplayfp. The image (player, zero filled variables and data) is
- * loaded at its lowest address; a five byte start routine behind it passes the score's clock to `init` in X, and
+ * loaded at its lowest address; a start routine behind it (five bytes, ten more for a multispeed score that programs CIA1 timer A) passes the score's clock to `init` in X, and
  * `play` is the entry at origin+3. The header records the largest free page range of $0400-$CFFF.
  */
 export function sidwaveGamePsid(doc: ParsedSidwave, build: SidwaveGameBuild): Buffer {
   const { image } = build;
   const low = build.combinedOrigin;
   const high = Math.max(image.ramEnd, image.dataEnd ?? 0);
-  if (high + 5 > SIDWAVE_MEMORY_END) {
+  // A score with several play calls per frame is timed by CIA1 timer A (the header says so): the start routine
+  // programs the latch like the PRG installer does. The player itself never touches the CIA.
+  const latch = Math.round((image.system === "NTSC" ? 1_022_727 : 985_248) / image.framesPerSecond) - 1;
+  const start = [
+    ...(image.playCallsPerFrame > 1 ? [0xa9, latch & 0xff, 0x8d, 0x04, 0xdc, 0xa9, latch >> 8, 0x8d, 0x05, 0xdc] : []),
+    0xa2, image.system === "NTSC" ? 1 : 0, 0x4c, image.origin & 0xff, image.origin >> 8,
+  ];
+  if (high + start.length > SIDWAVE_MEMORY_END) {
     throw new SidwaveValidationError("$.origin", "the PSID start routine would end past $D000; lower the origin");
   }
-  const body = Buffer.alloc(2 + (high - low) + 5);
+  const body = Buffer.alloc(2 + (high - low) + start.length);
   body.writeUInt16LE(low, 0);
   body.set(build.combined, 2);
-  body.set([0xa2, image.system === "NTSC" ? 1 : 0, 0x4c, image.origin & 0xff, image.origin >> 8], 2 + high - low);
-  const relocation = freePageRange([[low, high + 5]]);
+  body.set(start, 2 + high - low);
+  const relocation = freePageRange([[low, high + start.length]]);
   return compileSidwaveToSid(doc, body, { initAddress: high, playAddress: image.origin + SIDWAVE_GAME_ENTRY.play, relocation }).sid;
 }
