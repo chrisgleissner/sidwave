@@ -6,17 +6,20 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { parseSidwave } from "../src/sidwave.ts";
 import { compileSidwaveToPrg, compileSidwaveToSid } from "../src/sidwaveCompiler.ts";
+import { createRequire } from "node:module";
 import {
   createLibsidplayfpEngine,
   SidEngineUnavailableError,
+  SidLoadError,
   TraceOverflowError,
 } from "../src/engine/libsidplayfp.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../data/sound/examples");
 
-async function tune(name = "funk_bass", vbi = false) {
+async function tune(name = "funk_bass", vbi = false, mode = undefined) {
   const doc = parseSidwave(await readFile(path.join(root, `${name}.yaml`), "utf8"));
   if (vbi) doc.speed = 1;
+  if (mode) doc.song.mode = mode;
   const prg = compileSidwaveToPrg(doc);
   const options = { initAddress: prg.initAddress, playAddress: prg.playAddress };
   return new Uint8Array(compileSidwaveToSid(doc, prg.prg, options).sid);
@@ -111,7 +114,9 @@ test("trace chunks concatenate to streamed result; bounds and abort are typed", 
   const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
   const chunks = [];
   const streamed = await engine.trace({ sid, seconds: 1, onChunk: (c) => chunks.push(c) });
-  assert.deepEqual(concatenate(chunks), streamed.records);
+  const buffered = await engine.trace({ sid, seconds: 1 });
+  assert.deepEqual(concatenate(chunks), buffered.records);
+  assert.equal(streamed.count, buffered.count);
   await assert.rejects(engine.render({ sid, seconds: 2, maxSeconds: 1 }), { code: "limit_exceeded" });
   const controller = new AbortController();
   controller.abort();
@@ -148,7 +153,6 @@ test("a completed trace reports zero dropped records and its chunks sum to the r
   const result = await engine.trace({ sid, seconds: 2, onChunk: (c) => chunks.push(c) });
   assert.equal(result.droppedRecords, 0);
   assert.equal(concatenate(chunks).length / 4, result.count);
-  assert.equal(result.records.length, result.count * 4);
 });
 
 test("a missing libsidplayfp-wasm package gives SidEngineUnavailableError naming the package and install command", async () => {
@@ -196,4 +200,130 @@ test("sixty-second streaming trace equals its non-streamed record buffer", async
   assert.deepEqual(concatenate(chunks), buffered.records);
   assert.equal(streamed.count, buffered.count);
   assert.equal(streamed.droppedRecords, 0);
+});
+
+const nodeRequire = createRequire(import.meta.url);
+
+function fakeModule({ perSlice = 0, dropped = 0, droppedFrom = 1, cycle = 100 } = {}) {
+  const packed = new Float64Array(perSlice * 4);
+  for (let i = 0; i < perSlice; i++) packed.set([0, 24, 15, cycle], i * 4);
+  let created = 0;
+  class Context {
+    index = created++;
+    configure() { return true; }
+    getLastError() { return ""; }
+    setSystemROMs() { return true; }
+    setEmulationConfig() { return true; }
+    setSidWriteTraceEnabled() {}
+    loadSidBuffer() { return true; }
+    selectSong() { return 1; }
+    getTuneMd5() { return "fake"; }
+    render() { return new Int16Array(882); }
+    getAndClearSidWriteTracesPacked() { return packed; }
+    getDroppedSidWriteTraceCount() { return this.index >= droppedFrom ? dropped : 0; }
+    delete() {}
+  }
+  return { loadLibsidplayfp: async () => ({ SidPlayerContext: Context }) };
+}
+const fakeSid = new Uint8Array(0x7c + 8);
+
+test("a dropped-record count from the binding fails the trace with TraceOverflowError", async () => {
+  const engine = createLibsidplayfpEngine({ emulation: "sidlite", importModule: async () => fakeModule({ perSlice: 2, dropped: 1 }) });
+  await assert.rejects(
+    engine.trace({ sid: fakeSid, seconds: 0.1 }),
+    (error) => error instanceof TraceOverflowError && error.message === "Trace buffer overflow in render slice 0 (1 dropped records; limit 1048576)",
+  );
+});
+
+test("the default maxRecords is 2^22 records", async () => {
+  // 100,000 records per slice and 50 slices per second give 5,000,000 records, more than 4,194,304.
+  const engine = createLibsidplayfpEngine({ emulation: "sidlite", importModule: async () => fakeModule({ perSlice: 100_000 }) });
+  await assert.rejects(
+    engine.trace({ sid: fakeSid, seconds: 1 }),
+    (error) => error instanceof TraceOverflowError && error.message === "Trace exceeds maxRecords 4194304; records would be lost",
+  );
+});
+
+test("with onChunk the records are not accumulated; count still reports every record", async () => {
+  const sid = await tune();
+  const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+  const buffered = await engine.trace({ sid, seconds: 1 });
+  let delivered = 0;
+  const streamed = await engine.trace({ sid, seconds: 1, onChunk: (c) => (delivered += c.length / 4) });
+  assert.equal(streamed.records.length, 0);
+  assert.equal(streamed.count, buffered.count);
+  assert.equal(delivered, buffered.count);
+});
+
+test("errors thrown by onChunk and onProgress propagate unchanged", async () => {
+  const sid = await tune();
+  const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+  const chunkError = new RangeError("chunk consumer failed");
+  await assert.rejects(engine.trace({ sid, seconds: 0.5, onChunk: () => { throw chunkError; } }), (error) => error === chunkError);
+  const progressError = new TypeError("progress consumer failed");
+  await assert.rejects(engine.render({ sid, seconds: 0.5, onProgress: () => { throw progressError; } }), (error) => error === progressError);
+});
+
+test("loader failures and unexpected binding errors keep their cause", async () => {
+  const loaderError = new Error("Cannot find package 'libsidplayfp-wasm'");
+  const missing = createLibsidplayfpEngine({ emulation: "sidlite", importModule: async () => { throw loaderError; } });
+  await assert.rejects(missing.render({ sid: fakeSid, seconds: 0.1 }), (error) => error instanceof SidEngineUnavailableError && error.cause === loaderError);
+  const bindingError = new Error("wasm trap");
+  const broken = fakeModule();
+  const Context = (await broken.loadLibsidplayfp()).SidPlayerContext;
+  Context.prototype.render = () => { throw bindingError; };
+  const engine = createLibsidplayfpEngine({ emulation: "sidlite", importModule: async () => broken });
+  await assert.rejects(engine.render({ sid: fakeSid, seconds: 0.1 }), (error) => error instanceof SidLoadError && error.cause === bindingError && error.message === "wasm trap");
+});
+
+test("the engine version is read from the installed libsidplayfp-wasm package and the peer range is ^1.1.1", async () => {
+  const installed = nodeRequire("libsidplayfp-wasm/package.json").version;
+  const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+  assert.equal(engine.version, "unknown");
+  const result = await engine.render({ sid: await tune(), seconds: 0.1 });
+  assert.equal(result.engine.version, installed);
+  assert.equal(engine.version, installed);
+  const manifest = JSON.parse(await readFile(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf8"));
+  assert.equal(manifest.peerDependencies["libsidplayfp-wasm"], "^1.1.1");
+});
+
+test("the clock comes from the PSID header flags unless the request sets it", async () => {
+  const ntsc = await tune("funk_bass", true, "NTSC");
+  const pal = await tune("funk_bass", true, "PAL");
+  const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+  const fromHeader = await engine.trace({ sid: ntsc, seconds: 1 });
+  const palRun = await engine.trace({ sid: pal, seconds: 1 });
+  const forced = await engine.trace({ sid: ntsc, seconds: 1, clock: "PAL" });
+  assert.equal(fromHeader.clock, "NTSC");
+  assert.equal(palRun.clock, "PAL");
+  assert.equal(forced.clock, "PAL");
+  assert.equal(fromHeader.horizonCycles - fromHeader.originCycle, 1_022_727);
+  assert.equal(palRun.horizonCycles - palRun.originCycle, 985_248);
+  // VBI play rate: one call per frame, 263 x 65 cycles on NTSC.
+  const starts = [];
+  let previous = -Infinity;
+  for (let i = 0; i < fromHeader.records.length; i += 4) {
+    const cycle = fromHeader.records[i + 3];
+    if (cycle - previous > 1_000) starts.push(cycle);
+    previous = cycle;
+  }
+  const gaps = starts.slice(1).map((x, i) => x - starts[i]).filter((x) => x > 10_000 && x < 30_000).sort((a, b) => a - b);
+  const median = gaps[Math.floor(gaps.length / 2)];
+  assert.ok(Math.abs(median - 263 * 65) / (263 * 65) < 0.01);
+});
+
+test("trace records end at the requested horizon; cycles may exceed it by less than one slice", async () => {
+  const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+  const a = await engine.trace({ sid: await tune(), seconds: 1 });
+  const b = await engine.trace({ sid: await tune("title_fanfare"), seconds: 1 });
+  for (const result of [a, b]) {
+    assert.equal(result.horizonCycles, result.originCycle + 985_248);
+    assert.ok(result.count > 0);
+    let last = 0;
+    for (let i = 3; i < result.records.length; i += 4) last = Math.max(last, result.records[i]);
+    assert.ok(last <= result.horizonCycles);
+    assert.ok(result.cycles >= result.horizonCycles);
+    assert.ok(result.cycles - result.horizonCycles < 25_000);
+  }
+  assert.equal(a.horizonCycles, b.horizonCycles);
 });
