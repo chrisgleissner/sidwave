@@ -56,3 +56,50 @@ test("three-way merge joins disjoint edits, refuses concurrent note edits, accep
   assert.equal(same.conflicts.length, 0);
   assert.ok(same.merged);
 });
+
+test("formatter orders the fields of voices, patterns, instruments, sections and notes", () => {
+  const source = `timeline: [intro]
+voices:
+  - patterns:
+      A:
+        length: 0.25
+        groove:
+          - {len: 1, inst: lead, note: C4}
+          - "D4 ~ ~ ~"
+    instrument: lead
+    name: Lead
+    id: 1
+sections:
+  intro:
+    layers: {v1: A}
+    bars: 1
+instruments:
+  lead: {adsr: [0, 4, 10, 4], waveform: saw}
+sids: [{model: "8580", address: "$D400", id: sid1}]
+tempo: 120
+title: T
+sidwave: 1.2
+`;
+  assert.equal(formatSidwave(source), `sidwave: 1.2
+title: "T"
+tempo: 120
+sids: [{id: "sid1", address: "$D400", model: "8580"}]
+instruments:
+  lead: {waveform: "saw", adsr: [0, 4, 10, 4]}
+voices:
+  - id: 1
+    name: "Lead"
+    instrument: "lead"
+    patterns:
+      A:
+        groove:
+          - {note: "C4", inst: "lead", len: 1}
+          - "D4 ~ ~ ~"
+        length: 0.25
+sections:
+  intro:
+    bars: 1
+    layers: {v1: "A"}
+timeline: ["intro"]
+`);
+});

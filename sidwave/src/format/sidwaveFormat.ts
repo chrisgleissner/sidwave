@@ -12,7 +12,7 @@ export interface Conflict { path: string; base?: unknown; ours?: unknown; theirs
 
 // Ordered from the SIDWave spec/schema. Nested objects use their own schema field order.
 const orders: Record<string, string[]> = {
-  "$": ["sidwave", "song", "title", "author", "tempo", "meter", "mode", "length_bars", "speed", "cpu", "sids", "instruments", "global_fx", "samples", "kit", "voices", "sections", "timeline", "loop_to", "accent", "end", "swing", "swing_unit"],
+  $: ["sidwave", "song", "title", "author", "tempo", "meter", "mode", "length_bars", "speed", "cpu", "sids", "instruments", "global_fx", "samples", "kit", "voices", "sections", "timeline", "loop_to", "accent", "end", "swing", "swing_unit"],
   song: ["title", "author", "tempo", "mode", "length_bars", "global_fx"],
   voices: ["id", "sid", "channel", "name", "role", "center", "level", "waveform", "pulse_width", "adsr", "detune", "instrument", "echo", "unison", "follow", "patterns"],
   pattern: ["type", "groove", "drums", "notes", "motif", "root", "length", "frame_rate", "transpositions", "fx", "bars"],
@@ -39,22 +39,33 @@ function compileEqual(a: string, b: string): boolean {
   try { const x = compileSidwaveToPrg(parseSidwave(a), { loop: false }).prg; const y = compileSidwaveToPrg(parseSidwave(b), { loop: false }).prg; return x.equals(y); }
   catch { return false; }
 }
-function reorder(node: any, context = "$"): void {
-  if (YAML.isMap(node)) {
-    const key = context === "$" ? "$" : context;
-    const order = orders[key] ?? [];
-    node.items.sort((a: any, b: any) => {
-      const ak = String((a.key as any)?.value ?? ""), bk = String((b.key as any)?.value ?? "");
-      const ai = order.indexOf(ak), bi = order.indexOf(bk);
-      return (ai < 0 ? 1e6 : ai) - (bi < 0 ? 1e6 : bi);
-    });
-    for (const item of node.items) {
-      const k = String((item.key as any)?.value ?? "");
-      let child = k === "voices" ? "voices" : k === "timeline" || k === "sections" ? "section" : k === "instruments" ? "instrument" : k === "patterns" ? "pattern" : k === "fx" || k === "global_fx" ? "fx" : k === "sids" ? "sid" : k === "groove" ? "note" : k;
-      reorder(item.value, child);
-    }
-  } else if (YAML.isSeq(node)) {
-    for (const item of node.items) reorder(item, context === "voices" ? "voice" : context);
+/** Schema kind of the value under each key, per parent kind. "named" is a map whose keys are user chosen names and whose values have the given kind; "list" is a sequence of that kind. */
+const children: Record<string, Record<string, string>> = {
+  $: { song: "song", voices: "list:voices", sections: "named:section", timeline: "list:section", instruments: "named:instrument", sids: "list:sid", global_fx: "fx" },
+  voices: { patterns: "named:pattern", fx: "fx" },
+  pattern: { groove: "list:note", fx: "fx" },
+  section: {},
+  instrument: { fx: "fx" },
+  song: { global_fx: "fx" },
+};
+function reorder(node: any, kind = "$"): void {
+  if (YAML.isSeq(node)) {
+    for (const item of node.items) reorder(item, kind);
+    return;
+  }
+  if (!YAML.isMap(node)) return;
+  const order = orders[kind] ?? [];
+  node.items.sort((a: any, b: any) => {
+    const ai = order.indexOf(String((a.key as any)?.value ?? "")), bi = order.indexOf(String((b.key as any)?.value ?? ""));
+    return (ai < 0 ? 1e6 : ai) - (bi < 0 ? 1e6 : bi);
+  });
+  for (const item of node.items) {
+    const key = String((item.key as any)?.value ?? "");
+    const spec = children[kind]?.[key];
+    if (!spec) continue;
+    const [shape, inner] = spec.includes(":") ? spec.split(":") : ["map", spec];
+    if (shape === "named" && YAML.isMap(item.value)) for (const entry of item.value.items) reorder(entry.value, inner);
+    else reorder(item.value, inner);
   }
 }
 /** Canonical YAML: two spaces, double quoted strings, and short scalar lists flow when <= 6 items and <= 72 chars. */
