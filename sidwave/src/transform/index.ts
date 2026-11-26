@@ -2,7 +2,7 @@
 // Copyright (C) 2025-2026 Christian Gleissner
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 import YAML from "yaml";
-import { parseSidwave, SIDWAVE_NOTE_RANGE, SIDWAVE_TEMPO_RANGE, noteNameToMidi, midiToNoteName } from "../sidwave.js";
+import { parseSidwave, SIDWAVE_NOTE_RANGE, SIDWAVE_TEMPO_RANGE, noteNameToMidi } from "../sidwave.js";
 import { compileSidwaveToPrg, maxSidwaveMidi } from "../sidwaveCompiler.js";
 import { formatSidwave } from "../format/sidwaveFormat.js";
 
@@ -56,18 +56,31 @@ function noteTokens(raw: string): Array<{ value: string; start: number; end: num
   for (let m; (m = re.exec(raw));) if (noteNameToMidi(m[1]!) !== undefined) out.push({ value: m[1]!, start: m.index, end: m.index + m[1]!.length });
   return out;
 }
-function shiftedNote(raw: string, amount: number, max: number, path: string): string {
+const SHARP_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const FLAT_NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+/** Pitch-class name of a MIDI note. A token that already has an accidental keeps its style (Bb stays flat); a natural note takes the document style. */
+function pitchClass(midi: number, original: string, flatDefault: boolean): string {
+  const flat = /^[A-Ga-g]b/.test(original) ? true : /^[A-Ga-g]#/.test(original) ? false : flatDefault;
+  return (flat ? FLAT_NAMES : SHARP_NAMES)[((midi % 12) + 12) % 12]!;
+}
+/** The document style for naturals that become black keys: flats when the score spells more notes with flats than with sharps. */
+function prefersFlats(text: string): boolean {
+  let flats = 0, sharps = 0;
+  for (const spelled of [...noteTokens(text).map((n) => n.value), ...chordTokens(text).map((c) => c.root)]) { if (/^[A-Ga-g]b/.test(spelled)) flats++; else if (/^[A-Ga-g]#/.test(spelled)) sharps++; }
+  return flats > sharps;
+}
+function shiftedNote(raw: string, amount: number, max: number, path: string, flatDefault = false): string {
   const midi = noteNameToMidi(raw)! + amount;
   if (midi < SIDWAVE_NOTE_RANGE.min || midi > SIDWAVE_NOTE_RANGE.max || midi > max) throw new SidwaveTransformError("out_of_range", `Offending note at ${path}`);
-  return midiToNoteName(midi);
+  return pitchClass(midi, raw, flatDefault) + (Math.floor(midi / 12) - 1);
 }
 const CHORD_NAMED = "m|min|maj|dim|aug|sus2|sus4|sus|m6|min6|maj7|m7|min7|dim7|m7b5|maj9|m9|min9|add9";
 const CHORD_QUALITY = new RegExp(`^(?:${CHORD_NAMED}|6|7|9)?$`);
 /** Chord root of a chord symbol shifted by `amount` semitones, written as a pitch class without octave (Cm7 + 2 gives Dm7). */
-function shiftedChord(root: string, quality: string, amount: number, max: number, path: string): string {
+function shiftedChord(root: string, quality: string, amount: number, max: number, path: string, flatDefault = false): string {
   const pitch = noteNameToMidi(`${root}3`)! + amount;
   if (pitch < 12 || pitch > max) throw new SidwaveTransformError("out_of_range", `Offending note at ${path}`);
-  return midiToNoteName(pitch).replace(/-?\d+$/, "") + quality;
+  return pitchClass(pitch, root, flatDefault) + quality;
 }
 /** Chord symbols inside a groove string, such as the Cm7 of "Cm7@arp". Qualities that are only digits (C7) are note names and are found by noteTokens. */
 function chordTokens(raw: string): Array<{ root: string; quality: string; start: number; end: number }> {
@@ -76,10 +89,10 @@ function chordTokens(raw: string): Array<{ root: string; quality: string; start:
   for (let m; (m = re.exec(raw));) out.push({ root: m[1]!, quality: m[2]!, start: m.index, end: m.index + m[0].length });
   return out;
 }
-function replacements(raw: string, amount: number, max: number, path: string): string {
+function replacements(raw: string, amount: number, max: number, path: string, flatDefault: boolean): string {
   const tokens = [
-    ...noteTokens(raw).map((n) => ({ start: n.start, end: n.end, text: () => shiftedNote(n.value, amount, max, path) })),
-    ...chordTokens(raw).map((c) => ({ start: c.start, end: c.end, text: () => shiftedChord(c.root, c.quality, amount, max, path) })),
+    ...noteTokens(raw).map((n) => ({ start: n.start, end: n.end, text: () => shiftedNote(n.value, amount, max, path, flatDefault) })),
+    ...chordTokens(raw).map((c) => ({ start: c.start, end: c.end, text: () => shiftedChord(c.root, c.quality, amount, max, path, flatDefault) })),
   ].sort((x, y) => y.start - x.start);
   let result = raw;
   for (const t of tokens) result = result.slice(0, t.start) + t.text() + result.slice(t.end);
@@ -117,9 +130,11 @@ const tidy = (x: number) => Number(x.toPrecision(12));
 /** Preconditions: the input is a valid score; semitones is an integer; every shifted pitched note stays in SIDWAVE_NOTE_RANGE and the selected clock's SID frequency range. Preserves rhythm, percussion encodings, instruments, and voices outside scope. Scope is restricted to patterns used only in selected named sections; ambiguous shared/inline/sequence scoping is unsupported. The result must parse and compile (see TransformValidation); otherwise code "precondition" with the compiler message. */
 export function transpose(text: string, options: TransformOptions & { semitones: number; scope?: { voices?: string[]; sections?: string[] } }): TransformResult {
   if (!Number.isInteger(options?.semitones)) throw new SidwaveTransformError("precondition", "semitones must be an integer");
-  const doc = docFor(text, options.validate), root = js(doc), changed: string[] = [], max = maxSidwaveMidi(root.mode === "NTSC" ? "NTSC" : "PAL");
+  const doc = docFor(text, options.validate), flat = prefersFlats(text), root = js(doc), changed: string[] = [], max = maxSidwaveMidi(root.mode === "NTSC" ? "NTSC" : "PAL");
   const selectedSections = new Set(options.scope?.sections ?? []);
   for (const name of selectedSections) if (!(root.sections?.[name]) && !(root.timeline ?? []).some((e: any) => e?.section === name)) throw new SidwaveTransformError("precondition", `Unknown section ${name}`);
+  // Nothing moves: return the text as it was given, not a re-spelled copy.
+  if (options.semitones === 0) return { text, report: { changed, preserved: ["rhythm", "percussion", "instruments", "voices outside scope"], warnings: [] } };
   for (const [vi, voice] of (root.voices ?? []).entries()) {
     const id = String(voice.id ?? vi + 1), name = String(voice.name ?? "");
     if (voice.role === "drums") continue;
@@ -133,7 +148,7 @@ export function transpose(text: string, options: TransformOptions & { semitones:
       const base = ["voices", vi, "patterns", pname] as (string|number)[];
       const mutateString = (path: (string|number)[], val: string, exempt = false) => {
         if (exempt || !(noteTokens(val).length || chordTokens(val).length)) return;
-        const next = replacements(val, options.semitones, max, ptr(path.map(String)));
+        const next = replacements(val, options.semitones, max, ptr(path.map(String)), flat);
         if (next !== val) { setAt(doc,path,next); changed.push(ptr(path.map(String))); }
       };
       if (typeof pattern.groove === "string") mutateString([...base,"groove"], pattern.groove);
@@ -144,7 +159,7 @@ export function transpose(text: string, options: TransformOptions & { semitones:
         else if (entry && typeof entry.chord === "string") {
           const symbol = /^([A-Ga-g](?:#|b)?)(.*)$/.exec(entry.chord);
           if (!symbol || !CHORD_QUALITY.test(symbol[2]!)) throw new SidwaveTransformError("unsupported", `Cannot transpose chord ${entry.chord} at ${ptr(path.map(String))}`);
-          setAt(doc, [...path, "chord"], shiftedChord(symbol[1]!, symbol[2]!, options.semitones, max, ptr([...path, "chord"].map(String)))); changed.push(ptr([...path, "chord"].map(String)));
+          setAt(doc, [...path, "chord"], shiftedChord(symbol[1]!, symbol[2]!, options.semitones, max, ptr([...path, "chord"].map(String)), flat)); changed.push(ptr([...path, "chord"].map(String)));
         }
         else if (entry && typeof entry === "object") throw new SidwaveTransformError("unsupported", `Cannot transpose groove construct at ${ptr(path.map(String))}`);
       });
@@ -154,9 +169,9 @@ export function transpose(text: string, options: TransformOptions & { semitones:
         const tokens=pattern.motif.split(/([\s,]+)/); let did=false;
         const next=tokens.map((tok:string)=>{
           if (/^[+-]?\d+$/.test(tok)) { did=true; const n=Number(tok)+options.semitones; const rootMidi=noteNameToMidi(pattern.root??"C3")??48; if(rootMidi+n<SIDWAVE_NOTE_RANGE.min||rootMidi+n>max) throw new SidwaveTransformError("out_of_range",`Offending note at ${ptr([...base,"motif"].map(String))}`); return String(n); }
-          if (/^[A-Ga-g](?:#|b)?\d+$/.test(tok)) { did=true; return shiftedNote(tok,options.semitones,max,ptr([...base,"motif"].map(String))); }
+          if (/^[A-Ga-g](?:#|b)?\d+$/.test(tok)) { did=true; return shiftedNote(tok,options.semitones,max,ptr([...base,"motif"].map(String)),flat); }
           const chord=/^([A-Ga-g](?:#|b)?)(.*)$/.exec(tok);
-          if (chord && CHORD_QUALITY.test(chord[2]!)) { did=true; const pitch=noteNameToMidi(`${chord[1]}3`)!+options.semitones; if(pitch<12||pitch>max) throw new SidwaveTransformError("out_of_range",`Offending note at ${ptr([...base,"motif"].map(String))}`); return midiToNoteName(pitch).replace(/-?\d+$/,"")+chord[2]; }
+          if (chord && CHORD_QUALITY.test(chord[2]!)) { did=true; const pitch=noteNameToMidi(`${chord[1]}3`)!+options.semitones; if(pitch<12||pitch>max) throw new SidwaveTransformError("out_of_range",`Offending note at ${ptr([...base,"motif"].map(String))}`); return pitchClass(pitch,chord[1]!,flat)+chord[2]; }
           return tok;
         }).join("");
         if(did&&next!==pattern.motif){setAt(doc,[...base,"motif"],next);changed.push(ptr([...base,"motif"].map(String)));}

@@ -346,7 +346,7 @@ test("transpose handles slides, bends, note lists, drums, kit notes and unsuppor
 test("transpose shifts motif notes, semitone offsets and chord symbols and checks their range", () => {
   const motif = (text, root = "") => `sidwave: 1.2\ntitle: "T"\ntempo: 120\nvoices:\n  - id: 1\n    patterns:\n      A: {motif: "${text}",${root} length: 1}\ntimeline: [{bars: 1, layers: {v1: "A"}}]\n`;
   const up = transpose(motif("Cm7, 0 4 -1 C4 Bbmaj7 - ~"), { semitones: 3, validate: "none" });
-  assert.ok(up.text.includes(`motif: "D#m7, 3 7 2 D#4 C#maj7 - ~"`), up.text);
+  assert.ok(up.text.includes(`motif: "Ebm7, 3 7 2 Eb4 Dbmaj7 - ~"`), up.text);
   assert.deepEqual(up.report.changed, ["/voices/0/patterns/A/motif"]);
   assert.equal(transpose(motif("- ~ pad"), { semitones: 3, validate: "none" }).text, motif("- ~ pad"));
   assert.deepEqual(transpose(motif("- ~ pad"), { semitones: 3, validate: "none" }).report.changed, []);
@@ -554,6 +554,53 @@ test("validate: parse accepts a result that parses but does not compile, validat
   assert.throws(() => transpose("sidwave: 1.2\ntitle: x\n", { semitones: 1 }), (e) => e.code === "input" && /^The input is not a valid SIDWave score: /.test(e.message));
 });
 
+test("every transformation rejects text that is not a score mapping with code input", () => {
+  const calls = [
+    (x) => transpose(x, { semitones: 1 }), (x) => setTempo(x, { bpm: 90 }), (x) => scaleTempo(x, { factor: 1 }),
+    (x) => substituteInstrument(x, { from: "a", to: "lib:kick" }), (x) => quantise(x, { grid: 1 }),
+    (x) => restructure(x, { order: [] }), (x) => humanise(x, { seed: 1, maxShift: 0.1 }),
+  ];
+  for (const call of calls) for (const input of ["- a\n", "plain text\n", "", "a: [\n"]) fails(() => call(input), "input");
+  fails(() => transpose("- a\n", { semitones: 1 }), "input", "The input is not a SIDWave score: expected a YAML mapping at the top level");
+});
+
+test("transpose keeps the accidental style of a note and returns the input for 0 semitones", () => {
+  const flatScore = score({ a: ["Bb2", "C3", "Eb3", "F#3"], b: "Bb2 ~ C3 ~ Eb3 ~ F#3 ~" });
+  const up = transpose(flatScore, { semitones: 2, validate: "none" });
+  assert.equal(up.text, score({ a: ["C3", "D3", "F3", "G#3"], b: "C3 ~ D3 ~ F3 ~ G#3 ~", bass: "D2 ~ ~ ~ A1 ~ ~ ~", c: "A1 ~ ~ ~ D2 ~ ~ ~" }), "F# stays a sharp, naturals that become black keys follow the flat majority");
+  const natural = transpose(score({ a: ["Bb2", "C3", "Eb3", "Db3"], b: "Bb2 ~ C3 ~ Eb3 ~ Db3 ~" }), { semitones: 1, validate: "none" });
+  assert.ok(natural.text.includes(`note: "B2"`) && natural.text.includes(`note: "Db3"`) && natural.text.includes(`note: "E3"`) && natural.text.includes(`note: "D3"`), natural.text);
+  const sharp = transpose(base, { semitones: 1 });
+  assert.ok(sharp.text.includes(`note: "C#3"`) && sharp.text.includes(`note: "F#3"`), sharp.text);
+  const text = "this is returned unchanged\nsidwave: 1.2\n";
+  assert.deepEqual(transpose(base, { semitones: 0 }), { text: base, report: { changed: [], preserved: ["rhythm", "percussion", "instruments", "voices outside scope"], warnings: [] } });
+  const odd = base.replace("title:", "title :");
+  assert.equal(transpose(odd, { semitones: 0 }).text, odd);
+  void text;
+});
+
+// Spelling cannot be restored exactly: C# and Db both move to the same natural note, so the way back cannot know
+// which one it came from. The round trip must restore every pitch and everything else in the text, so the texts
+// are compared with the accidentals normalised to sharps.
+const SHARP_OF = { Db: "C#", Eb: "D#", Gb: "F#", Ab: "G#", Bb: "A#" };
+const sharpSpelling = (text) => text.replace(/(?<![A-Za-z0-9_])([DEGAB]b)(?![a-z])/g, (_, flat) => SHARP_OF[flat]);
+for (const name of allExamples) {
+  test(`transposing ${name} up and back down restores the score up to accidental spelling`, { timeout: 300000 }, async () => {
+    const text = await readFile(new URL(`../data/sound/examples/${name}`, import.meta.url), "utf8");
+    const canonical = formatSidwave(text);
+    let restored = 0;
+    for (const n of [1, 2, 5, 7, -1, -2, -5, -7]) {
+      let up;
+      try { up = transpose(text, { semitones: n, validate: "parse" }); } catch (e) { assert.ok(e instanceof SidwaveTransformError && e.code === "out_of_range", `${name} +${n}: ${e}`); continue; }
+      const back = transpose(up.text, { semitones: -n, validate: "parse" });
+      assert.equal(sharpSpelling(back.text), sharpSpelling(canonical), `${name} +${n} then -${n}`);
+      assert.deepEqual(pitches(back.text), pitches(text), `${name} +${n} then -${n}: pitches`);
+      restored++;
+    }
+    assert.ok(restored >= 3, name);
+  });
+}
+
 test("README example: transpose and setTempo", () => {
   const demo = formatSidwave(`title: Demo
 sidwave: 1.2
@@ -569,14 +616,4 @@ timeline: [{ bars: 1, layers: { v1: A } }]
   assert.ok(up.text.includes('groove: "D4 ~ ~ ~"'));
   assert.deepEqual(setTempo(up.text, { bpm: 90 }).report.changed, ["/tempo"]);
   valid(up.text);
-});
-
-test("every transformation rejects text that is not a score mapping with code input", () => {
-  const calls = [
-    (x) => transpose(x, { semitones: 1 }), (x) => setTempo(x, { bpm: 90 }), (x) => scaleTempo(x, { factor: 1 }),
-    (x) => substituteInstrument(x, { from: "a", to: "lib:kick" }), (x) => quantise(x, { grid: 1 }),
-    (x) => restructure(x, { order: [] }), (x) => humanise(x, { seed: 1, maxShift: 0.1 }),
-  ];
-  for (const call of calls) for (const input of ["- a\n", "plain text\n", "", "a: [\n"]) fails(() => call(input), "input");
-  fails(() => transpose("- a\n", { semitones: 1 }), "input", "The input is not a SIDWave score: expected a YAML mapping at the top level");
 });
