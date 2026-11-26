@@ -897,8 +897,8 @@ timeline: [{ bars: 4, layers: { v1: m } }]
 A `sidwave: 1.4` document accepts everything that 1.3 accepts and compiles it to the same PRG bytes
 (test/sidwave14Songs: every 1.3 example, and the recorded hashes of all earlier examples in
 test/fixtures/sidwave-s4a/example-hashes.json), so every statement about 1.3 documents in this file also holds for
-1.4 documents. `songs` is accepted only in 1.4: a 1.2 or 1.3 document that uses it is rejected with
-`songs require sidwave: 1.4`.
+1.4 documents. `songs` and `effects` are accepted only in 1.4: a 1.2 or 1.3 document that uses one of them is
+rejected with `songs require sidwave: 1.4` or `effects require sidwave: 1.4`.
 
 ### Songs
 
@@ -1011,6 +1011,200 @@ estimator uses the union of the features of all songs, so a song that does not u
 still estimated with it. The selector runs only in `init`. A value
 that differs between songs (the filter sweep step, the live voices, the play-once length, the CIA latch) is copied
 into the player's own location by `init`; a value that is the same in every song is not copied and costs nothing.
+
+### Effects
+
+**Observed need.** A game plays a short sound when something happens (a shot when the fire button goes down, a
+bounce when a sprite hits the screen edge) on top of music that keeps playing. Reproducer: the title tune of
+`data/sound/examples/game_songs.yaml` is playing and the player fires. The sound has to start within one frame of the
+button press, take one voice for a few frames, and give that voice back to the music, which has to be at the
+position it would have reached without the sound.
+
+**Why 1.3 and the 1.4 songs cannot express it.** A 1.3 score is a fixed sequence of play calls. A PRG has the three
+entries install, `init` and `play`, and a game build has `init`, `play` and `stop`; none of them takes an event
+(`test/sidwave14Effects`: "evidence for the need"). A sound written into the timeline plays at one fixed position of
+the song, not when the player presses a button. Songs are no substitute: the sound would be a fourth song, started with
+`init`, and `init` resets the whole player, so the title tune stops and starts over from its first play call when the
+game calls `init(0)` again (the same test plays 100 calls of the title, switches to a shot song for 8 calls and back,
+and the title writes its first call's registers again, not those of call 100). Two players, one for the music and one
+for the effects, cannot share the three voices of one SID without writing over each other.
+
+**Design.** An optional top-level `effects` mapping from the effect name to `{ priority, voices, steps }`. The player
+gets a second, small program, the effect engine, and a new entry `sfx`: A = effect index, Y = the voice (1 to 3) or $FF
+for any allowed voice. An effect owns a voice from the play call after `sfx` until its last step has run. While it
+does, the music keeps running (its notes, tables and loops advance as always) but writes the seven registers of that
+voice into a shadow instead of the SID; when the effect ends, the shadow is copied to the SID in the same play call,
+so the music continues at the position it has reached. When the document defines no effects the player has no engine
+and its bytes do not change.
+
+```yaml
+sidwave: 1.4
+# instruments, voices, patterns and a timeline as in any score
+effects:
+  pew:                         # effect 0
+    priority: 8                # 0 to 15
+    voices: [3]                # only voice 3 of the first SID may carry it (default: 1, 2 and 3)
+    steps:
+      - { freq: 2400, wave: pulse, pulse: 0.25, adsr: [0, 0, 15, 6] }   # first step: frequency 2400 Hz, lasts 1 play call
+      - { freq: 1800 }
+      - { freq: 900, wait: 2 }
+      - { gate: false, wait: 3 }                                          # release for 3 play calls
+  thud:                        # effect 1
+    priority: 5
+    steps:
+      - { freq: 90, wave: noise, adsr: [0, 5, 0, 4], wait: 5, filter: off }
+      - { gate: false, wait: 3 }
+```
+
+**Rejected alternative.** Effects as songs (above): `init` resets the player, so starting an effect stops the music.
+A variant that keeps the player running and only switches the stream pointers of one voice would put the effect into
+the voice's command stream, where it cannot be started at an arbitrary frame and has no priorities. The effect engine
+is separate from the streams.
+
+**Specification.**
+
+- `effects` is a mapping of up to 32 effects; the index of an effect is its position in the mapping (the order written),
+  which is the value of A for `sfx`. An empty mapping defines no effects and compiles to the same bytes as a document
+  without `effects`. A name has 1 to 32 letters, digits or underscores and does not start with a digit.
+- An effect has `priority` (required, whole number 0 to 15), `voices` (a list of 1 to 3 voice numbers from 1 to 3 without
+  repeats; default 1, 2, 3) and `steps` (1 to 255 steps). Unknown fields are rejected.
+- Voice numbers 1 to 3 are the three voices of the first SID in the `sids` order (the voice slots 0 to 2), whatever
+  the `id` of the voices of the score is. Effects never use the voices of a second or later SID, and a SID that holds
+  only the first three voices sounds as before. A voice that the score centres (`center:`, which also sounds on a mirror
+  channel on another SID) cannot carry effects, because the engine does not write the mirror channel: it is left out of
+  the default `voices`, and listing it is an error that names it. If that leaves an effect no voice, the effect is an
+  error.
+- A step has `freq`, `wave`, `pulse`, `adsr`, `gate`, `filter` and `wait`, all optional except that the first step needs a
+  `freq`.
+  - `freq` is a note name (C0 to B7, such as `C5` or `F#2`) or an exact frequency in Hz (1 to 3848) as a number or as
+    text such as `"880Hz"`. The player stores the frequency register for the PAL and for the NTSC clock and uses the one
+    of the clock that `init` was given.
+  - `wave` is `pulse`, `sawtooth`, `triangle`, `noise` or one of the combinations `tri+saw`, `tri+pulse`, `saw+pulse`
+    and `tri+saw+pulse`. `pulse` is a fraction (greater than 0 and up to 1) or a register value 1 to 4094. `adsr` is
+    `[attack, decay, sustain, release]`, four values 0 to 15. `gate` is `true` or `false`.
+  - `filter` is `off` or `keep`. `off` clears the filter routing bit of the voice (the voice bypasses the filter) until
+    a later step says `keep` or the effect ends; `keep` is the default and leaves the routing as the music sets it. The
+    change reaches the SID with the filter registers of the next play call, so the routing follows one play call later at
+    the start and at the end of the effect.
+  - `wait` is the number of play calls the step lasts, 1 to 255 (default 1).
+  - A field a step omits keeps the value of the steps before. The first step starts from `wave: pulse`, `pulse: 0.5`,
+    `adsr: [0, 0, 15, 0]` and `gate: true`, and writes all of them. A step writes only the fields it names.
+  - The first step writes the control register with the gate off before its other registers, so an effect that is
+    started again, or that takes over a voice with a held note, restarts its envelope.
+- Timing. `sfx` only records the request. The first step is applied in the next play call, after the music of that call,
+  so the latency is at most one play period. A step applied in call n lasts `wait` calls; the next step is applied in
+  call n + `wait`. An effect of T play calls owns its voice from the call after `sfx` for T + 1 calls: in the last
+  of them the voice is given back (the registers of the music are copied to the SID, the control register last).
+- The shadow holds what the music writes to the voice, including its gate. The copy at the end therefore includes the
+  gate state: a note that the music started while the effect ran sounds from its gate edge on, with the envelope the
+  music gives it; the voice does not wait for the next note.
+- Voice allocation. `sfx` checks, in this order: A is below the number of effects; the song has not ended (a play-once
+  score, see below); Y is $FF or 1 to 3 and, if given, is allowed for the effect. The candidates are the allowed voices
+  (or only the requested one). Then:
+  1. the lowest-numbered candidate that no effect owns is taken;
+  2. otherwise, if the candidate with the lowest priority (the lowest-numbered one among equals) runs an effect of
+     strictly lower priority than the new one, that effect is replaced;
+  3. otherwise, if a candidate runs the same effect (the same index, so the same priority), the effect starts again
+     on that voice;
+  4. otherwise the request is rejected.
+  An effect with priority 0 therefore never replaces another one and starts only on a free voice or restarts itself,
+  and an effect with priority 15 replaces any other effect. A rejected `sfx` changes no state.
+- Entry `sfx`: A = effect index, Y = voice or $FF. Returns carry clear when the effect was started and carry set when it
+  was rejected. Clobbers A, X, Y and the flags except that the caller's interrupt flag is restored. It runs with
+  interrupts disabled, so it may be called from the main program while a raster interrupt calls `play`; it must not be
+  called from an interrupt that can interrupt `play` itself. It writes no SID register. It uses only the player's own
+  RAM, no zero page and at most 5 bytes of stack including its return address.
+- `init` and `stop` cancel every effect without touching the effect's voice (`stop` silences all voices; `init` resets
+  the player). A running effect does not survive either call, and `sfx` can start effects again right after `init`.
+- A song that plays once (a score with an `end` block, or a song with `loop: false`) ends its effects with the song:
+  when the song has finished its last play call, running effects give their voices back (the registers of the music are
+  copied to the SID) and the usual release and volume fade follow. `sfx` is rejected from then on until `init`. An effect
+  that is longer than the song is therefore cut off at the end of the song. In a document with songs, effects are
+  accepted while a looping song plays.
+- All songs of a document share its effects. With multispeed (`speed` above 1) the steps are counted in play calls, not in
+  video frames.
+- Filter and volume. The music's filter cutoff, resonance and the chip volume are not touched by effects, except for
+  `filter: off` described above. An effect is as loud as the chip volume and the soft volume ramp of the music allow.
+
+**Output.**
+
+- PRG: the vectors are `$080D` (installer), `$0810` init, `$0813` play and, with effects, `$0816` sfx (`CompileResult.sfxAddress`,
+  3 bytes after the play vector, so a score without effects keeps its layout). From BASIC, `POKE 780,<effect>: POKE 782,255:
+  SYS 2070` starts effect `<effect>` on any voice (the registers A and Y are the values in 780 and 782; the carry flag of the
+  result is bit 0 of the value in 783). From machine code, `lda #<effect> : ldy #$FF : jsr $0816`. The BASIC program does not
+  need any other setup: the installer's interrupt calls `play`, which runs the effects.
+- PSID: the file is the same PRG body, so the entry is at `$0816` after loading at `$0801`, but PSID defines no way to call
+  it, so a player such as sidplayfp plays the music only. `compileSidwaveToSid` accepts the score and the music is
+  unchanged (tested).
+- Game build: `origin+9` is `jmp sfx` (a one byte `rts` stub when the score has no effects). The symbol files add
+  `sidwave_effects` (the count) and `sidwave_fx_<name>` (the index of each effect); the contract lists `effects` with
+  name, index, priority, voices, steps and frames, and the sfx entry's inputs, outputs and clobbered registers.
+  The cycles are measured twice: `cycles.worst` over the music alone, and `cycles.withEffects` over a run in which
+  every play call starts, restarts or replaces an effect on a rotating voice request, with `sfxWorst` for the `sfx` call.
+  `cycles.estimatedWorst` includes the effect engine and bounds both. The effect RAM (45 bytes for one SID, plus 4 with `filter: off`)
+  is part of `contract.ram`.
+- The estimator charges every score with effects up to 1201 more cycles per play call with one SID (`100 + 7 x channels +
+  3 x 360`, with 390 instead of 360 when a step uses `filter: off`). A score whose music already uses most of the stock budget may therefore
+  need `cpu: turbo` with effects (the error message says so), although the effects themselves rarely cost that much.
+
+**Schema.** `data/sound/sidwave.schema.json` has the property `effects` (an object of at most 32 properties whose names
+match `^[A-Za-z_][A-Za-z0-9_]{0,31}$`), with the effect and step fields above and the same ranges.
+
+**Parser.** `parseEffects` and `parseEffectStep` in `src/sidwave.ts`. The parsed document has `effects` (`ParsedEffect[]`),
+absent when the mapping is empty. Errors carry the JSON path (`$.effects.zap.steps[2].wait`). `SIDWAVE_MAX_EFFECTS` (32) and
+`SIDWAVE_MAX_EFFECT_STEPS` (255) are exported.
+
+**Compiler.** `src/sidwaveEffects.ts` builds the step records (11 bytes each: flags, wait, PAL frequency, NTSC
+frequency, pulse width, control, attack/decay, sustain/release), the tables (allowed voices, priority and start address per
+effect) and the assembly of the engine. `src/sidwaveCompiler.ts` hooks it into the player when `effects` exist: the voice
+register write of the music jumps to a shadow copy for an owned voice; `play` calls the engine after the last chip;
+`init` and `game_stop` reset it; the end of a play-once song stops it; with `filter: off` the write of the filter routing
+register ($D417) is masked.
+
+**Tests.** `test/sidwave14Effects.test.mjs` (language, limits, records, longest and most effects, cost),
+`test/sidwave14EffectsRuntime.test.mjs` (the adversarial list: a trigger on every play call for 10 s, triggers on all voices at
+once, priority inversions, a trigger in the call that wraps the song loop, effects during multispeed, an effect running
+when `stop` is called, an effect longer than the play-once song) and `test/sidwave14EffectsCombos.test.mjs` (filter
+routing, two SIDs, a score with an `end` block, PRG and PSID). Every run plays the score with effects and the same score
+without effects on the bundled emulator, side by side, and after every play call checks four properties:
+
+1. the voices that no effect owns, and the filter and volume registers, are written exactly as in the plain run;
+2. the SID register image equals the plain run's for every voice that no effect owns, so an owned voice has its music values
+   again from the call in which its effect ends;
+3. every write to an owned voice has the program counter inside the effect engine, so no music write reaches an owned voice;
+4. an effect that `sfx` accepted writes its first registers in the very next play call (latency of one play period).
+
+Boundaries: 0 effects (`effects: {}`), 32 effects (and 33 rejected), an effect with 1 step, the longest effect (255 steps,
+each step's frequency checked across page boundaries of the data), priority 0 and 15 (and -1, 16 rejected), `voices` with one
+and three entries and with invalid numbers (0, 4, duplicates, text, an empty list), every step field and its invalid values,
+wait 1 and 255 (0 and 256 rejected). Combinations: several songs, multispeed, play-once songs and scores with an `end` block,
+two SIDs and a centred voice, filter routing, the game target (including a split data block and garbage-filled memory, with
+every write checked against the contract) and PRG and PSID output.
+
+**Player cost.** Measured on the bundled emulator (`src/sidwaveEmulator.ts`) with the three songs of `game_songs.yaml`
+(three voices, the 1.4 song selector) at origin $1000; "worst play call" is the highest cycle count of one call over a full
+pass plus one loop of every song, with the given number of effects started on every call:
+
+| Score | PRG bytes | Worst play call, no effect running | One effect running | Three effects running |
+| --- | --- | --- | --- | --- |
+| `game_songs` without effects | 3191 | 1878 | - | - |
+| 1 effect of 3 steps | 3832 | 1946 | 2181 | 2651 |
+| 3 effects of 6 steps | 3873 | 1946 | 2181 | 2643 |
+
+The first effect costs 604 bytes of engine code and tables, each further effect 4 bytes, each step 11 bytes, and `filter: off`
+74 bytes; the effect RAM is 45 bytes. Against the plain run at the same play call, the engine adds
+78 cycles while no effect runs (the owned-voice check of the three voices and the idle pass), 317 cycles with one effect
+starting a step on every call and 787 cycles with three (at origin $1000; the test repeats this at four origins, which differ
+in page crossings, and checks that all stay below the compiler's bound of 1201). A call of `sfx` takes at most 360
+cycles. The measured worst calls are well below the estimate (2584 without effects, 3785 with).
+`test/sidwave14Effects.test.mjs` ("the measured cost of the effect engine stays below the compiler's bound") measures this
+on every run.
+
+**Documents without `effects` compile to identical bytes.** Nothing of the engine is generated without effects. The hash
+fixture `test/fixtures/sidwave-s4a/example-hashes.json` (PRG, play-once PRG and PSID of the 14 earlier examples) passes
+unchanged, and a document with `effects: {}` compiles to the same PRG and game bytes as the same document without the
+key (`test/sidwave14Effects`). A document with `sidwave: 1.3` (or 1.2, or none) that contains `effects` is rejected with
+`effects require sidwave: 1.4` (`$.effects`).
 
 ## Playable examples
 
