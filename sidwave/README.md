@@ -94,7 +94,7 @@ const trace = await engine.trace({ sid, seconds: 10 });
 - `maxRecords` defaults to 4,194,304 (2^22 records, 128 MB of Float64). Raise it explicitly for longer traces.
 - With `onChunk`, records are delivered as they are produced and are not accumulated: the result has an empty `records` array and `count` gives the number of records delivered. An error thrown by `onChunk` or `onProgress` ends the call and propagates unchanged.
 - `clock` defaults to the clock flag in the PSID header (PAL if the header gives none). It determines the slice length, the horizon and all cycle-to-time conversions.
-- `horizonCycles` is `originCycle` plus the requested duration, where `originCycle` is the cycle at which the first PCM sample is produced. Records after the horizon are discarded, so traces of equal duration end at the same cycle. `cycles` is the end of the last rendered slice and can exceed `horizonCycles` by up to one slice (about 20 ms).
+- `horizonCycles` is `originCycle` plus the requested duration, where `originCycle` is the cycle at which the first PCM sample is produced. It is measured with a small PSID probe tune and is approximate for RSID or ROM-booted tunes, whose start-up time differs; verdicts are unaffected because both traces in a comparison share it. Records after the horizon are discarded, so traces of equal duration end at the same cycle. `cycles` is the end of the last rendered slice and can exceed `horizonCycles` by up to one slice (about 20 ms).
 
 ### Tracing and audio
 

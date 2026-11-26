@@ -327,3 +327,17 @@ test("trace records end at the requested horizon; cycles may exceed it by less t
   }
   assert.equal(a.horizonCycles, b.horizonCycles);
 });
+
+test("a failure to read the package version leaves the version unknown and does not fail the engine", async () => {
+  const engine = createLibsidplayfpEngine({
+    emulation: "sidlite",
+    importModule: async () => fakeModule({ perSlice: 1 }),
+    readVersion: () => {
+      throw new Error("package.json is not readable");
+    },
+  });
+  const result = await engine.render({ sid: fakeSid, seconds: 0.1 });
+  assert.equal(result.engine.version, "unknown");
+  assert.equal(engine.version, "unknown");
+  assert.equal(result.samples.length, 4410);
+});

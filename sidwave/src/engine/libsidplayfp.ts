@@ -36,6 +36,8 @@ type EngineOptions = {
   traceBufferLimit?: number;
   /** Test hook: replaces the dynamic import of the optional libsidplayfp-wasm package. */
   importModule?: (specifier: string) => Promise<unknown>;
+  /** Test hook: replaces reading the installed package version. */
+  readVersion?: () => string;
 };
 
 type SidPlayerContext = {
@@ -127,6 +129,7 @@ export function createLibsidplayfpEngine({
   sliceSeconds = SLICE_SECONDS,
   traceBufferLimit = 2 ** 20,
   importModule = (specifier: string) => import(specifier),
+  readVersion = readInstalledVersion,
 }: EngineOptions): SidEngine {
   const id = "libsidplayfp-wasm";
   let version = "unknown";
@@ -137,7 +140,11 @@ export function createLibsidplayfpEngine({
   const getModule = () =>
     (modulePromise ??= importModule(optionalPackage)
       .then((loaded: any) => {
-        version = readInstalledVersion();
+        try {
+          version = readVersion();
+        } catch {
+          version = "unknown";
+        }
         return loaded.loadLibsidplayfp({ engine: emulation }) as Promise<LibsidplayfpWasmModule>;
       })
       .catch((error) => {
@@ -204,7 +211,8 @@ export function createLibsidplayfpEngine({
       }
       ctx.setEmulationConfig({
         ...(req.model ? { sidModel: req.model === "6581" ? "MOS6581" : "MOS8580", forceSidModel: true } : {}),
-        ...(req.clock ? { c64Model: req.clock, forceC64Model: true } : {}),
+        c64Model: clock,
+        forceC64Model: true,
         powerOnDelay: 8191,
       });
       // Trace is enabled before loadSidBuffer so init writes are captured when the binding records them.
