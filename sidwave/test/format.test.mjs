@@ -110,3 +110,35 @@ test("diff classifies instrument definition changes as synthesis", () => {
   assert.deepEqual(diffSidwave(plain, lead).changes, [{ class: "synthesis", path: "/instruments", after: { lead: { waveform: "saw", portamento: 2 } }, summary: "/instruments changed" }]);
   assert.deepEqual(diffSidwave(lead, slow).changes, [{ class: "synthesis", path: "/instruments/lead/portamento", before: 2, after: 5, summary: "/instruments/lead/portamento changed" }]);
 });
+
+test("three-way merge joins edits to different entries of the same list", () => {
+  const base = `sidwave: 1.2\ntitle: "T"\ntempo: 120\nvoices:\n  - id: 1\n    waveform: "pulse"\n    patterns:\n      A: {groove: "C4 ~ ~ ~", length: 1}\n  - id: 2\n    waveform: "saw"\n    patterns:\n      A: {groove: "C3 ~ ~ ~", length: 1}\nsections:\n  s: {bars: 1, layers: {v1: "A", v2: "A"}}\ntimeline: ["s"]\n`;
+  const ours = base.replace('"pulse"', '"triangle"');
+  const theirs = base.replace('"C4 ~ ~ ~"', '"D4 ~ ~ ~"').replace('"saw"', '"noise"');
+  const merged = mergeSidwave(base, ours, theirs);
+  assert.deepEqual(merged.conflicts, []);
+  assert.equal(merged.merged, `sidwave: 1.2
+title: "T"
+tempo: 120
+voices:
+  - id: 1
+    waveform: "triangle"
+    patterns:
+      A:
+        groove: "D4 ~ ~ ~"
+        length: 1
+  - id: 2
+    waveform: "noise"
+    patterns:
+      A:
+        groove: "C3 ~ ~ ~"
+        length: 1
+sections:
+  s:
+    bars: 1
+    layers:
+      v1: "A"
+      v2: "A"
+timeline: ["s"]
+`);
+});

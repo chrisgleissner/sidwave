@@ -116,6 +116,10 @@ export function mergeSidwave(base: string, ours: string, theirs: string): { merg
       }
       return out;
     }
+    if ([bv, ov, tv].every(Array.isArray) && bv.length === ov.length && ov.length === tv.length) {
+      // Lists of equal length (voices, timeline entries, groove entries) merge entry by entry.
+      return ov.map((_: unknown, i: number) => merge(bv[i], ov[i], tv[i], `${path}/${i}`));
+    }
     conflicts.push({ path: path || "", ...(bv === undefined ? {} : { base: bv }), ...(ov === undefined ? {} : { ours: ov }), ...(tv === undefined ? {} : { theirs: tv }), summary: `Concurrent edits at ${path || "/"}` });
     return ov;
   };
