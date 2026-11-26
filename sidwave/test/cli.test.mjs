@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runCli, EXIT_OK, EXIT_FAILED, EXIT_USAGE } from "../src/cli.js";
+import { runCli, EXIT_OK, EXIT_FAILED, EXIT_USAGE, EXIT_INPUT } from "../src/cli.js";
 import { confinedFileReader, compileSidwaveBytes, lintSidwave, listSidwaveExamples, readExampleScore, isExampleName } from "../src/sidwaveOps.js";
 import { parseSidwave } from "../src/sidwave.js";
 
@@ -46,7 +46,7 @@ test("usage errors exit 2", () => {
   try {
     for (const args of [["frobnicate"], ["validate"], ["validate", "a", "b"], ["validate", "--bogus", "x"], ["compile", "x", "-o"], ["compile", "x", "--format", "wav"],
       ["validate", "x", "--json=1"], ["validate", "x", "-o", "y"], ["validate", "x", "--strict"], ["examples", "a", "b"], ["examples", "nope"], ["examples", "--force"],
-      ["examples", "--allow-dir", "."], ["compile", "x", "--force"], ["lint", "x", "--format", "prg"], ["validate", "missing.yaml"]]) {
+      ["examples", "--allow-dir", "."], ["compile", "x", "--force"], ["lint", "x", "--format", "prg"], ["compile", "x", "--seconds", "3"], ["validate", "x", "--song", "1"], ["lint", "x", "--progress"]]) {
       const result = run(dir, ...args);
       assert.equal(result.code, EXIT_USAGE, args.join(" "));
       assert.match(result.err, /^sidwave: /);
@@ -61,16 +61,25 @@ test("validate accepts a valid score and reports the error path of an invalid on
     const ok = run(dir, "validate", "ok.yaml");
     assert.equal(ok.code, EXIT_OK);
     assert.match(ok.out, /valid SIDWAVE 1\.0, 3 voices, 1 SID$/m);
-    assert.deepEqual(JSON.parse(run(dir, "validate", "ok.yaml", "--json").out), { ok: true, file: "ok.yaml", version: "1.0", title: "Für Elise", mode: "PAL", voices: 3, sids: 1 });
+    assert.deepEqual(JSON.parse(run(dir, "validate", "ok.yaml", "--json").out), { ok: true, command: "validate", result: { file: "ok.yaml", version: "1.0", title: "Für Elise", mode: "PAL", voices: 3, sids: 1 } });
     fs.writeFileSync(path.join(dir, "bad.yaml"), ELISE.replace("tempo:", "tempoo:"));
     const bad = run(dir, "validate", "bad.yaml");
-    assert.equal(bad.code, EXIT_FAILED);
+    assert.equal(bad.code, EXIT_INPUT);
     assert.match(bad.err, /^bad\.yaml: Invalid SIDWAVE at \$/);
     const json = JSON.parse(run(dir, "validate", "bad.yaml", "--json").out);
     assert.equal(json.ok, false);
-    assert.equal(json.error.path, "$.song.tempoo");
+    assert.equal(json.command, "validate");
+    assert.equal(json.error.category, "validation");
+    assert.equal(json.error.details.path, "$.song.tempoo");
+    assert.equal(json.error.details.file, "bad.yaml");
+    assert.equal(json.result, undefined);
     fs.writeFileSync(path.join(dir, "junk.yaml"), "a: [");
-    assert.equal(run(dir, "validate", "junk.yaml").code, EXIT_FAILED);
+    assert.equal(run(dir, "validate", "junk.yaml").code, EXIT_INPUT);
+    const missing = run(dir, "validate", "missing.yaml");
+    assert.equal(missing.code, EXIT_INPUT);
+    assert.equal(missing.err, "sidwave: cannot read missing.yaml: ENOENT\n");
+    const missingJson = JSON.parse(run(dir, "validate", "missing.yaml", "--json").out);
+    assert.deepEqual(missingJson, { ok: false, command: "validate", error: { category: "input", message: "cannot read missing.yaml: ENOENT", details: { file: "missing.yaml" } } });
   } finally { done(); }
 });
 
@@ -85,7 +94,9 @@ test("compile writes PRG and PSID, selects the format, never overwrites the inpu
     assert.equal(sha(written), sha(expected.bytes));
     const sid = run(dir, "compile", "song.sidwave.yaml", "-o", "out/x.sid", "--json");
     assert.equal(sid.code, EXIT_OK);
-    const summary = JSON.parse(sid.out);
+    const envelope = JSON.parse(sid.out);
+    assert.equal(envelope.command, "compile");
+    const summary = envelope.result;
     assert.equal(summary.format, "sid");
     assert.equal(summary.sidCount, 1);
     assert.equal(summary.initAddress, 0x0810);
@@ -94,17 +105,19 @@ test("compile writes PRG and PSID, selects the format, never overwrites the inpu
     assert.equal(fs.readFileSync(path.join(dir, "out/x.sid")).subarray(0, 4).toString(), "PSID");
     assert.equal(run(dir, "compile", "song.sidwave.yaml", "--format", "sid", "-o", "y.bin").code, EXIT_OK);
     assert.equal(fs.readFileSync(path.join(dir, "y.bin")).subarray(0, 4).toString(), "PSID");
-    const noLoop = JSON.parse(run(dir, "compile", "song.sidwave.yaml", "--no-loop", "-o", "n.prg", "--json").out);
+    const noLoop = JSON.parse(run(dir, "compile", "song.sidwave.yaml", "--no-loop", "-o", "n.prg", "--json").out).result;
     assert.equal(noLoop.loop, false);
     assert.ok(noLoop.prgBytes > summary.prgBytes);
-    assert.equal(JSON.parse(run(dir, "compile", "song.sidwave.yaml", "--loop", "-o", "l.prg", "--json").out).prgBytes, summary.prgBytes);
+    assert.equal(JSON.parse(run(dir, "compile", "song.sidwave.yaml", "--loop", "-o", "l.prg", "--json").out).result.prgBytes, summary.prgBytes);
     const refused = run(dir, "compile", "song.sidwave.yaml", "-o", "song.sidwave.yaml");
     assert.equal(refused.code, EXIT_USAGE);
     assert.equal(fs.readFileSync(path.join(dir, "song.sidwave.yaml"), "utf8"), ELISE);
     fs.symlinkSync("song.sidwave.yaml", path.join(dir, "link.prg"));
     assert.equal(run(dir, "compile", "song.sidwave.yaml", "-o", "link.prg").code, EXIT_USAGE);
     fs.writeFileSync(path.join(dir, "blocker"), "");
-    assert.equal(run(dir, "compile", "song.sidwave.yaml", "-o", "blocker/x.prg").code, EXIT_USAGE);
+    const blocked = run(dir, "compile", "song.sidwave.yaml", "-o", "blocker/x.prg");
+    assert.equal(blocked.code, EXIT_INPUT);
+    assert.match(blocked.err, /^sidwave: cannot write .*blocker\/x\.prg: /);
   } finally { done(); }
 });
 
@@ -117,10 +130,10 @@ test("compile to standard output keeps the bytes and the summary apart; invalid 
     assert.equal(sha(result.bytes), sha(compileSidwaveBytes(parseSidwave(ELISE)).bytes));
     assert.equal(result.out, "");
     assert.match(result.err, /standard output: PRG/);
-    assert.equal(JSON.parse(run(dir, "compile", "a.yaml", "-o", "-", "--json").err).output, null);
+    assert.equal(JSON.parse(run(dir, "compile", "a.yaml", "-o", "-", "--json").err).result.output, null);
     fs.writeFileSync(path.join(dir, "bad.yaml"), "voices: 3\n");
     const bad = run(dir, "compile", "bad.yaml");
-    assert.equal(bad.code, EXIT_FAILED);
+    assert.equal(bad.code, EXIT_INPUT);
     assert.equal(fs.existsSync(path.join(dir, "bad.prg")), false);
     assert.equal(JSON.parse(run(dir, "compile", "bad.yaml", "--json").out).ok, false);
   } finally { done(); }
@@ -140,9 +153,11 @@ test("lint reports findings and --strict turns them into exit 1", () => {
     assert.equal(run(dir, "lint", "f.yaml", "--strict").code, EXIT_FAILED);
     const json = JSON.parse(run(dir, "lint", "f.yaml", "--strict", "--json", "--no-loop").out);
     assert.equal(json.ok, false);
-    assert.ok(json.findings.length > 0);
+    assert.equal(json.command, "lint");
+    assert.equal(json.error, undefined);
+    assert.ok(json.result.findings.length > 0);
     fs.writeFileSync(path.join(dir, "bad.yaml"), "x: 1\n");
-    assert.equal(run(dir, "lint", "bad.yaml").code, EXIT_FAILED);
+    assert.equal(run(dir, "lint", "bad.yaml").code, EXIT_INPUT);
   } finally { done(); }
 });
 
@@ -153,7 +168,8 @@ test("examples lists, prints and writes the bundled scores", () => {
     assert.equal(list.code, EXIT_OK);
     assert.equal(list.out.trim().split("\n").length, 15);
     const json = JSON.parse(run(dir, "examples", "--json").out);
-    assert.equal(json.length, 15);
+    assert.equal(json.command, "examples");
+    assert.equal(json.result.length, 15);
     assert.ok(isExampleName("acid_line") && !isExampleName("../x"));
     assert.equal(run(dir, "examples", "acid_line").out, readExampleScore("acid_line"));
     const wrote = run(dir, "examples", "acid_line", "-o", "ex");
@@ -162,7 +178,7 @@ test("examples lists, prints and writes the bundled scores", () => {
     assert.equal(run(dir, "examples", "acid_line", "-o", "ex").code, EXIT_USAGE);
     assert.equal(run(dir, "examples", "acid_line", "-o", "ex", "--force", "--json").code, EXIT_OK);
     fs.writeFileSync(path.join(dir, "file"), "");
-    assert.equal(run(dir, "examples", "acid_line", "-o", "file").code, EXIT_USAGE);
+    assert.equal(run(dir, "examples", "acid_line", "-o", "file").code, EXIT_INPUT);
     assert.throws(() => readExampleScore("nope"), /unknown example/);
     assert.equal(run(dir, "validate", path.join(dir, "ex/acid_line.yaml")).code, EXIT_OK);
   } finally { done(); }
@@ -187,7 +203,7 @@ test("file: sample sources are confined to the working directory unless --allow-
     fs.rmSync(path.join(work, "sub/kick.u8"));
     fs.symlinkSync(path.join(outside, "kick.u8"), path.join(work, "sub/kick.u8"));
     const refused = run(work, "validate", "d.yaml");
-    assert.equal(refused.code, EXIT_FAILED);
+    assert.equal(refused.code, EXIT_INPUT);
     assert.match(refused.err, /outside the allowed directories/);
     assert.equal(run(work, "validate", "d.yaml", "--allow-dir", outside).code, EXIT_OK);
     assert.equal(run(work, "lint", "d.yaml", `--allow-dir=${outside}`).code, EXIT_OK);
@@ -218,15 +234,15 @@ for (const [label, runtime] of runtimes) {
       assert.equal(spawnCli(runtime, dir, "examples", "fuer_elise", "-o", "e").code, 2);
       const compiled = spawnCli(runtime, dir, "compile", "s.yaml", "--format", "sid", "--json");
       assert.equal(compiled.code, 0);
-      assert.equal(JSON.parse(compiled.out.toString()).format, "sid");
+      assert.equal(JSON.parse(compiled.out.toString()).result.format, "sid");
       assert.equal(sha(fs.readFileSync(path.join(dir, "s.sid"))), sha(compileSidwaveBytes(parseSidwave(ELISE), { format: "sid" }).bytes));
       const stdout = spawnCli(runtime, dir, "compile", "s.yaml", "-o", "-");
       assert.equal(sha(stdout.out), sha(compileSidwaveBytes(parseSidwave(ELISE)).bytes));
       fs.writeFileSync(path.join(dir, "bad.yaml"), "nonsense: true\n");
       const bad = spawnCli(runtime, dir, "validate", "bad.yaml");
-      assert.equal(bad.code, 1);
+      assert.equal(bad.code, 3);
       assert.match(bad.err, /Invalid SIDWAVE at \$/);
-      assert.equal(spawnCli(runtime, dir, "validate", "missing.yaml").code, 2);
+      assert.equal(spawnCli(runtime, dir, "validate", "missing.yaml").code, 3);
       assert.equal(spawnCli(runtime, dir, "nonsense").code, 2);
       assert.equal(spawnCli(runtime, dir).code, 2);
       assert.equal(spawnCli(runtime, dir, "compile", "s.yaml", "-o", "s.yaml").code, 2);

@@ -3,10 +3,13 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 import { createHash } from "node:crypto";
 import { psidClock } from "../engine/libsidplayfp.js";
-import type { EngineIdentity, SidClock, SidEngine, SidEmulation } from "../engine/types.js";
+import type { EngineIdentity, SidClock, SidEngine, SidEmulation, SystemRoms } from "../engine/types.js";
+import { A1_SAMPLE_RATE, compareAudioA1, type A1Result, type A1Rules } from "./a1.js";
+
+export * from "./a1.js";
 
 export type Difference = {
-  level: "T0" | "T1" | "A0";
+  level: "T0" | "T1" | "A0" | "A1";
   category:
     | "missing_write"
     | "extra_write"
@@ -15,7 +18,8 @@ export type Difference = {
     | "timing"
     | "length"
     | "pcm"
-    | "empty_trace";
+    | "empty_trace"
+    | "audio";
   call?: number;
   /** Cycles from engine start. 0 for empty_trace, which has no write to point at. */
   cycle?: number;
@@ -52,23 +56,43 @@ export type CompareOptions = {
   clockHz?: number;
 };
 
+export type A1Details = Partial<Omit<A1Result, "verdict">> & {
+  /** Why A1 was not evaluated: the engine, sample rate or ROMs differ from the conditions of the rule file. */
+  reason?: string;
+};
+
 export type VerifyResult = {
-  level: "T0" | "T1" | "A0" | "none";
+  level: "T0" | "T1" | "A0" | "A1" | "none";
   levels: {
     T0: "pass" | "fail";
     T1: "pass" | "fail";
     A0: "pass" | "fail" | "not evaluated";
-    A1: "not evaluated";
+    A1: "pass" | "fail" | "not evaluated";
   };
   horizon: { seconds: number; cycles: number; calls: number };
   firstDifference?: Difference;
-  engines: { trace: EngineIdentity; pcm?: EngineIdentity };
+  a1?: A1Details;
+  engines: { trace: EngineIdentity; pcm?: EngineIdentity; a1?: EngineIdentity };
+};
+
+export type A1VerifyOptions = {
+  /** A reSIDfp engine. A1 is defined only for its 48 kHz mono renders under the conditions of the rule file. */
+  engine: SidEngine;
+  rules: A1Rules;
+  /** Observation horizon of the audio comparison. Default: the verify horizon. */
+  seconds?: number;
+  roms?: SystemRoms;
+  /** Hex SHA-256 of each ROM in `roms`, compared with the rule file. */
+  romHashes?: { kernal?: string; basic?: string; chargen?: string };
+  signal?: AbortSignal;
+  onProgress?: (fraction: number) => void;
 };
 
 const CLOCK_HZ = { PAL: 985_248, NTSC: 1_022_727 } as const;
 /** Default burst gap of callGroups, in cycles. */
 export const DEFAULT_BURST_GAP = 2_000;
 const DEFAULT_TOLERANCE = 0;
+export const MAX_VERIFY_SECONDS = 180;
 
 /** One SID write of a trace: zero-based SID, register offset, value, cycle counted from engine start. */
 export type TraceWrite = { sid: number; reg: number; value: number; cycle: number; index: number };
@@ -300,17 +324,24 @@ export async function verifySid(
     pcmEngine?: SidEngine;
     /** Clock for both tunes. Default: the clock flag of the expected tune's PSID header, else PAL. */
     clock?: SidClock;
+    /** Evaluate A1 with this reSIDfp engine and rule set. */
+    a1?: A1VerifyOptions;
+    /** Largest trace per tune. Default and maximum 2,000,000 writes. */
+    maxRecords?: number;
+    signal?: AbortSignal;
   },
 ): Promise<VerifyResult> {
-  const { engine, seconds, song, toleranceCycles = 0, pcmEngine } = options;
-  if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 60) {
-    throw new VerifyError("invalid_options", "seconds must be in (0, 60]");
+  const { engine, seconds, song, toleranceCycles = 0, pcmEngine, signal } = options;
+  const maxRecords = options.maxRecords ?? 2_000_000;
+  const abort = signal ? { signal } : {};
+  if (!Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_VERIFY_SECONDS) {
+    throw new VerifyError("invalid_options", `seconds must be in (0, ${MAX_VERIFY_SECONDS}]`);
   }
   const clock = options.clock ?? psidClock(expected) ?? "PAL";
   const clockHz = CLOCK_HZ[clock];
   const [a, b] = await Promise.all([
-    engine.trace({ sid: expected, seconds, song, clock, maxRecords: 2_000_000 }),
-    engine.trace({ sid: observed, seconds, song, clock, maxRecords: 2_000_000 }),
+    engine.trace({ sid: expected, seconds, song, clock, maxRecords, ...abort }),
+    engine.trace({ sid: observed, seconds, song, clock, maxRecords, ...abort }),
   ]);
   const horizonCycles = Math.min(a.horizonCycles, b.horizonCycles);
   const cmp = compareTraces(a.records, b.records, { horizonCycles, toleranceCycles, clockHz });
@@ -320,8 +351,8 @@ export async function verifySid(
   let pcmIdentity: EngineIdentity | undefined;
   if (pcmEngine) {
     const [x, y] = await Promise.all([
-      pcmEngine.render({ sid: expected, seconds, song, clock }),
-      pcmEngine.render({ sid: observed, seconds, song, clock }),
+      pcmEngine.render({ sid: expected, seconds, song, clock, ...abort }),
+      pcmEngine.render({ sid: observed, seconds, song, clock, ...abort }),
     ]);
     const emulationOf = (identity: EngineIdentity & { emulation?: SidEmulation }) => identity.emulation;
     if (emulationOf(x.engine) !== "sidlite" || emulationOf(y.engine) !== "sidlite") {
@@ -348,15 +379,73 @@ export async function verifySid(
     }
   }
 
+  let A1: VerifyResult["levels"]["A1"] = "not evaluated";
+  let a1Details: A1Details | undefined;
+  let a1Identity: EngineIdentity | undefined;
+  let a1Diff: Difference | undefined;
+  if (options.a1) {
+    const outcome = await evaluateA1(expected, observed, options.a1, { seconds, song, clock, clockHz, originCycle: a.originCycle });
+    A1 = outcome.level;
+    a1Details = outcome.details;
+    a1Identity = outcome.identity;
+    a1Diff = outcome.difference;
+  }
+
   const T0 = cmp.t0.equal ? "pass" : "fail";
   const T1 = cmp.t1.equal ? "pass" : "fail";
-  const level = T0 === "pass" ? "T0" : T1 === "pass" ? "T1" : A0 === "pass" ? "A0" : "none";
-  const firstDifference = cmp.t0.firstDifference ?? cmp.t1.firstDifference ?? audioDiff;
+  const level = T0 === "pass" ? "T0" : T1 === "pass" ? "T1" : A0 === "pass" ? "A0" : A1 === "pass" ? "A1" : "none";
+  const firstDifference = cmp.t0.firstDifference ?? cmp.t1.firstDifference ?? audioDiff ?? a1Diff;
   return {
     level,
-    levels: { T0, T1, A0, A1: "not evaluated" },
+    levels: { T0, T1, A0, A1 },
     horizon: { seconds, cycles: horizonCycles, calls: cmp.horizon.calls },
     ...(firstDifference ? { firstDifference } : {}),
-    engines: { trace: a.engine, ...(pcmIdentity ? { pcm: pcmIdentity } : {}) },
+    ...(a1Details ? { a1: a1Details } : {}),
+    engines: { trace: a.engine, ...(pcmIdentity ? { pcm: pcmIdentity } : {}), ...(a1Identity ? { a1: a1Identity } : {}) },
   };
+}
+
+async function evaluateA1(
+  expected: Uint8Array,
+  observed: Uint8Array,
+  a1: A1VerifyOptions,
+  context: { seconds: number; song: number | undefined; clock: SidClock; clockHz: number; originCycle: number },
+): Promise<{ level: VerifyResult["levels"]["A1"]; details: A1Details; identity?: EngineIdentity; difference?: Difference }> {
+  const seconds = a1.seconds ?? context.seconds;
+  if (!Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_VERIFY_SECONDS) {
+    throw new VerifyError("invalid_options", `A1 seconds must be in (0, ${MAX_VERIFY_SECONDS}]`);
+  }
+  const conditions = a1.rules.conditions;
+  const mismatchedRom = conditions && a1.romHashes
+    ? (["kernal", "basic", "chargen"] as const).find((name) => a1.romHashes![name] !== undefined && a1.romHashes![name] !== conditions.roms[name])
+    : undefined;
+  if (mismatchedRom) {
+    return { level: "not evaluated", details: { reason: `The ${mismatchedRom} ROM differs from the ROM pinned in the A1 rule file` } };
+  }
+  const request = {
+    seconds, song: context.song, clock: context.clock, sampleRate: A1_SAMPLE_RATE, channels: 1 as const,
+    ...(a1.roms ? { roms: a1.roms } : {}), ...(a1.signal ? { signal: a1.signal } : {}),
+  };
+  const [x, y] = await Promise.all([
+    a1.engine.render({ ...request, sid: expected, ...(a1.onProgress ? { onProgress: a1.onProgress } : {}) }),
+    a1.engine.render({ ...request, sid: observed }),
+  ]);
+  const identity = x.engine;
+  const pinned = conditions?.engine;
+  const reason = identity.emulation !== "residfp"
+    ? `A1 requires reSIDfp rendering, not ${identity.emulation}`
+    : x.sampleRate !== A1_SAMPLE_RATE || x.channels !== 1
+      ? `A1 requires ${A1_SAMPLE_RATE} Hz mono renders`
+      : pinned && (identity.id !== pinned.id || identity.version !== pinned.version)
+        ? `The engine ${identity.id} ${identity.version} differs from the pinned ${pinned.id} ${pinned.version}`
+        : undefined;
+  if (reason) return { level: "not evaluated", details: { reason }, identity };
+  const result = compareAudioA1(x.samples, y.samples, a1.rules, { horizonSeconds: seconds });
+  const { verdict, ...details } = result;
+  let difference: Difference | undefined;
+  if (verdict === "fail" && result.firstBad) {
+    const cycle = context.originCycle + Math.floor(result.firstBad.timeSeconds * context.clockHz);
+    difference = { level: "A1", category: result.firstBad.class === "truncated" ? "length" : "audio", cycle, timeSeconds: cycle / context.clockHz };
+  }
+  return { level: verdict, details, identity, ...(difference ? { difference } : {}) };
 }
