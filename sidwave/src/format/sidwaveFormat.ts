@@ -22,18 +22,41 @@ const orders: Record<string, string[]> = {
   instrument: ["waveform", "pulse_width", "adsr", "portamento", "legato", "hard_restart", "sync", "ring", "wavetable", "pulsetable", "filtertable", "vibrato", "fx"],
   fx: ["vibrato", "pwm_sweep", "slide", "filter_mod"],
 };
-const musical = new Set(["groove", "notes", "motif", "length", "transpositions", "frame_rate", "bars", "layers", "tempo", "meter", "section", "sections", "timeline", "length_bars", "swing", "swing_unit", "transpose", "levels", "volume", "level", "accent", "end", "loop_to"]);
-const synthesis = new Set(["instruments", "adsr", "waveform", "pulse_width", "wavetable", "pulsetable", "filtertable", "filter", "global_fx", "fx", "vibrato", "pwm_sweep", "filter_mod", "slide", "hard_restart", "sync", "ring", "instrument", "echo", "unison", "follow", "detune"]);
-const hardware = new Set(["sids", "sid", "address", "model", "mode", "cpu", "speed", "layout", "overrides", "clock"]);
-function esc(s: string) { return s.replace(/~/g, "~0").replace(/\//g, "~1"); }
+// Classification is by position in the score schema, never by a key name found at an arbitrary depth: an instrument
+// named "sid" or "timeline", or a section named "mode", is user data and classifies by where it sits.
+const ROOT_HARDWARE = new Set(["sids", "mode", "cpu", "speed", "clock", "layout", "overrides"]);
+const ROOT_SYNTHESIS = new Set(["instruments", "global_fx", "samples", "kit"]);
+const ROOT_MUSICAL = new Set(["tempo", "meter", "length_bars", "sections", "timeline", "loop_to", "accent", "end", "swing", "swing_unit"]);
+const VOICE_SYNTHESIS = new Set(["waveform", "pulse_width", "adsr", "detune", "instrument", "echo", "unison", "follow", "fx"]);
+const VOICE_MUSICAL = new Set(["patterns", "level", "center"]);
+const SYNTHESIS_ENTRY = new Set(["inst", "instrument", "fx", "vibrato"]);
+const un = (s: string) => s.replace(/~1/g, "/").replace(/~0/g, "~");
 function classify(path: string): ChangeClass {
-  const parts = path.split("/").slice(1);
-  if (parts.includes("patterns") || parts.includes("timeline") || parts.includes("voices") && parts.includes("groove")) return "musical";
-  if (parts.some((x) => hardware.has(x))) return "hardware";
-  if (parts.some((x) => synthesis.has(x))) return "synthesis";
-  if (parts.some((x) => musical.has(x))) return "musical";
-  return "structural";
+  const parts = path.split("/").slice(1).map(un);
+  const [root, , third] = parts;
+  if (root === undefined) return "structural";
+  if (root === "song") return parts[1] === "global_fx" ? "synthesis" : parts[1] === "tempo" || parts[1] === "length_bars" ? "musical" : parts[1] === "mode" ? "hardware" : "structural";
+  if (ROOT_HARDWARE.has(root)) return "hardware";
+  if (ROOT_SYNTHESIS.has(root)) return "synthesis";
+  if (root === "voices") {
+    // /voices/<index>/<field>/...
+    if (third === undefined) return "structural";
+    if (third === "sid") return "hardware";
+    if (VOICE_SYNTHESIS.has(third)) return "synthesis";
+    if (third === "patterns") {
+      // /voices/<i>/patterns/<name>/<field>/...: effects and instrument choices are decided before the pattern rule.
+      const [field, index, key] = parts.slice(4);
+      if (field === "fx" || ((field === "groove" || field === "notes") && key !== undefined && index !== undefined && SYNTHESIS_ENTRY.has(key))) return "synthesis";
+      return "musical";
+    }
+    return VOICE_MUSICAL.has(third) ? "musical" : "structural";
+  }
+  if (root === "sections" || root === "timeline") {
+    return parts[2] === "filter" || parts[2] === "fx" ? "synthesis" : "musical";
+  }
+  return ROOT_MUSICAL.has(root) ? "musical" : "structural";
 }
+function esc(s: string) { return s.replace(/~/g, "~0").replace(/\//g, "~1"); }
 function equal(a: unknown, b: unknown): boolean { return JSON.stringify(a) === JSON.stringify(b); }
 function compileEqual(a: string, b: string): boolean {
   try { const x = compileSidwaveToPrg(parseSidwave(a), { loop: false }).prg; const y = compileSidwaveToPrg(parseSidwave(b), { loop: false }).prg; return x.equals(y); }

@@ -452,3 +452,24 @@ timeline: [{bars: 1, layers: {v1: "A"}}]
   assert.deepEqual([merged.title, merged.voices[0].patterns.A.groove], ["Demo tune", "D4 ~ ~ ~"]);
   assert.deepEqual(mergeSidwave(base, base.replace("C4", "E4"), theirs).conflicts, [{ path: "/voices/0/patterns/A/groove", base: "C4 ~ ~ ~", ours: "E4 ~ ~ ~", theirs: "D4 ~ ~ ~", summary: "Concurrent edits at /voices/0/patterns/A/groove" }]);
 });
+
+test("diff classifies by schema position, not by key names found at any depth", () => {
+  const classOf = (a, b) => diffSidwave(a, b).changes.map((c) => [c.class, c.path]);
+  // User chosen names that equal schema keys.
+  assert.deepEqual(classOf("instruments:\n  sid: {note: 1}\n", "instruments:\n  sid: {note: 2}\n"), [["synthesis", "/instruments/sid/note"]]);
+  assert.deepEqual(classOf("instruments:\n  timeline: {x: 1}\n", "instruments:\n  timeline: {x: 2}\n"), [["synthesis", "/instruments/timeline/x"]]);
+  assert.deepEqual(classOf("sections:\n  mode: {x: 1}\n", "sections:\n  mode: {x: 2}\n"), [["musical", "/sections/mode/x"]]);
+  assert.deepEqual(classOf("sections:\n  sids: {bars: 1}\n", "sections:\n  sids: {bars: 2}\n"), [["musical", "/sections/sids/bars"]]);
+  assert.deepEqual(classOf("voices:\n  - id: 1\n    patterns:\n      mode: {groove: C4}\n", "voices:\n  - id: 1\n    patterns:\n      mode: {groove: D4}\n"), [["musical", "/voices/0/patterns/mode/groove"]]);
+  // Hardware keys at their real position.
+  assert.deepEqual(classOf("mode: PAL\n", "mode: NTSC\n"), [["hardware", "/mode"]]);
+  assert.deepEqual(classOf("voices:\n  - {id: 1, sid: 1}\n", "voices:\n  - {id: 1, sid: 2}\n"), [["hardware", "/voices/0/sid"]]);
+  // Effects and instrument choices are decided before the pattern rule.
+  const pattern = (body) => `voices:\n  - id: 1\n    patterns:\n      A:\n${body}\n`;
+  assert.deepEqual(classOf(pattern("        fx: {vibrato: {depth: 1}}"), pattern("        fx: {vibrato: {depth: 2}}")), [["synthesis", "/voices/0/patterns/A/fx/vibrato/depth"]]);
+  assert.deepEqual(classOf(pattern("        groove:\n          - {note: C4, inst: a}"), pattern("        groove:\n          - {note: C4, inst: b}")), [["synthesis", "/voices/0/patterns/A/groove/0/inst"]]);
+  assert.deepEqual(classOf(pattern("        groove:\n          - {note: C4, inst: a}"), pattern("        groove:\n          - {note: D4, inst: a}")), [["musical", "/voices/0/patterns/A/groove/0/note"]]);
+  // Samples and kit are sound definitions.
+  assert.deepEqual(classOf("samples: {defs: {a: 1}}\n", "samples: {defs: {a: 2}}\n"), [["synthesis", "/samples/defs/a"]]);
+  assert.deepEqual(classOf("kit: {k: 1}\n", "kit: {k: 2}\n"), [["synthesis", "/kit/k"]]);
+});
