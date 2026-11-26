@@ -51,9 +51,14 @@ export interface TraceRecord {
 export interface TraceResult {
   records: Float64Array;
   count: number;
-  droppedRecords: 0;
+  /** Records the engine reported as dropped. Any nonzero count aborts the trace, so a returned result carries 0. */
+  droppedRecords: number;
   cycles: number;
   seconds: number;
+  /** PCM rendered while tracing; identical to the PCM of a render() with the same request. */
+  samples: Int16Array;
+  sampleRate: number;
+  channels: 1 | 2;
   engine: EngineIdentity;
 }
 

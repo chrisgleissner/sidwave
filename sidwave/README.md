@@ -10,7 +10,7 @@ Status: pre-release. This package has not been published to npm yet. Build it fr
 npm install sidwave
 ```
 
-Requires Node.js 24 or later. Runtime dependencies: `yaml` and `6502-toolkit`.
+Requires Node.js 24 or later. Runtime dependencies: `yaml` and `6502-toolkit`. Optional peer dependency: `libsidplayfp-wasm` (see Engine).
 
 ## Library
 
@@ -68,6 +68,34 @@ Exit codes: 0 success; 1 invalid input or failed verdict; 2 usage or operational
 - 14 example scores in [`data/sound/examples`](data/sound/examples).
 
 Planned and not yet available: SID file reader and writer, `sidwave verify`, formatter and diff, a relocatable player and sound effects for games, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
+
+## Engine
+
+`sidwave/engine` renders and traces SID files with [libsidplayfp-wasm](https://www.npmjs.com/package/libsidplayfp-wasm) (reSIDfp or SIDLite). `sidwave/verify` compares the SID register writes of two tunes (levels T0, T1) and, with a SIDLite engine, their PCM (level A0). The package is an optional peer dependency: install it yourself when you use these two entry points.
+
+```bash
+npm install libsidplayfp-wasm
+```
+
+Without it, `createLibsidplayfpEngine(...).render()` and `.trace()` throw `SidEngineUnavailableError` with a message that names the package and this install command. The rest of sidwave does not need it.
+
+```ts
+import { createLibsidplayfpEngine } from "sidwave/engine";
+
+const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+const { samples, md5 } = await engine.render({ sid, seconds: 10 });
+const trace = await engine.trace({ sid, seconds: 10, onChunk: (records) => {} });
+```
+
+`trace` returns the SID writes as groups of four numbers (SID number, register, value, cycle). It never drops writes: if the trace buffer or `maxRecords` would be exceeded it throws `TraceOverflowError`. `onChunk` delivers the records as they are produced. Tracing does not change the audio; `trace` returns the same PCM that `render` returns.
+
+ROMs are optional. No ROMs are downloaded or bundled. Pass your own KERNAL, BASIC and character ROM images in the `roms` field of a request:
+
+```ts
+await engine.render({ sid, seconds: 10, roms: { kernal, basic, chargen } }); // Uint8Array images
+```
+
+Tunes that call the KERNAL or BASIC (RSID tunes, for example) may not advance without them. Tunes that only use the SID chip and their own code, such as the ones sidwave compiles, play without ROMs.
 
 ## More
 

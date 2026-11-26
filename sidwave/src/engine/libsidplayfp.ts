@@ -30,6 +30,8 @@ type EngineOptions = {
   /** Test hooks; production defaults render in ~20 ms slices. */
   sliceSeconds?: number;
   traceBufferLimit?: number;
+  /** Test hook: replaces the dynamic import of the optional libsidplayfp-wasm package. */
+  importModule?: (specifier: string) => Promise<unknown>;
 };
 
 type SidPlayerContext = {
@@ -60,6 +62,7 @@ type RunResult = {
   seconds: number;
   md5: string;
   trace: Float64Array;
+  droppedRecords: number;
   cycles: number;
 };
 
@@ -68,6 +71,7 @@ export function createLibsidplayfpEngine({
   emulation,
   sliceSeconds = SLICE_SECONDS,
   traceBufferLimit = 2 ** 20,
+  importModule = (specifier: string) => import(specifier),
 }: EngineOptions): SidEngine {
   const id = "libsidplayfp-wasm";
   const version = "1.1.1";
@@ -75,11 +79,13 @@ export function createLibsidplayfpEngine({
   const optionalPackage = ["libsidplayfp", "wasm"].join("-");
 
   const getModule = () =>
-    (modulePromise ??= import(optionalPackage)
+    (modulePromise ??= importModule(optionalPackage)
       .then((loaded: any) => loaded.loadLibsidplayfp({ engine: emulation }) as Promise<LibsidplayfpWasmModule>)
       .catch((error) => {
+        modulePromise = undefined;
         throw new SidEngineUnavailableError(
-          `libsidplayfp-wasm is unavailable; install the optional dependency: ${String(error)}`,
+          `The libsidplayfp-wasm package is required but could not be loaded (${String(error)}). ` +
+            "Install it with: npm install libsidplayfp-wasm",
         );
       }));
 
@@ -120,6 +126,7 @@ export function createLibsidplayfpEngine({
       const traceParts: Float64Array[] = [];
       let sampleCount = 0;
       let traceCount = 0;
+      let droppedRecords = 0;
       let cycles = 0;
       let slice = 0;
       const wantSamples = Math.ceil(req.seconds * sampleRate) * channels;
@@ -137,6 +144,7 @@ export function createLibsidplayfpEngine({
         if (tracing) {
           const dropped = ctx.getDroppedSidWriteTraceCount();
           const packed = ctx.getAndClearSidWriteTracesPacked();
+          droppedRecords += dropped;
           if (dropped !== 0 || packed.length / 4 > traceBufferLimit) {
             throw new TraceOverflowError(
               `Trace buffer overflow in render slice ${slice} (${dropped} dropped records; limit ${traceBufferLimit})`,
@@ -144,8 +152,10 @@ export function createLibsidplayfpEngine({
           }
           if (packed.length) {
             traceCount += packed.length / 4;
-            const maxRecords = tracing ? ((req as TraceRequest).maxRecords ?? MAX_TRACE_RECORDS) : MAX_TRACE_RECORDS;
-            if (traceCount > maxRecords) throw new SidLimitError("Trace maxRecords exceeded");
+            const maxRecords = (req as TraceRequest).maxRecords ?? MAX_TRACE_RECORDS;
+            if (traceCount > maxRecords) {
+              throw new TraceOverflowError(`Trace exceeds maxRecords ${maxRecords}; records would be lost`);
+            }
             if (reqOnChunk(req)) req.onChunk!(packed);
             traceParts.push(packed);
           }
@@ -165,7 +175,8 @@ export function createLibsidplayfpEngine({
         trace.set(part, offset);
         offset += part.length;
       }
-      return { samples, sampleRate, channels, seconds: sampleCount / (sampleRate * channels), md5, trace, cycles };
+      const seconds = sampleCount / (sampleRate * channels);
+      return { samples, sampleRate, channels, seconds, md5, trace, droppedRecords, cycles };
     } catch (error) {
       if (error instanceof SidEngineError) throw error;
       throw new SidLoadError(error instanceof Error ? error.message : String(error));
@@ -197,9 +208,12 @@ export function createLibsidplayfpEngine({
       return {
         records: result.trace,
         count: result.trace.length / 4,
-        droppedRecords: 0,
+        droppedRecords: result.droppedRecords,
         cycles: result.cycles,
         seconds: result.seconds,
+        samples: result.samples,
+        sampleRate: result.sampleRate,
+        channels: result.channels,
         engine: identity(),
       };
     },

@@ -12,10 +12,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../data
 async function tune(name = "funk_bass", transform) {
   let yaml = await readFile(path.join(root, `${name}.yaml`), "utf8");
   if (transform) yaml = transform(yaml);
-  const doc = parseSidwave(yaml), prg = compileSidwaveToPrg(doc);
-  return new Uint8Array(compileSidwaveToSid(doc, prg.prg, { initAddress: prg.initAddress, playAddress: prg.playAddress }).sid);
+  const doc = parseSidwave(yaml);
+  const prg = compileSidwaveToPrg(doc);
+  const options = { initAddress: prg.initAddress, playAddress: prg.playAddress };
+  return new Uint8Array(compileSidwaveToSid(doc, prg.prg, options).sid);
 }
-const packed = writes => new Float64Array(writes.flatMap(([sid,r,v,c]) => [sid,r,v,c]));
+const packed = (writes) => new Float64Array(writes.flat());
 
 test("synthetic trace comparison reports missing, extra, order, and length categories", () => {
   const base = packed([[0,1,10,0],[1,2,20,30000]]);
