@@ -203,10 +203,20 @@ export function quantise(text:string,{grid}:{grid:number}):TransformResult {
 /** Preconditions: every requested name exists as a named section or sequence item. Preserves section definitions and their contents; order may duplicate sections. */
 export function restructure(text:string,{order}:{order:string[]}):TransformResult {
   if(!Array.isArray(order)||order.some(x=>typeof x!=="string")) throw new SidwaveTransformError("precondition","order must be an array of names");
-  const doc=docFor(text), root=js(doc); const names=new Set([...Object.keys(root.sections??{}),...(root.timeline??[]).map((x:any)=>typeof x==="string"?x.split(/[+*]/)[0]:x?.section??x?.use).filter(Boolean)]);
+  const doc=docFor(text), root=js(doc), entries:any[]=root.timeline??[];
+  const entryName=(x:any):string|undefined=>typeof x==="string"?x.split(/[+*]/)[0]:x?.section??x?.use;
+  const names=new Set([...Object.keys(root.sections??{}),...entries.map(entryName).filter(Boolean)]);
   const missing=order.find(n=>!names.has(n));if(missing)throw new SidwaveTransformError("precondition",`Unknown section or sequence item ${missing}`);
-  if(root.sections){const current=doc.get("timeline",true) as any;if(!current)throw new SidwaveTransformError("precondition","Document has no timeline");const values=order.map(name=>root.sections[name]?name:root.timeline.find((e:any)=>e?.section===name||e?.use===name)??name);doc.set("timeline",values as any);}
-  else doc.set("timeline",order as any);
+  if(root.sections&&!doc.get("timeline",true))throw new SidwaveTransformError("precondition","Document has no timeline");
+  // Keep the existing timeline entry (with its modifiers, layer overrides or inline definition) where there is one.
+  // An entry that defines a section inline (section: name) is used once; later repeats refer to it by name.
+  const used=new Set<string>();
+  const values=order.map(name=>{
+    const entry=entries.find(e=>entryName(e)===name);
+    if(entry===undefined||(used.has(name)&&entry&&typeof entry==="object"&&entry.section!==undefined))return name;
+    used.add(name);return entry;
+  });
+  doc.set("timeline",values as any);
   return finish(doc,["/timeline"],["section definitions and contents"]);
 }
 /** Preconditions: seed is an integer; maxShift is finite and nonnegative. Uses seeded bounded variation of per-note len values (beats), a language-supported duration field. Preserves note pitches, instrument references, and each pattern's total length. Notes without explicit len are unsupported and named in warnings. */
