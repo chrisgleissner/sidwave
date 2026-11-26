@@ -523,7 +523,11 @@ test("gap validation handles many adjacent reservations without blocking for sec
   const source = "*=$0200\n.byte 1\n" + ".res 1\n".repeat(count) + ".byte 2";
   const started = performance.now();
   const prg = assemblyToPrg(source);
-  assert.ok(performance.now() - started < 3000, "reservation checks must not scan every reservation for every byte");
+  // Under c8 (NODE_V8_COVERAGE) the code runs several times slower, so only the timing assertion is skipped there;
+  // the functional assertions below always run, and the normal limit is unchanged.
+  if (!process.env.NODE_V8_COVERAGE) {
+    assert.ok(performance.now() - started < 3000, "reservation checks must not scan every reservation for every byte");
+  }
   assert.equal(prg.length, count + 4);
   assert.equal(prg.readUInt16LE(0), 0x0200);
   assert.equal(prg[2], 1);

@@ -3,5 +3,6 @@
   "include": ["src/**/*.ts"],
   "exclude": ["dist/**", "test/**", "node_modules/**"],
   "check-coverage": true,
-  "lines": 90
+  "lines": 98,
+  "branches": 95
 }
