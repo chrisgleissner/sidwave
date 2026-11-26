@@ -128,7 +128,8 @@ timeline: ["s"]
   const result = humanise(text, { seed: 7, maxShift: 0.1 });
   assert.deepEqual(result.report.changed, ["/voices/0/patterns/A/groove/0/len", "/voices/0/patterns/A/groove/1/len"]);
   const groove = YAML.parse(result.text).voices[0].patterns.A.groove;
-  assert.equal(groove[0].len + groove[1].len, 2);
+  assert.ok(Math.abs(groove[0].len + groove[1].len - 2) < 1e-9);
+  for (const e of groove.filter((x) => typeof x === "object")) assert.equal(Number(e.len.toPrecision(12)), e.len, "durations carry at most 12 significant digits");
   assert.notEqual(groove[0].len, 1);
   assert.deepEqual([groove[2].len, groove[4].len], [2, 4]);
   valid(result.text);
@@ -461,7 +462,7 @@ test("restructure rejects unknown names, bad orders and a sectioned score withou
 
 test("humanise varies explicit durations deterministically and keeps pitches and pattern lengths", () => {
   const r = humanise(base, { seed: 1, maxShift: 0.1 });
-  assert.equal(r.text, score({ lens: [1.3254147881176324, 0.6745852118823676, 1.5005471442360432, 0.4994528557639569] }));
+  assert.equal(r.text, score({ lens: [1.32541478812, 0.674585211882, 1.50054714424, 0.499452855764] }));
   assert.deepEqual(r.report, {
     changed: ["/voices/0/patterns/A/groove/0/len", "/voices/0/patterns/A/groove/1/len", "/voices/0/patterns/A/groove/2/len", "/voices/0/patterns/A/groove/3/len"],
     preserved: ["note pitches", "instrument references", "pattern lengths"],
@@ -616,4 +617,21 @@ timeline: [{ bars: 1, layers: { v1: A } }]
   assert.ok(up.text.includes('groove: "D4 ~ ~ ~"'));
   assert.deepEqual(setTempo(up.text, { bpm: 90 }).report.changed, ["/tempo"]);
   valid(up.text);
+});
+
+test("restructure with the existing order returns the input text unchanged", () => {
+  const odd = base.replace("title:", "title :").replace('timeline: ["intro", "main", "intro"]', 'timeline: [ "intro",   "main", "intro" ]');
+  const r = restructure(odd, { order: ["intro", "main", "intro"] });
+  assert.equal(r.text, odd);
+  assert.deepEqual(r.report, { changed: [], preserved: ["section definitions and contents"], warnings: [] });
+  assert.notEqual(restructure(odd, { order: ["main", "intro", "intro"] }).text, odd);
+  const withEntries = base.replace('timeline: ["intro", "main", "intro"]', 'timeline:\n  - {use: "main", layers: {v1: "A"}}\n  - "intro"');
+  assert.equal(restructure(withEntries, { order: ["main", "intro"] }).text, withEntries);
+});
+
+test("humanise writes durations with at most 12 significant digits", () => {
+  const r = humanise(base, { seed: 11, maxShift: 0.3 });
+  const lens = YAML.parse(r.text).voices[0].patterns.A.groove.map((e) => e.len);
+  assert.ok(lens.every((len) => Number(len.toPrecision(12)) === len), lens.join(" "));
+  assert.ok(r.report.changed.length > 0);
 });

@@ -251,6 +251,8 @@ export function restructure(text:string,{order,validate}:TransformOptions&{order
     if(entry===undefined||(used.has(name)&&entry&&typeof entry==="object"&&entry.section!==undefined))return name;
     used.add(name);return entry;
   });
+  // The same order again changes nothing: return the text as it was given.
+  if(root.timeline!==undefined&&JSON.stringify(values)===JSON.stringify(entries)) return {text,report:{changed:[],preserved:["section definitions and contents"],warnings:[]}};
   doc.set("timeline",values as any);
   return finish(doc,["/timeline"],["section definitions and contents"],[],validate);
 }
@@ -270,7 +272,7 @@ export function humanise(text:string,{seed,maxShift,scope,validate}:TransformOpt
       const groups=entryGroups(entries), deltas=new Map<number,number>(), open=new Map<number,number>();
       // Pair consecutive explicit durations inside one "|" group so that every bar keeps its length.
       for(const ix of explicit){const g=groups[ix]!;if(open.has(g)){const d=(rand()*2-1)*maxShift;deltas.set(open.get(g)!,d);deltas.set(ix,-d);open.delete(g);}else open.set(g,ix);}
-      for(const ix of explicit){if(!deltas.has(ix))continue;const old=entries[ix].len, next=old+deltas.get(ix)!;if(next<=0)throw new SidwaveTransformError("unsupported",`Bounded variation would make duration nonpositive at /voices/${vi}/patterns/${esc(pn)}/${key}/${ix}/len`);if(next!==old){setAt(doc,["voices",vi,"patterns",pn,key,ix,"len"],next);changed.push(ptr(["voices",String(vi),"patterns",pn,key,String(ix),"len"]));}}
+      for(const ix of explicit){if(!deltas.has(ix))continue;const old=entries[ix].len, next=tidy(old+deltas.get(ix)!);if(next<=0)throw new SidwaveTransformError("unsupported",`Bounded variation would make duration nonpositive at /voices/${vi}/patterns/${esc(pn)}/${key}/${ix}/len`);if(next!==old){setAt(doc,["voices",vi,"patterns",pn,key,ix,"len"],next);changed.push(ptr(["voices",String(vi),"patterns",pn,key,String(ix),"len"]));}}
     }
   }
   return finish(doc,changed,["note pitches","instrument references","pattern lengths"],warnings,validate);
