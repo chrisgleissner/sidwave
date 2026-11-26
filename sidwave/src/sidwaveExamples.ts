@@ -21,6 +21,7 @@ export const SIDWAVE_EXAMPLES = [
   { name: "chamber_waltz", title: "Gilt Footsteps", style: "Three independent voices in 3/4 with no percussion" },
   { name: "title_fanfare", title: "The Gate Opens", style: "Short filtered brass fanfare with timpani and a held cadence" },
   { name: "ultisid_orchestra", title: "An Atlas of Wind", style: "Eight SIDs with divided strings, twin echo leads, arps and a drum kit" },
+  { name: "game_songs", title: "Level One", style: "SIDWave 1.4 songs: a title tune, an in-game loop and a game-over jingle that share one player" },
   { name: "wall_of_sid", title: "Twenty-Seven Lanterns", style: "Nine SIDs and a gradual build to a 27-voice finale" },
 ] as const;
 

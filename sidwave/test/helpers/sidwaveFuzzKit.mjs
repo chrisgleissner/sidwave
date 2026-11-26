@@ -464,7 +464,8 @@ function checkCompiled(doc, c, fault) {
     if (!Number.isFinite(c[key]) || c[key] < 0) fault("compile-result-not-finite", `${key} = ${c[key]}`);
   }
   if (!(c.totalFrames > 0)) fault("compile-result-empty-song", `totalFrames = ${c.totalFrames}`);
-  if (c.streamBytes.length !== doc.voices.length && c.streamBytes.length !== doc.sids.length * 3) fault("compile-result-stream-count", `${c.streamBytes.length} streams for ${doc.voices.length} voices`);
+  const copies = doc.songs && doc.songs.length > 1 ? doc.songs.length : 1;
+  if (c.streamBytes.length !== doc.voices.length * copies && c.streamBytes.length !== doc.sids.length * 3 * copies) fault("compile-result-stream-count", `${c.streamBytes.length} streams for ${doc.voices.length} voices`);
   if (c.requiresTurbo && !doc.cpu && doc.sids.length > 0 && c.warnings.length === 0 && doc.version === "1.2") fault("turbo-needed-but-not-declared", `estimate ${c.worstCaseCyclesPerCall}`);
 }
 
@@ -578,7 +579,8 @@ export function checkPsidRoundTrip(doc, compiled, fault) {
   if (sid.readUInt16BE(8) !== 0) bad("load", sid.readUInt16BE(8), 0);
   if (sid.readUInt16BE(10) !== compiled.initAddress) bad("init", sid.readUInt16BE(10), compiled.initAddress);
   if (sid.readUInt16BE(12) !== compiled.playAddress) bad("play", sid.readUInt16BE(12), compiled.playAddress);
-  if (sid.readUInt16BE(14) !== 1 || sid.readUInt16BE(16) !== 1) bad("songs", `${sid.readUInt16BE(14)}/${sid.readUInt16BE(16)}`, "1/1");
+  const songCount = doc.songs?.length ?? 1;
+  if (sid.readUInt16BE(14) !== songCount || sid.readUInt16BE(16) !== 1) bad("songs", `${sid.readUInt16BE(14)}/${sid.readUInt16BE(16)}`, `${songCount}/1`);
   if (sid.readUInt32BE(18) !== (doc.speed > 1 ? 1 : 0)) bad("speed", sid.readUInt32BE(18), doc.speed > 1 ? 1 : 0);
   const latin = (offset) => { const raw = sid.subarray(offset, offset + 32); const z = raw.indexOf(0); return raw.subarray(0, z < 0 ? 32 : z).toString("latin1"); };
   const text = (s) => s.replace(/[\x00-\x1f\x7f-\x9f]/g, " ").replace(/[^\u0000-\u00ff]/gu, "?").slice(0, 32);

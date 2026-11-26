@@ -151,9 +151,9 @@ test("examples lists, prints and writes the bundled scores", () => {
   try {
     const list = run(dir, "examples");
     assert.equal(list.code, EXIT_OK);
-    assert.equal(list.out.trim().split("\n").length, 14);
+    assert.equal(list.out.trim().split("\n").length, 15);
     const json = JSON.parse(run(dir, "examples", "--json").out);
-    assert.equal(json.length, 14);
+    assert.equal(json.length, 15);
     assert.ok(isExampleName("acid_line") && !isExampleName("../x"));
     assert.equal(run(dir, "examples", "acid_line").out, readExampleScore("acid_line"));
     const wrote = run(dir, "examples", "acid_line", "-o", "ex");

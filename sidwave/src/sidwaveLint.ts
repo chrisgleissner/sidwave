@@ -3,7 +3,7 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import type { Arrangement } from "./sidwaveCompiler.js";
-import { midiToHz, type ParsedSidwave, type SidwaveRamp } from "./sidwave.js";
+import { isV13, midiToHz, type ParsedSidwave, type SidwaveRamp } from "./sidwave.js";
 import { digiSpans } from "./sidwaveDigi.js";
 import { cutoffHz } from "./sidwaveFilterModel.js";
 
@@ -19,6 +19,7 @@ export interface SidwaveFinding {
 const SEVERITY = [
   "HR-SHORT", "FILTER-MUTED", "FILTER-BASS", "TABLE-CUT", "CLASH", "FILTER-SHARED", "FILTER-IGNORED", "LOOP-TIE",
   "SEQ-CUT", "VOL-STEP", "FLAT", "REPEAT", "LEVEL-NOOP", "HR-GAP", "FILTER-STEP", "PW-EDGE", "ARP-FAST", "NO-BASS",
+  "SONG-SILENT", "UNUSED-PATTERN", "UNUSED-SECTION",
   "DUP", "ONE-SIDE", "RINGSYNC-SRC", "DIGI-SHARED", "FILTER-MODEL", "TEMPO-GRID",
 ];
 const INFO = new Set(["TEMPO-GRID"]);
@@ -44,6 +45,15 @@ export class SidwaveFindings {
   }
 
   has(code: string): boolean { return this.byCode.has(code); }
+
+  /** Adds the findings of another collection, counts included, with `prefix` in front of the position of a new code. */
+  merge(findings: readonly SidwaveFinding[], prefix = ""): void {
+    for (const found of findings) {
+      const own = this.byCode.get(found.code);
+      if (own) own.count += found.count;
+      else this.byCode.set(found.code, { ...found, first: prefix + found.first });
+    }
+  }
 
   list(): SidwaveFinding[] {
     const rank = (code: string) => { const i = SEVERITY.indexOf(code); return i < 0 ? SEVERITY.length : i; };
@@ -474,7 +484,7 @@ export function arrangementReport(doc: ParsedSidwave, arr: Arrangement): string[
     const ids = voices.map((slot) => `v${[...doc.voiceSlots].find(([, v]) => v === slot)?.[0] ?? slot + 1}`);
     // SIDWave 1.3 names the metre of every entry, with its grouping when it is not one group per beat.
     const meter = s.meter ?? doc.song.meterSig ?? { sig: `${doc.song.meter}/4`, groups: [1] };
-    const metre = doc.version === "1.3" ? ` meter ${meter.sig}${meter.groups.some((g) => g > 1) ? ` (${meter.groups.join("+")})` : ""}` : "";
+    const metre = isV13(doc) ? ` meter ${meter.sig}${meter.groups.some((g) => g > 1) ? ` (${meter.groups.join("+")})` : ""}` : "";
     return `${i + 1} ${s.section || "section"} bars ${first}-${first + bars - 1}${metre} ${clockText(entry.startTime)}-${clockText(entry.endTime)} level ${level} est ${est} ${ids.join(",")}`;
   });
 }

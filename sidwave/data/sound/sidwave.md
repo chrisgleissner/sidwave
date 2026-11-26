@@ -13,7 +13,7 @@ LLM → SIDWave (YAML) → MCP compiler → PRG or PSID → C64 / Ultimate / VIC
 
 - **Format name:** SIDWave
 - **File suffix:** `.sidwave.yaml` (or `.sid.yaml` for brevity)
-- **Version field:** `sidwave: 1.0`, `sidwave: 1.1`, `sidwave: 1.2`, or `sidwave: 1.3`
+- **Version field:** `sidwave: 1.0`, `sidwave: 1.1`, `sidwave: 1.2`, `sidwave: 1.3`, or `sidwave: 1.4`
 - **Schema file:** `sidwave.schema.json`
 - **Serialization:** YAML 1.2 or JSON
 
@@ -892,6 +892,119 @@ voices:
 timeline: [{ bars: 4, layers: { v1: m } }]
 ```
 
+## SIDWave 1.4
+
+A `sidwave: 1.4` document accepts everything that 1.3 accepts and compiles it to the same PRG bytes
+(test/sidwave14Songs: every 1.3 example, and the recorded hashes of all earlier examples in
+test/fixtures/sidwave-s4a/example-hashes.json), so every statement about 1.3 documents in this file also holds for
+1.4 documents. `songs` is accepted only in 1.4: a 1.2 or 1.3 document that uses it is rejected with
+`songs require sidwave: 1.4`.
+
+### Songs
+
+**Observed need.** A game or demo ships several songs (a title tune, an in-game loop, a game-over jingle) that use
+one set of instruments and patterns. Reproducer: `data/sound/examples/game_songs.yaml` written as three SIDWave 1.3
+documents (one `timeline` each) compiles to three PRGs of 2111, 2292 and 2082 bytes, 6485 bytes in total. Each PRG
+holds its own copy of the 6502 player, the instrument tables, the frequency tables and the variables, and a game
+has to load, place and start three players.
+
+**Why 1.3 cannot express it.** A document is one song: `timeline`, `loop_to`, `end`, `length_bars`, `tempo` and
+`speed` each exist once. A timeline can switch between sections but only in a fixed order, so a game that wants
+"play the in-game loop now" has no way to ask for it. Concatenating the three timelines into one would play them
+one after another and share one loop point and one tempo. Writing three documents duplicates the player and every
+shared edit has to be made three times.
+
+**Design.** An optional top-level `songs` list. Instruments, voices, patterns and named `sections` are shared. Every
+song has its own `timeline` and may set its own `loop`, `tempo` and `speed`. The player holds one block of code and
+one instrument table; `init` selects the song. When `songs` is absent, the document is one song exactly as in 1.3.
+
+```yaml
+sidwave: 1.4
+tempo: 110                     # default for songs that set no tempo
+speed: 1                       # default for songs that set no speed
+instruments:
+  lead: { waveform: pulse, adsr: [1, 5, 10, 4], pulse_width: 0.4 }
+  bass: { waveform: sawtooth, adsr: [0, 5, 9, 3] }
+voices:
+  - { id: 1, instrument: lead, patterns: { tune: { length: 1, bars: 1, groove: "A4 C5 E5 D5" }, run: { length: 0.5, bars: 1, groove: "A4 C5 E5 A5 G5 E5 C5 E5" } } }
+  - { id: 2, instrument: bass, patterns: { root: { length: 1, bars: 1, groove: "A2 ~ A2 ~" }, low: { length: 4, bars: 1, groove: "A1" } } }
+sections:
+  verse: { bars: 2, layers: { v1: tune, v2: root } }
+  drive: { bars: 2, layers: { v1: run, v2: root } }
+  fallen: { bars: 1, layers: { v2: low } }
+songs:
+  - name: title                # unique, at most 32 characters
+    timeline: [verse, drive, verse]
+  - name: ingame
+    tempo: 140
+    loop: drive                # section name or 1-based position: "verse" plays once, then "drive" repeats
+    timeline: [verse, drive]
+  - name: gameover
+    tempo: 90
+    loop: false                # plays once, fades out and stops
+    timeline: [fallen, { bars: 1, layers: { v2: low } }]
+```
+
+**Rejected alternative.** Several documents in one YAML stream (`---`). It duplicates instruments and patterns,
+so a shared edit must be made in every document, and the compiler would have to find out which parts the documents
+share. A `songs` list states the sharing.
+
+**Specification.**
+
+- `songs` is a list of 1 to 32 songs (the PSID speed field has one bit per song). A song has the fields `name`
+  (required, unique, 1 to 32 characters), `timeline` (required, at least one entry; the entries are those of the
+  top-level `timeline`, including named sections, `name*count` and `name+N`), `loop`, `tempo` and `speed`.
+  Unknown fields are rejected.
+- `loop` is `true` (the default: repeat from the start), `false` (play once, then stop; the player fades the SID
+  volume out as it does for a 1.2 piece that plays once), a section name, or a 1-based timeline position. The last
+  two repeat from that entry, as the top-level `loop_to` does. A song cannot hold an `end` block: for a release
+  tail, end the timeline with a bar of rests.
+- `tempo` (30 to 220) and `speed` (1 to 4) default to the document values. A song plays at its own frame rate, so
+  a song with `speed: 2` makes two play calls per video frame.
+- With `songs`, the document has no top-level `timeline`, `loop_to`, `end` or `length_bars` (each is rejected and
+  the message names the song field to use instead), and `samples.voices` and `samples.triggers` are rejected because
+  they are positioned on one timeline. Digi voices (`digi:`) play their samples from the layers of any song.
+- Song 0 is the default. The document-level view (`ParsedSidwave.timeline`, `speed`, `song.tempo`) describes song 0.
+- Limit: songs times voice channels (3 per SID) is at most 255, because the song tables are indexed with one byte.
+  With one SID that allows all 32 songs; with the eight SIDs of `ultisid8` it allows 10.
+- All songs share one instrument table, which is limited to 63 entries (an instrument used at different speeds or
+  detunings counts once for each variant).
+- A document with `songs` and a single song compiles to the same bytes as the same song written without `songs`.
+
+**Output.**
+
+- PRG: plays song 0, like the document without songs. `compileSidwaveToPrg(doc, { song: n })` makes the PRG play
+  song `n` (0-based) instead. The PRG installer does not select a song at run time; the entry `init` ($0810) does.
+- PSID: the header records `songs` and `startSong` (1, the first song) and sets speed bit `n` when song `n + 1` has
+  `speed` above 1. `init` takes the song in A as the PSID format defines it (0-based, the host passes the song
+  number minus one) and programs the CIA 1 latch of that song when songs differ in speed.
+- Game build (`compileSidwave(doc, { target: "game", ... })`): `init` takes the song in A. The contract lists every
+  song with its `playCallsPerFrame`, `loop` and length, and the cycles are measured for every song.
+- An index beyond the last song plays song 0 (in the PRG `init`, the PSID and the game build).
+- `init` resets all player state, so a song started after any other song writes the same registers as after a
+  fresh start (tested for every song of a five-song score with differing tempo, speed and loop behaviour).
+- A song with `loop: false` ends by itself and writes no further registers; call `init` to play another song.
+
+**Lint.** `UNUSED-PATTERN` (a voice pattern that no song plays), `UNUSED-SECTION` (a named section that no song
+uses) and `SONG-SILENT` (a song whose layers never play a pattern) are reported for documents with `songs`. Other
+findings carry the name of the song in front of their position. A song without a timeline, or with an empty one, is
+an error rather than a finding.
+
+**Player cost.** Measured on the bundled emulator with the same 3-voice song once, twice and eight times in one
+document (full song and one loop of each, `init` of each song included); the 1.3 row is the same song without `songs`:
+
+| Songs | PRG bytes | Bytes beyond the streams | Worst play call (cycles) | Worst `init` (cycles) |
+| --- | --- | --- | --- | --- |
+| 1.3 document, one song | 2111 | 0 | 1795 | 4190 |
+| 1 | 2111 | 0 | 1795 | 4190 |
+| 2 | 2561 | 102 | 1805 | 4445 |
+| 8 | 4763 | 216 | 1797 | 4370 |
+
+The song selector costs about 100 bytes plus about 19 bytes per song, and nothing per play call (the 10-cycle
+difference of the two-song row was measured; its cause was not investigated). The selector runs only in `init`. A value
+that differs between songs (the filter sweep step, the live voices, the play-once length, the CIA latch) is copied
+into the player's own location by `init`; a value that is the same in every song is not copied and costs nothing.
+
 ## Playable examples
 
 Open the composition index and use the names with `c64_sound` `play_preset`.
@@ -902,6 +1015,7 @@ guide in its header. [Composition index](c64://sound/examples)
 - Start with [chiptune](c64://sound/examples/chiptune_drive), [ambient](c64://sound/examples/ambient_filter), or [funk](c64://sound/examples/funk_bass). They were rewritten in SIDWave 1.2 for 1.3.2; their 1.3.1 (SIDWave 1.1) texts are kept as test fixtures that pin the 1.1 compiler output.
 - Use [acid bass](c64://sound/examples/acid_line) for filter accents, [the ballad](c64://sound/examples/arp_ballad) for chord arps and PWM, [drum and bass](c64://sound/examples/drum_and_bass) for multispeed breakbeats, and [the digi groove](c64://sound/examples/digi_groove) for CIA2 samples.
 - Use [metal](c64://sound/examples/metal_sync) for sync, ring and bends, [the chamber waltz](c64://sound/examples/chamber_waltz) for 3/4 counterpoint, and [the fanfare](c64://sound/examples/title_fanfare) for filtered brass and a held cadence.
+- Use [the game songs](c64://sound/examples/game_songs) for three songs (title, in-game loop, game-over jingle) in one player.
 - Use [stereo echo](c64://sound/examples/stereo_echo) for panning, [the orchestra](c64://sound/examples/ultisid_orchestra) for 24 voices, and [the nine-SID finale](c64://sound/examples/wall_of_sid) for the build to 27 voices. The last piece needs `configure: true` and a fitted SID in socket 1.
 
 ## Authoring and Validation

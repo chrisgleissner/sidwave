@@ -47,10 +47,12 @@ export interface ScoreDescription {
   mode: string;
   voices: number;
   sids: number;
+  /** SIDWave 1.4: the number of songs of a document with `songs`. */
+  songs?: number;
 }
 
 export function describeSidwave(doc: ParsedSidwave): ScoreDescription {
-  return { version: doc.version, title: doc.song.title, mode: doc.song.mode, voices: doc.voices.length, sids: doc.sids.length };
+  return { version: doc.version, title: doc.song.title, mode: doc.song.mode, voices: doc.voices.length, sids: doc.sids.length, ...(doc.songs ? { songs: doc.songs.length } : {}) };
 }
 
 /** The path and message of a validation failure, or undefined for any other error. */

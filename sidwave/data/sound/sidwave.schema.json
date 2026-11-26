@@ -4,13 +4,17 @@
   "title": "SIDWave Composition Schema",
   "description": "See sidwave.md for the meaning of every field. The compiler also checks note ranges after transposition and minimum note durations.",
   "type": "object",
-  "required": ["sidwave", "title", "tempo", "voices", "timeline"],
+  "required": ["sidwave", "title", "tempo", "voices"],
   "allOf": [{
+    "if": { "not": { "required": ["songs"] } },
+    "then": { "required": ["timeline"] },
+    "else": { "properties": { "sidwave": { "enum": [1.4, "1.4"] } }, "not": { "anyOf": [{ "required": ["timeline"] }, { "required": ["loop_to"] }, { "required": ["end"] }, { "required": ["length_bars"] }] } }
+  }, {
     "if": { "not": { "required": ["samples"] } },
     "then": { "properties": { "voices": { "minItems": 1 } } }
   }],
   "properties": {
-    "sidwave": { "type": ["number", "string"], "enum": [1, 1.1, 1.2, 1.3, "1.0", "1", "1.1", "1.2", "1.3"] },
+    "sidwave": { "type": ["number", "string"], "enum": [1, 1.1, 1.2, 1.3, 1.4, "1.0", "1", "1.1", "1.2", "1.3", "1.4"] },
     "title": { "type": "string" },
     "author": { "type": "string" },
     "tempo": { "type": "number", "minimum": 30, "maximum": 220, "description": "Beats (quarter notes) per minute." },
@@ -20,6 +24,20 @@
     "cpu": { "type": "string", "enum": ["turbo"] },
     "kit": { "type": "object", "minProperties": 1, "propertyNames": { "pattern": "^[A-Za-z]$" }, "additionalProperties": { "$ref": "#/$defs/instrumentRef" }, "description": "1.2: default kit for drums.steps; the keys are also groove and motif tokens that play the instrument at C3." },
     "sections": { "type": "object", "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$" }, "additionalProperties": { "$ref": "#/$defs/section" }, "description": "1.2: named sections used by the timeline." },
+    "songs": {
+      "type": "array", "minItems": 1, "maxItems": 32,
+      "description": "1.4: several songs that share the voices, patterns, sections and instruments. Replaces the top-level timeline, loop_to, end and length_bars. The first song is the default; init selects a song by its 0-based index. The songs times the voice channels (3 per SID) may not exceed 255.",
+      "items": {
+        "type": "object", "required": ["name", "timeline"], "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 32, "description": "Unique within the document." },
+          "timeline": { "type": "array", "minItems": 1, "items": { "oneOf": [{ "$ref": "#/$defs/section" }, { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_-]*([+-][0-9]+)?(\\*[0-9]+)?$" }] }, "description": "Sections of this song, as the top-level timeline." },
+          "loop": { "oneOf": [{ "type": "boolean" }, { "type": "string" }, { "type": "integer", "minimum": 1 }], "default": true, "description": "true loops from the start, false plays once and stops, a section name or 1-based timeline position loops back to that entry." },
+          "tempo": { "type": "number", "minimum": 30, "maximum": 220, "description": "Defaults to the document tempo." },
+          "speed": { "type": "integer", "minimum": 1, "maximum": 4, "description": "Play calls per video frame; defaults to the document speed." }
+        }
+      }
+    },
     "loop_to": { "type": ["string", "integer"], "minimum": 1, "description": "1.2: section name or 1-based timeline index the song loops to. Exclusive with end and length_bars." },
     "accent": { "type": "integer", "minimum": 0, "maximum": 8, "default": 3, "description": "1.2: sustain levels added by a ! accent." },
     "end": { "oneOf": [{ "const": true }, { "type": "object", "properties": { "hold_beats": { "type": "number", "minimum": 0, "maximum": 64 }, "release": { "type": "boolean", "default": true } }, "additionalProperties": false }], "description": "1.2: hold the notes sounding at the last bar line, release them and stop writing." },
