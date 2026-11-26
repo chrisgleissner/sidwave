@@ -1,5 +1,7 @@
 # sidwave
 
+[![Codecov](https://codecov.io/gh/chrisgleissner/sidwave/graph/badge.svg?flag=sidwave)](https://codecov.io/gh/chrisgleissner/sidwave)
+
 SIDWAVE ("SID Wave") is a music language, compiler and toolkit for the Commodore 64 SID chip. Write a score as YAML or JSON; compile it to a self-playing C64 PRG or a PSID file that includes the 6502 player.
 
 Status: pre-release. This package has not been published to npm yet; the install command below is the intended one.

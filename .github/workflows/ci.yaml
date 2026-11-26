@@ -35,7 +35,7 @@ jobs:
         run: npm run test:bun
 
   coverage:
-    name: Coverage gate (90 % lines per package)
+    name: Coverage gate and Codecov upload
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +48,22 @@ jobs:
           bun-version: 1.3.1
       - run: npm ci
       - run: npm run coverage
+      - name: Upload 6502-toolkit coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: 6502-toolkit/coverage/lcov.info
+          flags: 6502-toolkit
+          fail_ci_if_error: true
+          disable_search: true
+      - name: Upload sidwave coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: sidwave/coverage/lcov.info
+          flags: sidwave
+          fail_ci_if_error: true
+          disable_search: true
 
   package:
     name: Pack and clean-install smoke test
