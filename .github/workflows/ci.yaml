@@ -49,6 +49,8 @@ jobs:
       - run: npm ci
       - run: npm run coverage
       - name: Upload 6502-toolkit coverage to Codecov
+        # Pull requests from forks get no secrets; their coverage gate still runs.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -57,6 +59,8 @@ jobs:
           fail_ci_if_error: true
           disable_search: true
       - name: Upload sidwave coverage to Codecov
+        # Pull requests from forks get no secrets; their coverage gate still runs.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
