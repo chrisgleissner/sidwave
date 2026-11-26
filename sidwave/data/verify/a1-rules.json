@@ -1,0 +1,723 @@
+{
+  "schema": "sidwave-a1-rules/1",
+  "parameters": {
+    "thetaSpec": 6,
+    "thetaLevel": 3,
+    "sGap": 15,
+    "k": 2,
+    "m": 8
+  },
+  "conditions": {
+    "sampleRate": 48000,
+    "channels": 1,
+    "window": 1024,
+    "hop": 512,
+    "bands": 48,
+    "bandRangeHz": [
+      40,
+      16000
+    ],
+    "floorDb": -60,
+    "lagRangeMs": 24,
+    "lagStepSamples": 96,
+    "lagSeconds": 30,
+    "spanSeconds": 2,
+    "engine": {
+      "id": "libsidplayfp-wasm",
+      "version": "1.1.1",
+      "emulation": "residfp"
+    },
+    "roms": {
+      "kernal": "88e86ed3d0c710edab8f90ad146faa8de1ead11f43494b176c7b54724ca721c6",
+      "basic": "54a1464b4b27c9dc61bbd62a818fdd12ec99af9089111005a5add0ad0e6bd5ec",
+      "chargen": "5e3451466841b93df7e01e4b635b07b8d8633351bae483b1961d96b3131186e7"
+    }
+  },
+  "grid": {
+    "thetaSpec": [
+      6,
+      8,
+      10,
+      12,
+      15,
+      20
+    ],
+    "thetaLevel": [
+      3,
+      4.5,
+      6,
+      9
+    ],
+    "sGap": [
+      6,
+      10,
+      15
+    ],
+    "k": [
+      2,
+      3,
+      4
+    ],
+    "m": [
+      3,
+      5,
+      8
+    ]
+  },
+  "objective": "minimise 3 * false-accept rate + false-reject rate on the development set; ties go to the larger thetaSpec, thetaLevel, sGap, k, m in that order",
+  "split": {
+    "rule": "SHA-256(tune id) mod 10 < 7 is development, otherwise held out",
+    "development": [
+      "example:ambient_filter",
+      "example:chiptune_drive",
+      "example:fuer_elise",
+      "example:funk_bass",
+      "example:stereo_echo",
+      "example:title_fanfare",
+      "gen:chiptune:101",
+      "gen:chiptune:303",
+      "gen:chiptune:404",
+      "gen:ambient:111",
+      "gen:ambient:222",
+      "gen:ambient:333",
+      "gen:funk:242",
+      "gen:funk:363"
+    ],
+    "heldOut": [
+      "example:acid_line",
+      "example:arp_ballad",
+      "example:chamber_waltz",
+      "example:drum_and_bass",
+      "example:metal_sync",
+      "example:ultisid_orchestra",
+      "gen:chiptune:202",
+      "gen:funk:121"
+    ]
+  },
+  "corpus": {
+    "manifestSha256": "7f33d6322cb2dff4dfccdd192361ec3f1ed721fcc46f26012a13756189f42dbd",
+    "horizonMaxSeconds": 180,
+    "scored": 249,
+    "skipped": 227,
+    "unsupportedBases": [
+      {
+        "id": "example:digi_groove",
+        "reason": "does not compile to a PSID: Invalid SIDWAVE at $.samples: CIA2 NMI digi samples require standalone PRG output"
+      },
+      {
+        "id": "example:wall_of_sid",
+        "reason": "does not compile to a PSID: Invalid SIDWAVE at $.sids: PSID supports at most 3 SID chips; use PRG output for more than 3 SIDs"
+      }
+    ]
+  },
+  "development": {
+    "parameters": {
+      "thetaSpec": 6,
+      "thetaLevel": 3,
+      "sGap": 15,
+      "k": 2,
+      "m": 8
+    },
+    "falseAccept": {
+      "count": 42,
+      "total": 166,
+      "rate": 0.253,
+      "ci95": [
+        0.193,
+        0.3242
+      ]
+    },
+    "falseReject": {
+      "count": 4,
+      "total": 32,
+      "rate": 0.125,
+      "ci95": [
+        0.0497,
+        0.2807
+      ]
+    },
+    "byClass": {
+      "wrong_note": {
+        "falseAccept": {
+          "count": 10,
+          "total": 28,
+          "rate": 0.3571,
+          "ci95": [
+            0.2071,
+            0.5417
+          ]
+        }
+      },
+      "octave_error": {
+        "falseAccept": {
+          "count": 5,
+          "total": 14,
+          "rate": 0.3571,
+          "ci95": [
+            0.1634,
+            0.6124
+          ]
+        }
+      },
+      "missing_note": {
+        "falseAccept": {
+          "count": 5,
+          "total": 14,
+          "rate": 0.3571,
+          "ci95": [
+            0.1634,
+            0.6124
+          ]
+        }
+      },
+      "extra_note": {
+        "falseAccept": {
+          "count": 1,
+          "total": 10,
+          "rate": 0.1,
+          "ci95": [
+            0.0179,
+            0.4042
+          ]
+        }
+      },
+      "detune_voice": {
+        "falseAccept": {
+          "count": 0,
+          "total": 8,
+          "rate": 0,
+          "ci95": [
+            0,
+            0.3244
+          ]
+        },
+        "falseReject": {
+          "count": 4,
+          "total": 4,
+          "rate": 1,
+          "ci95": [
+            0.5101,
+            1
+          ]
+        }
+      },
+      "timing_shift": {
+        "falseAccept": {
+          "count": 2,
+          "total": 26,
+          "rate": 0.0769,
+          "ci95": [
+            0.0214,
+            0.2414
+          ]
+        }
+      },
+      "tempo_drift": {
+        "falseAccept": {
+          "count": 0,
+          "total": 14,
+          "rate": 0,
+          "ci95": [
+            0,
+            0.2153
+          ]
+        }
+      },
+      "gate_length": {
+        "falseAccept": {
+          "count": 1,
+          "total": 5,
+          "rate": 0.2,
+          "ci95": [
+            0.0362,
+            0.6245
+          ]
+        }
+      },
+      "envelope": {
+        "falseAccept": {
+          "count": 0,
+          "total": 8,
+          "rate": 0,
+          "ci95": [
+            0,
+            0.3244
+          ]
+        }
+      },
+      "waveform": {
+        "falseAccept": {
+          "count": 7,
+          "total": 8,
+          "rate": 0.875,
+          "ci95": [
+            0.5291,
+            0.9776
+          ]
+        }
+      },
+      "pulse_width": {
+        "falseAccept": {
+          "count": 5,
+          "total": 5,
+          "rate": 1,
+          "ci95": [
+            0.5655,
+            1
+          ]
+        }
+      },
+      "filter": {
+        "falseAccept": {
+          "count": 4,
+          "total": 10,
+          "rate": 0.4,
+          "ci95": [
+            0.1682,
+            0.6873
+          ]
+        }
+      },
+      "sound_in_silence": {
+        "falseAccept": {
+          "count": 0,
+          "total": 5,
+          "rate": 0,
+          "ci95": [
+            0,
+            0.4345
+          ]
+        }
+      },
+      "sections_swapped": {
+        "falseAccept": {
+          "count": 0,
+          "total": 5,
+          "rate": 0,
+          "ci95": [
+            0,
+            0.4345
+          ]
+        }
+      },
+      "long_tune_defect": {
+        "falseAccept": {
+          "count": 2,
+          "total": 4,
+          "rate": 0.5,
+          "ci95": [
+            0.15,
+            0.85
+          ]
+        }
+      },
+      "identical": {
+        "falseReject": {
+          "count": 0,
+          "total": 14,
+          "rate": 0,
+          "ci95": [
+            0,
+            0.2153
+          ]
+        }
+      },
+      "pcm_delay": {
+        "falseReject": {
+          "count": 0,
+          "total": 14,
+          "rate": 0,
+          "ci95": [
+            0,
+            0.2153
+          ]
+        }
+      },
+      "missing_percussion": {
+        "falseAccept": {
+          "count": 0,
+          "total": 2,
+          "rate": 0,
+          "ci95": [
+            0,
+            0.6576
+          ]
+        }
+      }
+    },
+    "borderline": {
+      "passed": 19,
+      "total": 51
+    },
+    "misclassified": [
+      {
+        "tune": "example:ambient_filter",
+        "class": "wrong_note",
+        "severity": "2",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:ambient_filter",
+        "class": "octave_error",
+        "severity": "12",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:ambient_filter",
+        "class": "detune_voice",
+        "severity": "3",
+        "label": "B",
+        "verdict": "fail",
+        "firstBad": "2.645 s (level)"
+      },
+      {
+        "tune": "example:ambient_filter",
+        "class": "waveform",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:ambient_filter",
+        "class": "pulse_width",
+        "severity": "512",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:ambient_filter",
+        "class": "filter",
+        "severity": "40",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:ambient_filter",
+        "class": "long_tune_defect",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:chiptune_drive",
+        "class": "pulse_width",
+        "severity": "512",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:chiptune_drive",
+        "class": "filter",
+        "severity": "40",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:chiptune_drive",
+        "class": "long_tune_defect",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:fuer_elise",
+        "class": "wrong_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:fuer_elise",
+        "class": "missing_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:funk_bass",
+        "class": "wrong_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:funk_bass",
+        "class": "octave_error",
+        "severity": "12",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:funk_bass",
+        "class": "detune_voice",
+        "severity": "3",
+        "label": "B",
+        "verdict": "fail",
+        "firstBad": "9.237 s (spectral)"
+      },
+      {
+        "tune": "example:funk_bass",
+        "class": "waveform",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:funk_bass",
+        "class": "pulse_width",
+        "severity": "512",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:funk_bass",
+        "class": "filter",
+        "severity": "40",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:stereo_echo",
+        "class": "wrong_note",
+        "severity": "2",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:stereo_echo",
+        "class": "detune_voice",
+        "severity": "3",
+        "label": "B",
+        "verdict": "fail",
+        "firstBad": "23.573 s (level)"
+      },
+      {
+        "tune": "example:stereo_echo",
+        "class": "waveform",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:stereo_echo",
+        "class": "pulse_width",
+        "severity": "512",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:title_fanfare",
+        "class": "wrong_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:title_fanfare",
+        "class": "wrong_note",
+        "severity": "2",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:title_fanfare",
+        "class": "octave_error",
+        "severity": "12",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:title_fanfare",
+        "class": "detune_voice",
+        "severity": "3",
+        "label": "B",
+        "verdict": "fail",
+        "firstBad": "4.768 s (spectral)"
+      },
+      {
+        "tune": "example:title_fanfare",
+        "class": "timing_shift",
+        "severity": "3",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:title_fanfare",
+        "class": "gate_length",
+        "severity": "half",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:title_fanfare",
+        "class": "waveform",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:title_fanfare",
+        "class": "pulse_width",
+        "severity": "512",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "example:title_fanfare",
+        "class": "filter",
+        "severity": "40",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:chiptune:101",
+        "class": "wrong_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:chiptune:101",
+        "class": "timing_shift",
+        "severity": "6",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:chiptune:303",
+        "class": "missing_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:chiptune:404",
+        "class": "wrong_note",
+        "severity": "2",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:chiptune:404",
+        "class": "missing_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:chiptune:404",
+        "class": "extra_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:ambient:111",
+        "class": "waveform",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:ambient:222",
+        "class": "waveform",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:ambient:333",
+        "class": "waveform",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:funk:242",
+        "class": "wrong_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:funk:242",
+        "class": "octave_error",
+        "severity": "12",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:funk:242",
+        "class": "missing_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:funk:363",
+        "class": "wrong_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:funk:363",
+        "class": "octave_error",
+        "severity": "12",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      },
+      {
+        "tune": "gen:funk:363",
+        "class": "missing_note",
+        "severity": "1",
+        "label": "M",
+        "verdict": "pass",
+        "firstBad": "no bad window"
+      }
+    ]
+  }
+}

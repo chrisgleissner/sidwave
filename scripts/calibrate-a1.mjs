@@ -102,7 +102,13 @@ async function workerMain() {
   const readPcm = (file) => { const b = fs.readFileSync(file); return new Int16Array(b.buffer, b.byteOffset, b.length / 2); };
 
   async function base({ raw }) {
-    const { sid, duration } = compile(raw);
+    let compiled;
+    try {
+      compiled = compile(raw);
+    } catch (error) {
+      return { unsupported: `does not compile to a PSID: ${String(error.message).slice(0, 120)}` };
+    }
+    const { sid, duration } = compiled;
     const horizon = horizonOf(duration);
     const rendered = await render(sid, horizon);
     return { sidSha: sha256(sid), duration, horizon, pcmFile: rendered.file, cached: rendered.cached, engine: rendered.identity, romHashes };
@@ -136,7 +142,12 @@ async function workerMain() {
       description = outcome.mutation.description;
       targets = outcome.mutation.targets;
       firstUseSeconds = outcome.mutation.firstUseSeconds;
-      const { sid } = compile(outcome.document);
+      let sid;
+      try {
+        ({ sid } = compile(outcome.document));
+      } catch (error) {
+        return { ...meta, status: "skipped", reason: `the mutated score does not compile to a PSID: ${String(error.message).slice(0, 100)}`, description };
+      }
       if (sha256(sid) === baseInfo.sidSha && kind.class !== "identical") return { ...meta, status: "skipped", reason: "the compiled SID is identical to the base tune", description };
       const rendered = await render(sid, baseInfo.horizon);
       candidate = readPcm(rendered.file);
@@ -244,10 +255,15 @@ async function runItems(args, side, bases, newSeeds) {
   }
   const baseResults = new Map();
   let finished = 0;
+  const unsupported = [];
   await Promise.all(chosen.map(async (b) => {
-    baseResults.set(b.id, await pool.run({ type: "base", raw: b.raw }));
-    log(`base ${b.id} rendered (${++finished}/${chosen.length}), horizon ${baseResults.get(b.id).horizon} s`);
+    const result = await pool.run({ type: "base", raw: b.raw });
+    if (result.unsupported) { unsupported.push({ id: b.id, reason: result.unsupported }); log(`base ${b.id} skipped: ${result.unsupported}`); return; }
+    baseResults.set(b.id, result);
+    log(`base ${b.id} rendered (${++finished}/${chosen.length}), horizon ${result.horizon} s`);
   }));
+  for (const u of unsupported) chosen.splice(chosen.findIndex((b) => b.id === u.id), 1);
+  args.unsupportedBases = unsupported;
   const jobs = [];
   for (const b of chosen) {
     for (const kind of kinds) {
@@ -330,7 +346,7 @@ async function phaseDev(args) {
     scored: items.length, skipped, grid: A1_GRID, selected: summarise(selection.best), top: selection.top,
     startingParameters: summarise(scoreItems(items, A1_STARTING_PARAMETERS)),
     engine: [...baseResults.values()][0]?.engine, romHashes: [...baseResults.values()][0]?.romHashes,
-    baseCount: manifest.bases.length,
+    baseCount: manifest.bases.length, unsupportedBases: args.unsupportedBases,
   };
   writeReport(args, `a1-report-dev-${args.horizonCap}.json`, report);
   const sel = report.selected;
@@ -338,7 +354,7 @@ async function phaseDev(args) {
 }
 
 async function phaseFreeze(args) {
-  const { selectParameters } = await dist("verify/calibration.js");
+  const { selectParameters, splitSide } = await dist("verify/calibration.js");
   const { A1_GRID, A1_BANDS, A1_BAND_RANGE_HZ, A1_FLOOR_DB, A1_HOP, A1_LAG_SECONDS, A1_LAG_STEP, A1_LAG_STEPS, A1_SPAN_SECONDS, A1_WINDOW } = await dist("verify/a1.js");
   const bases = await baseTunes([]);
   const { records, baseResults, chosen } = await runItems(args, "development", bases, []);
@@ -346,7 +362,7 @@ async function phaseFreeze(args) {
   const selection = selectParameters(items);
   const { sha256: manifestSha } = await manifestOf(bases, args.horizonCap);
   const first = [...baseResults.values()][0];
-  const heldOut = bases.filter((b) => !chosen.includes(b)).map((b) => b.id);
+  const heldOut = bases.filter((b) => splitSide(b.id) === "heldout").map((b) => b.id);
   const file = {
     schema: "sidwave-a1-rules/1",
     parameters: selection.best.parameters,
@@ -358,7 +374,7 @@ async function phaseFreeze(args) {
     grid: A1_GRID,
     objective: "minimise 3 * false-accept rate + false-reject rate on the development set; ties go to the larger thetaSpec, thetaLevel, sGap, k, m in that order",
     split: { rule: "SHA-256(tune id) mod 10 < 7 is development, otherwise held out", development: chosen.map((b) => b.id), heldOut },
-    corpus: { manifestSha256: manifestSha, horizonMaxSeconds: args.horizonCap, scored: items.length, skipped: skipped.length },
+    corpus: { manifestSha256: manifestSha, horizonMaxSeconds: args.horizonCap, scored: items.length, skipped: skipped.length, unsupportedBases: args.unsupportedBases },
     development: summarise(selection.best),
   };
   const text = `${JSON.stringify(file, null, 2)}\n`;
