@@ -180,3 +180,12 @@ test("assembled code is accepted by the PRG writer for every one of the 256 opco
   const expected = CASES.flatMap((entry) => [canonicalOpcode(entry), ...entry.operandBytes]);
   assert.deepEqual([...prg], [0x00, 0xc0, ...expected]);
 });
+
+test("an absolute operand below $0100 is assembled in the zero-page form, so the round trip of such an instruction changes its length", () => {
+  const original = Uint8Array.of(0xad, 0x12, 0x00);
+  const [line] = disassemble(original, 0xc000);
+  assert.equal(`${line.mnemonic} ${line.operand}`, "LDA $0012");
+  assert.deepEqual(code("  LDA $0012"), [0xa5, 0x12]);
+});
+
+test.todo("disassembled absolute operands below $0100 should assemble back to the absolute form (the syntax has no way to force it)");
