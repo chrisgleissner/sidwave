@@ -73,6 +73,14 @@
       "types": "./dist/songlengths.d.ts",
       "default": "./dist/songlengths.js"
     },
+    "./engine": {
+      "types": "./dist/engine/libsidplayfp.d.ts",
+      "default": "./dist/engine/libsidplayfp.js"
+    },
+    "./verify": {
+      "types": "./dist/verify/index.d.ts",
+      "default": "./dist/verify/index.js"
+    },
     "./data/*": "./data/*",
     "./package.json": "./package.json"
   },
@@ -120,5 +128,16 @@
   "homepage": "https://github.com/chrisgleissner/sidwave/tree/main/sidwave#readme",
   "bugs": {
     "url": "https://github.com/chrisgleissner/sidwave/issues"
+  },
+  "peerDependencies": {
+    "libsidplayfp-wasm": "1.1.1"
+  },
+  "peerDependenciesMeta": {
+    "libsidplayfp-wasm": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "libsidplayfp-wasm": "1.1.1"
   }
 }
