@@ -169,7 +169,63 @@ The three songs compile to 3188 bytes as one player, against 6485 bytes as three
 - Lint checks and error messages that name the failing path in the score.
 - 15 example scores in [`data/sound/examples`](data/sound/examples).
 
-Planned and not yet available: `sidwave verify`, formatter and diff, sound effects for games, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
+Planned and not yet available: `sidwave verify`, sound effects for games, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
+
+## Formatting, diff and merge
+
+`sidwave/format` rewrites a score in a canonical layout, compares two scores by meaning, and merges two edits of one base score. These are library functions only; there is no command line for them yet.
+
+- `formatSidwave(text)` sorts the keys of the document, voices, patterns, instruments, sections and notes into the order of the language specification, writes strings with double quotes, writes short lists of scalars (at most 6 items and 72 characters) on one line, and keeps comments. A comment block that is followed by a blank line before the first key stays at the top of the file. Formatting a formatted score returns it unchanged. It throws the YAML error for text that is not YAML.
+- `diffSidwave(a, b)` returns `{ changes, compiledEqual }`. Each change has a JSON-pointer-like `path`, the `before` and `after` values, and a class: `musical` (notes, tempo, timeline, sections), `synthesis` (instruments, waveforms, ADSR, filters, effects), `hardware` (SIDs, chip model, clock mode) or `structural` (everything else). Text that differs only in layout gives one `formatting` change. `compiledEqual` is true when both scores compile to the same PRG.
+- `mergeSidwave(base, ours, theirs)` merges the maps of the three scores key by key, and lists of equal length entry by entry. When both sides change the same value differently, or one side deletes a value that the other changes, it returns `{ conflicts }` and no merged text. Otherwise it returns `{ merged, conflicts: [] }`, where `merged` is canonical text that has been parsed as a valid score. The changes are applied to the YAML document of `ours`, so its comments, anchors, aliases and flow style stay where the merge did not change a value; comments that belong to a value changed by the merge are lost. If an edit cannot be applied in place (for example below an alias), the whole result is written from the merged data, which drops all comments and expands aliases. The result then has `preserved: false` and a `warnings` entry that gives the reason; otherwise `preserved` is `true`. Check `preserved` before you replace a commented file with `merged`.
+
+```ts
+import { formatSidwave, diffSidwave, mergeSidwave } from "sidwave/format";
+
+const base = formatSidwave(`title: Demo
+sidwave: 1.2
+tempo: 120
+voices:
+  - id: 1
+    patterns:
+      A: { groove: "C4 ~ ~ ~", length: 1 }
+timeline: [{ bars: 1, layers: { v1: A } }]
+`);
+// sidwave: 1.2, title: "Demo", tempo: 120, ... (keys in specification order)
+
+const ours = base.replace("Demo", "Demo tune");
+const theirs = base.replace("C4", "D4");
+
+diffSidwave(base, theirs).changes;
+// [{ class: "musical", path: "/voices/0/patterns/A/groove", before: "C4 ~ ~ ~", after: "D4 ~ ~ ~", summary: "/voices/0/patterns/A/groove changed" }]
+
+mergeSidwave(base, ours, theirs).merged; // title "Demo tune" and groove "D4 ~ ~ ~"
+mergeSidwave(base, base.replace("C4", "E4"), theirs).conflicts;
+// [{ path: "/voices/0/patterns/A/groove", base: "C4 ~ ~ ~", ours: "E4 ~ ~ ~", theirs: "D4 ~ ~ ~", summary: "Concurrent edits at /voices/0/patterns/A/groove" }]
+```
+
+## Transformations
+
+`sidwave/transform` changes a score and returns `{ text, report }`. The text is canonical (see above). `report.changed` lists the paths that were edited, `report.preserved` names what the operation keeps, and `report.warnings` names the parts it left alone. Every transformation first checks that its input is a valid score, then parses and compiles its result. A transformation never returns a score that does not parse or compile: it throws `SidwaveTransformError` instead. The `code` is `input` (the text is not a valid score), `precondition` (an argument or the result is not acceptable, with the parser or compiler message), `out_of_range` or `unsupported`. Pass `validate: "parse"` to check only parsing, or `validate: "none"` to skip the checks for a fragment that is not a complete score.
+
+| Function | Effect |
+| --- | --- |
+| `transpose(text, { semitones, scope? })` | Shifts notes, slides, bends, chord symbols and motifs. Drum voices and `kitNote` entries stay. Notes (and the wavetable offsets built on them) must stay in the playable SID range of the score's clock, otherwise `precondition`. `scope` selects voices (by id or name) and sections. A section scope is refused when a selected pattern is also played by another section. A note with an accidental keeps its style (flat stays flat); other notes follow the style the score uses more often. `semitones: 0` returns the input text. |
+| `setTempo(text, { bpm })`, `scaleTempo(text, { factor })` | Set or multiply the tempo (30 to 220 BPM). Notes stay the same. A tempo at which a note becomes shorter than the player allows makes the result invalid, and the call throws `precondition`. |
+| `substituteInstrument(text, { from, to })` | Replaces `instrument` and `inst` references. `to` is a defined instrument or a `lib:` recipe. |
+| `quantise(text, { grid })` | Rounds explicit `len` values to the grid. Each bar group keeps its length. |
+| `restructure(text, { order })` | Sets the timeline to the named sections or entries in the given order. Existing entries keep their modifiers and overrides. The same order returns the input text. |
+| `humanise(text, { seed, maxShift })` | Varies explicit `len` values by up to `maxShift` beats with a seeded generator, in pairs inside a bar group. The same seed gives the same text. |
+
+```ts
+import { transpose, setTempo } from "sidwave/transform";
+
+const up = transpose(base, { semitones: 2 });
+up.report.changed; // ["/voices/0/patterns/A/groove"]
+// the groove "C4 ~ ~ ~" is now "D4 ~ ~ ~"
+
+setTempo(up.text, { bpm: 90 }).report.changed; // ["/tempo"]
+```
 
 ## Engine
 
