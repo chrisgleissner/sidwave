@@ -41,9 +41,28 @@ function shiftedNote(raw: string, amount: number, max: number, path: string): st
   if (midi < SIDWAVE_NOTE_RANGE.min || midi > SIDWAVE_NOTE_RANGE.max || midi > max) throw new SidwaveTransformError("out_of_range", `Offending note at ${path}`);
   return midiToNoteName(midi);
 }
+const CHORD_NAMED = "m|min|maj|dim|aug|sus2|sus4|sus|m6|min6|maj7|m7|min7|dim7|m7b5|maj9|m9|min9|add9";
+const CHORD_QUALITY = new RegExp(`^(?:${CHORD_NAMED}|6|7|9)?$`);
+/** Chord root of a chord symbol shifted by `amount` semitones, written as a pitch class without octave (Cm7 + 2 gives Dm7). */
+function shiftedChord(root: string, quality: string, amount: number, max: number, path: string): string {
+  const pitch = noteNameToMidi(`${root}3`)! + amount;
+  if (pitch < 12 || pitch > max) throw new SidwaveTransformError("out_of_range", `Offending note at ${path}`);
+  return midiToNoteName(pitch).replace(/-?\d+$/, "") + quality;
+}
+/** Chord symbols inside a groove string, such as the Cm7 of "Cm7@arp". Qualities that are only digits (C7) are note names and are found by noteTokens. */
+function chordTokens(raw: string): Array<{ root: string; quality: string; start: number; end: number }> {
+  const out: Array<{root:string;quality:string;start:number;end:number}> = [];
+  const re = new RegExp(`(?<![A-Za-z0-9_@#/])([A-G](?:#|b)?)(${CHORD_NAMED})(?![A-Za-z0-9_#/])`, "g");
+  for (let m; (m = re.exec(raw));) out.push({ root: m[1]!, quality: m[2]!, start: m.index, end: m.index + m[0].length });
+  return out;
+}
 function replacements(raw: string, amount: number, max: number, path: string): string {
-  const tokens = noteTokens(raw); let result = raw;
-  for (const t of tokens.reverse()) result = result.slice(0,t.start) + shiftedNote(t.value, amount, max, path) + result.slice(t.end);
+  const tokens = [
+    ...noteTokens(raw).map((n) => ({ start: n.start, end: n.end, text: () => shiftedNote(n.value, amount, max, path) })),
+    ...chordTokens(raw).map((c) => ({ start: c.start, end: c.end, text: () => shiftedChord(c.root, c.quality, amount, max, path) })),
+  ].sort((x, y) => y.start - x.start);
+  let result = raw;
+  for (const t of tokens) result = result.slice(0, t.start) + t.text() + result.slice(t.end);
   return result;
 }
 function patternNamesFor(root: any, voice: any): string[] { return Object.keys(voice.patterns ?? {}); }
@@ -93,7 +112,7 @@ export function transpose(text: string, options: { semitones: number; scope?: { 
       if (outside?.has(pname)) throw new SidwaveTransformError("unsupported", `Pattern ${pname} of voice ${id} is also played outside the selected sections`);
       const base = ["voices", vi, "patterns", pname] as (string|number)[];
       const mutateString = (path: (string|number)[], val: string, exempt = false) => {
-        if (exempt || !noteTokens(val).length) return;
+        if (exempt || !(noteTokens(val).length || chordTokens(val).length)) return;
         const next = replacements(val, options.semitones, max, ptr(path.map(String)));
         if (next !== val) { setAt(doc,path,next); changed.push(ptr(path.map(String))); }
       };
@@ -102,7 +121,11 @@ export function transpose(text: string, options: { semitones: number; scope?: { 
         const path=[...base,"groove",ei] as (string|number)[];
         if (typeof entry === "string") mutateString(path,entry);
         else if (entry && typeof entry.note === "string") { mutateString([...path,"note"],entry.note,entry.kitNote === true); if(typeof entry.slide_from==="string") mutateString([...path,"slide_from"],entry.slide_from,entry.kitNote===true); if(entry.bend && typeof entry.bend.to==="string") mutateString([...path,"bend","to"],entry.bend.to,entry.kitNote===true); }
-        else if (entry && entry.chord) mutateString([...path,"chord"],entry.chord);
+        else if (entry && typeof entry.chord === "string") {
+          const symbol = /^([A-Ga-g](?:#|b)?)(.*)$/.exec(entry.chord);
+          if (!symbol || !CHORD_QUALITY.test(symbol[2]!)) throw new SidwaveTransformError("unsupported", `Cannot transpose chord ${entry.chord} at ${ptr(path.map(String))}`);
+          setAt(doc, [...path, "chord"], shiftedChord(symbol[1]!, symbol[2]!, options.semitones, max, ptr([...path, "chord"].map(String)))); changed.push(ptr([...path, "chord"].map(String)));
+        }
         else if (entry && typeof entry === "object") throw new SidwaveTransformError("unsupported", `Cannot transpose groove construct at ${ptr(path.map(String))}`);
       });
       if (Array.isArray(pattern.notes)) pattern.notes.forEach((note:string, ni:number) => mutateString([...base,"notes",ni],note));
@@ -113,7 +136,7 @@ export function transpose(text: string, options: { semitones: number; scope?: { 
           if (/^[+-]?\d+$/.test(tok)) { did=true; const n=Number(tok)+options.semitones; const rootMidi=noteNameToMidi(pattern.root??"C3")??48; if(rootMidi+n<SIDWAVE_NOTE_RANGE.min||rootMidi+n>max) throw new SidwaveTransformError("out_of_range",`Offending note at ${ptr([...base,"motif"].map(String))}`); return String(n); }
           if (/^[A-Ga-g](?:#|b)?\d+$/.test(tok)) { did=true; return shiftedNote(tok,options.semitones,max,ptr([...base,"motif"].map(String))); }
           const chord=/^([A-Ga-g](?:#|b)?)(.*)$/.exec(tok);
-          if (chord && /^(?:m|min|maj|dim|aug|sus2|sus4|sus|6|m6|min6|7|maj7|m7|min7|dim7|m7b5|9|maj9|m9|min9|add9)?$/.test(chord[2]!)) { did=true; const pitch=noteNameToMidi(`${chord[1]}3`)!+options.semitones; if(pitch<12||pitch>max) throw new SidwaveTransformError("out_of_range",`Offending note at ${ptr([...base,"motif"].map(String))}`); return midiToNoteName(pitch).replace(/-?\d+$/,"")+chord[2]; }
+          if (chord && CHORD_QUALITY.test(chord[2]!)) { did=true; const pitch=noteNameToMidi(`${chord[1]}3`)!+options.semitones; if(pitch<12||pitch>max) throw new SidwaveTransformError("out_of_range",`Offending note at ${ptr([...base,"motif"].map(String))}`); return midiToNoteName(pitch).replace(/-?\d+$/,"")+chord[2]; }
           return tok;
         }).join("");
         if(did&&next!==pattern.motif){setAt(doc,[...base,"motif"],next);changed.push(ptr([...base,"motif"].map(String)));}

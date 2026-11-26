@@ -193,3 +193,24 @@ test("transpose writes motif chord symbols without an octave", () => {
     valid(result.text);
   }
 });
+
+test("transpose shifts chord symbols in groove strings and chord entries", () => {
+  const text = `sidwave: 1.2
+title: "T"
+tempo: 120
+voices:
+  - id: 1
+    patterns:
+      A:
+        groove:
+          - "Cm7@arp C4 ~ ~"
+          - {chord: "Gsus4", arp: "0,5,7", speed: 2}
+        length: 1
+timeline: [{bars: 1, layers: {v1: "A"}}]
+`;
+  const result = transpose(text, { semitones: 2 });
+  assert.ok(result.text.includes(`          - "Dm7@arp D4 ~ ~"\n          - {chord: "Asus4", arp: "0,5,7", speed: 2}\n`), result.text);
+  assert.deepEqual(result.report.changed, ["/voices/0/patterns/A/groove/0", "/voices/0/patterns/A/groove/1/chord"]);
+  const odd = text.replace("Gsus4", "G/B");
+  assert.throws(() => transpose(odd, { semitones: 2 }), (e) => e instanceof SidwaveTransformError && e.code === "unsupported" && e.message === "Cannot transpose chord G/B at /voices/0/patterns/A/groove/1");
+});
