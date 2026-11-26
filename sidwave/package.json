@@ -115,6 +115,7 @@
     "build": "tsc -p tsconfig.json",
     "test": "node --import tsx/esm --test test/*.test.mjs",
     "test:bun": "bun test test/*.test.mjs",
+    "examples:game": "node examples/game/build.mjs",
     "coverage": "node ../scripts/run-package-coverage.mjs ."
   },
   "keywords": [
