@@ -258,7 +258,9 @@ Planned and not yet available: reconstruction of SID tunes into scores, MIDI/Mus
 generates a form-structured piece from one of 33 profiles (see `data/compose/profiles.md`); the default generator is unchanged.
 `sidwave complete song.yaml --op continue --bars 8` appends a section, and `--op harmonise`, `--op accompany` and
 `--op fill-section` add a harmony voice, a bass and percussion, or a missing section. Voices and sections that the
-operation does not target keep their register output; the command verifies that by tracing both scores. See `sidwave complete --help`
+operation does not target keep their register output; the command verifies that by tracing both scores. Not compared, and named in the
+result: the ring-out tail of a score with `end` when new entries follow the original ones (continue, fill-section at the end), and the
+hard restart before a continued voice's next attack. See `sidwave complete --help`
 and the "Composer 2 and completion" section of `data/sound/sidwave.md`.
 
 ## Formatting, diff and merge

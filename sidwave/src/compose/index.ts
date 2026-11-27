@@ -9,4 +9,4 @@ export { checkCounterpoint, type CounterpointReport, type CounterpointViolation,
 export * from "./complete.js";
 export { analyseScore, detectKey, inferChords, extractMotif, type Analysis, type VoiceInfo, type VoiceRole, type EntryInfo } from "./analyse.js";
 export { verifyProtected, type ProtectedReport, type ProtectedSpec, type Mismatch } from "./protected.js";
-export { traceDocument, worstCycles, type DocTrace, type TraceCall } from "./trace.js";
+export { traceDocument, worstCycles, type DocTrace } from "./trace.js";

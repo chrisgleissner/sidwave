@@ -38,6 +38,8 @@ const { PROFILES, composeSidwave, measureScore, distinctness, traceDocument, wor
 const args = process.argv.slice(2);
 const flag = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : fallback; };
 const SEEDS = Number(flag("--seeds", "8"));
+/** Variation and repetition measures cover the first bars of the lead, the whole length of a version 1 score, so that length does not decide them. */
+const WINDOW_BARS = 8;
 const LABEL = flag("--label", "heldout-v1");
 const OUT = path.resolve(flag("--out", path.join(repo, "sidwave", "data", "compose")));
 const FRAME_CYCLES = { PAL: 19656, NTSC: 17095 };
@@ -59,10 +61,10 @@ function evaluate(version, profile, seed) {
     for (const f of compiled.lint ?? []) if (!isInfoCode(f.code)) item.lint[f.code] = f.count;
     item.lintClean = Object.keys(item.lint).length === 0;
     const budget = Math.floor((FRAME_CYCLES[doc.song.mode] / doc.speed) * 0.8);
-    const trace = traceDocument(doc, { calls: Math.min(3000, compiled.totalFrames) });
+    const trace = traceDocument(doc, { compiled });
     item.cycles = { worst: worstCycles(trace), budget, within: worstCycles(trace) <= budget };
     item.prgBytes = compiled.prg.length;
-    const m = measureScore(doc);
+    const m = measureScore(doc, { windowBars: WINDOW_BARS });
     item.measures = { ...m, leadSignature: undefined };
     item.signature = m.leadSignature;
   } catch (error) {
@@ -125,6 +127,8 @@ for (const profile of PROFILES) {
       row.identical = r.protected.identical;
       row.cellsCompared = r.protected.cellsCompared;
       row.callsCompared = r.protected.callsCompared;
+      row.tailCallsCompared = r.protected.tailCallsCompared;
+      row.unprotectedTail = r.protected.unprotectedTail ? r.protected.unprotectedTail.toCall - r.protected.unprotectedTail.fromCall : 0;
     } catch (error) {
       row.ok = false;
       row.error = String(error.message).slice(0, 160);
@@ -135,14 +139,15 @@ for (const profile of PROFILES) {
 const completionSummary = {};
 for (const op of ["continue", "fill-section", "harmonise", "accompany"]) {
   const rows = completion.filter((r) => r.op === op);
-  completionSummary[op] = { runs: rows.length, ok: rows.filter((r) => r.ok).length, identical: rows.filter((r) => r.identical).length, callsCompared: rows.reduce((n, r) => n + (r.callsCompared ?? 0), 0) };
+  completionSummary[op] = { runs: rows.length, ok: rows.filter((r) => r.ok).length, identical: rows.filter((r) => r.identical).length, callsCompared: rows.reduce((n, r) => n + (r.callsCompared ?? 0), 0),
+    tailCallsCompared: rows.reduce((n, r) => n + (r.tailCallsCompared ?? 0), 0), tailCallsNotCompared: rows.reduce((n, r) => n + (r.unprotectedTail ?? 0), 0), refused: rows.filter((r) => !r.ok).map((r) => `${r.profile}: ${r.error}`) };
 }
 
 const report = {
   note: "Proxy measures of generated scores. They are not measures of musical quality and make no claim about it.",
   package: pkg.version, profiles: PROFILES.length, seedRule: `first 4 bytes (big endian) of SHA-256("sidwave-composer-eval:${LABEL}:<i>"), i = 0..${SEEDS - 1}`, seeds,
   v1Mapping: "style from the profile palette (chip and saw: chiptune, soft: ambient, funk: funk); root is the profile tonic; preset classic; PAL; the same seeds",
-  budget: "80 percent of a video frame divided by the score's speed, in cycles of the worst player call of up to 3000 calls on the bundled 6502 interpreter",
+  budget: "80 percent of a video frame divided by the score's speed, in cycles of the worst player call over every call of one pass of the score on the register-write 6502 interpreter (measured, not the compiler's bound)",
   summary: byVersion, completionSummary, completion, items: items.map(({ signature, ...rest }) => rest),
 };
 fs.mkdirSync(OUT, { recursive: true });
@@ -163,6 +168,7 @@ musical quality, and nothing here claims that composer 2 sounds better or worse 
 - Seed rule: ${report.seedRule}. The seeds are ${seeds.join(", ")}.
 - Version 1 mapping: ${report.v1Mapping}.
 - Budget: ${report.budget}.
+- Variation window: ${report.variationWindow}
 - Regenerate with \`nice -n 10 node scripts/evaluate-composer.mjs\`; the JSON file next to this one has every score's numbers.
 
 ## Technical correctness and lint
@@ -211,12 +217,20 @@ ${row("By kind", (s) => JSON.stringify(s.counterpoint.byKind))}
 ## Completion operations and protected material
 
 Each operation ran on every composer 2 profile (first held-out seed, second seed for the generated material). The original
-and the completed score were run on the bundled 6502 interpreter and the SID register writes of every protected voice were
+and the completed score were run on the register-write 6502 interpreter and the SID register writes of every protected voice were
 compared call by call.
 
-| Operation | Runs | Completed | Protected material identical | Player calls compared |
-| --- | --- | --- | --- | --- |
-${Object.entries(completionSummary).map(([op, c]) => `| ${op} | ${c.runs} | ${c.ok} | ${c.identical} | ${c.callsCompared} |`).join("\n")}
+| Operation | Runs | Completed | Protected material identical | Player calls compared | Tail calls compared | Tail calls not compared |
+| --- | --- | --- | --- | --- | --- | --- |
+${Object.entries(completionSummary).map(([op, c]) => `| ${op} | ${c.runs} | ${c.ok} | ${c.identical} | ${c.callsCompared} | ${c.tailCallsCompared} | ${c.tailCallsNotCompared} |`).join("\n")}
+
+The ring-out tail is the part of a score with \`end\` after its last timeline entry (the end hold and release). It is compared
+unless new timeline entries follow the original ones (continue, and fill-section at the end), when it no longer follows the
+last original entry; the "not compared" column counts those calls. In the last hard-restart-plus-one calls of a voice's section that the voice
+continues, the comparison ends where either score first clears the voice's gate (the hard restart of the next attack).
+An operation that the comparison rejects fails with nothing written; those are listed here:
+
+${Object.entries(completionSummary).flatMap(([op, c]) => c.refused.map((r) => `- ${op}: ${r}`)).join("\n") || "- none"}
 `;
 fs.writeFileSync(path.join(OUT, "composer-eval.md"), md);
 console.log(md);

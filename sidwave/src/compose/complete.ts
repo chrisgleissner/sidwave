@@ -2,9 +2,11 @@
 // Copyright (C) 2025-2026 Christian Gleissner
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
+import { createHash } from "node:crypto";
 import YAML from "yaml";
 import { SidwaveOperationError } from "../cliCore.js";
 import { midiToNoteName, noteNameToMidi, parseSidwave, type ParsedSidwave, type SidwaveDocument } from "../sidwave.js";
+import type { SidwaveReadOptions } from "../sidwavePcm.js";
 import { analyseScore, extractMotif, inferChords, isSilentRef, type Analysis, type Note as PNote, type VoiceInfo } from "./analyse.js";
 import { arpBar, bassBar, lineTokens } from "./compose.js";
 import { composeCounterLine, composeMelody, makeMotif, type Note } from "./melody.js";
@@ -45,6 +47,8 @@ export interface CompleteOptions {
   instrument?: string;
   /** Compare the protected material by tracing both scores (default true). */
   verify?: boolean;
+  /** How `file:` sample sources are read (the command line passes a reader confined to the working directory and `--allow-dir`). */
+  readOptions?: SidwaveReadOptions;
 }
 
 export interface CompleteResult {
@@ -68,7 +72,7 @@ export function completeScore(input: string | SidwaveDocument, op: CompleteOp, o
   const original: SidwaveDocument = typeof input === "string" ? (YAML.parse(input) as SidwaveDocument) : (structuredClone(input) as SidwaveDocument);
   if (!original || typeof original !== "object") fail("the score is not a SIDWave document");
   const raw = structuredClone(original);
-  const parsed = parseSidwave(structuredClone(original));
+  const parsed = parseSidwave(structuredClone(original), options.readOptions);
   const a = analyseScore(parsed);
   if (!Array.isArray(raw.timeline)) fail("the completion operations need a score with a timeline list");
   const ctx: Ctx = { a, raw, seed: options.seed ?? 1, used: new Set() };
@@ -80,8 +84,8 @@ export function completeScore(input: string | SidwaveDocument, op: CompleteOp, o
     case "fill-section": result = doFill(ctx, options); break;
     default: throw new SidwaveOperationError("usage", `unknown completion operation "${op as string}"`);
   }
-  const completed = parseSidwave(structuredClone(raw));
-  const report = options.verify === false ? undefined : verifyProtected(parsed, completed, result.spec);
+  const completed = parseSidwave(structuredClone(raw), options.readOptions);
+  const report = options.verify === false ? undefined : verifyProtected(parsed, completed, result.spec, createHash("sha1").update(JSON.stringify(original)).digest("hex"));
   if (report && !report.identical) {
     throw new SidwaveOperationError("validation", `the completion changed protected material (voice ${report.mismatches[0]!.voice}, timeline entry ${report.mismatches[0]!.entry + 1}); nothing was written`, { report });
   }
@@ -240,10 +244,30 @@ function materialFor(ctx: Ctx, voices: VoiceInfo[], index: number, bars: number,
 /** Voices that play somewhere in the score. */
 const playing = (a: Analysis) => a.voices.filter((v) => !v.silent && (v.role === "drums" || v.notes.length > 0));
 
-function applyMaterial(ctx: Ctx, entry: Record<string, unknown>, material: Material, tag: string): number[] {
+/** The last cell becomes a rest, so that the material after it starts after a rest as it did when the entry was silent. */
+function endWithRest(tokens: string[]): string[] {
+  const out = [...tokens];
+  out[out.length - 1] = "-";
+  return out;
+}
+
+/** The first cell becomes a rest for a voice that plays in the entry before: the note before it ends as it did, and the hard restart of the first new attack falls inside the rest. */
+function startWithRest(tokens: string[]): string[] {
+  const out = [...tokens];
+  out[0] = "-";
+  return out;
+}
+
+function applyMaterial(ctx: Ctx, entry: Record<string, unknown>, material: Material, tag: string, followed: boolean, previous: number): number[] {
   const layers = (entry.layers ??= {}) as Record<string, string>;
   const targets: number[] = [];
-  for (const [id, tokens] of material.tokens) { layers[`v${id}`] = addPattern(ctx, id, tag, groove(tokens)); targets.push(id); }
+  for (const [id, tokens] of material.tokens) {
+    const afterPlaying = previous >= 0 && !isSilentRef(ctx.a.parsed.timeline[previous]!.layers[`v${id}`]);
+    let t = followed ? endWithRest(tokens) : tokens;
+    if (afterPlaying) t = startWithRest(t);
+    layers[`v${id}`] = addPattern(ctx, id, tag, groove(t));
+    targets.push(id);
+  }
   for (const [id, ref] of material.drumsRef) { layers[`v${id}`] = ref; targets.push(id); }
   return targets;
 }
@@ -261,6 +285,12 @@ function uniqueSectionName(a: Analysis, base: string): string {
 
 type Outcome = { targets: number[]; entries: number[]; addedBars: number; spec: ProtectedSpec };
 
+/** The (voice, entry) cells of the voices that play in the entry. */
+function playsIn(a: Analysis, voices: number[], entry: number): Array<{ voice: number; entry: number }> {
+  if (entry < 0) return [];
+  return voices.filter((voice) => !isSilentRef(a.parsed.timeline[entry]!.layers[`v${voice}`])).map((voice) => ({ voice, entry }));
+}
+
 function identityMap(a: Analysis): number[] { return a.entries.map((_, i) => i); }
 
 function doContinue(ctx: Ctx, o: CompleteOptions): Outcome {
@@ -272,12 +302,14 @@ function doContinue(ctx: Ctx, o: CompleteOptions): Outcome {
   if (voices.length === 0) fail("the score has no playing voice to continue");
   const material = materialFor(ctx, voices, index, bars, "authentic", "cont");
   const entry: Record<string, unknown> = { section: uniqueSectionName(a, "Continue"), bars, layers: {} };
-  const targets = applyMaterial(ctx, entry, material, "cont");
+  const targets = applyMaterial(ctx, entry, material, "cont", false, index - 1);
   (raw.timeline as unknown[]).push(entry);
   if (raw.length_bars !== undefined) raw.length_bars = a.totalBars + bars;
   return {
     targets, entries: [index], addedBars: bars,
-    spec: { entryMap: identityMap(a), excluded: [], guarded: targets.flatMap((voice) => a.entries.map((e) => ({ voice, entry: e.index })).slice(-1)) },
+    // The added entry follows the last one, so the original ring-out tail is not compared, and a voice that plays in the
+    // last original entry and continues has its hard restart written in the end of that entry.
+    spec: { entryMap: identityMap(a), excluded: [], guarded: playsIn(a, targets, index - 1), tail: "unprotected" },
   };
 }
 
@@ -409,7 +441,7 @@ function doFill(ctx: Ctx, o: CompleteOptions): Outcome {
   }
   const cadence: Cadence = index < a.entries.length - (existing ? 1 : 0) ? "half" : "authentic";
   const material = materialFor(ctx, voices, index, bars, cadence, "fill");
-  const targets = applyMaterial(ctx, entry, material, "fill");
+  const targets = applyMaterial(ctx, entry, material, "fill", index < a.entries.length - (existing ? 0 : 0) && (existing ? index < a.entries.length - 1 : index < a.entries.length), index - 1);
   if (!existing) {
     rawEntries.splice(index, 0, entry);
     if (raw.length_bars !== undefined) raw.length_bars = a.totalBars + bars;
@@ -422,7 +454,8 @@ function doFill(ctx: Ctx, o: CompleteOptions): Outcome {
     spec: {
       entryMap,
       excluded: existing ? targets.map((voice) => ({ voice, entry: index })) : [],
-      guarded: index > 0 ? targets.map((voice) => ({ voice, entry: index - 1 })) : [],
+      guarded: playsIn(a, targets, index - 1),
+      tail: !existing && index === a.entries.length ? "unprotected" : "compared",
     },
   };
 }

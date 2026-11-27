@@ -3,13 +3,13 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import type { ParsedSidwave } from "../sidwave.js";
-import { SIDWAVE_HARD_RESTART_FRAMES } from "../sidwaveCompiler.js";
+import { SIDWAVE_HARD_RESTART_FRAMES, compileSidwaveToPrg } from "../sidwaveCompiler.js";
 import { traceDocument, type DocTrace } from "./trace.js";
 
 /**
- * Verification that a completion left the protected material alone. Both scores are run on the bundled 6502 interpreter
- * and the SID register writes of each protected voice are compared call by call: the same registers, the same values and
- * the same order within the call. Voices that a completion targets are compared outside the cells it changes.
+ * Verification that a completion left the protected material alone. Both scores are run on the register-write interpreter
+ * of trace.ts and the SID register writes of each protected voice are compared call by call: the same registers, the same
+ * values and the same order within the call. Voices that a completion targets are compared outside the cells it changes.
  */
 
 export interface ProtectedSpec {
@@ -18,10 +18,20 @@ export interface ProtectedSpec {
   /** Original (voice, entry) cells that the completion changes; they are not compared. */
   excluded: ReadonlyArray<{ voice: number; entry: number }>;
   /**
-   * Original (voice, entry) cells followed by new material of the same voice. The last `guard` player calls of these cells
-   * are not compared: the hard restart before the next attack is written there.
+   * Original (voice, entry) cells of a voice that plays in the cell and is followed by new material of the same voice. In
+   * the last `guard` player calls of such a cell, the comparison ends at the first call in which either score writes the
+   * voice's control register with the gate bit clear. From there the writes belong to the hard restart of the next attack
+   * (in the original, of the loop's first note): gate off, zero envelope, and the next note's frequency and pulse width, which
+   * the player writes with the restart. Before that call all seven registers must be identical, so a difference in pitch
+   * earlier in the guard is a failure.
    */
   guarded: ReadonlyArray<{ voice: number; entry: number }>;
+  /**
+   * `compared` (default): the calls after the end of the last original entry (the ring-out tail of a score with `end`) are
+   * compared too. `unprotected`: new timeline entries follow the original ones, so the original tail no longer exists as
+   * it was and is not compared; the report names it.
+   */
+  tail?: "compared" | "unprotected";
 }
 
 export interface Mismatch { voice: number; entry: number; call: number; original: string; completed: string }
@@ -32,31 +42,26 @@ export interface ProtectedReport {
   voices: number[];
   cellsCompared: number;
   callsCompared: number;
-  /** Player calls left out at the end of each guarded cell: (longest hard restart in video frames + 1) x speed. */
+  /** Length of the guard window at the end of a guarded cell: (longest hard restart in video frames + 1) x speed player calls. */
   guardCalls: number;
   guardedCells: number;
   excludedCells: number;
+  /** Calls after the last original entry that were compared (0 when the score has no tail or the tail is unprotected). */
+  tailCallsCompared: number;
+  /** The calls after the last original entry that are not compared, with the reason. */
+  unprotectedTail?: { fromCall: number; toCall: number; reason: string };
   /** The first differences, at most 10. */
   mismatches: Mismatch[];
 }
 
-function voiceRegisters(doc: ParsedSidwave, id: number): [number, number] {
+/** Offset from $D400 of a voice's first register. */
+function voiceRegisters(doc: ParsedSidwave, id: number): number {
   const slot = doc.voiceSlots.get(id)!;
-  const chip = doc.sids[Math.floor(slot / 3)]!;
-  const base = chip.address - 0xd400 + (slot % 3) * 7;
-  return [base, base + 7];
+  return doc.sids[Math.floor(slot / 3)]!.address - 0xd400 + (slot % 3) * 7;
 }
 
-function signatures(trace: DocTrace, range: [number, number]): string[] {
-  return trace.calls.map((call) => {
-    let text = "";
-    for (const [reg, value] of call.writes) if (reg >= range[0] && reg < range[1]) text += `${reg - range[0]}=${value},`;
-    return text;
-  });
-}
-
-function entryFrames(doc: ParsedSidwave, trace: DocTrace): Array<[number, number]> {
-  const fpb = (trace.compile.framesPerSecond * 60) / doc.song.tempo;
+function entryFrames(doc: ParsedSidwave, framesPerSecond: number): Array<[number, number]> {
+  const fpb = (framesPerSecond * 60) / doc.song.tempo;
   let beat = 0;
   return doc.timeline.map((section) => {
     const from = Math.round(beat * fpb + 1e-9);
@@ -74,38 +79,111 @@ function longestRestart(doc: ParsedSidwave): number {
   return longest;
 }
 
-export function verifyProtected(original: ParsedSidwave, completed: ParsedSidwave, spec: ProtectedSpec): ProtectedReport {
-  const a = traceDocument(original);
-  const b = traceDocument(completed);
-  const framesA = entryFrames(original, a);
-  const framesB = entryFrames(completed, b);
+/** Index of the first difference between the writes of a voice in call `ia` of `a` and call `ib` of `b`, or -1; `limit` registers from the voice's first. */
+function firstDifference(a: DocTrace, ia: number, b: DocTrace, ib: number, lo: number, limit: number): number {
+  let pa = a.starts[ia]!;
+  const ea = a.starts[ia + 1]!;
+  let pb = b.starts[ib]!;
+  const eb = b.starts[ib + 1]!;
+  const hi = lo + limit;
+  let index = 0;
+  for (;;) {
+    let wa = -1;
+    while (pa < ea) { const e = a.writes[pa++]!; const off = e >> 8; if (off >= lo && off < hi) { wa = e; break; } }
+    let wb = -1;
+    while (pb < eb) { const e = b.writes[pb++]!; const off = e >> 8; if (off >= lo && off < hi) { wb = e; break; } }
+    if (wa !== wb) return index;
+    if (wa < 0) return -1;
+    index++;
+  }
+}
+
+function describe(trace: DocTrace, call: number, lo: number): string {
+  const out: string[] = [];
+  for (let i = trace.starts[call]!; i < trace.starts[call + 1]!; i++) {
+    const e = trace.writes[i]!;
+    if ((e >> 8) >= lo && (e >> 8) < lo + 7) out.push(`${(e >> 8) - lo}=${e & 255}`);
+  }
+  return out.join(",");
+}
+
+/** First call in [from, to) in which the voice's control register is written with the gate bit clear, or `to`. */
+function gateOffCall(trace: DocTrace, from: number, to: number, lo: number): number {
+  for (let call = Math.max(0, from); call < to; call++) {
+    for (let i = trace.starts[call]!; i < trace.starts[call + 1]!; i++) {
+      const e = trace.writes[i]!;
+      if ((e >> 8) === lo + 4 && (e & 1) === 0) return call;
+    }
+  }
+  return to;
+}
+
+const cache = new Map<string, DocTrace>();
+
+/**
+ * Compares the register writes of the protected voices. `originalKey` (a content hash of the original document) lets repeated
+ * operations on the same score reuse the original's trace. The completed score is compiled once and traced only as far as
+ * the protected cells and the tail reach in it.
+ */
+export function verifyProtected(original: ParsedSidwave, completed: ParsedSidwave, spec: ProtectedSpec, originalKey?: string): ProtectedReport {
+  let a = originalKey === undefined ? undefined : cache.get(originalKey);
+  if (!a) {
+    a = traceDocument(original);
+    if (originalKey !== undefined) {
+      if (cache.size >= 4) cache.delete(cache.keys().next().value!);
+      cache.set(originalKey, a);
+    }
+  }
+  const framesA = entryFrames(original, a.compile.framesPerSecond);
+  const lastEntry = framesA.length - 1;
+  const lastA = framesA[lastEntry]![1];
+  const tailLength = a.callCount - lastA;
+  const tailCompared = (spec.tail ?? "compared") === "compared" && tailLength > 0;
   const guard = (longestRestart(original) + 1) * original.speed;
   const excluded = new Set(spec.excluded.map((c) => `${c.voice}:${c.entry}`));
   const guarded = new Set(spec.guarded.map((c) => `${c.voice}:${c.entry}`));
+  const compiledB = compileSidwaveToPrg(completed);
+  const framesB = entryFrames(completed, compiledB.framesPerSecond);
+  const lastB = framesB[spec.entryMap[lastEntry]!]![1];
+  const horizon = Math.max(...framesA.map((_, entry) => framesB[spec.entryMap[entry]!]![1]), tailCompared ? lastB + tailLength : 0);
+  const b = traceDocument(completed, { compiled: compiledB, calls: horizon });
   const report: ProtectedReport = {
     identical: true, voices: original.voices.map((v) => v.id), cellsCompared: 0, callsCompared: 0, guardCalls: guard,
-    guardedCells: guarded.size, excludedCells: excluded.size, mismatches: [],
+    guardedCells: guarded.size, excludedCells: excluded.size, tailCallsCompared: 0, mismatches: [],
   };
+  if (!tailCompared && tailLength > 0) {
+    report.unprotectedTail = {
+      fromCall: lastA, toCall: a.callCount,
+      reason: "new timeline entries follow the original ones, so the end hold and release of the original no longer follow its last entry",
+    };
+  }
   for (const voice of original.voices) {
-    const sigA = signatures(a, voiceRegisters(original, voice.id));
-    const sigB = signatures(b, voiceRegisters(completed, voice.id));
+    const lo = voiceRegisters(original, voice.id);
+    if (lo !== voiceRegisters(completed, voice.id)) throw new Error(`voice ${voice.id} moved to another register block`);
+    const fail = (entry: number, call: number, ia: number, ib: number) => {
+      report.identical = false;
+      if (report.mismatches.length < 10) report.mismatches.push({ voice: voice.id, entry, call, original: describe(a!, ia, lo), completed: describe(b, ib, lo) });
+    };
     framesA.forEach(([from, to], entry) => {
       const key = `${voice.id}:${entry}`;
       if (excluded.has(key)) return;
       const target = framesB[spec.entryMap[entry]!]![0];
-      const length = to - from - (guarded.has(key) ? guard : 0);
+      const length = to - from;
+      // In a guarded cell the comparison stops where the completed score's voice gate goes off inside the guard: from there on
+      // the writes belong to the hard restart of the next attack (gate off, zero envelope, the next note's pitch and pulse).
+      const guardFrom = guarded.has(key) ? Math.min(gateOffCall(b, target + length - guard, target + length, lo) - target, gateOffCall(a!, to - guard, to, lo) - from) : length;
       report.cellsCompared++;
-      for (let i = 0; i < length; i++) {
+      for (let i = 0; i < Math.min(length, guardFrom); i++) {
         report.callsCompared++;
-        const x = sigA[from + i] ?? "";
-        const y = sigB[target + i] ?? "";
-        if (x !== y) {
-          report.identical = false;
-          if (report.mismatches.length < 10) report.mismatches.push({ voice: voice.id, entry, call: i, original: x, completed: y });
-          return;
-        }
+        if (firstDifference(a!, from + i, b, target + i, lo, 7) >= 0) { fail(entry, i, from + i, target + i); return; }
       }
     });
+    if (tailCompared && !excluded.has(`${voice.id}:${lastEntry}`)) {
+      for (let i = 0; i < tailLength; i++) {
+        report.tailCallsCompared++;
+        if (firstDifference(a, lastA + i, b, lastB + i, lo, 7) >= 0) { fail(lastEntry, lastA - framesA[lastEntry]![0] + i, lastA + i, lastB + i); break; }
+      }
+    }
   }
   return report;
 }

@@ -3,7 +3,7 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import { SidwaveValidationError, midiToNoteName, noteNameToMidi, parseSidwave, type SidwaveDocument, type SystemMode } from "../sidwave.js";
-import { compileSidwaveToPrg, maxSidwaveMidi } from "../sidwaveCompiler.js";
+import { estimateSidwaveCycles, maxSidwaveMidi } from "../sidwaveCompiler.js";
 import { cellPitches, composeCounterLine, composeMelody, fitLeadToBass, makeMotif, varyMelody, type Motif, type Note } from "./melody.js";
 import {
   DEVELOPMENT_PLANS, FORMS, LAYOUTS, PALETTES, getProfile, type ComposeProfile, type FormSection, type Role,
@@ -28,9 +28,10 @@ export interface ComposeOptions {
   /** Largest allowed cycles for one player call, measured on the bundled 6502 interpreter. */
   cycleBudget?: number;
   /**
-   * Measure the cycles of the plan on the bundled 6502 interpreter (up to `measureFrames` player calls, default 3000)
-   * instead of using the compiler's static upper bound. Without it the bound is used first and the interpreter only runs
-   * when the bound exceeds the budget, because the measured value never exceeds the bound.
+   * Measure the cycles of the plan by running every player call of the score on the register-write interpreter (or the first
+   * `measureFrames` calls) instead of using the compiler's static upper bound. Without it the bound is used and
+   * `cycles.kind` is "estimated"; the interpreter then runs only when the bound exceeds the budget, because the measured
+   * value never exceeds the bound. `cycles.kind` says which figure is reported.
    */
   measure?: boolean;
   measureFrames?: number;
@@ -43,6 +44,16 @@ export interface PlannedSection {
   startBar: number;
   bars: number;
   key: string;
+  /** How the section's last phrase ends. */
+  cadence: Cadence;
+  /** Roman numerals of the last two chords, and the harmonic function of the last one. */
+  endChords: string[];
+  endFunction: string;
+  /** Pitch class of the tonic of the section's key, and the last lead note of the section as MIDI (absent when the lead rests). */
+  tonic: number;
+  finalNote?: number;
+  /** Pitch classes of the last chord. */
+  finalChord: number[];
 }
 
 export interface ComposeResult {
@@ -209,7 +220,7 @@ export function composeSidwave(options: ComposeOptions): ComposeResult {
     let kind: "estimated" | "measured" = "estimated";
     let estimate: number;
     try {
-      estimate = compileSidwaveToPrg(parsed).worstCaseCyclesPerCall;
+      estimate = estimateSidwaveCycles(parsed);
     } catch (error) {
       // The compiler refuses a plan above the player's own budget; treat that as over budget and repair.
       if (!(error instanceof SidwaveValidationError)) throw error;
@@ -218,9 +229,9 @@ export function composeSidwave(options: ComposeOptions): ComposeResult {
     worst = estimate;
     if (options.measure || estimate > budget) {
       if (estimate !== Infinity || options.measure) {
-        const trace = traceDocument(parsed, { calls: Math.min(options.measureFrames ?? 3000, 3000) });
+        const trace = traceDocument(parsed, { ...(options.measureFrames === undefined ? {} : { calls: options.measureFrames }) });
         worst = worstCycles(trace);
-        frames = trace.calls.length;
+        frames = trace.callCount;
         kind = "measured";
       }
     }
@@ -289,9 +300,10 @@ function buildScore(profile: ComposeProfile, options: ComposeOptions, system: Sy
     const contrasting = section.contrast === true && profile.contrast !== "home";
     const key = contrasting ? relatedKey(home, profile.contrast) : home;
     const finalSection = si === sections.length - 1;
-    const cacheKey = `${section.material}:${section.phrases}:${contrasting}`;
+    const cacheKey = `${section.material}:${section.phrases}:${contrasting}:${section.role === "intro"}`;
     let material = materials.get(cacheKey);
     const harmony = substream(seed, `harmony:${cacheKey}`);
+    const sectionCadence: Cadence = contrasting || section.role === "intro" ? "half" : "authentic";
     if (!material) {
       const chords: Chord[] = [];
       for (let p = 0; p < section.phrases; p++) {
@@ -393,7 +405,13 @@ function buildScore(profile: ComposeProfile, options: ComposeOptions, system: Sy
       }).join("");
       addPattern("drums", si, text, {});
     }
-    planned.push({ name: section.name, material: section.material, role: section.role, startBar: starts[si]!, bars, key: keyName(material.key) });
+    const lastChords = material.chords.slice(-2);
+    const lastNote = leadNotes ? [...leadNotes].reverse().find((n) => n.midi !== null) : undefined;
+    planned.push({
+      name: section.name, material: section.material, role: section.role, startBar: starts[si]!, bars, key: keyName(material.key),
+      cadence: sectionCadence, endChords: lastChords.map((c) => c.name), endFunction: lastChords[lastChords.length - 1]!.fn,
+      tonic: material.key.tonic, ...(lastNote ? { finalNote: lastNote.midi! } : {}), finalChord: [...lastChords[lastChords.length - 1]!.pcs],
+    });
   });
 
   const voices = roles.map((role) => ({

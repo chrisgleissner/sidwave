@@ -1352,24 +1352,39 @@ syncopation, density, phrase length, harmonic rhythm and the key of the contrast
   fifths or octaves, no crossing and a preference for contrary motion. `checkCounterpoint` reports violations of these rules.
 - **Rhythm**: groove tables per profile, syncopation, bass patterns and drum patterns with fills.
 - **Instrumentation**: lead, counter line, chord arpeggio, bass, percussion and pad on at most three voices per SID (one or
-  two SIDs), using library instruments without filter tables. The plan is measured on the bundled 6502 interpreter against a
-  cycle budget (default 80 percent of a video frame divided by `speed`); an over-budget plan loses its vibrato, then its
-  pad, counter line, arpeggio and percussion voices, then one speed step, and the result lists the repairs.
+  two SIDs), using library instruments without filter tables. The plan is checked against a cycle budget (default 80 percent
+  of a video frame divided by `speed`). By default the figure is the compiler's static upper bound for the worst player
+  call, reported as `cycles.kind: "estimated"`; with `measure: true` every call of one pass runs on the register-write 6502
+  interpreter and the figure is `"measured"`. An over-budget plan (the bound is measured first when it exceeds the budget)
+  loses its vibrato, then its pad, counter line, arpeggio and percussion voices, then one speed step, and the result lists the
+  repairs.
 
 `sidwave complete <score> --op continue|harmonise|accompany|fill-section` (library: `completeScore`) adds to an existing
 score of any version: a continuation in the key, tempo and instruments of the score with the motif of its last section,
 a harmony voice (chord arpeggio or counter line) under a melody voice, a bass line and percussion on free voices, or a
 named missing section. The operations add patterns, voices and timeline entries and never rewrite one that plays. A target
-voice that plays is refused. Unless `--no-verify` is given, the original and the completed score are run on the bundled
+voice that plays is refused. Unless `--no-verify` is given, the original and the completed score are run on a register-write
 6502 interpreter and the SID register writes of every protected voice are compared call by call; a difference stops the
-command. At the end of a voice's last original section the last hard-restart frames plus one player calls are left out when
-that voice continues, because the next attack writes its hard restart there. Inserting a section before later material is
-accepted only when it moves that material by a whole number of player calls. Scores with several songs, a tempo change or a
-section metre other than the song metre are refused.
+command and nothing is written. Two things are not compared, and the result names them (`ProtectedReport`):
+- **The ring-out tail.** A score with `end` plays on after its last timeline entry (the end hold and release). It is compared
+  for harmonise, accompany and fill-section in place or before later material. When new entries follow the original ones
+  (`continue`, and `fill-section` at the end) the tail no longer follows the last original entry; it is not compared and
+  `unprotectedTail` gives its call range and the reason.
+- **The hard restart before a continued voice.** In the last (longest hard restart in frames + 1) x speed calls of a voice's
+  last original section, when that voice plays there and continues, the comparison ends where either score first clears the
+  voice's gate: the next attack's hard restart (gate off, zero envelope, the next note's frequency and pulse width) is written
+  there. Every call before it must be identical in all seven registers.
+
+New material for a voice that plays in the entry before starts with a rest, and material inserted before later entries ends
+with one, so that the notes around it keep their attacks. Inserting a section before later material is accepted only when it
+moves that material by a whole number of player calls. A fill-section in place can still be refused when the first note of the
+next section depends on the note before it (legato); nothing is written then. Scores with several songs, a tempo change or a
+section metre other than the song metre are refused. `--allow-dir` permits `file:` sample sources as in `compile`.
 
 `scripts/evaluate-composer.mjs` compares composer 2 with the version 1 generator on 33 profiles and held-out seeds
-(`data/compose/composer-eval.md`). The measures are proxies for technical correctness, lint, structure and variation. They
-do not measure musical quality.
+(`data/compose/composer-eval.md`). The measures are proxies for technical correctness, lint, structure and variation, with
+the variation measures taken over the first 8 bars of the lead so that length does not decide them. They do not measure
+musical quality.
 
 ## Authoring and Validation
 

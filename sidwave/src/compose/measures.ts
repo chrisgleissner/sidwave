@@ -67,7 +67,12 @@ function counterVoiceSlots(doc: ParsedSidwave): Set<number> {
 
 const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]!;
 
-export function measureScore(doc: ParsedSidwave): ScoreMeasures {
+/**
+ * Measures a score. `windowBars` limits the variation and repetition measures (entropies, distinct durations, repetition,
+ * motif recurrence, the signature) to the lead's first bars, so scores of different lengths are measured over the same
+ * span; the counterpoint measure always covers the whole score and is a rate.
+ */
+export function measureScore(doc: ParsedSidwave, options: { windowBars?: number } = {}): ScoreMeasures {
   const { voices, meter, framesPerBeat } = pitchedVoices(doc);
   const empty: ScoreMeasures = {
     bars: doc.song.length_bars, sections: doc.timeline.length, voices: voices.length, leadNotes: 0, repetitionRatio: 0, motifRecurrence: 0,
@@ -78,7 +83,8 @@ export function measureScore(doc: ParsedSidwave): ScoreMeasures {
   const ranked = [...voices].sort((a, b) => median(b.notes.map((n) => n.midi)) - median(a.notes.map((n) => n.midi)));
   const lead = ranked[0]!;
   const bass = ranked[ranked.length - 1]!;
-  const notes = [...lead.notes].sort((a, b) => a.start - b.start);
+  const windowEnd = options.windowBars === undefined ? Infinity : options.windowBars * meter;
+  const notes = [...lead.notes].filter((n) => n.start < windowEnd - 1e-9).sort((a, b) => a.start - b.start);
 
   // Repetition: bars of the lead compared by their pitches and onsets relative to the bar.
   const bars = new Map<number, string[]>();

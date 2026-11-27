@@ -195,15 +195,15 @@ export function composeMelody(input: MelodyInput): MelodyResult {
   return { notes, snapped };
 }
 
-/** Embellishes a melody for a repeat: a long weak-beat note gains an upper neighbour, a late phrase may rise an octave. */
+/** Embellishes a melody for a repeat: a long note gains an upper neighbour on its second-last cell and returns to its pitch, so a cadence still ends on its chord tone. */
 export function varyMelody(random: Random, notes: Note[], key: Key, range: [number, number], amount: number): Note[] {
   const pool = scaleNotes(key, range[0], range[1] + 12);
   const out: Note[] = [];
   for (const n of notes) {
-    // The neighbour sounds on the last two cells of the note, so it must not start on a beat.
+    // The neighbour sounds on the second-last cell of the note, so it must not start on a beat.
     if (n.midi !== null && n.dur >= 4 && n.at % 4 === 0 && (n.dur - 2) % 4 === 2 && random() < amount) {
       const up = pool.find((p) => p > n.midi!) ?? n.midi + 2;
-      out.push({ at: n.at, dur: n.dur - 2, midi: n.midi }, { at: n.at + n.dur - 2, dur: 2, midi: up });
+      out.push({ at: n.at, dur: n.dur - 2, midi: n.midi }, { at: n.at + n.dur - 2, dur: 1, midi: up }, { at: n.at + n.dur - 1, dur: 1, midi: n.midi });
     } else out.push({ ...n });
   }
   return out;

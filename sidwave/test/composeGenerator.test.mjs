@@ -9,6 +9,8 @@ import { FORMS, LAYOUTS, PROFILES, getProfile } from "../src/compose/profiles.js
 import { GROOVES, BASS_PATTERNS, DRUM_PATTERNS, DRUM_FILLS, ARP_PATTERNS } from "../src/compose/rhythm.js";
 import { checkCounterpoint, makeMotif, transformMotif } from "../src/compose/melody.js";
 import { measureScore, distinctness } from "../src/compose/measures.js";
+import { traceDocument } from "../src/compose/trace.js";
+import { Cpu6502 } from "../src/sidwaveEmulator.js";
 import { MODE_GRAMMAR, MODE_NAMES, progression, randomSource, triad } from "../src/compose/theory.js";
 
 test("there are at least 30 documented profiles with distinct names", () => {
@@ -170,4 +172,73 @@ test("inter-seed distinctness is 0 for identical leads and near 1 for unrelated 
 
 test("getProfile reports the known names for an unknown profile", () => {
   assert.throws(() => getProfile("x"), /known profiles: chip-aaba-minor/);
+});
+
+test("every composed section ends on its cadence: tonic after dominant, or the dominant for a half cadence", () => {
+  let sections = 0;
+  for (const profile of PROFILES) {
+    for (const seed of [3, 17]) {
+      const r = composeSidwave({ profile: profile.name, seed });
+      for (const s of r.sections) {
+        sections++;
+        if (s.cadence === "authentic") {
+          assert.equal(s.endFunction, "T", `${profile.name} ${s.name}`);
+          assert.ok(s.finalChord.includes(s.tonic), `${profile.name} ${s.name}: the final chord holds the tonic`);
+        } else {
+          assert.equal(s.cadence, "half");
+          assert.equal(s.endFunction, "D", `${profile.name} ${s.name}`);
+        }
+        // A contrasting section returns through the dominant of the home key; the others end in their own key.
+        if (s.finalNote !== undefined) assert.ok(s.finalChord.includes(((s.finalNote % 12) + 12) % 12), `${profile.name} ${s.name}: the last melody note is a tone of the last chord`);
+      }
+      // A score that ends closes on the tonic; a looping score may end its last section on the dominant that leads back to the start.
+      const last = r.sections.at(-1);
+      if (profile.ending === "end") assert.equal(last.cadence, "authentic", profile.name);
+    }
+  }
+  assert.ok(sections > 200);
+});
+
+test("the cycle figure says whether it was estimated or measured, and measuring runs the whole score", () => {
+  const estimated = composeSidwave({ profile: "chip-aaba-minor", seed: 5 });
+  assert.equal(estimated.cycles.kind, "estimated");
+  const measured = composeSidwave({ profile: "chip-aaba-minor", seed: 5, measure: true });
+  assert.equal(measured.cycles.kind, "measured");
+  const doc = parseSidwave(measured.score);
+  assert.equal(measured.cycles.frames, compileSidwaveToPrg(doc).totalFrames);
+  assert.ok(measured.cycles.worst <= estimated.cycles.worst, "the measured worst call does not exceed the compiler's bound");
+});
+
+test("the register-write interpreter gives the same writes and cycles as the bundled interpreter", () => {
+  for (const profile of ["chip-aaba-minor", "wide-vc-major", "waltz-aaba-minor", "funk-vc-dorian"]) {
+    const doc = parseSidwave(composeSidwave({ profile, seed: 9 }).score);
+    const compiled = compileSidwaveToPrg(doc);
+    const mem = new Uint8Array(65536);
+    mem.set(compiled.prg.subarray(2), compiled.loadAddress);
+    mem[0xea31] = 0x60;
+    mem[0x02a6] = 1;
+    let raster = 100;
+    let writes = [];
+    const cpu = new Cpu6502(mem, {
+      write(a, v) { if (a >= 0xd400 && a < 0xd800) writes.push(((a - 0xd400) << 8) | v); },
+      read(a) { if (a === 0xd012) return (raster = (raster + 1) % 312) & 0xff; return undefined; },
+    });
+    cpu.call(compiled.initAddress);
+    const trace = traceDocument(doc, { compiled });
+    for (let i = 0; i < trace.callCount; i++) {
+      writes = [];
+      const cycles = cpu.call(compiled.playAddress);
+      assert.equal(trace.cycles[i], cycles, `${profile} call ${i}`);
+      assert.deepEqual(Array.from(trace.writes.subarray(trace.starts[i], trace.starts[i + 1])), writes, `${profile} call ${i}`);
+    }
+  }
+});
+
+test("variation measures over a fixed window do not depend on the length of the score", () => {
+  const short = measureScore(parseSidwave(composeSidwave({ profile: "chip-loop-minor", seed: 4 }).score), { windowBars: 8 });
+  const long = measureScore(parseSidwave(composeSidwave({ profile: "chip-aaba-minor", seed: 4 }).score), { windowBars: 8 });
+  assert.ok(short.leadNotes > 0 && long.leadNotes > 0);
+  assert.ok(long.leadSignature.every((entry) => Number(entry.split(":")[0]) < 8 * 16 + 16), "the signature stays in the window");
+  const full = measureScore(parseSidwave(composeSidwave({ profile: "chip-aaba-minor", seed: 4 }).score));
+  assert.ok(full.leadNotes > long.leadNotes);
 });
