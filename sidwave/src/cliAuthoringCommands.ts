@@ -5,6 +5,7 @@
 import type { CliIo } from "./cliCore.js";
 import { runDiffCli } from "./cliDiff.js";
 import { runFormatCli } from "./cliFormat.js";
+import { runGenerateCli } from "./cliGenerate.js";
 import { runMergeCli } from "./cliMerge.js";
 import { runTransformCli } from "./cliTransform.js";
 
@@ -14,10 +15,12 @@ export const AUTHORING_COMMANDS: Record<string, (args: string[], io: CliIo) => n
   format: runFormatCli,
   diff: runDiffCli,
   merge: runMergeCli,
+  generate: runGenerateCli,
 };
 
 export const AUTHORING_USAGE = `  sidwave transform <score> --transpose <n>|--tempo <bpm>|--swap-instrument <a>=<b>|--quantise <grid>|... [-o <out>]   (see "sidwave transform --help")
   sidwave format   <score>... [--check|--write]
   sidwave diff     <a> <b> [--json]            (exit 1 when the scores differ)
   sidwave merge    <base> <ours> <theirs> [-o <out>]   (exit 1 on conflicts)
+  sidwave generate [--style <s>] [--seed <n>] [--composer 1|2] [--profile <p>] [-o <score>] [--prg <f>] [--sid <f>] | --list
 `;
