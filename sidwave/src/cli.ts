@@ -431,7 +431,7 @@ export function runCli(args: string[], io: CliIo): number | Promise<number> {
     if (first === "reconstruct" && (rest.some((arg) => arg === "--from" || arg.startsWith("--from=")) || isTraceInput(rest, io.cwd))) return reconstructFromTraceCommand(rest, io).catch((error: unknown) => fail(io, json, name, error));
     if (authoring) return authoring(rest, io);
     const command = name === "sidwave" ? undefined : COMMANDS[name];
-    if (!command) throw new UsageError(unknownCommandMessage(first, [...Object.keys(COMMANDS), ...Object.keys(INTERCHANGE_COMMANDS), ...Object.keys(AUTHORING_COMMANDS), "retarget", "complete"]));
+    if (!command) throw new UsageError(unknownCommandMessage(first, [...Object.keys(COMMANDS), ...Object.keys(INTERCHANGE_COMMANDS), ...Object.keys(AUTHORING_COMMANDS), "retarget", "complete", "sid", "songlengths", "stil"]));
     const options = parseArgs(rest, name);
     if (options.help) { io.out(HELP); return EXIT_OK; }
     if (options.version) { io.out(`${packageVersion()}\n`); return EXIT_OK; }
