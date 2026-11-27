@@ -45,7 +45,10 @@ export async function reconstructCommand(io: CliIo, options: ReconstructOptions)
   if (options.positional.length !== 1) throw new UsageError("reconstruct needs exactly one SID file");
   const file = options.positional[0]!;
   const bytes = readInput(file, { cwd: io.cwd });
-  parseSidFile(bytes);
+  const header = parseSidFile(bytes);
+  if (options.run.song !== undefined && options.run.song > header.songs) {
+    throw new SidwaveOperationError("input", `--song ${options.run.song} is outside 1..${header.songs}, the subtunes of ${file}`, { file });
+  }
   const engine = io.createEngine ? io.createEngine("sidlite") : createLibsidplayfpEngine({ emulation: "sidlite" });
   const { score, report } = await reconstructSid(bytes, { engine, song: options.run.song, seconds: options.run.seconds });
   const target = options.output === undefined || options.output === "-" ? undefined : resolve(io.cwd, options.output);

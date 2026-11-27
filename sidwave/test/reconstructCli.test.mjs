@@ -64,3 +64,11 @@ test("invalid input is classified as input (exit 3) in the JSON envelope", async
   assert.equal(result.exit, 3);
   assert.equal(JSON.parse(result.out).error.category, "input");
 });
+
+test("--song outside the subtunes of the file is an input error (exit 3)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "sidwave-reconstruct-"));
+  writeFileSync(join(dir, "tune.sid"), compileSidwaveBytes(parseSidwave(buildScore("basic", 1)), { format: "sid", loop: true }).bytes);
+  const result = await run(["reconstruct", "tune.sid", "--song", "2", "--json"], dir);
+  assert.equal(result.exit, 3);
+  assert.equal(JSON.parse(result.out).error.category, "input");
+});

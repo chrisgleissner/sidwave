@@ -13,6 +13,7 @@ import { reconstructSid } from "../../src/reconstruct/reconstruct.ts";
 export const FEATURES = ["basic", "pulse", "arpeggio", "hard_restart", "multispeed", "vibrato", "filter", "combined", "generator"];
 export const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
 /** The seeds the tests run: all eight, for every feature. */
+/** Horizon of the round trip in seconds. */
 export const SECONDS = 3;
 
 export function random(seed) {
@@ -81,7 +82,7 @@ export function buildScore(feature, seed) {
     const patterns = { A: { length: 0.5, groove: groove(rand, 12) }, B: { length: 0.5, groove: groove(rand, 12) } };
     voices.push({ id: v, instrument: name, patterns });
   }
-  const bar = (v) => (seed % 2 ? `A B A*2` : `A A B`).replace(/A|B/g, (m) => m);
+  const bar = () => (seed % 2 ? "A B A*2" : "A A B");
   return {
     sidwave: "1.4", title: `${feature} ${seed}`, tempo: 110 + (seed % 5) * 10, mode: "PAL", speed,
     ...(feature === "filter" || feature === "combined" ? { sids: [{ id: "sid1", address: "$D400", model: "6581" }] } : {}),

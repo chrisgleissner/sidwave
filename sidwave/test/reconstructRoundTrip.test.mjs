@@ -52,21 +52,32 @@ test("round trip of combined features (pulse, arpeggio, hard restart, vibrato an
   }
 });
 
-test("round trip of combined features, seeds 2, 4, 6, 7 and 8", {
+test("round trip of combined features, all 8 seeds", {
   timeout: 180_000,
-  todo: "failing: seeds 2, 4, 6 and 8 report instruments whose frequency registers no vibrato fit reproduces (isolated by the shrinker in fixtures/reconstruct-regressions/combined-seed2.yaml: one note of an instrument with vibrato delay 4, a pulse table and a test-bit hard restart); seed 7 differs only in call timing",
+  todo: "measured verdicts for seeds 1 to 8: exact, different, exact, different, exact, different, state_exact, call_count. Seeds 2, 4 and 6 differ in register state (the shrunk fixture combined-seed2.yaml isolates a failed vibrato fit on a note of an instrument with vibrato delay 4, a pulse table and a test-bit hard restart); seed 7 differs only in call timing; seed 8 has a call count mismatch",
 }, async () => {
-  for (const seed of [2, 4, 6, 7, 8]) {
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
     const r = await roundTrip(buildScore("combined", seed));
     assert.equal(verdict(r.report), "exact", `combined seed ${seed}: ${JSON.stringify(r.report.fdiffState.first)}`);
   }
 });
 
-test("round trip of generator tunes (SIDWave 1.1 library instruments)", {
+test("round trip of generator tunes (SIDWave 1.1 library instruments), strict, all 8 seeds", {
   timeout: 180_000,
-  todo: "failing: legato notes with portamento (pitch), the soft-start volume ramp of the 1.4 player (volume), and hz cutoffs of library filter tables are not recovered",
+  todo: "failing for all 8 seeds: legato notes with portamento (pitch), the soft-start volume ramp of the 1.4 player (volume), and hz cutoffs of library filter tables are not recovered",
 }, async () => {
-  for (const seed of [1, 2, 3]) {
+  for (const seed of SEEDS) {
+    const r = await roundTrip(buildScore("generator", seed));
+    assert.equal(verdict(r.report), "exact", `generator seed ${seed}: ${JSON.stringify(r.report.fdiff.first)}`);
+  }
+});
+
+// Relaxed, not a strict pass: only the register-state classes (timing excluded) are required to match.
+test("relaxed round trip of generator tunes: register state only", {
+  timeout: 180_000,
+  todo: "failing: same causes as the strict generator test",
+}, async () => {
+  for (const seed of SEEDS) {
     const r = await roundTrip(buildScore("generator", seed));
     assert.equal(stateDifferences(r.report), 0, `generator seed ${seed}: ${JSON.stringify(r.report.fdiffState.first)}`);
   }
