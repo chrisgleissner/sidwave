@@ -261,8 +261,8 @@ function importCommand(args: string[], io: CliIo): number {
   return 0;
 }
 
-export const INTERCHANGE_HELP = `  sidwave export <file> [--format events|midi|musicxml] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--json]
-  sidwave import <file> [--format midi|musicxml|goattracker|furnace] [-o <out.yaml>] [--grid <beats>] [--voices 1-3]
+export const INTERCHANGE_HELP = `  sidwave export <file> [--format events|midi|musicxml|goattracker|furnace] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--json]
+  sidwave import <file> [--format midi|musicxml|goattracker|furnace] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>]
                         [--no-drums] [--no-bend] [--title <text>] [--mode PAL|NTSC] [--no-validate] [--force] [--json]
 `;
 

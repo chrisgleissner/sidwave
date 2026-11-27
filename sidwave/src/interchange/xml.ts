@@ -42,14 +42,15 @@ export function parseXml(input: string, limits: XmlLimits = {}): XmlNode {
   const fail = (message: string): never => { throw new XmlError(`${message} (offset ${pos})`); };
   const stack: XmlNode[] = [];
   let root: XmlNode | undefined;
-  const isNameStart = (c: string) => /[A-Za-z_:]/.test(c);
+  const nameStart = (c: number) => (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c === 58;
+  const nameChar = (c: number) => nameStart(c) || (c >= 48 && c <= 57) || c === 46 || c === 45;
   const readName = (): string => {
     const start = pos;
-    if (pos >= n || !isNameStart(text[pos]!)) fail("expected a name");
-    while (pos < n && /[A-Za-z0-9_:.\-]/.test(text[pos]!)) pos++;
+    if (pos >= n || !nameStart(text.charCodeAt(pos))) fail("expected a name");
+    while (pos < n && nameChar(text.charCodeAt(pos))) pos++;
     return text.slice(start, pos);
   };
-  const skipSpace = () => { while (pos < n && /\s/.test(text[pos]!)) pos++; };
+  const skipSpace = () => { while (pos < n) { const c = text.charCodeAt(pos); if (c === 32 || c === 10 || c === 13 || c === 9) pos++; else break; } };
   while (pos < n) {
     const lt = text.indexOf("<", pos);
     const end = lt === -1 ? n : lt;
