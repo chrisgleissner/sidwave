@@ -138,7 +138,7 @@ export async function isolateVoice(sidBytes: Uint8Array, options: IsolateOptions
   const wav = encodeWav(render.samples, render.sampleRate, 1);
   return {
     wav, method: "reconstruct-and-recompile",
-    methodNote: "The engine binding cannot replay a list of register writes, so the tune was reconstructed as a SIDWave score, the other voices got empty layers, and the score was compiled and rendered. The audio is as exact as the reconstruction.",
+    methodNote: "The engine binding cannot replay a list of register writes, so the tune was reconstructed as a SIDWave score, the other voices got empty layers, and the score was compiled and rendered. The audio is as exact as the reconstruction; oscillator phases differ from the original because the SIDWave player writes a few cycles apart from the original player, so the solo renders add up in power, not sample by sample.",
     mode, voice: options.voice, silenced, coupling: detectCoupling(ir, options.voice), reconstructionStrictExact: report.strictExact,
     horizon: { seconds, song, sampleRate: render.sampleRate }, engine: render.engine, sha256: sha256(wav),
   };
