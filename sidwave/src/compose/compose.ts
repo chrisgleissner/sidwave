@@ -73,7 +73,8 @@ const VOICE_ROLE: Partial<Record<Role, "bass" | "lead" | "drums" | "pad" | "arp"
 const name = (midi: number) => midiToNoteName(midi);
 
 /** Tokens of one bar of a monophonic line on the sixteenth grid. */
-function lineTokens(notes: readonly Note[], from: number, cells: number): string[] {
+/** @internal Token builders shared with the completion operations. */
+export function lineTokens(notes: readonly Note[], from: number, cells: number): string[] {
   const out: string[] = Array.from({ length: cells }, () => "-");
   for (const n of notes) {
     if (n.at < from || n.at >= from + cells) continue;
@@ -105,7 +106,8 @@ function slur(tokens: string[]): string[] {
 
 function bassMidi(pcValue: number, offset = 0): number { return 36 + pcValue + offset; }
 
-function bassBar(pattern: string, chords: readonly Chord[], cells: number, nextRoot: number | undefined, key: Key, approach: boolean,
+/** @internal Token builders shared with the completion operations. */
+export function bassBar(pattern: string, chords: readonly Chord[], cells: number, nextRoot: number | undefined, key: Key, approach: boolean,
   clashes: (cell: number, midi: number) => boolean): string[] {
   const slotCells = cells / chords.length;
   const scale = new Set(scalePcs(key));
@@ -157,7 +159,8 @@ function soundingFromTokens(bars: readonly string[][], cell: number): number | u
   }
 }
 
-function arpBar(pattern: string, chords: readonly Chord[], cells: number): string[] {
+/** @internal Token builders shared with the completion operations. */
+export function arpBar(pattern: string, chords: readonly Chord[], cells: number): string[] {
   const slotCells = cells / chords.length;
   const out: string[] = [];
   cellString(pattern, cells).split("").forEach((c, i) => {
@@ -169,7 +172,8 @@ function arpBar(pattern: string, chords: readonly Chord[], cells: number): strin
   return out;
 }
 
-function padBar(chords: readonly Chord[], cells: number): string[] {
+/** @internal Token builders shared with the completion operations. */
+export function padBar(chords: readonly Chord[], cells: number): string[] {
   const slotCells = cells / chords.length;
   const out: string[] = [];
   for (let i = 0; i < cells; i++) {

@@ -14,6 +14,7 @@ import {
 } from "./cliCore.js";
 import { RECONSTRUCT_COMMAND_HELP, RECONSTRUCT_USAGE, reconstructCommand } from "./cliReconstruct.js";
 import { INTERCHANGE_COMMANDS, INTERCHANGE_HELP } from "./interchange/cli.js";
+import { runCompleteCli } from "./cliComplete.js";
 import { RUN_COMMANDS, RUN_HELP, flagName, takeRunFlag, type RunFlags } from "./cliVerify.js";
 import {
   compileSidwaveBytes, confinedReadOptions, describeSidwave, isExampleName, lintSidwave, listSidwaveExamples,
@@ -35,6 +36,7 @@ Usage:
   sidwave examples [<name>] [-o <dir>] [--force] [--json]
   sidwave retarget <file> [--clock pal|ntsc] [--model 6581|8580] [--sids <n>] [--budget-cycles <n>] [--budget-bytes <n>]
                           [--allow-changes] [-o <out>] [--force] [--json]   (see "sidwave retarget --help")
+  sidwave complete <score> --op continue|harmonise|accompany|fill-section [options]   (see "sidwave complete --help")
 ${INTERCHANGE_HELP}${RUN_HELP.usage}${RECONSTRUCT_USAGE}  sidwave --help | --version
 
 Commands:
@@ -403,6 +405,7 @@ export function runCli(args: string[], io: CliIo): number | Promise<number> {
     if (first === "-V" || first === "--version") { io.out(`${packageVersion()}\n`); return EXIT_OK; }
     if (first === "retarget") return runRetarget(io, rest);
     if (interchange) return interchange(rest, io);
+    if (first === "complete") return runCompleteCli(rest, io);
     const command = name === "sidwave" ? undefined : COMMANDS[name];
     if (!command) throw new UsageError(`unknown command "${first}"`);
     const options = parseArgs(rest, name);
