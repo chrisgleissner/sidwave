@@ -296,7 +296,7 @@ test("every YAML example in the effects chapter of the specification and the REA
   const spec = fs.readFileSync(new URL("../data/sound/sidwave.md", import.meta.url), "utf8");
   const readme = fs.readFileSync(new URL("../README.md", import.meta.url), "utf8");
   const sources = [
-    spec.slice(spec.indexOf("### Effects"), spec.indexOf("## Playable examples")),
+    spec.slice(spec.indexOf("### Effects"), spec.indexOf("## SIDWave 1.5")),
     readme.slice(readme.indexOf("### Sound effects (SIDWave 1.4)"), readme.indexOf("### Example game programs")),
   ];
   let count = 0;

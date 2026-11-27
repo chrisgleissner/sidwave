@@ -52,6 +52,35 @@ test("the library loads through the production import resolver and a score can u
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("a 1.5 source gives a 1.5 library, and a score that imports it needs 1.5 only for the 1.5 constructs", async () => {
+  const text = `sidwave: "1.5"
+title: T
+tempo: 120
+voices:
+  - { id: 1, instrument: drum, patterns: { a: { length: 1, bars: 1, groove: "A4 - C5 -" } } }
+instruments:
+  drum: { waveform: pulse, adsr: [0, 4, 12, 3], wavetable: [{ wave: noise, reg: $10C3 }, { wave: pulse, note: A4 }], pulsetable: { wrap: true, steps: [{ set: 1024 }, { add: 64, frames: 4 }] } }
+timeline:
+  - { section: Main, bars: 1, layers: { v1: a } }
+`;
+  const result = await extractInstruments(text, { created: CREATED });
+  assert.equal(String(YAML.parse(result.library).sidwave), "1.5");
+  const replaced = replaceWithImports(text, ["drum"]);
+  assert.equal(String(YAML.parse(replaced).sidwave), "1.5");
+  const dir = mkdtempSync(join(tmpdir(), "sidwave-extract-"));
+  try {
+    writeFileSync(join(dir, "lib.yaml"), result.library);
+    const file = join(dir, "score.yaml");
+    const parse = (score) => parseSidwave(score, confinedReadOptions(dir, [], file));
+    writeFileSync(file, replaced);
+    assert.ok(compileSidwaveBytes(parse(replaced), { format: "sid" }).bytes.length > 100);
+    const older = replaced.replace(/sidwave: .*/, 'sidwave: "1.4"');
+    assert.throws(() => parse(older), /requires sidwave: 1\.5/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  const check = await checkInstrumentReuse({ library: result.library, instrument: "drum", source: text, engine: sharedEngine(), seconds: 2 });
+  assert.equal(check.equal, true, JSON.stringify(check.first));
+});
+
 test("invalid library names, dates and non-score input are rejected", async () => {
   const text = seededText("basic", 1);
   await assert.rejects(() => extractInstruments(text, { name: "bad name" }), /library name/);

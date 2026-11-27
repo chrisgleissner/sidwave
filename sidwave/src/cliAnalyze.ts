@@ -96,8 +96,8 @@ export const ANALYZE_HELP = `  analyze    Structural analysis: key and mode, met
              the score offline and checks every hash and the verdict; exit 0 when all checks pass, 1 otherwise.
              Exit 0 after writing when the strict verdict holds, 1 when it does not (the bundle is written either way).
   extract-instruments
-             Write the instruments of a score, or of the reconstruction of a SID tune, as a SIDWave 1.4 library with
-             provenance (to -o or standard output).
+             Write the instruments of a score, or of the reconstruction of a SID tune, as a SIDWave library (1.4, or 1.5
+             for a 1.5 source) with provenance (to -o or standard output).
 `;
 
 interface Options {

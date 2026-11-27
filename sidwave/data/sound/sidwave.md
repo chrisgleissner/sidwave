@@ -13,7 +13,7 @@ LLM → SIDWave (YAML) → MCP compiler → PRG or PSID → C64 / Ultimate / VIC
 
 - **Format name:** SIDWave
 - **File suffix:** `.sidwave.yaml` (or `.sid.yaml` for brevity)
-- **Version field:** `sidwave: 1.0`, `sidwave: 1.1`, `sidwave: 1.2`, `sidwave: 1.3`, or `sidwave: 1.4`
+- **Version field:** `sidwave: 1.0`, `sidwave: 1.1`, `sidwave: 1.2`, `sidwave: 1.3`, `sidwave: 1.4`, or `sidwave: 1.5`
 - **Schema file:** `sidwave.schema.json`
 - **Serialization:** YAML 1.2 or JSON
 
@@ -1389,7 +1389,7 @@ guide in its header. [Composition index](c64://sound/examples)
 
 ## Asset libraries (SIDWave 1.4)
 
-A `sidwave: 1.4` score may import libraries of instruments, patterns and effects. Resolution happens before the score is
+A `sidwave: 1.4` (or 1.5) score may import libraries of instruments, patterns and effects. Resolution happens before the score is
 parsed, so a score that uses libraries compiles to the bytes of the equivalent score with the library items written out.
 
 **Observed need.** A drum kit, a bass instrument or a sound effect set that several scores share is copied into each
@@ -1403,8 +1403,9 @@ built-in `lib:` instruments, a fixed list that ships with the compiler (see "Bui
 aliases work inside one file only. There is no way to name another file, to say which version of it is meant, or to
 check that its content is what the author tested.
 
-**Design.** A library is a SIDWave file with `sidwave: 1.4`, a `library` block, and the maps `instruments`, `patterns`
-and `effects`. It has no voices, timeline or SID map. A library may import other libraries.
+**Design.** A library is a SIDWave file with `sidwave: 1.4` or `1.5`, a `library` block, and the maps `instruments`, `patterns`
+and `effects`. It has no voices, timeline or SID map. A library may import other libraries. A
+1.5 construct inside a library item needs a `sidwave: 1.5` score: the check applies to the score that imports the item.
 
 ```yaml
 sidwave: 1.4
@@ -1493,7 +1494,7 @@ bytes of the flattened score"). Only the items a score refers to are included, s
 
 **Older documents are unchanged.** A score without `imports` takes the same path as before: the hash fixture
 `test/fixtures/sidwave-s4a/example-hashes.json` passes with a library resolver supplied ("keep their recorded bytes").
-`imports` in a document that is not `sidwave: 1.4` is rejected with `imports require sidwave: 1.4`.
+`imports` in a document that is neither `sidwave: 1.4` nor `1.5` is rejected with `imports require sidwave: 1.4 or later`.
 
 **Tests.** `test/sidwave14Libs.test.mjs`: resolution, namespaces and nested libraries, collisions, cycles, the depth,
 size and count caps, path traversal (`../`, absolute, URLs, symbolic links to files and directories, `pkg:` escapes),

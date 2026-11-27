@@ -226,9 +226,9 @@
     },
     "libraryFile": {
       "type": "object", "required": ["sidwave", "library"], "additionalProperties": false,
-      "description": "A SIDWave library file (1.4): metadata and the maps instruments, patterns and effects, with no voices or timeline. Validate library files against this definition.",
+      "description": "A SIDWave library file (1.4 or 1.5): metadata and the maps instruments, patterns and effects, with no voices or timeline. Validate library files against this definition.",
       "properties": {
-        "sidwave": { "enum": [1.4, "1.4"] },
+        "sidwave": { "enum": [1.4, "1.4", 1.5, "1.5"] },
         "library": {
           "type": "object", "required": ["name", "version", "licence", "provenance"], "additionalProperties": false,
           "properties": {

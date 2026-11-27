@@ -184,3 +184,13 @@ test("player.idle_writes is documented in the schema, the spec chapter and the c
   assert.match(read("data/sound/sidwave.md"), /#### Player options: `player.soft_start` and `player.idle_writes`/);
   assert.match(read("CHANGELOG.md"), /`player\.idle_writes`/);
 });
+
+test("the YAML example of the 1.5 chapter of the specification parses with the tuning it shows", async () => {
+  const { readFileSync } = await import("node:fs");
+  const spec = readFileSync(new URL("../data/sound/sidwave.md", import.meta.url), "utf8");
+  const chapter = spec.slice(spec.indexOf("## SIDWave 1.5"), spec.indexOf("## Playable examples"));
+  const blocks = [...chapter.matchAll(/```yaml\n([\s\S]*?)```/g)].map((m) => m[1]);
+  assert.equal(blocks.length, 1);
+  const tuned = parseSidwave(score("1.5", blocks[0].replace(/^sidwave: .*\n/, "")));
+  assert.deepEqual(tuned.tuning, { cents: -12, registers: [[69, 0x1cd6], [72, 0x2222]] });
+});

@@ -13,8 +13,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 614,
-    "message": "F-diff: the recovered score differs from the tune in 614 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 600,
+    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
    }
   ]
  },
@@ -32,8 +32,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 614,
-    "message": "F-diff: the recovered score differs from the tune in 614 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 600,
+    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "write",
@@ -72,8 +72,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 614,
-    "message": "F-diff: the recovered score differs from the tune in 614 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 600,
+    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "write",
@@ -126,8 +126,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 614,
-    "message": "F-diff: the recovered score differs from the tune in 614 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 600,
+    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "write",
@@ -166,8 +166,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 614,
-    "message": "F-diff: the recovered score differs from the tune in 614 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 600,
+    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "write",
@@ -206,8 +206,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 164,
-    "message": "F-diff: the recovered score differs from the tune in 164 register-class differences over 50 compared player calls (a call can differ in several classes)."
+    "count": 150,
+    "message": "F-diff: the recovered score differs from the tune in 150 register-class differences over 50 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "plan",
@@ -239,8 +239,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 614,
-    "message": "F-diff: the recovered score differs from the tune in 614 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 600,
+    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "plan",
@@ -265,8 +265,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 614,
-    "message": "F-diff: the recovered score differs from the tune in 614 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 600,
+    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "write",
@@ -291,8 +291,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 614,
-    "message": "F-diff: the recovered score differs from the tune in 614 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 600,
+    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "write",
@@ -317,8 +317,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 164,
-    "message": "F-diff: the recovered score differs from the tune in 164 register-class differences over 50 compared player calls (a call can differ in several classes)."
+    "count": 150,
+    "message": "F-diff: the recovered score differs from the tune in 150 register-class differences over 50 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "plan",
