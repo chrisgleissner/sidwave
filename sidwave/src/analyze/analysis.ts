@@ -7,6 +7,7 @@
 // result of a model, with the method named). For a SID tune the notes come from the SIDWave reconstruction, so the
 // musical facts are inferred; the technique, resource and register-range facts are observed in the trace.
 
+import { SidwaveOperationError } from "../cliCore.js";
 import { parseSidFile } from "../sidFile.js";
 import { psidClock, type SidEngine } from "../engine/libsidplayfp.js";
 import { IR_CLOCK_HZ, type FrameIr } from "../reconstruct/ir.js";
@@ -196,6 +197,7 @@ export async function analyzeScore(text: string, options: AnalyzeScoreOptions = 
 export async function analyzeSid(sidBytes: Uint8Array, options: AnalyzeSidOptions): Promise<AnalysisReport> {
   const file = parseSidFile(sidBytes);
   const song = options.song ?? file.startSong;
+  if (!Number.isInteger(song) || song < 1 || song > file.songs) throw new SidwaveOperationError("input", `song ${song} is outside 1..${file.songs}`);
   const seconds = options.seconds ?? DEFAULT_HORIZON_SECONDS;
   const clock = psidClock(sidBytes) ?? "PAL";
   const engine = memoEngine(options.engine);
@@ -226,7 +228,7 @@ export async function analyzeSid(sidBytes: Uint8Array, options: AnalyzeSidOption
     reconstruction: summariseReconstruction(rec, differing),
     ...(parts ? { key: parts.key, metre: parts.metre, form: parts.form } : {}),
     motifs: parts?.motifs ?? [],
-    voices: parts ? parts.voices.map((v) => ({ ...v, ...(facts.has(v.voice) ? { trace: facts.get(v.voice)! } : {}) })) : [],
+    voices: voicesOf(parts?.voices ?? [], facts),
     techniques: techniquesFromIr(ir),
     resources,
     limits: [
@@ -237,6 +239,20 @@ export async function analyzeSid(sidBytes: Uint8Array, options: AnalyzeSidOption
       ...(rec.unsupported.length ? [`The trace holds ${rec.unsupported.length} feature(s) the language cannot express (see sample playback and the reconstruction report); musical facts leave them out.`] : []),
     ],
   };
+}
+
+/** Voices of the reconstruction with their trace facts, plus the traced voices the reconstruction does not model (for example the second SID). */
+function voicesOf(modelled: VoiceUse[], facts: Map<number, TraceVoiceFacts>): AnalysisReport["voices"] {
+  const out: AnalysisReport["voices"] = modelled.map((v) => ({ ...v, ...(facts.has(v.voice) ? { trace: facts.get(v.voice)! } : {}) }));
+  const have = new Set(modelled.map((v) => v.voice));
+  for (const [voice, trace] of [...facts].sort((a, b) => a[0] - b[0])) {
+    if (have.has(voice) || (trace.gateShare === 0 && !trace.frequencyRange)) continue;
+    out.push({
+      voice, sid: Math.floor((voice - 1) / 3), noteCount: 0, percussionCount: 0, notesPerSecond: 0, soundingShare: trace.gateShare,
+      role: { basis: "inferred", method: "the reconstruction does not model this voice, so no role is derived", value: "unreconstructed" }, trace,
+    });
+  }
+  return out.sort((a, b) => a.voice - b.voice);
 }
 
 function summariseReconstruction(rec: ReconstructReport, differing: number): NonNullable<AnalysisReport["reconstruction"]> {

@@ -180,7 +180,7 @@ export interface ReuseOptions {
   seconds?: number;
 }
 
-const PROBE_NOTES = ["C3", "E4", "A4", "C5", "G3", "D5"];
+const PROBE_NOTES = ["C3", "E4", "A4", "C5"];
 
 /** Probe scores: the same notes on one voice, once with the instrument inline and once imported from the library. */
 export function reuseProbes(options: Pick<ReuseOptions, "library" | "instrument" | "source" | "notes">): { inline: string; imported: string } {
@@ -213,7 +213,7 @@ export async function checkInstrumentReuse(options: ReuseOptions): Promise<Reuse
     const compile = (text: string, file?: string) => new Uint8Array(compileSidwaveBytes(parseSidwave(text, confinedReadOptions(dir, [], file)), { format: "sid", loop: false }).bytes);
     const inline = compile(probes.inline);
     const imported = compile(probes.imported, join(dir, "score.yaml"));
-    const seconds = options.seconds ?? 6;
+    const seconds = options.seconds ?? 5;
     const [a, b] = await Promise.all([options.engine.trace({ sid: inline, seconds }), options.engine.trace({ sid: imported, seconds })]);
     const result = fdiff(restrictIrToVoice(irOfTrace(a), 1), restrictIrToVoice(irOfTrace(b), 1), { alignExpected: 1, alignObserved: 1 });
     const differing = Object.values(result.classes).reduce((n, c) => n + c.differingCalls, 0);

@@ -115,6 +115,7 @@ export function silenceVoices(score: string, voices: readonly number[]): string 
 export async function isolateVoice(sidBytes: Uint8Array, options: IsolateOptions): Promise<IsolateResult> {
   const file = parseSidFile(sidBytes);
   const song = options.song ?? file.startSong;
+  if (!Number.isInteger(song) || song < 1 || song > file.songs) throw new SidwaveOperationError("input", `song ${song} is outside 1..${file.songs}`);
   const seconds = options.seconds ?? DEFAULT_HORIZON_SECONDS;
   const mode = options.mode ?? "solo";
   const engine = memoEngine(options.engine);
