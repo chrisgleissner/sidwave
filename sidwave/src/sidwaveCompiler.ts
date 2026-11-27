@@ -3904,6 +3904,8 @@ init_core:`);
     const label = loop ? "play" : "play_tick";
     if (!playerCode.includes(`\n${label}:\n`) || !playerCode.includes("  sta $01\n  ldy #95\n  cpx #0\n")) throw new Error("SIDWAVE player code changed: the start patch point was not found");
     const last = arr.startSteps.length - 1;
+    // The stores carry a trailing comment so that the later passes that rewrite `sta $D415` to `sta $D418` (the SID multiplexer, the filter
+    // route mask and the soft-start volume ramp) leave them alone: a start write reaches the first SID exactly as listed.
     const steps = arr.startSteps.map((step, k) => `  lda st_i
   cmp #${k}
   beq st_run_${k}
@@ -3913,8 +3915,8 @@ st_run_${k}:
   pha
   lda #$36
   sta $01
-${arr.chips && step.some((w) => w.reg >= 0x15) ? "  lda sid_io\n  pha\n  lda sid_io+1\n  pha\n  lda #0\n  sta sid_io\n  lda #$D4\n  sta sid_io+1\n" : ""}${step.map((w) => `  lda #$${hex2(w.value)}\n  sta $${(0xd400 + w.reg).toString(16).toUpperCase()}`).join("\n")}
-${arr.chips && step.some((w) => w.reg >= 0x15) ? "  pla\n  sta sid_io+1\n  pla\n  sta sid_io\n" : ""}  pla
+${step.map((w) => `  lda #$${hex2(w.value)}\n  sta $${(0xd400 + w.reg).toString(16).toUpperCase()} ; start`).join("\n")}
+  pla
   sta $01
   inc st_i
 ${k === last ? `  lda #<${label}_run\n  sta ${label}+1\n  lda #>${label}_run\n  sta ${label}+2\n` : ""}  rts

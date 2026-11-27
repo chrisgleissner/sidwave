@@ -3,7 +3,7 @@
 import test from "#test/runner";
 import assert from "#test/assert";
 import YAML from "yaml";
-import { foldLoop, recoverScore } from "../src/reconstruct/recover.ts";
+import { clampRestarts, foldLoop, recoverScore } from "../src/reconstruct/recover.ts";
 import { buildIr } from "../src/reconstruct/ir.ts";
 import { parseSidwave } from "../src/sidwave.ts";
 import { compileSidwaveBytes } from "../src/sidwaveOps.ts";
@@ -254,4 +254,20 @@ test("compiled examples reconstructed at 20 s and 60 s always return a score tha
       assert.equal(report.internalError, undefined, `${name} ${seconds} s`);
     }
   }
+});
+
+test("clampRestarts shortens an instrument's hard restart to its shortest note, measured in the emitted patterns (speed 5)", () => {
+  const document = {
+    instruments: { a: { hard_restart: { frames: 1, adsr: [0, 15, 0, 15], test: true } }, b: { hard_restart: { frames: 2 } }, c: { hard_restart: { frames: 0 } } },
+    voices: [{ instrument: "a", patterns: {
+      P1: { length: 0.075, groove: [{ note: "A#7", inst: "a", len: 0.075 }, "C4@b", "~", "-"] },
+      P2: { length: 0.25, groove: ["C4", "~", "D4@b"] },
+    } }],
+  };
+  // 80 calls per beat: 0.075 beat = 6 calls (a needs 5 + 5 = 10); b: C4 + tie = 12 calls, D4 = 20 calls (needs 2 * 5 + 5 = 15)
+  assert.equal(clampRestarts(document, 80, 5), 2);
+  assert.equal(document.instruments.a.hard_restart.frames, 0);
+  assert.equal(document.instruments.a.hard_restart.test, undefined);
+  assert.equal(document.instruments.b.hard_restart.frames, 1);
+  assert.equal(clampRestarts(document, 80, 5), 0);
 });

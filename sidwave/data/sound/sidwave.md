@@ -92,9 +92,11 @@ timeline:
 
 | Field | Meaning |
 | --- | --- |
-| `sidwave` | Format version, `1.0` (legacy), `1.1`, `1.2`, or `1.3`. |
+| `sidwave` | Format version: `1.0` (legacy), `1.1`, `1.2`, `1.3`, `1.4` or `1.5`. |
 | `instruments` | Optional named instrument map. Voices may select an instrument; `lib:name` selects a built-in recipe. |
-| `speed` | Player calls per frame, from 1 to 4. |
+| `speed` | Player calls per frame, from 1 to 4 (to 8 in 1.5; see "Speed up to 8"). |
+| `player` | 1.5: player options `soft_start`, `idle_writes` and `start` (see "Player options"). |
+| `tuning` | 1.5: `cents` shift and exact `registers` per note (see "Tuning"). |
 | `title`, `author` | Written to the PSID header (Latin-1, 32 characters). |
 | `meter` | Quarter notes per bar. Defaults to 4. In 1.2 use `meter: 3` for 3/4. 1.3 also accepts time signatures (see SIDWave 1.3). |
 | `tempo` | Beats (quarter notes) per minute, 30–220. Default 100. |
@@ -1277,6 +1279,11 @@ any gate-on; the per-tune first differences are in `data/reconstruct/dev-report.
 writes only the listed registers and does nothing else; the song starts in the call after the last list. Recovery lists only
 calls before the first gate-on of any voice. The option is limited to that start-up phase so that it cannot hold music.
 
+**Interaction with `soft_start`.** Start writes are exact in their calls whatever `soft_start` is. A start call writes
+`$D415` to `$D418` straight to the first SID, so a `$D418` value is not scaled by the volume ramp and the ramp does not run
+in those calls. With the default `soft_start: true` the ramp then begins at zero in the first song call and moves the
+volume from there, so the start volume holds only until that call; set `soft_start: false` to keep the written volume.
+
 **Rejected alternative.** An `init` register list written by the init routine instead of in play calls. The original writes
 in play calls, and the F-diff compares call by call, so a write in the init call would be in the wrong call.
 
@@ -1354,6 +1361,10 @@ speed 5 or more is less than one player call at tempos up to 220.
 one frame (`speed` calls). The compiler's cycle budget check still applies: at the higher speeds the 1.4 player needs more cycles per
 call than one call period holds at 1 MHz, and such a score is rejected with `use cpu: turbo`. Seven of the 24 development tunes are
 rejected for that reason (speeds 4 to 8), so the recovered score does not compile for them.
+
+**Known limit.** At speed 8 the first note of a score lasts one call fewer than its row count (gate off at call 29 instead of 30
+in the round-trip test), because the player's first row starts one call into the song at that speed. A recovered speed-8 score
+therefore has a first note one call shorter than the tune; later notes are exact. This is open (`todo` in `reconstructRepairs.test.mjs`).
 
 **Rejected alternative.** Mapping a multi-speed tune onto a slower grid: the call timing then differs.
 

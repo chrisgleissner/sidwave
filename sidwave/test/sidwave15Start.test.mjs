@@ -129,3 +129,29 @@ timeline:
   const first = run.calls[0].cycles;
   assert.equal(run.cpu.call(run.compiled.playAddress), first, `the first call after a second init is start step 0 again`);
 });
+
+test("start writes are exact with the default soft_start, including every $D418 value and $D415-$D417", async () => {
+  const { playDoc } = await import("./helpers/sidwaveEmulator.mjs");
+  const steps = Array.from({ length: 8 }, (_, k) => [
+    { reg: 0xd418, value: 45 + k * 9 }, { reg: 0xd417, value: 0xf1 - k }, { reg: 0xd415, value: k }, { reg: 0xd416, value: 100 + k }, { reg: 0xd404, value: 8 },
+  ]);
+  for (const speed of [1, 2, 3]) {
+    const text = `sidwave: "1.5"
+title: T
+tempo: 120
+speed: ${speed}
+cpu: turbo
+player: { start: ${JSON.stringify(steps)} }
+voices:
+  - { id: 1, instrument: lead, patterns: { a: { length: 1, bars: 1, groove: "A4 - C5 -" } } }
+instruments:
+  lead: { waveform: pulse, adsr: [0, 4, 12, 3] }
+timeline:
+  - { section: Main, bars: 4, layers: { v1: a } }
+`;
+    const run = playDoc(text, 9);
+    for (let k = 0; k < 8; k++) {
+      assert.deepEqual(run.calls[k].writes.map((w) => [w.addr, w.value]), steps[k].map((w) => [w.reg, w.value]), `speed ${speed} step ${k}`);
+    }
+  }
+});

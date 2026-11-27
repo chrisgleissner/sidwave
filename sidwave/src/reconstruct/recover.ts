@@ -1065,6 +1065,46 @@ function usesRegSteps(def: InstrumentDef, members: NoteSegment[]): boolean {
 }
 
 
+/**
+ * The compiler needs every note of an instrument to last at least the instrument's restart plus one call group (`speed`
+ * calls). The restart belongs to the instrument, so it is clamped to the shortest note that uses the instrument. The notes are
+ * measured in the emitted patterns (a note, its ties and the pattern row length), which is the length the compiler sees.
+ * Returns the number of instruments changed.
+ */
+export function clampRestarts(document: Record<string, unknown>, callsPerBeat: number, speed: number): number {
+  const instruments = document.instruments as Record<string, { hard_restart?: { frames: number; adsr?: unknown; test?: boolean } }> | undefined;
+  if (!instruments) return 0;
+  const shortest = new Map<string, number>();
+  for (const voice of (document.voices ?? []) as Array<{ instrument: string; patterns: Record<string, { length: number; groove: unknown[] }> }>) {
+    for (const pattern of Object.values(voice.patterns)) {
+      const g = pattern.groove;
+      for (let i = 0; i < g.length; i++) {
+        const entry = g[i];
+        let note = typeof entry === "object" && entry !== null ? (entry as { note?: string }).note : (entry as string);
+        if (!note || note === "-" || note === "~") continue;
+        let inst = typeof entry === "object" && entry !== null && (entry as { inst?: string }).inst ? (entry as { inst: string }).inst : voice.instrument;
+        if (typeof note === "string" && note.includes("@")) [note, inst] = note.split("@") as [string, string];
+        let len = typeof entry === "object" && entry !== null && (entry as { len?: number }).len !== undefined ? (entry as { len: number }).len : pattern.length;
+        for (let j = i + 1; j < g.length && g[j] === "~"; j++) len += pattern.length;
+        const calls = Math.floor(len * callsPerBeat + 1e-6);
+        shortest.set(inst, Math.min(shortest.get(inst) ?? Infinity, calls));
+      }
+    }
+  }
+  let changed = 0;
+  for (const [name, calls] of shortest) {
+    const hr = instruments[name]?.hard_restart;
+    if (!hr || hr.frames === 0) continue;
+    const allowed = Math.max(0, Math.floor((calls - speed) / speed));
+    if (hr.frames > allowed) {
+      hr.frames = allowed;
+      if (allowed === 0) { delete hr.adsr; delete hr.test; }
+      changed++;
+    }
+  }
+  return changed;
+}
+
 /** True when compiling the document fails only because the instrument pool or a table holds too much. */
 function exceedsBudget(document: Record<string, unknown>): boolean {
   try {
@@ -1534,6 +1574,8 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   const silent: Layout = { blockBars: "flat", voices: [{ patterns: { P1: { length: 1 / callsPerBeat, groove: ["-"] } }, sequence: "P1", maxBeats: 0 }] };
   if (!used.length) { voiceIds.push(1); entriesByVoice.push([]); defaults.push(0); }
   const document = chosen?.document ?? build(silent);
+  const clampedRestarts = clampRestarts(document, callsPerBeat, speed);
+  if (clampedRestarts) unsupported.push({ kind: "hard_restart", detail: `${clampedRestarts} instruments have a hard restart that was shortened to fit their shortest note`, evidence: { instruments: clampedRestarts } });
   const usage = new Map<string, number>();
   for (const seg of allSegs) if (!seg.phantom) usage.set(instNames[seg.instrument]!, (usage.get(instNames[seg.instrument]!) ?? 0) + 1);
   const refitted = fitCompilerBudgets(document, usage);
