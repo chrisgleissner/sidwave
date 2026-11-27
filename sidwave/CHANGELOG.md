@@ -4,8 +4,6 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 
 ## Unreleased
 
-- `convert` and `export` exit 5 (limit) instead of 3 when a score exceeds a fixed capacity of the target format, such as the 124 orderlist entries of SID-Wizard.
-
 ### Added
 
 - `sidwave sid info|edit|player`, `sidwave songlengths lookup|verify|write` and `sidwave stil parse|query` for HVSC work, and the library entry point `sidwave/hvsc` (`editSidHeader`, `writeSonglengthsEntry`, `verifySonglengths`, `lookupSonglengthEntries`, `parseStil`, `queryStil`, `identifySidPlayer`). `sid edit` patches only the bytes of the named header fields (title, author, released, songs, start song, speed, clock, SID models, second and third SID, flags, version, addresses, relocation range), validates the result against the PSID specification, raises the header version with a warning when a field needs it, and prints the old and new Songlengths MD5 keys; `--dry-run` shows the field changes. `songlengths write` adds or updates an entry in Songlengths.md5 or Songlengths.txt and changes only the lines it touches, including `--from-md5` to carry the times of an edited file over. `songlengths verify` checks every entry against the files of an HVSC tree. `sid player` reads a SIDId signature file from a path the user gives (none is shipped). `--hvsc` defaults to `HVSC_ROOT`. See `doc/hvsc.md`.
@@ -42,6 +40,7 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 
 ### Changed
 
+- `convert` and `export` exit 5 (limit) instead of 3 when a score exceeds a fixed capacity of the target format, such as the 124 orderlist entries of SID-Wizard.
 - GoatTracker and Furnace export count time in video frames. A score with `speed: 2` or more was written at twice the intended tempo; the multispeed rounding is now reported as `timing.multispeed`.
 - MIDI export writes drum hits on channel 10 (General MIDI percussion), and MusicXML export writes them as a separate unpitched percussion part, so that importing the file again keeps them as drum hits. The MIDI and MusicXML output changes for the shipped examples that contain drum hits: `chiptune_drive` (1.1 and 1.2), `funk_bass`, `stereo_echo`, `acid_line`, `ambient_filter` (1.1 and 1.2), `generated_ambient` and the reconstruct regression score `generator-seed1-silent-pitch`. Scores without drum hits give byte-identical output.
 - MIDI, MusicXML, GoatTracker and Furnace import no longer report static sentences as losses. A loss is reported only when content was dropped, with its count (unread MIDI events, unread notation marks).
