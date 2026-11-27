@@ -1,0 +1,537 @@
+{
+ "mod:effects -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "mod.effect.approx",
+    "severity": "approx",
+    "count": 13,
+    "message": "Effect 0xy arpeggio: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 1xx portamento up: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 2xx portamento down: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 3xx tone portamento: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 4xy vibrato: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Axy volume slide: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Cxx set volume: 1 use(s) are imported approximately (see doc/interchange.md). | Effect E1x fine portamento up: 1 use(s) are imported approximately (see doc/interchange.md). | Effect ECx note cut: 1 use(s) are imported approximately (see doc/interchange.md). | Effect EDx note delay: 1 use(s) are imported approximately (see doc/interchange.md)."
+   },
+   {
+    "stage": "read",
+    "code": "mod.effect.dropped",
+    "severity": "lost",
+    "count": 7,
+    "message": "Effect 7xy tremolo: 1 of 1 use(s) are not imported. | Effect 8xx set panning: 1 of 1 use(s) are not imported. | Effect 9xx sample offset: 1 of 1 use(s) are not imported. | Effect E4x vibrato waveform: 1 of 1 use(s) are not imported. | Effect E5x set finetune: 1 of 1 use(s) are not imported. | Effect E9x retrigger note: 1 of 1 use(s) are not imported. | Effect EFx invert loop: 1 of 1 use(s) are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "mod.note.delay",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 delayed note(s) (EDx) start on the nearest row."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   }
+  ]
+ },
+ "mod:effects -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "mod.effect.approx",
+    "severity": "approx",
+    "count": 13,
+    "message": "Effect 0xy arpeggio: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 1xx portamento up: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 2xx portamento down: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 3xx tone portamento: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 4xy vibrato: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Axy volume slide: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Cxx set volume: 1 use(s) are imported approximately (see doc/interchange.md). | Effect E1x fine portamento up: 1 use(s) are imported approximately (see doc/interchange.md). | Effect ECx note cut: 1 use(s) are imported approximately (see doc/interchange.md). | Effect EDx note delay: 1 use(s) are imported approximately (see doc/interchange.md)."
+   },
+   {
+    "stage": "read",
+    "code": "mod.effect.dropped",
+    "severity": "lost",
+    "count": 7,
+    "message": "Effect 7xy tremolo: 1 of 1 use(s) are not imported. | Effect 8xx set panning: 1 of 1 use(s) are not imported. | Effect 9xx sample offset: 1 of 1 use(s) are not imported. | Effect E4x vibrato waveform: 1 of 1 use(s) are not imported. | Effect E5x set finetune: 1 of 1 use(s) are not imported. | Effect E9x retrigger note: 1 of 1 use(s) are not imported. | Effect EFx invert loop: 1 of 1 use(s) are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "mod.note.delay",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 delayed note(s) (EDx) start on the nearest row."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "compile.advisory",
+    "severity": "info",
+    "count": 2,
+    "message": "CLASH: Move one note a semitone or shorten the overlap (at bar 1 v1) | FLAT: Estimated loudness varies by 1.4 dB; set section level or volume to build and release (at bar 1)"
+   }
+  ]
+ },
+ "mod:effects -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "mod.effect.approx",
+    "severity": "approx",
+    "count": 13,
+    "message": "Effect 0xy arpeggio: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 1xx portamento up: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 2xx portamento down: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 3xx tone portamento: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 4xy vibrato: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Axy volume slide: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Cxx set volume: 1 use(s) are imported approximately (see doc/interchange.md). | Effect E1x fine portamento up: 1 use(s) are imported approximately (see doc/interchange.md). | Effect ECx note cut: 1 use(s) are imported approximately (see doc/interchange.md). | Effect EDx note delay: 1 use(s) are imported approximately (see doc/interchange.md)."
+   },
+   {
+    "stage": "read",
+    "code": "mod.effect.dropped",
+    "severity": "lost",
+    "count": 7,
+    "message": "Effect 7xy tremolo: 1 of 1 use(s) are not imported. | Effect 8xx set panning: 1 of 1 use(s) are not imported. | Effect 9xx sample offset: 1 of 1 use(s) are not imported. | Effect E4x vibrato waveform: 1 of 1 use(s) are not imported. | Effect E5x set finetune: 1 of 1 use(s) are not imported. | Effect E9x retrigger note: 1 of 1 use(s) are not imported. | Effect EFx invert loop: 1 of 1 use(s) are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "mod.note.delay",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 delayed note(s) (EDx) start on the nearest row."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "3 glides and 1 instrument with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "mod:effects -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "mod.effect.approx",
+    "severity": "approx",
+    "count": 13,
+    "message": "Effect 0xy arpeggio: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 1xx portamento up: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 2xx portamento down: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 3xx tone portamento: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 4xy vibrato: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Axy volume slide: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Cxx set volume: 1 use(s) are imported approximately (see doc/interchange.md). | Effect E1x fine portamento up: 1 use(s) are imported approximately (see doc/interchange.md). | Effect ECx note cut: 1 use(s) are imported approximately (see doc/interchange.md). | Effect EDx note delay: 1 use(s) are imported approximately (see doc/interchange.md)."
+   },
+   {
+    "stage": "read",
+    "code": "mod.effect.dropped",
+    "severity": "lost",
+    "count": 7,
+    "message": "Effect 7xy tremolo: 1 of 1 use(s) are not imported. | Effect 8xx set panning: 1 of 1 use(s) are not imported. | Effect 9xx sample offset: 1 of 1 use(s) are not imported. | Effect E4x vibrato waveform: 1 of 1 use(s) are not imported. | Effect E5x set finetune: 1 of 1 use(s) are not imported. | Effect E9x retrigger note: 1 of 1 use(s) are not imported. | Effect EFx invert loop: 1 of 1 use(s) are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "mod.note.delay",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 delayed note(s) (EDx) start on the nearest row."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "3 glides and 1 instrument with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "mod:effects -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "mod.effect.approx",
+    "severity": "approx",
+    "count": 13,
+    "message": "Effect 0xy arpeggio: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 1xx portamento up: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 2xx portamento down: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 3xx tone portamento: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 4xy vibrato: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Axy volume slide: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Cxx set volume: 1 use(s) are imported approximately (see doc/interchange.md). | Effect E1x fine portamento up: 1 use(s) are imported approximately (see doc/interchange.md). | Effect ECx note cut: 1 use(s) are imported approximately (see doc/interchange.md). | Effect EDx note delay: 1 use(s) are imported approximately (see doc/interchange.md)."
+   },
+   {
+    "stage": "read",
+    "code": "mod.effect.dropped",
+    "severity": "lost",
+    "count": 7,
+    "message": "Effect 7xy tremolo: 1 of 1 use(s) are not imported. | Effect 8xx set panning: 1 of 1 use(s) are not imported. | Effect 9xx sample offset: 1 of 1 use(s) are not imported. | Effect E4x vibrato waveform: 1 of 1 use(s) are not imported. | Effect E5x set finetune: 1 of 1 use(s) are not imported. | Effect E9x retrigger note: 1 of 1 use(s) are not imported. | Effect EFx invert loop: 1 of 1 use(s) are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "mod.note.delay",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 delayed note(s) (EDx) start on the nearest row."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 2,
+    "message": "2 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "3 glides and portamento notes are exported as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "mod:effects -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "mod.effect.approx",
+    "severity": "approx",
+    "count": 13,
+    "message": "Effect 0xy arpeggio: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 1xx portamento up: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 2xx portamento down: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 3xx tone portamento: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 4xy vibrato: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Axy volume slide: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Cxx set volume: 1 use(s) are imported approximately (see doc/interchange.md). | Effect E1x fine portamento up: 1 use(s) are imported approximately (see doc/interchange.md). | Effect ECx note cut: 1 use(s) are imported approximately (see doc/interchange.md). | Effect EDx note delay: 1 use(s) are imported approximately (see doc/interchange.md)."
+   },
+   {
+    "stage": "read",
+    "code": "mod.effect.dropped",
+    "severity": "lost",
+    "count": 7,
+    "message": "Effect 7xy tremolo: 1 of 1 use(s) are not imported. | Effect 8xx set panning: 1 of 1 use(s) are not imported. | Effect 9xx sample offset: 1 of 1 use(s) are not imported. | Effect E4x vibrato waveform: 1 of 1 use(s) are not imported. | Effect E5x set finetune: 1 of 1 use(s) are not imported. | Effect E9x retrigger note: 1 of 1 use(s) are not imported. | Effect EFx invert loop: 1 of 1 use(s) are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "mod.note.delay",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 delayed note(s) (EDx) start on the nearest row."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 2,
+    "message": "2 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "mod:effects -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "mod.effect.approx",
+    "severity": "approx",
+    "count": 13,
+    "message": "Effect 0xy arpeggio: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 1xx portamento up: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 2xx portamento down: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 3xx tone portamento: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 4xy vibrato: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Axy volume slide: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Cxx set volume: 1 use(s) are imported approximately (see doc/interchange.md). | Effect E1x fine portamento up: 1 use(s) are imported approximately (see doc/interchange.md). | Effect ECx note cut: 1 use(s) are imported approximately (see doc/interchange.md). | Effect EDx note delay: 1 use(s) are imported approximately (see doc/interchange.md)."
+   },
+   {
+    "stage": "read",
+    "code": "mod.effect.dropped",
+    "severity": "lost",
+    "count": 7,
+    "message": "Effect 7xy tremolo: 1 of 1 use(s) are not imported. | Effect 8xx set panning: 1 of 1 use(s) are not imported. | Effect 9xx sample offset: 1 of 1 use(s) are not imported. | Effect E4x vibrato waveform: 1 of 1 use(s) are not imported. | Effect E5x set finetune: 1 of 1 use(s) are not imported. | Effect E9x retrigger note: 1 of 1 use(s) are not imported. | Effect EFx invert loop: 1 of 1 use(s) are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "mod.note.delay",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 delayed note(s) (EDx) start on the nearest row."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "compile.advisory",
+    "severity": "info",
+    "count": 2,
+    "message": "CLASH: Move one note a semitone or shorten the overlap (at bar 1 v1) | FLAT: Estimated loudness varies by 1.4 dB; set section level or volume to build and release (at bar 1)"
+   }
+  ]
+ },
+ "mod:effects -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "mod.effect.approx",
+    "severity": "approx",
+    "count": 13,
+    "message": "Effect 0xy arpeggio: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 1xx portamento up: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 2xx portamento down: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 3xx tone portamento: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 4xy vibrato: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Axy volume slide: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Cxx set volume: 1 use(s) are imported approximately (see doc/interchange.md). | Effect E1x fine portamento up: 1 use(s) are imported approximately (see doc/interchange.md). | Effect ECx note cut: 1 use(s) are imported approximately (see doc/interchange.md). | Effect EDx note delay: 1 use(s) are imported approximately (see doc/interchange.md)."
+   },
+   {
+    "stage": "read",
+    "code": "mod.effect.dropped",
+    "severity": "lost",
+    "count": 7,
+    "message": "Effect 7xy tremolo: 1 of 1 use(s) are not imported. | Effect 8xx set panning: 1 of 1 use(s) are not imported. | Effect 9xx sample offset: 1 of 1 use(s) are not imported. | Effect E4x vibrato waveform: 1 of 1 use(s) are not imported. | Effect E5x set finetune: 1 of 1 use(s) are not imported. | Effect E9x retrigger note: 1 of 1 use(s) are not imported. | Effect EFx invert loop: 1 of 1 use(s) are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "mod.note.delay",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 delayed note(s) (EDx) start on the nearest row."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "3 glides and 1 instrument with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "mod:effects -> sidwizard": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "mod.effect.approx",
+    "severity": "approx",
+    "count": 13,
+    "message": "Effect 0xy arpeggio: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 1xx portamento up: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 2xx portamento down: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 3xx tone portamento: 4 use(s) are imported approximately (see doc/interchange.md). | Effect 4xy vibrato: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Axy volume slide: 4 use(s) are imported approximately (see doc/interchange.md). | Effect Cxx set volume: 1 use(s) are imported approximately (see doc/interchange.md). | Effect E1x fine portamento up: 1 use(s) are imported approximately (see doc/interchange.md). | Effect ECx note cut: 1 use(s) are imported approximately (see doc/interchange.md). | Effect EDx note delay: 1 use(s) are imported approximately (see doc/interchange.md)."
+   },
+   {
+    "stage": "read",
+    "code": "mod.effect.dropped",
+    "severity": "lost",
+    "count": 7,
+    "message": "Effect 7xy tremolo: 1 of 1 use(s) are not imported. | Effect 8xx set panning: 1 of 1 use(s) are not imported. | Effect 9xx sample offset: 1 of 1 use(s) are not imported. | Effect E4x vibrato waveform: 1 of 1 use(s) are not imported. | Effect E5x set finetune: 1 of 1 use(s) are not imported. | Effect E9x retrigger note: 1 of 1 use(s) are not imported. | Effect EFx invert loop: 1 of 1 use(s) are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "mod.note.delay",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 delayed note(s) (EDx) start on the nearest row."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 2,
+    "message": "2 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "3 glides and 1 instrument with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "rows.one-call",
+    "severity": "info",
+    "count": 1,
+    "message": "Rows are one player call long (note starts and ends fall on odd calls): the module is correct but large and uses the fastest tempo."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Instrument s01_sine_lead_a47_1: wavetable is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Instrument s01_sine_lead: vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 5,
+    "message": "5 notes carry bends, chord arpeggios, legato or an early gate-off that SID-Wizard rows of this export do not express."
+   },
+   {
+    "stage": "write",
+    "code": "expression.dropped",
+    "severity": "approx",
+    "count": 1,
+    "message": "Note velocities (3 distinct values) are not exported; the module plays at full volume."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 2,
+    "message": "2 tempo changes are not exported; the module has one tempo."
+   }
+  ]
+ }
+}

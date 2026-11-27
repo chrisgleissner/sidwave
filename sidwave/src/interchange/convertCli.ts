@@ -14,7 +14,7 @@ import { detectFormat, findFormat, formatDefinitions, listFormats, resolveTarget
 import type { Loss } from "./loss.js";
 
 export const CONVERT_HELP = `  sidwave convert <in> [<out>] [--to <format>] [--from <format>] [--song <n>] [--voices <n>] [--keep-score <file>]
-                  [--report <file>|-] [--strict] [--dry-run] [--verify] [--force] [--json]   (see "sidwave convert --help")
+                  [--sids 1-10] [--report <file>|-] [--strict] [--dry-run] [--verify] [--force] [--json]   (see "sidwave convert --help")
   sidwave formats [--json]
   sidwave info <file> [--from <format>] [--json]
 `;
@@ -40,6 +40,7 @@ Options:
   --to <format>        Target format (id, alias or extension). Run "sidwave formats" for the list.
   --from <format>      Input format; skips detection.
   --song <n>           Song or subtune, 1-based (default 1; a .sid: its start song).
+  --sids <n>           MOD only: keep 1 to 10 SIDs (3 voices each).
   --voices <n>         Keep at most n voices. The voices with the most notes x pitch range are kept; the others are listed as lost.
   --grid <beats>       Quantisation grid of MIDI and MusicXML input, in quarter notes (default 0.25).
   --mode PAL|NTSC      Clock of imported scores (default PAL).
@@ -58,7 +59,7 @@ Losses have a severity: info (nothing musical lost), approx (close, not equal) a
 Exit codes: 0 success; 1 --strict found a lost loss; 2 usage; 3 unreadable or ambiguous input; 4 engine unavailable; 5 limit.
 `;
 
-const VALUED = ["-o", "--output", "--to", "--from", "--song", "--voices", "--grid", "--mode", "--seconds", "--model", "--keep-score", "--report", "--title", "--allow-dir"];
+const VALUED = ["-o", "--output", "--to", "--from", "--song", "--voices", "--grid", "--mode", "--seconds", "--model", "--keep-score", "--report", "--title", "--allow-dir", "--sids"];
 const BARE = ["--strict", "--dry-run", "--verify", "--force", "--json", "-h", "--help"];
 
 const stem = (file: string): string => basename(file, extname(file)).replace(/\.sidwave$/i, "");
@@ -130,6 +131,7 @@ async function convertCommandInner(args: string[], io: CliIo): Promise<number> {
   const { bytes, path } = readBounded(io, file);
   const song = intFlag(a, "--song", 1);
   const voices = intFlag(a, "--voices", 1);
+  const sids = intFlag(a, "--sids", 1);
   const grid = numberFlag(a, "--grid");
   if (grid !== undefined && !(grid > 0)) throw new UsageError("--grid needs a number above 0");
   const seconds = numberFlag(a, "--seconds");
@@ -151,7 +153,7 @@ async function convertCommandInner(args: string[], io: CliIo): Promise<number> {
   const notices: string[] = [];
   const options = {
     inputName: file, ...(from === undefined ? {} : { from }), to: target.id,
-    ...(song === undefined ? {} : { song }), ...(voices === undefined ? {} : { voices }), ...(grid === undefined ? {} : { grid }),
+    ...(song === undefined ? {} : { song }), ...(voices === undefined ? {} : { voices }), ...(sids === undefined ? {} : { sids }), ...(grid === undefined ? {} : { grid }),
     ...(mode ? { mode } : {}), ...(model ? { model } : {}), ...(seconds === undefined ? {} : { seconds }), ...(title === undefined ? {} : { title }),
     verify: a.flags.has("--verify"),
     readOptions: confinedReadOptions(io.cwd, a.allowDirs, path),

@@ -14,6 +14,7 @@ export interface ReadContext {
   song?: number;
   grid?: number;
   voices?: number;
+  sids?: number;
   mode?: "PAL" | "NTSC";
   title?: string;
   /** Compile an import to prove that SIDWave accepts it. Default true. */
@@ -70,8 +71,11 @@ export interface FormatDefinition {
   readOnlyExtensions?: string[];
   /** Names accepted by `--from` and `--to` besides the id. */
   aliases?: string[];
-  /** Confidence 0..1 that `bytes` are this format, from the content only. 0 means not this format. */
-  magic(bytes: Uint8Array): number;
+  /**
+   * Confidence 0..1 that `bytes` are this format, from the content. 0 means not this format. `extension` is the lower-case
+   * extension of the file name (empty when there is none), for a content check that is too weak to use without it.
+   */
+  magic(bytes: Uint8Array, extension?: string): number;
   /** Short description of how the format is recognised, for `sidwave formats`. */
   detection: string;
   caps: FormatCaps;

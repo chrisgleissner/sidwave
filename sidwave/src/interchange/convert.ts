@@ -29,6 +29,7 @@ export interface ConvertOptions {
   /** Voice limit; the smaller of it and the target's own limit applies. */
   voices?: number;
   grid?: number;
+  sids?: number;
   mode?: "PAL" | "NTSC";
   title?: string;
   /** Seconds: the horizon of a reconstruct and the length of a WAV render. */
@@ -87,15 +88,24 @@ export function ambiguityMessage(name: string, detection: Detection, size?: numb
   return `cannot tell the format of ${name} with confidence: candidates ${list}. Pass ${fixes}.`;
 }
 
+function checkSids(sids: number | undefined, source: FormatDefinition): void {
+  if (sids === undefined) return;
+  if (source.id !== "mod") throw new UsageError(`--sids is supported only for MOD input; the input is ${source.id}`);
+  if (!Number.isInteger(sids) || sids < 1 || sids > 10) throw new UsageError(`--sids must be from 1 to 10; it is ${sids}`);
+}
+
 export function inputFormat(bytes: Uint8Array, options: ConvertOptions): { format: FormatDefinition; detection: Detection; viaFrom: boolean } {
   const name = options.inputName ?? "the input";
   const detection = detectFormat(bytes, options.inputName);
   if (options.from !== undefined) {
     const format = getFormat(options.from);
+    checkSids(options.sids, format);
     return { format, detection: { ...detection, warnings: [] }, viaFrom: true };
   }
   if (detection.ambiguous || !detection.best) throw new InterchangeUsageError(ambiguityMessage(name, detection, bytes.length));
-  return { format: getFormat(detection.best.id), detection, viaFrom: false };
+  const format = getFormat(detection.best.id);
+  checkSids(options.sids, format);
+  return { format, detection, viaFrom: false };
 }
 
 function parseScore(yaml: string, options: ConvertOptions): ParsedSidwave {
@@ -127,7 +137,7 @@ export async function convert(bytes: Uint8Array, options: ConvertOptions = {}): 
   const read = await source.read(bytes, {
     name: options.inputName ?? "input",
     ...(songNumber === undefined ? {} : { song: songNumber }),
-    ...(options.grid === undefined ? {} : { grid: options.grid }), ...(options.voices === undefined ? {} : { voices: options.voices }),
+    ...(options.grid === undefined ? {} : { grid: options.grid }), ...(options.voices === undefined ? {} : { voices: options.voices }), ...(options.sids === undefined ? {} : { sids: options.sids }),
     ...(options.mode ? { mode: options.mode } : {}), ...(options.title === undefined ? {} : { title: options.title }),
     ...(options.seconds === undefined ? {} : { seconds: options.seconds }),
     ...(options.createEngine ? { createEngine: options.createEngine } : {}), ...(options.signal ? { signal: options.signal } : {}), notice,

@@ -113,7 +113,7 @@ export function detectFormat(bytes: Uint8Array, name?: string, definitions: read
   const byExtension = ext ? definitions.filter((f) => f.extensions.includes(ext)) : [];
   const candidates: DetectionCandidate[] = [];
   for (const f of definitions) {
-    let confidence = f.magic(bytes);
+    let confidence = f.magic(bytes, ext);
     if (confidence <= 0) continue;
     let by: DetectionCandidate["by"] = "magic";
     if (confidence < CLEAR_MAGIC && byExtension.includes(f)) { confidence = Math.min(0.95, confidence + 0.35); by = "magic+extension"; }

@@ -29,3 +29,7 @@ export * from "./loss.js";
 export * from "./scorePlan.js";
 export * from "./registry.js";
 export * from "./convert.js";
+export * from "./mod.js";
+export * from "./modSamples.js";
+export * from "./modPlay.js";
+export * from "./modImport.js";
