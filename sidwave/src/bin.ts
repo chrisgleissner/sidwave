@@ -8,7 +8,7 @@ import { runCli } from "./cli.js";
 // SIGINT aborts the running operation through the signal; a second SIGINT ends the process at once.
 const controller = new AbortController();
 process.on("SIGINT", () => {
-  if (controller.signal.aborted) process.exit(130);
+  if (controller.signal.aborted) process.exit(5);
   controller.abort();
 });
 

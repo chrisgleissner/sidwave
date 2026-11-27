@@ -123,6 +123,17 @@ test("findLag returns a multiple of 96 samples within 24 ms and reports a late c
   assert.equal(findLag({ samples: reference }, reference, reference.length), 0);
 });
 
+test("the cached lag flux is recomputed when the horizon changes", () => {
+  const cache = { samples: reference };
+  const late = melody({ shiftSeconds: 0.012 });
+  findLag(cache, late, 24_000);
+  const short = cache.flux.length;
+  assert.equal(cache.fluxHorizon, 24_000);
+  findLag(cache, late, reference.length);
+  assert.equal(cache.fluxHorizon, reference.length);
+  assert.ok(cache.flux.length > short, `${cache.flux.length} > ${short}`);
+});
+
 test("one 30 ms burst in a rest of the tune is isolated: it fails with K=2 but not with K=6", () => {
   const withRest = new Int16Array(SR * 2);
   withRest.set(tone(440, 0.6), 0);

@@ -30,17 +30,34 @@ function sandbox() {
   return { dir, done: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
+import { createLibsidplayfpEngine } from "../src/engine/libsidplayfp.ts";
+/** Placeholder ROM images are not runnable, so the engine renders without them; the command still hashes and checks them. */
+const ignoreRoms = (emulation) => {
+  const engine = createLibsidplayfpEngine({ emulation });
+  return { id: engine.id, get version() { return engine.version; }, render: (req) => engine.render({ ...req, roms: undefined }), trace: (req) => engine.trace({ ...req, roms: undefined }) };
+};
+
 async function run(cwd, args, extra = {}) {
   const out = [], err = [], bytes = [];
   const code = await runCli(args, { cwd, out: (t) => out.push(t), err: (t) => err.push(t), outBytes: (b) => bytes.push(Buffer.from(b)), ...extra });
   return { code, out: out.join(""), err: err.join(""), bytes: Buffer.concat(bytes) };
 }
 
+function romDir(dir) {
+  const rom = path.join(dir, "roms");
+  fs.mkdirSync(rom, { recursive: true });
+  fs.writeFileSync(path.join(rom, "kernal.rom"), Buffer.alloc(8192, 1));
+  fs.writeFileSync(path.join(rom, "basic.rom"), Buffer.alloc(8192, 2));
+  fs.writeFileSync(path.join(rom, "chargen.rom"), Buffer.alloc(4096, 3));
+  return rom;
+}
+const pinnedRoms = { kernal: sha(Buffer.alloc(8192, 1)), basic: sha(Buffer.alloc(8192, 2)), chargen: sha(Buffer.alloc(4096, 3)) };
+
 function rulesFile(dir, overrides = {}, parameters = { thetaSpec: 2, thetaLevel: 3, sGap: 10, k: 2, m: 3 }) {
   const file = path.join(dir, "rules.json");
   fs.writeFileSync(file, JSON.stringify({
     schema: "sidwave-a1-rules/1", parameters,
-    conditions: { sampleRate: 48000, channels: 1, engine: { id: "libsidplayfp-wasm", version: engineVersion, emulation: "residfp" }, roms: { kernal: "k", basic: "b", chargen: "c" }, ...overrides },
+    conditions: { sampleRate: 48000, channels: 1, engine: { id: "libsidplayfp-wasm", version: engineVersion, emulation: "residfp" }, roms: pinnedRoms, ...overrides },
   }));
   return file;
 }
@@ -136,7 +153,7 @@ test("render and trace refuse bad options, over-budget runs and overwriting the 
       ["render", "a.yaml", "--song", "0"], ["render", "a.yaml", "--rate", "100"], ["render", "a.yaml", "--model", "9000"], ["render", "a.yaml", "--engine", "x"], ["render", "a.yaml", "--clock", "X"],
       ["render", "a.yaml", "--progress=1"], ["render", "a.yaml", "--seconds"], ["render", "a.yaml", "--strict"], ["render", "a.yaml", "-o", "a.yaml"],
       ["trace"], ["trace", "a.yaml", "--format", "xml"], ["trace", "a.yaml", "--json"], ["trace", "a.yaml", "--rate", "48000"], ["trace", "a.yaml", "-o", "a.yaml"],
-      ["verify"], ["verify", "a.yaml"], ["verify", "a.yaml", "b.yaml", "--level", "T9"], ["verify", "a.yaml", "b.yaml", "--rate", "48000"], ["verify", "a.yaml", "b.yaml", "-o", "x"],
+      ["verify"], ["verify", "a.yaml"], ["verify", "a.yaml", "b.yaml", "--level", "T9"], ["verify", "a.yaml", "b.yaml", "--rate", "48000"], ["verify", "a.yaml", "b.yaml", "--model", "8580"], ["verify", "a.yaml", "b.yaml", "-o", "x"],
       ["verify", "a.yaml", "b.yaml", "--tolerance-cycles", "-1"], ["verify", "a.yaml", "b.yaml", "--tolerance-cycles", "1.5"]]) {
       const result = await run(dir, args);
       assert.equal(result.code, EXIT_USAGE, args.join(" "));
@@ -220,9 +237,10 @@ test("verify A0 and A1: identical tunes reach T0, A1 evaluates under a rule file
   const { dir, done } = sandbox();
   try {
     const rules = rulesFile(dir);
+    const roms = romDir(dir);
     const a0 = JSON.parse((await run(dir, ["verify", "a.yaml", "a.yaml", "--seconds", "1", "--level", "A0", "--json"])).out);
     assert.equal(a0.result.levels.A0, "pass");
-    const a1 = await run(dir, ["verify", "a.yaml", "a.yaml", "--seconds", "1", "--a1-rules", rules, "--json", "--progress"]);
+    const a1 = await run(dir, ["verify", "a.yaml", "a.yaml", "--seconds", "1", "--a1-rules", rules, "--roms", roms, "--json", "--progress"], { createEngine: ignoreRoms });
     assert.equal(a1.code, EXIT_OK);
     const parsed = JSON.parse(a1.out);
     assert.equal(parsed.result.levels.A1, "pass");
@@ -231,13 +249,21 @@ test("verify A0 and A1: identical tunes reach T0, A1 evaluates under a rule file
     assert.equal(parsed.result.a1.badWindows, 0);
     assert.match(parsed.result.a1.rulesSha256, /^[0-9a-f]{64}$/);
     assert.match(a1.err, /progress: A1 render \d+%/);
-    const changed = await run(dir, ["verify", "a.yaml", "b.yaml", "--seconds", "1", "--a1-rules", rules]);
+    const changed = await run(dir, ["verify", "a.yaml", "b.yaml", "--seconds", "1", "--a1-rules", rules, "--roms", roms], { createEngine: ignoreRoms });
     assert.equal(changed.code, EXIT_FAILED);
     assert.match(changed.out, /A1 \(approximate\): \d+ of 92 windows differ, lag -?\d+ ms/);
     const wrongVersion = rulesFile(dir, { engine: { id: "libsidplayfp-wasm", version: "0.0.0", emulation: "residfp" } });
-    const notEvaluated = await run(dir, ["verify", "a.yaml", "a.yaml", "--seconds", "1", "--a1-rules", wrongVersion]);
+    const notEvaluated = await run(dir, ["verify", "a.yaml", "a.yaml", "--seconds", "1", "--a1-rules", wrongVersion, "--roms", roms], { createEngine: ignoreRoms });
     assert.equal(notEvaluated.code, EXIT_OK);
     assert.match(notEvaluated.out, /A1 \(approximate\): not evaluated \(The engine libsidplayfp-wasm .* differs from the pinned libsidplayfp-wasm 0\.0\.0\)/);
+    const noRoms = await run(dir, ["verify", "a.yaml", "a.yaml", "--seconds", "1", "--a1-rules", rules]);
+    assert.equal(noRoms.code, EXIT_OK);
+    assert.match(noRoms.out, /A1 \(approximate\): not evaluated \(The rule file pins the kernal ROM and none was supplied/);
+    const otherRom = path.join(dir, "other");
+    fs.mkdirSync(otherRom);
+    for (const f of ["kernal.rom", "basic.rom"]) fs.copyFileSync(path.join(roms, f), path.join(otherRom, f));
+    fs.writeFileSync(path.join(otherRom, "chargen.rom"), Buffer.alloc(4096, 9));
+    assert.match((await run(dir, ["verify", "a.yaml", "a.yaml", "--seconds", "1", "--a1-rules", rules, "--roms", otherRom])).out, /not evaluated \(The chargen ROM differs/);
     const missingRules = await run(dir, ["verify", "a.yaml", "a.yaml", "--seconds", "1", "--a1-rules", "nope.json"]);
     assert.equal(missingRules.code, EXIT_INPUT);
     fs.writeFileSync(path.join(dir, "bad-rules.json"), "{}");
@@ -337,6 +363,19 @@ test("library helpers: WAV encoding, trace formatting, ROM loading and the defau
   } finally { done(); }
 });
 
+test("a second SIGINT ends the process with exit 5", async () => {
+  const binJs = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist", "bin.js");
+  const { dir, done } = sandbox();
+  try {
+    const { spawn } = await import("node:child_process");
+    const child = spawn(process.execPath, [binJs, "render", "a.yaml", "--seconds", "180", "--progress", "-o", "x.wav"], { cwd: dir });
+    let count = 0;
+    child.stderr.on("data", () => { if (count++ === 0) { child.kill("SIGINT"); child.kill("SIGINT"); } });
+    const code = await new Promise((resolve) => child.on("close", resolve));
+    assert.ok(code === 5, `exit ${code}`);
+  } finally { done(); }
+});
+
 test("the built CLI aborts on SIGINT with exit 5 and keeps standard output clean", async () => {
   const binJs = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist", "bin.js");
   assert.ok(fs.existsSync(binJs), "dist/bin.js is missing; run npm run build");
@@ -359,5 +398,6 @@ test("the built CLI aborts on SIGINT with exit 5 and keeps standard output clean
     const help = spawnSync(process.execPath, [binJs, "--help"], { encoding: "utf8" });
     assert.match(help.stdout, /sidwave verify/);
     assert.match(help.stdout, /3 input or validation error/);
+    assert.match(help.stdout, /validate {3}Parse a score\. Exit 0 when it is valid, 3 with the path/);
   } finally { done(); }
 });

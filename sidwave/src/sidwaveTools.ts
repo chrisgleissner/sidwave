@@ -321,7 +321,6 @@ export interface VerifyTunesOptions extends RunControl {
   toleranceCycles?: number;
   clock?: SidClock;
   roms?: SystemRoms;
-  romHashes?: LoadedRoms["hashes"];
   /** Rule set for A1. Default: the frozen rule file shipped with the package. */
   rules?: A1Rules;
 }
@@ -362,7 +361,6 @@ export async function verifyTunes(reference: LoadedTune, candidate: LoadedTune, 
           engine: engineFor(options, "residfp"),
           rules: options.rules ?? loadRulesOrFail(),
           ...(options.roms ? { roms: options.roms } : {}),
-          ...(options.romHashes ? { romHashes: options.romHashes } : {}),
           ...(options.signal ? { signal: options.signal } : {}),
           ...(progress ? { onProgress: (f: number) => progress("A1 render", f) } : {}),
         },

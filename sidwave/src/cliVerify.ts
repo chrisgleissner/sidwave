@@ -216,7 +216,7 @@ export function formatVerify(report: VerifyReport): string {
 
 async function verifyCommand(io: CliIo, options: CommandOptions): Promise<number> {
   common("verify", options);
-  reject(options, "verify", ["rate", "engine"]);
+  reject(options, "verify", ["rate", "engine", "model"]);
   if (options.positional.length !== 2) throw new UsageError("verify needs a reference and a candidate");
   const run = options.run;
   const [reference, candidate] = loadInputs(io, options, options.positional) as [LoadedTune, LoadedTune];
@@ -230,7 +230,7 @@ async function verifyCommand(io: CliIo, options: CommandOptions): Promise<number
     seconds: run.seconds ?? defaultHorizon(reference, run.song, songlengths),
     ...(run.toleranceCycles === undefined ? {} : { toleranceCycles: run.toleranceCycles }),
     ...(run.clock ? { clock: run.clock } : {}),
-    ...(rom ? { roms: rom.roms, romHashes: rom.hashes } : {}),
+    ...(rom ? { roms: rom.roms } : {}),
     ...(rules ? { rules } : {}),
   });
   io.out(options.json ? `${JSON.stringify(envelope("verify", report.verdict === "pass", { result: report }), null, 2)}\n` : `${formatVerify(report)}\n`);

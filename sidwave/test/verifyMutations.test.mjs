@@ -262,3 +262,24 @@ test("a mutation that never compiles is reported with its last failure", () => {
   assert.equal(outcome.applied, false);
   assert.match(outcome.reason, /^the mutated score does not compile: Invalid SIDWAVE at \$\.cpu: the player needs up to \d+ cycles/);
 });
+
+test("whole-instrument and refactor mutations change exactly these leaves of the parsed score", () => {
+  const leaves = (name, cls, severity) => {
+    const outcome = apply(name, cls, severity, { horizonSeconds: 180 });
+    assert.equal(outcome.applied, true, `${cls} ${outcome.reason}`);
+    return diffPaths(parsed(readRawScore(read(name))), parsed(outcome.document));
+  };
+  assert.deepEqual(leaves("acid_line", "waveform", "1"), ["$.instruments.l2a.waveform"]);
+  assert.deepEqual(leaves("acid_line", "filter", "off"), ["$.instruments.bpa.filtertable"]);
+  assert.deepEqual(leaves("acid_line", "filter", "40"), ["$.instruments.bpa.filtertable.steps[0].hz"]);
+  assert.deepEqual(leaves("acid_line", "envelope", "attack_decay"), ["$.instruments.ohat.adsr[1]"]);
+  assert.deepEqual(leaves("acid_line", "pulse_width", "512"), ["$.instruments.line2.pulsetable.steps[0].value"]);
+  assert.deepEqual(leaves("acid_line", "refactor_duplicate_pattern", "1"), ["$.voices[0].patterns.bp1_dup", "$.timeline[0].layers.v1"]);
+  assert.deepEqual(leaves("acid_line", "sound_in_silence", "50ms"), ["$.voices[2].patterns.s2.groove[23]", "$.instruments.sw_burst"]);
+  // Sync and ring: only the flag of the frames that had one changes; the other frames of the table are untouched.
+  assert.deepEqual(leaves("metal_sync", "sync_ring", "off"), ["$.instruments.scr.wavetable[0].sync", "$.instruments.scr.wavetable[1].sync"]);
+  const rename = leaves("acid_line", "refactor_rename_instrument", "1");
+  assert.ok(rename.length > 5);
+  assert.ok(rename.every((p) => p.startsWith("$.voices[") || p.startsWith("$.instruments")), rename.join());
+  assert.ok(rename.filter((p) => p.endsWith(".inst")).length > 5);
+});

@@ -956,5 +956,12 @@
     "id": "libsidplayfp-wasm",
     "version": "1.1.1",
     "emulation": "residfp"
+  },
+  "limitations": {
+    "summary": "Most benign controls were vacuous (identical recompile read the same cached PCM; the rename and duplicate-pattern refactors compile to identical SIDs and were skipped). The effective benign set was 7 identical, 7 delay and 4 detune items. Two benign classes of the design were not implemented. Bases that do not compile to a PSID were excluded, among them ultisid_orchestra in this held-out set (more than three SID chips).",
+    "details": "a1-limitations.md",
+    "unsupportedBases": [
+      "example:ultisid_orchestra"
+    ]
   }
 }

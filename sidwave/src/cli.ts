@@ -30,7 +30,7 @@ Usage:
 ${RUN_HELP.usage}  sidwave --help | --version
 
 Commands:
-  validate   Parse a score. Exit 0 when it is valid, 1 with the path of the first error otherwise.
+  validate   Parse a score. Exit 0 when it is valid, 3 with the path of the first error otherwise.
   compile    Write a PRG (default) or PSID file. The output defaults to the input name with .prg or .sid in the
              current directory; "-o -" writes the bytes to standard output. With --format omitted, a -o name
              ending in .sid selects PSID. --json prints the format, sizes, addresses, SID count and duration.

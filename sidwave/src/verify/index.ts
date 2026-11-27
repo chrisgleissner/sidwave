@@ -83,9 +83,8 @@ export type A1VerifyOptions = {
   rules: A1Rules;
   /** Observation horizon of the audio comparison. Default: the verify horizon. */
   seconds?: number;
+  /** ROM images for the render. When the rule file pins ROM hashes, all three must be supplied and match. */
   roms?: SystemRoms;
-  /** Hex SHA-256 of each ROM in `roms`, compared with the rule file. */
-  romHashes?: { kernal?: string; basic?: string; chargen?: string };
   signal?: AbortSignal;
   onProgress?: (fraction: number) => void;
 };
@@ -418,11 +417,18 @@ async function evaluateA1(
     throw new VerifyError("invalid_options", `A1 seconds must be in (0, ${MAX_VERIFY_SECONDS}]`);
   }
   const conditions = a1.rules.conditions;
-  const mismatchedRom = conditions && a1.romHashes
-    ? (["kernal", "basic", "chargen"] as const).find((name) => a1.romHashes![name] !== undefined && a1.romHashes![name] !== conditions.roms[name])
-    : undefined;
-  if (mismatchedRom) {
-    return { level: "not evaluated", details: { status: A1_STATUS, reason: `The ${mismatchedRom} ROM differs from the ROM pinned in the A1 rule file` } };
+  if (conditions) {
+    // The rule file pins the ROMs. Hash the ROMs the render will use; when none are supplied the engine would use
+    // defaults whose identity is unknown, so A1 is not evaluated.
+    for (const name of ["kernal", "basic", "chargen"] as const) {
+      const image = a1.roms?.[name];
+      if (!image) {
+        return { level: "not evaluated", details: { status: A1_STATUS, reason: `The rule file pins the ${name} ROM and none was supplied, so the ROM in use is unknown; pass the pinned ROMs` } };
+      }
+      if (createHash("sha256").update(image).digest("hex") !== conditions.roms[name]) {
+        return { level: "not evaluated", details: { status: A1_STATUS, reason: `The ${name} ROM differs from the ROM pinned in the A1 rule file` } };
+      }
+    }
   }
   const request = {
     seconds, song: context.song, clock: context.clock, sampleRate: A1_SAMPLE_RATE, channels: 1 as const,

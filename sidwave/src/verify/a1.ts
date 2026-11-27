@@ -227,6 +227,8 @@ export interface A1Reference {
   samples: Int16Array;
   /** Flux of the first A1_LAG_SECONDS at hop A1_LAG_STEP, used for the lag search. */
   flux?: Float64Array;
+  /** The horizon in samples that `flux` was computed for. */
+  fluxHorizon?: number;
   /** Features at hop A1_HOP and offset 0, per window count. */
   features?: A1Features;
 }
@@ -242,7 +244,10 @@ function lagFlux(samples: Int16Array, horizonSamples: number): Float64Array {
  * the first 30 s. A positive lag means the candidate is late. Ties go to the smaller absolute lag.
  */
 export function findLag(reference: A1Reference, candidate: Int16Array, horizonSamples: number): number {
-  reference.flux ??= lagFlux(reference.samples, horizonSamples);
+  if (reference.flux === undefined || reference.fluxHorizon !== horizonSamples) {
+    reference.flux = lagFlux(reference.samples, horizonSamples);
+    reference.fluxHorizon = horizonSamples;
+  }
   const other = lagFlux(candidate, horizonSamples);
   let best = 0;
   let bestScore = pearson(reference.flux, other, 0);

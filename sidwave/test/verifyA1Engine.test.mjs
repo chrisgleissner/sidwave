@@ -1,5 +1,6 @@
 import test from "#test/runner";
 import assert from "#test/assert";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,18 +43,34 @@ test("A1 passes identical tunes and fails a changed melody on reSIDfp, naming th
 
 test("A1 reports why it was not evaluated", async () => {
   const original = await tune();
-  const pinned = (patch) => ({ ...unfrozenRules(), conditions: { sampleRate: 48000, channels: 1, engine: { id: "libsidplayfp-wasm", version: "1.1.1", emulation: "residfp" }, roms: { kernal: "k", basic: "b", chargen: "c" }, ...patch } });
-  const wrongEngine = await verifySid(original, original, { engine: sidlite, seconds: 1, a1: { engine: sidlite, rules: unfrozenRules() } });
+  const image = (fill, size = 8192) => new Uint8Array(size).fill(fill);
+  const roms = { kernal: image(1), basic: image(2), chargen: image(3, 4096) };
+  // The images are placeholders, not runnable ROMs, so the engine renders without them; only their hashes matter here.
+  const ignoringRoms = { id: residfp.id, get version() { return residfp.version; }, render: (req) => residfp.render({ ...req, roms: undefined }), trace: (req) => residfp.trace(req) };
+  const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const pinnedRoms = { kernal: hash(roms.kernal), basic: hash(roms.basic), chargen: hash(roms.chargen) };
+  const version = residfp.version === "unknown" ? "1.1.1" : residfp.version;
+  const pinned = (patch = {}) => ({ ...unfrozenRules(), conditions: { sampleRate: 48000, channels: 1, engine: { id: "libsidplayfp-wasm", version, emulation: "residfp" }, roms: pinnedRoms, ...patch } });
+  const run = (a1) => verifySid(original, original, { engine: sidlite, seconds: 1, a1 });
+  const wrongEngine = await run({ engine: sidlite, rules: unfrozenRules() });
   assert.equal(wrongEngine.levels.A1, "not evaluated");
   assert.match(wrongEngine.a1.reason, /requires reSIDfp rendering, not sidlite/);
-  const version = await verifySid(original, original, { engine: sidlite, seconds: 1, a1: { engine: residfp, rules: pinned({ engine: { id: "libsidplayfp-wasm", version: "0.0.1", emulation: "residfp" } }) } });
-  assert.equal(version.levels.A1, "not evaluated");
-  assert.match(version.a1.reason, /differs from the pinned libsidplayfp-wasm 0\.0\.1/);
-  const rom = await verifySid(original, original, { engine: sidlite, seconds: 1, a1: { engine: residfp, rules: pinned(), romHashes: { basic: "other" } } });
-  assert.equal(rom.levels.A1, "not evaluated");
-  assert.match(rom.a1.reason, /basic ROM differs/);
-  const matching = await verifySid(original, original, { engine: sidlite, seconds: 1, a1: { engine: residfp, rules: pinned({ engine: { id: "libsidplayfp-wasm", version: residfp.version === "unknown" ? "1.1.1" : residfp.version, emulation: "residfp" } }), romHashes: { basic: "b" } } });
+  assert.equal(wrongEngine.a1.status, "approximate");
+  const badVersion = await run({ engine: ignoringRoms, roms, rules: pinned({ engine: { id: "libsidplayfp-wasm", version: "0.0.1", emulation: "residfp" } }) });
+  assert.equal(badVersion.levels.A1, "not evaluated");
+  assert.match(badVersion.a1.reason, /differs from the pinned libsidplayfp-wasm 0\.0\.1/);
+  const unknown = await run({ engine: residfp, rules: pinned() });
+  assert.equal(unknown.levels.A1, "not evaluated");
+  assert.match(unknown.a1.reason, /pins the kernal ROM and none was supplied/);
+  const partial = await run({ engine: residfp, roms: { kernal: roms.kernal }, rules: pinned() });
+  assert.match(partial.a1.reason, /pins the basic ROM and none was supplied/);
+  const different = await run({ engine: residfp, roms: { ...roms, basic: image(9) }, rules: pinned() });
+  assert.equal(different.levels.A1, "not evaluated");
+  assert.match(different.a1.reason, /^The basic ROM differs from the ROM pinned/);
+  const matching = await run({ engine: ignoringRoms, roms, rules: pinned() });
   assert.equal(matching.levels.A1, "pass");
+  const unpinnedRules = await run({ engine: residfp, rules: unfrozenRules() });
+  assert.equal(unpinnedRules.levels.A1, "pass");
   const none = await verifySid(original, original, { engine: sidlite, seconds: 1 });
   assert.equal(none.levels.A1, "not evaluated");
   assert.equal(none.a1, undefined);

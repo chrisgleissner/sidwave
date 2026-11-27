@@ -67,7 +67,11 @@ sidwave --help | --version
 - `render` writes 16-bit mono PCM as a WAV file (48 kHz by default, reSIDfp by default). `trace` writes the SID register writes as CSV (`sid,address,value,cycle`) or JSON lines, to standard output or `-o`. `trace --json` needs `-o`, because standard output carries the trace otherwise.
 - `sid-info` prints the PSID/RSID header; with `--songlengths` it adds the length of each subtune.
 - `--allow-dir <dir>` (repeatable) permits `file:` sample sources below `<dir>`. Without it they must lie below the current directory (symbolic links are resolved first). The command never uses the network.
-- Run options of `verify`, `render` and `trace`: `--progress` writes progress to standard error (never standard output), `--max-seconds`, `--max-records` and `--max-bytes` bound the audio length, the trace size and the input and output size, `--roms <dir>` supplies `kernal.rom`, `basic.rom` and `chargen.rom`, `--model 6581|8580` and `--clock PAL|NTSC` override the header. Ctrl-C (SIGINT) aborts the run through an `AbortSignal` that is passed to the library; a second Ctrl-C ends the process at once.
+- Run options of `verify`, `render` and `trace`: `--progress` writes progress to standard error (never standard output), `--max-seconds`, `--max-records` and `--max-bytes` bound the audio length, the trace size and the input and output size, `--roms <dir>` supplies `kernal.rom`, `basic.rom` and `chargen.rom`, `--clock PAL|NTSC` overrides the header (and `--model 6581|8580` for `render`). Ctrl-C (SIGINT) aborts the run through an `AbortSignal` that is passed to the library; a second Ctrl-C ends the process at once.
+
+### Breaking changes of the command line
+
+Compared with the earlier command line: an invalid score and an unreadable input file now exit 3 (they exited 1 and 2); an unwritable output path exits 3 (it exited 2); a failed verdict is the only case that exits 1. With `--json` the output is now an envelope `{ "ok", "command", "result" }` or `{ "ok": false, "command", "error": { "category", "message", "details" } }` instead of one flat object per command, and the file name of a failed validation moved to `error.details.file`. A second Ctrl-C exits 5.
 
 ### JSON output, error categories and exit codes
 
@@ -378,6 +382,10 @@ const result = await verifySid(reference, candidate, { engine, seconds: 60, a1: 
 ```
 
 **Status: approximate.** On the held-out tunes the frozen rules accepted 15 of 98 material defects (false accepts 15.3 %, 95 % interval 9.5-23.7 %) and rejected 4 of 18 benign changes (false rejects 22.2 %, 9.0-45.2 %; all four are 3-cent detunes). The bound for "verified within declared bounds" is 5 % for both, so A1 stays "approximate": a pass means the audio is plausibly the same, not that it is proven. Pitch-only changes (waveform swaps, small timing shifts, pulse width, filter cutoff) are the weakest area. `result.a1.status` carries the status, the CLI prints it, and [`data/verify/a1-heldout-report.json`](data/verify/a1-heldout-report.json) lists the per-class rates and every misclassified case.
+
+**Limits of the calibration.** The error rates are less reliable than their intervals suggest. Most benign controls were vacuous: the identical recompile read the same cached PCM, and the instrument-rename and duplicate-pattern refactors compile to identical SIDs and were skipped, so the effective benign set was 7 identical, 7 one-sample-delay and 4 detune items. The false-reject rate says little about how often A1 rejects equivalent tunes. Two benign classes of the design (inaudible voice volume, register reordering) were not implemented, and bases that do not compile to a PSID (`digi_groove`, `wall_of_sid`, and `ultisid_orchestra` in the held-out set) were excluded. [`data/verify/a1-limitations.md`](data/verify/a1-limitations.md) lists these and the requirements for a second version (independently rendered benign controls that differ in their SID bytes).
+
+When the rule file pins ROM hashes, A1 hashes the ROMs it is given (`--roms <dir>` on the command line) and reports "not evaluated" with the reason if they are missing or differ.
 
 The thresholds come from `data/verify/a1-rules.json`, which `scripts/calibrate-a1.mjs` writes after a grid search over score-level mutations (wrong, missing and extra notes, octave errors, detuning, timing, envelope, waveform, pulse width, filter, sync and ring, percussion, sections) and benign refactors. See the rule file for the corpus, the split between development and held-out tunes, and the measured error rates.
 
