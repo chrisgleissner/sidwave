@@ -9,6 +9,7 @@ import { createLibsidplayfpEngine, psidClock, type SidEngine } from "../engine/l
 import { SidwaveOperationError } from "../cliCore.js";
 import { diffSidwave, type ChangeClass, type SemanticChange } from "../format/sidwaveFormat.js";
 import { REGISTER_CLASSES } from "../reconstruct/fdiff.js";
+import { isInitCall } from "../reconstruct/recover.js";
 import { bestFdiff, irOfTrace, stateOnlyIr, type FDiffSummary } from "../reconstruct/reconstruct.js";
 import { md5ForSonglengths, parseSidFile } from "../sidFile.js";
 import { parseSidwave } from "../sidwave.js";
@@ -81,12 +82,14 @@ export async function compare(a: CompareInput, b: CompareInput, options: Compare
   const [ta, tb] = await Promise.all([engine.trace(request(left.bytes)), engine.trace(request(right.bytes))]);
   const ira = irOfTrace(ta);
   const irb = irOfTrace(tb);
-  const fd = bestFdiff(ira, irb);
-  const fs = bestFdiff(stateOnlyIr(ira), stateOnlyIr(irb));
+  // The init call of each trace is skipped: the standard alignment of the reconstruction verdict.
+  const first = isInitCall(ira, 0) ? 1 : 0;
+  const fd = bestFdiff(ira, irb, first);
+  const fs = bestFdiff(stateOnlyIr(ira), stateOnlyIr(irb), first);
   const voices: CompareReport["voices"] = [];
   const voiceCount = Math.max(ira.sidCount, irb.sidCount) * 3;
   for (let v = 1; v <= voiceCount; v++) {
-    const s = bestFdiff(restrictIrToVoice(ira, v), restrictIrToVoice(irb, v));
+    const s = bestFdiff(restrictIrToVoice(ira, v), restrictIrToVoice(irb, v), first);
     voices.push({
       voice: v, equal: s.equal && !s.callCountMismatch, differingCalls: s.differingCalls,
       ...(s.first ? { first: { class: s.first.class, call: s.first.call, timeSeconds: s.first.timeSeconds, register: s.first.register, expected: s.first.expected, observed: s.first.observed } } : {}),
@@ -108,7 +111,7 @@ export async function compare(a: CompareInput, b: CompareInput, options: Compare
     });
     const notes: string[] = [];
     if (left.kind !== right.kind || left.kind === "score") {
-      notes.push("T0 and T1 compare the writes of one player: they are not applicable between a SIDWave-compiled score and another player, so a failure there is expected. The F-diff above is the diagnostic.");
+      notes.push("T0 and T1 compare the register writes of one player. They hold only when both inputs run the same player code with the same timing; between a SIDWave-compiled score and a tune with another player they are not applicable and a failure there is expected. The F-diff above is the diagnostic.");
     }
     if (ladder.a1?.reason) notes.push(`A1 was not evaluated: ${ladder.a1.reason}`);
     notes.push(`A1 calibration status: ${ladder.a1?.status ?? "approximate"}`);
