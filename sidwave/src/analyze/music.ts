@@ -174,7 +174,8 @@ export function estimateMetre(model: ScoreModel, declaredBasis: "observed" | "in
   const onsets = new Float64Array(beats);
   for (const n of model.notes) {
     if (n.percussion) continue;
-    const b = Math.min(beats - 1, Math.floor(n.start / model.framesPerBeat + 1e-9));
+    // A note up to an eighth of a beat before the beat line belongs to that beat (call rounding of the start).
+    const b = Math.min(beats - 1, Math.floor(n.start / model.framesPerBeat + 0.125));
     // A note that is held for two beats or more carries more accent than a short one.
     onsets[b]! += 1 + (n.end - n.start >= 2 * model.framesPerBeat ? 0.5 : 0);
   }
@@ -193,17 +194,25 @@ export function estimateMetre(model: ScoreModel, declaredBasis: "observed" | "in
     return sum;
   };
   for (const lag of [3, 4, 6, 8, 12]) autocorrelation[String(lag)] = round(r(lag), 4);
-  // A bar length L is supported when the accent pattern also repeats after two bars: score(L) = mean of r(L) and r(2L).
-  let best = model.meterBeats;
-  let bestScore = -Infinity;
-  for (const lag of [3, 4, 6]) {
-    const score = (autocorrelation[String(lag)]! + autocorrelation[String(lag * 2)]!) / 2;
-    // 4 wins ties against 6 and 3: it is the most common bar length.
-    if (score > bestScore + 1e-9 || (lag === 4 && score > bestScore - 0.02)) { bestScore = score; best = lag; }
-  }
+  // Downbeat accent: the score starts on a bar line, so for a bar length L the beats at positions 0, L, 2L, ... carry
+  // the downbeats. The accent of L is the mean onset strength at those beats divided by the mean over all beats.
+  // The autocorrelation is reported as supporting evidence.
+  const accent = (lag: number): number => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < beats; i += lag) { sum += onsets[i]!; n++; }
+    return mean > 0 && n > 0 ? sum / n / mean : 0;
+  };
+  const accents: Record<string, number> = {};
+  for (const lag of [3, 4, 6]) accents[String(lag)] = round(accent(lag), 4);
+  let best = 4;
+  // 4 wins ties: it is the most common bar length. 3 and 6 beats need a clearly stronger accent than 4.
+  for (const lag of [3, 6]) if (accents[String(lag)]! > accents[String(best)]! * 1.1 + 0.02) best = lag;
+  if (best === 6 && accents["3"]! * 1.05 >= accents["6"]!) best = 3;
+  Object.assign(autocorrelation, Object.fromEntries(Object.entries(accents).map(([k, v]) => [`accent${k}`, v])));
   return {
     declared: { basis: declaredBasis, ...(declaredBasis === "inferred" ? { method: "the reconstruction assumes four beats per bar and fits the tempo to the player call rate" } : {}), beatsPerBar: model.meterBeats, tempoBpm: round(model.tempo, 3), framesPerBeat: round(model.framesPerBeat, 4) },
-    detected: { basis: "inferred", method: "autocorrelation of note onsets per beat: bar length L scores the mean of the lags L and 2L", beatsPerBar: best, autocorrelation, agrees: best === model.meterBeats },
+    detected: { basis: "inferred", method: "mean onset strength on the beats 0, L, 2L, ... relative to all beats, for L = 3, 4 and 6", beatsPerBar: best, autocorrelation, agrees: best === model.meterBeats },
   };
 }
 
@@ -238,12 +247,15 @@ function labelOf(i: number): string {
 export function analyzeForm(model: ScoreModel, basis: Basis = "inferred"): FormReport {
   const bars = model.barStarts.length - 1;
   // Notes per bar: notes are sorted by start, bars by start frame, so one merge pass assigns them.
+  // Offsets and lengths are compared in eighths of a beat: a tempo that is not a whole number of calls per beat moves
+  // the same musical position by a call from bar to bar.
+  const quantum = model.framesPerBeat / 8;
   const parts: string[][] = Array.from({ length: Math.max(0, bars) }, () => []);
   let bar = 0;
   for (const n of model.notes) {
     while (bar + 1 < bars && n.start >= model.barStarts[bar + 1]!) bar++;
     if (bar >= bars) break;
-    parts[bar]!.push(`${n.start - model.barStarts[bar]!}.${n.voice}.${n.midi}.${n.inst}.${n.end - n.start}`);
+    parts[bar]!.push(`${Math.round((n.start - model.barStarts[bar]!) / quantum)}.${n.voice}.${n.midi}.${n.inst}.${Math.round((n.end - n.start) / (model.framesPerBeat / 2))}`);
   }
   const ids = new Map<string, number>();
   const sequence: number[] = parts.map((p) => {
@@ -288,12 +300,12 @@ export function analyzeForm(model: ScoreModel, basis: Basis = "inferred"): FormR
       };
     }
   }
-  const declaredLoop = model.loopFrame === undefined ? undefined : { basis: "observed" as Basis, startBar: model.barStarts.findIndex((f) => f >= model.loopFrame!) };
+  const declaredLoop = model.loopFrame === undefined ? undefined : { basis, ...(basis === "inferred" ? { method: "loop point of the reconstructed score" } : {}), startBar: model.barStarts.findIndex((f) => f >= model.loopFrame!) };
   return {
-    declaredSections: model.sections.map((s) => ({ basis: "observed", name: s.name, startBar: model.barStarts.indexOf(s.startFrame), bars: s.bars })),
+    declaredSections: model.sections.map((s) => ({ basis, ...(basis === "inferred" ? { method: "section of the reconstructed score; the tune itself declares none" } : {}), name: s.name, startBar: model.barStarts.indexOf(s.startFrame), bars: s.bars })),
     barLabels: sequence.map(labelOf).join(""),
     runs, distinctBars: ids.size, repetitions, repeatShare: bars === 0 ? 0 : round(repeated / bars, 4), ...(loop ? { loop } : {}), ...(declaredLoop ? { declaredLoop } : {}),
-    basis, method: "exact comparison of the notes of each bar (offset, voice, pitch, instrument, length)",
+    basis, method: "comparison of the notes of each bar (offset in eighths of a beat, length in half beats, voice, pitch, instrument)",
   };
 }
 
@@ -302,7 +314,7 @@ export function analyzeForm(model: ScoreModel, basis: Basis = "inferred"): FormR
 export interface Motif extends Marked {
   /** Semitone steps between consecutive notes. */
   intervals: number[];
-  /** Inter-onset intervals in calls between consecutive notes. */
+  /** Inter-onset intervals between consecutive notes in eighths of a beat. */
   rhythm: number[];
   notes: number;
   occurrenceCount: number;
@@ -336,13 +348,14 @@ export function mineMotifs(model: ScoreModel): Motif[] {
   };
   const covered = new Set<string>();
   const result: Motif[] = [];
+  const quantum = model.framesPerBeat / 8;
   for (const length of MOTIF_LENGTHS) {
     const groups = new Map<string, Array<{ voice: number; index: number }>>();
     for (const [voice, list] of byVoice) {
       if (list.length < length) continue;
       // Pair i describes the step from note i to note i+1.
       const pairs: string[] = new Array(list.length - 1);
-      for (let i = 0; i + 1 < list.length; i++) pairs[i] = `${list[i + 1]!.midi - list[i]!.midi}:${list[i + 1]!.start - list[i]!.start}`;
+      for (let i = 0; i + 1 < list.length; i++) pairs[i] = `${list[i + 1]!.midi - list[i]!.midi}:${Math.round((list[i + 1]!.start - list[i]!.start) / quantum)}`;
       for (let i = 0; i + length <= list.length; i++) {
         const key = pairs.slice(i, i + length - 1).join(" ");
         let g = groups.get(key);
@@ -373,7 +386,7 @@ export function mineMotifs(model: ScoreModel): Motif[] {
       const steps = c.key.split(" ").map((s) => s.split(":").map(Number) as [number, number]);
       for (const p of c.places) for (let k = 0; k < length; k++) covered.add(`${p.voice}:${p.index + k}`);
       result.push({
-        basis: "inferred", method: "exact n-gram mining of (interval, inter-onset interval) pairs, at least 3 non-overlapping occurrences",
+        basis: "inferred", method: "n-gram mining of (interval, inter-onset interval in eighths of a beat) pairs, at least 3 non-overlapping occurrences",
         intervals: steps.map((s) => s[0]), rhythm: steps.map((s) => s[1]), notes: length, occurrenceCount: c.places.length,
         occurrences: c.places.slice(0, MOTIF_LOCATIONS).map((p) => {
           const note = byVoice.get(p.voice)![p.index]!;

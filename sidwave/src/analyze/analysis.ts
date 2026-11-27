@@ -59,8 +59,9 @@ export interface AnalysisReport {
   /** SID input: how well the reconstruction reproduces the tune, which bounds the musical facts. */
   reconstruction?: { strictExact: boolean; registerStateExact: boolean; notes: number; instruments: number; differingCalls: number; basis: "observed" };
   key?: KeyEstimate;
-  metre: MetreEstimate;
-  form: FormReport;
+  /** Absent when the reconstruction of a SID tune could not be parsed as a score (see limits). */
+  metre?: MetreEstimate;
+  form?: FormReport;
   motifs: Motif[];
   voices: Array<VoiceUse & { trace?: TraceVoiceFacts }>;
   techniques: Technique[];
@@ -155,7 +156,7 @@ function musicSections(doc: ParsedSidwave, basis: "observed" | "inferred") {
 export async function analyzeScore(text: string, options: AnalyzeScoreOptions = {}): Promise<AnalysisReport> {
   const doc = parseSidwave(text, options.read ?? {});
   const parts = musicSections(doc, "observed");
-  const compiled = compileSidwaveBytes(doc, { format: "sid" });
+  const compiled = compileSidwaveBytes(doc, { format: "prg" });
   const s = compiled.summary;
   const report: AnalysisReport = {
     schema: ANALYSIS_SCHEMA,
@@ -176,7 +177,7 @@ export async function analyzeScore(text: string, options: AnalyzeScoreOptions = 
   };
   if (options.engine) {
     const seconds = Math.min(options.seconds ?? s.durationSeconds, DEFAULT_HORIZON_SECONDS);
-    const bytes = new Uint8Array(compiled.bytes);
+    const bytes = new Uint8Array(compileSidwaveBytes(doc, { format: "sid" }).bytes);
     const trace = await options.engine.trace({ sid: bytes, seconds, clock: doc.song.mode });
     const ir = irOfTrace(trace);
     const observed = techniquesFromIr(ir);
@@ -202,8 +203,13 @@ export async function analyzeSid(sidBytes: Uint8Array, options: AnalyzeSidOption
   // The trace of the original was cached by the reconstruction.
   const trace = await engine.trace({ sid: sidBytes, song, seconds, clock });
   const ir = irOfTrace(trace);
-  const doc = parseSidwave(score);
-  const parts = musicSections(doc, "inferred");
+  let parts: ReturnType<typeof musicSections> | undefined;
+  let musicError: string | undefined;
+  try {
+    parts = musicSections(parseSidwave(score), "inferred");
+  } catch (error) {
+    musicError = error instanceof Error ? error.message : String(error);
+  }
   const facts = new Map(traceVoiceFacts(ir).map((f) => [f.voice, f]));
   const differing = rec.fdiff.differingCalls;
   const resources: ResourceReport = {
@@ -218,14 +224,16 @@ export async function analyzeSid(sidBytes: Uint8Array, options: AnalyzeSidOption
     source: { kind: "sid", sha256: sha256(sidBytes), md5: md5(sidBytes), song, title: file.name, author: file.author, released: file.released },
     horizon: { seconds, calls: ir.calls.length, clock: trace.clock, song },
     reconstruction: summariseReconstruction(rec, differing),
-    key: parts.key, metre: parts.metre, form: parts.form, motifs: parts.motifs,
-    voices: parts.voices.map((v) => ({ ...v, ...(facts.has(v.voice) ? { trace: facts.get(v.voice)! } : {}) })),
+    ...(parts ? { key: parts.key, metre: parts.metre, form: parts.form } : {}),
+    motifs: parts?.motifs ?? [],
+    voices: parts ? parts.voices.map((v) => ({ ...v, ...(facts.has(v.voice) ? { trace: facts.get(v.voice)! } : {}) })) : [],
     techniques: techniquesFromIr(ir),
     resources,
     limits: [
       "Notes, key, metre, form, motifs and roles come from the SIDWave reconstruction of the tune within the horizon; they are inferred and are only as good as the reconstruction (see reconstruction).",
       "Techniques, voice register ranges and resources are observed in the register trace of the original tune within the horizon.",
       "The cycle figures are the span between the first and last SID write of a call; the engine does not report the CPU cycles of the player.",
+      ...(musicError ? [`The reconstruction could not be used for musical facts (${musicError}); key, metre, form, motifs and voice roles are omitted.`] : []),
       ...(rec.unsupported.length ? [`The trace holds ${rec.unsupported.length} feature(s) the language cannot express (see sample playback and the reconstruction report); musical facts leave them out.`] : []),
     ],
   };
@@ -254,14 +262,18 @@ export function formatAnalysis(report: AnalysisReport): string {
     L.push(`Key ${tag(k)}: ${k.tonic} ${k.mode}, correlation ${k.correlation}, margin ${k.margin}, confidence ${k.confidence} (runner-up ${k.runnerUp.tonic} ${k.runnerUp.mode} ${k.runnerUp.correlation})`);
   } else L.push("Key: no pitched notes");
   const m = report.metre;
-  L.push(`Metre, declared ${tag(m.declared)}: ${m.declared.beatsPerBar} beats per bar at ${m.declared.tempoBpm} BPM`);
-  L.push(`Metre, detected ${tag(m.detected)}: ${m.detected.beatsPerBar} beats per bar${m.detected.agrees ? " (agrees)" : " (differs)"}`);
+  if (m) {
+    L.push(`Metre, declared ${tag(m.declared)}: ${m.declared.beatsPerBar} beats per bar at ${m.declared.tempoBpm} BPM`);
+    L.push(`Metre, detected ${tag(m.detected)}: ${m.detected.beatsPerBar} beats per bar${m.detected.agrees ? " (agrees)" : " (differs)"}`);
+  }
   const f = report.form;
-  L.push(`Form ${tag(f)}: ${f.barLabels.length} bars, ${f.distinctBars} distinct, ${Math.round(f.repeatShare * 100)}% repeat an earlier bar`);
-  if (f.runs.length) L.push(`  bar labels: ${f.runs.length <= 40 ? f.runs.map((r) => (r.bars > 1 ? `${r.label}x${r.bars}` : r.label)).join(" ") : `${f.runs.slice(0, 40).map((r) => (r.bars > 1 ? `${r.label}x${r.bars}` : r.label)).join(" ")} ...`}`);
-  for (const s of f.declaredSections) L.push(`  section "${s.name}" ${tag(s)}: bar ${s.startBar + 1}, ${s.bars} bars`);
-  if (f.loop) L.push(`  loop ${tag(f.loop)}: from bar ${f.loop.startBar + 1}, period ${f.loop.periodBars} bars, ${f.loop.repeats} repeats`);
-  if (f.declaredLoop) L.push(`  declared loop ${tag(f.declaredLoop)}: bar ${f.declaredLoop.startBar + 1}`);
+  if (f) {
+    L.push(`Form ${tag(f)}: ${f.barLabels.length} bars, ${f.distinctBars} distinct, ${Math.round(f.repeatShare * 100)}% repeat an earlier bar`);
+    if (f.runs.length) L.push(`  bar labels: ${f.runs.length <= 40 ? f.runs.map((r) => (r.bars > 1 ? `${r.label}x${r.bars}` : r.label)).join(" ") : `${f.runs.slice(0, 40).map((r) => (r.bars > 1 ? `${r.label}x${r.bars}` : r.label)).join(" ")} ...`}`);
+    for (const s of f.declaredSections) L.push(`  section "${s.name}" ${tag(s)}: bar ${s.startBar + 1}, ${s.bars} bars`);
+    if (f.loop) L.push(`  loop ${tag(f.loop)}: from bar ${f.loop.startBar + 1}, period ${f.loop.periodBars} bars, ${f.loop.repeats} repeats`);
+    if (f.declaredLoop) L.push(`  declared loop ${tag(f.declaredLoop)}: bar ${f.declaredLoop.startBar + 1}`);
+  }
   L.push(`Motifs: ${report.motifs.length}`);
   for (const mo of report.motifs.slice(0, 8)) {
     L.push(`  ${mo.notes} notes, intervals ${mo.intervals.join(" ")}, rhythm ${mo.rhythm.join(" ")} calls, ${mo.occurrenceCount} times in voice ${mo.voices.join(",")} (first at bar ${mo.occurrences[0]!.bar + 1})`);
