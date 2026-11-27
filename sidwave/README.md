@@ -115,7 +115,7 @@ sidwave watch song.yaml --loop-section chorus           # edit, save, listen
 sidwave watch song.yaml --no-play --json                # check only, one JSON object per event
 ```
 
-`play` takes a SIDWave score, a PSID or RSID file, or any input that `convert` reads (MIDI, MusicXML, GoatTracker, Furnace, SID-Wizard, MOD and the others). `watch` takes a score. `sidwave play --help` and `sidwave watch --help` list every option.
+`play` takes a SIDWave score, a PSID or RSID file, or any input that `convert` reads (MIDI, MusicXML, ABC, GoatTracker, Furnace, SID-Wizard, MOD and the others). `watch` takes a score. `sidwave play --help` and `sidwave watch --help` list every option.
 
 | Target | What it uses | Notes |
 | --- | --- | --- |

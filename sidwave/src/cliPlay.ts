@@ -49,7 +49,7 @@ Usage:
   sidwave play <file> [--target local|vice|u64] [options]
 
 A SIDWave score is compiled and played once. A SID file (PSID or RSID) plays until Ctrl-C. Other files (MIDI,
-MusicXML, GoatTracker, Furnace, SID-Wizard, MOD, ...) are imported as by "sidwave convert" and then played. Ctrl-C
+MusicXML, ABC, GoatTracker, Furnace, SID-Wizard, MOD, ...) are imported as by "sidwave convert" and then played. Ctrl-C
 stops the sound, ends the player or VICE and exits with status 0.
 
 ${SHARED_OPTIONS}  --from-bar <n>             Start at bar <n> of a score. The local target starts exactly there; VICE and the
