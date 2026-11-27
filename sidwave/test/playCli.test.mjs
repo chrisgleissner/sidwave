@@ -17,11 +17,16 @@ const SID = compileSidwaveBytes(parseSidwave(SCORE), { format: "sid" }).bytes;
 async function world(body) {
   const box = sandbox("sidwave-play-cli-");
   const programs = await fakePrograms(box.dir);
+  // Whatever a test leaves running when it fails is ended here, so that a failure never hangs the run.
+  const stop = new AbortController();
+  const children = [];
   try {
     box.write("song.yaml", SCORE);
     box.write("tune.sid", SID);
-    await body({ box, programs, player: programs.program("player", "player"), listener: programs.program("listener", "slow") });
+    await body({ box, programs, stop, children, player: programs.program("player", "player"), listener: programs.program("listener", "slow") });
   } finally {
+    stop.abort();
+    for (const child of children) child.kill("SIGKILL");
     await programs.close();
     box.done();
   }
@@ -123,8 +128,7 @@ test("play renders a score to the player and reports the result", async () => {
 });
 
 test("an interrupt stops the playback and exits 0", async () => {
-  await world(async ({ box, programs, listener }) => {
-    const stop = new AbortController();
+  await world(async ({ box, programs, listener, stop }) => {
     const run = cli(box.dir, ["play", "song.yaml", "--player", listener, "--loop", "--json"], { signal: stop.signal });
     const start = await programs.start();
     await programs.event("audio");
@@ -161,10 +165,15 @@ test("the password of the Ultimate comes from the environment and is not printed
 });
 
 test("watch --no-play prints places and exits 3 when the last version is invalid, 0 when it is valid", async () => {
-  await world(async ({ box }) => {
+  await world(async ({ box, stop: whole }) => {
     box.write("bad.yaml", SCORE.replace(/^tempo:.*$/m, "tempo: fast"));
+    const controller = () => {
+      const own = new AbortController();
+      whole.signal.addEventListener("abort", () => own.abort());
+      return own;
+    };
     for (const [file, code, wanted] of [["bad.yaml", 3, /\] error bad\.yaml:\d+:\d+: Invalid SIDWAVE at \$\.tempo/], ["song.yaml", 0, /\] ok: Neon Run, 3 voices, 1 SID, \d+ lint findings?[^\n]*\n\s+song\.yaml:\d+:\d+: [A-Z-]+: /]]) {
-      const stop = new AbortController();
+      const stop = controller();
       const run = cli(box.dir, ["watch", file, "--no-play"], { signal: stop.signal });
       await run.out.next(() => true, "the first report");
       stop.abort();
@@ -173,7 +182,7 @@ test("watch --no-play prints places and exits 3 when the last version is invalid
       assert.match(result.out, wanted);
       assert.match(result.err, /watching .*checking only.*Ctrl-C stops/);
     }
-    const stop = new AbortController();
+    const stop = controller();
     const run = cli(box.dir, ["watch", "bad.yaml", "--no-play", "--json"], { signal: stop.signal });
     await run.out.next((line) => line.includes('"error"'), "the error event");
     stop.abort();
@@ -184,12 +193,13 @@ test("watch --no-play prints places and exits 3 when the last version is invalid
 });
 
 test("watch plays through the command line and stops the player when interrupted", async () => {
-  await world(async ({ box, programs, listener }) => {
-    const stop = new AbortController();
+  await world(async ({ box, programs, listener, stop }) => {
+    // The example has an `end` and plays once; without it the watch loops it.
+    box.write("song.yaml", SCORE.replace(/^end:.*$/m, ""));
     const run = cli(box.dir, ["watch", "song.yaml", "--player", listener, "--debounce", "20"], { signal: stop.signal });
     const first = await programs.start();
     await run.out.next((line) => line.includes("playing on local audio through listener, looping"), "playing");
-    fs.writeFileSync(path.join(box.dir, "song.yaml"), SCORE.replace(/^tempo: *\d+/m, "tempo: 99"));
+    fs.writeFileSync(path.join(box.dir, "song.yaml"), SCORE.replace(/^end:.*$/m, "").replace(/^tempo: *\d+/m, "tempo: 99"));
     const second = await programs.start();
     await within(first.exited, "the end of the replaced player");
     await run.out.next((line) => /playing on .* s after the change/.test(line), "playing again");
@@ -200,8 +210,9 @@ test("watch plays through the command line and stops the player when interrupted
 });
 
 /** Starts the built command and waits for a line of output. */
-function command(cwd, args) {
+function command(cwd, args, children) {
   const child = spawn(process.execPath, [binJs, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+  children.push(child);
   const lines = eventQueue();
   for (const stream of [child.stdout, child.stderr]) stream.on("data", (data) => lines.push(String(data)));
   const exited = new Promise((resolve) => child.once("exit", (code, signal) => resolve({ code, signal })));
@@ -211,8 +222,8 @@ function command(cwd, args) {
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   test(`${signal} ends play, its player and exits 0`, { skip: process.platform === "win32" && "no POSIX signals" }, async () => {
     assert.ok(fs.existsSync(binJs), `${binJs} is missing: run "npm run build" before the tests`);
-    await world(async ({ box, programs, listener }) => {
-      const run = command(box.dir, ["play", "tune.sid", "--player", listener]);
+    await world(async ({ box, programs, listener, children }) => {
+      const run = command(box.dir, ["play", "tune.sid", "--player", listener], children);
       const player = await programs.start();
       await run.line(/playing tune\.sid/);
       run.child.kill(signal);
@@ -223,9 +234,9 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
 }
 
 test("SIGTERM ends watch and its VICE and removes the temporary files", { skip: process.platform === "win32" && "no POSIX signals" }, async () => {
-  await world(async ({ box, programs }) => {
+  await world(async ({ box, programs, children }) => {
     const vice = programs.program("vsid", "vice-stubborn");
-    const run = command(box.dir, ["watch", "song.yaml", "--target", "vice", "--vice", vice]);
+    const run = command(box.dir, ["watch", "song.yaml", "--target", "vice", "--vice", vice], children);
     const emulator = await programs.start();
     await run.line(/playing on VICE \(vsid\)/);
     assert.ok(fs.existsSync(emulator.args.at(-1)));
@@ -237,7 +248,7 @@ test("SIGTERM ends watch and its VICE and removes the temporary files", { skip: 
 });
 
 test("a process that exits without stopping the playback takes its children with it", async () => {
-  await world(async ({ box, programs }) => {
+  await world(async ({ box, programs, children }) => {
     const vice = programs.program("vsid", "vice-stubborn");
     const module = pathToFileURL(path.join(packageRoot, "dist", "play", "index.js")).href;
     box.write("exit.mjs", [
@@ -248,6 +259,7 @@ test("a process that exits without stopping the playback takes its children with
       "process.stdin.once('data', () => process.exit(7));",
     ].join("\n"));
     const child = spawn(process.execPath, [path.join(box.dir, "exit.mjs")], { cwd: box.dir, stdio: ["pipe", "ignore", "inherit"] });
+    children.push(child);
     const exited = new Promise((resolve) => child.once("exit", resolve));
     const emulator = await programs.start();
     child.stdin.end("go");

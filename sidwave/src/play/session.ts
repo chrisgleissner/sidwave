@@ -72,8 +72,8 @@ export function openPlayTarget(options: TargetOptions, cwd: string = process.cwd
   return {
     play(tune, { seconds } = {}) {
       const duration = length(tune, seconds);
-      // A score with samples or more than three SIDs is run as a PRG.
-      const upload = tune.sid
+      // A score with samples or more than three SIDs, or one that needs turbo speed, is run as a PRG.
+      const upload = tune.sid && !tune.needsPrg
         ? { kind: "sid" as const, bytes: tune.sid, ...(tune.song === undefined ? {} : { song: tune.song }) }
         : { kind: "prg" as const, bytes: tune.prg! };
       return startUltimatePlayback({ device: options.device, tune: upload, ...(duration === undefined ? {} : { seconds: duration }), ...(options.detach ? { detach: true } : {}) });

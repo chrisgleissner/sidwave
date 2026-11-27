@@ -54,6 +54,8 @@ sidwave verify   <reference.sid|score> <candidate.sid|score> [--song <n>] [--sec
 sidwave render   <file.sid|score> [-o <out.wav>] [--song <n>] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite]
 sidwave trace    <file.sid|score> [-o <out>] [--format csv|jsonl] [--song <n>] [--seconds <s>]
 sidwave reconstruct <file.sid> [--song <n>] [--seconds <s>] [-o <score.yaml>] [--json]
+sidwave play     <file> [--target local|vice|u64] [--host <h>] [options]     (see Playing and watching)
+sidwave watch    <score> [--loop-section <name>] [--no-play] [options]
 sidwave sid info|edit|player <file.sid|dir> [options]      (sid-info is the old name of "sid info")
 sidwave songlengths lookup|verify|write ...
 sidwave stil parse|query ...
@@ -100,6 +102,48 @@ With `--json` every command prints one JSON document on standard output:
 | `internal` | 70 | an unexpected error |
 
 Operational failures never use exit code 1, so a failed verdict cannot be mistaken for a broken run. Every command is a library function (`compileSidwaveBytes`, `lintSidwave`, `loadTune`, `verifyTunes`, `renderTune`, `traceTune`, `sidInfo`, ...); the command line only translates arguments and output. `classifyError` maps any thrown error to its category.
+
+## Playing and watching
+
+```sh
+sidwave play song.yaml                                  # play a score once
+sidwave play song.yaml --solo 1,2 --from-bar 17         # two voices, from bar 17
+sidwave play tune.sid --song 2 --seconds 30             # a PSID or RSID file
+sidwave play melody.mid --target vice                   # any file that convert reads
+sidwave play song.yaml --target u64 --host 192.168.1.20 # an Ultimate 64, C64 Ultimate or Ultimate-II
+sidwave watch song.yaml --loop-section chorus           # edit, save, listen
+sidwave watch song.yaml --no-play --json                # check only, one JSON object per event
+```
+
+`play` takes a SIDWave score, a PSID or RSID file, or any input that `convert` reads (MIDI, MusicXML, GoatTracker, Furnace, SID-Wizard, MOD and the others). `watch` takes a score. `sidwave play --help` and `sidwave watch --help` list every option.
+
+| Target | What it uses | Notes |
+| --- | --- | --- |
+| `local` (default) | The libsidplayfp engine renders in 20 ms slices into `paplay`, `pw-play`, `aplay`, `ffplay`, `mpv` or sox `play`, the first one on `PATH`. `--player` or `SIDWAVE_PLAYER` names another program, which receives a WAV stream on standard input. | Needs the optional package `libsidplayfp-wasm`. Plays at most 3 SIDs. Does not play digi samples; the other voices of such a score are played. |
+| `vice` | `vsid` for a SID file, else `x64sc` or `x64` with the PRG, without a window. `--vice` or `SIDWAVE_VICE` names the program, `--vice-arg` passes arguments to it. | Needed for digi samples (PRG) and 4 SIDs. Your VICE settings apply; they are not saved. |
+| `u64` | The Ultimate REST API: upload and run (`runners:sidplay`, or `runners:run_prg` for a score with samples, more than 3 SIDs or `cpu: turbo`), and `machine:reset` to stop. | Only with `--target u64 --host <h>`. The network password is read from `SIDWAVE_U64_PASSWORD`. Redirects are refused. `--detach` leaves the machine playing. The command does not change the device configuration. |
+
+Behaviour:
+
+- `play` plays a score once; `--loop` repeats it. A score with `end` plays once in any case. A SID file plays until Ctrl-C unless `--seconds` is given. `watch` loops by default.
+- Ctrl-C, SIGTERM and SIGHUP stop the sound, end the audio player or VICE (or reset the Ultimate) and exit 0. The processes that were started are also ended when `sidwave` exits for another reason. A `sidwave` process that is killed with SIGKILL cannot do this.
+- `--song` counts from 1, as for `render` and `convert`.
+- `--solo` and `--mute` take voice ids, voice names or digi voice ids. A voice that echoes, follows or doubles another voice is heard only together with its source. Ring modulation, hard sync and a shared filter still depend on the voices that were silenced.
+- `--from-bar` cuts the score at the section that contains the bar. The local target then discards the audio up to the bar and starts exactly there. VICE and the Ultimate start at the first bar of that section. Voice state that earlier sections would have left behind is not reproduced.
+- `--loop-section` loops one section, named or given by its position in the timeline. If its last note is too short to be followed by its first note, a bar of rest separates the repeats, and the command says so.
+- `watch` watches the directories of the score, of the `file:` samples it reads and of the libraries it imports, so it follows editors that save by renaming a new file over the old one. It waits for 60 ms without changes (`--debounce`). A save that changes nothing does not restart the music. An invalid version is reported as `file:line:column` and the last valid version keeps playing.
+
+Library: `sidwave/play` exports `readPlaySource`, `buildPlayTune`, `openPlayTarget`, `watchScore`, `selectScore` and the targets.
+
+```ts
+import { readFileSync } from "node:fs";
+import { buildPlayTune, openPlayTarget, readPlaySource } from "sidwave/play";
+
+const target = openPlayTarget({ kind: "local" });
+const source = await readPlaySource(readFileSync("song.yaml"), { name: "song.yaml" });
+const playback = target.play(buildPlayTune(source, { target: "local", solo: ["1"] }), { seconds: 10 });
+await playback.done; // playback.stop() ends it earlier
+```
 
 ## Using the player in a game
 

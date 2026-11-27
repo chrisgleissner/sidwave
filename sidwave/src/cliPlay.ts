@@ -83,7 +83,7 @@ file over the old one. A valid version restarts playback; an invalid one is repo
 valid version keeps playing. Lint findings are listed with their place. Ctrl-C ends the watch and the playback.
 
 ${SHARED_OPTIONS}  --from-bar <n>             Start at bar <n> (local target; VICE and the Ultimate start at the section).
-  --loop / --no-loop         The tune repeats (default) or plays once per save.
+  --loop / --no-loop         The tune repeats (default) or plays once per save. A score with "end" plays once.
   --no-play                  Only check: compile and lint, play nothing, need no player.
   --debounce <ms>            Quiet time after the last change before the file is read (default 60).
   --json                     One JSON object per line for every event (ok, error, playing, finished, missing,
@@ -181,7 +181,8 @@ async function report(command: string, args: readonly string[], io: CliIo, body:
     return await body();
   } catch (error) {
     const failure = classifyError(error);
-    if (args.includes("--json")) io.out(`${JSON.stringify(envelope(command, false, { error: failure }))}\n`);
+    // The output of watch is one JSON object per line.
+    if (args.includes("--json")) io.out(`${JSON.stringify(envelope(command, false, { error: failure }), null, command === "watch" ? undefined : 2)}\n`);
     else if (failure.category === "usage") io.err(`sidwave: ${failure.message}\nRun "sidwave ${command} --help" for usage.\n`);
     else if (failure.category === "validation" && typeof failure.details.file === "string") io.err(`${failure.details.file}: ${failure.message}\n`);
     else io.err(`sidwave: ${failure.message}\n`);
@@ -206,7 +207,7 @@ export function runPlayCli(args: string[], io: CliIo): Promise<number> {
     try {
       const source = await readPlaySource(bytes, {
         name: file, readOptions: confinedReadOptions(io.cwd, options.allowDirs, resolve(io.cwd, file)), signal: stop.signal,
-        notice: (message) => io.err(`${message}\n`),
+        notice: (message) => io.err(`${message}\n`), ...(options.tune.song === undefined ? {} : { song: options.tune.song }),
         ...(io.createEngine ? { createEngine: io.createEngine } : {}), ...(last(p, "--from") === undefined ? {} : { from: last(p, "--from")! }),
       });
       const tune = buildPlayTune(source, { ...options.tune, loop: p.flags.has("--loop"), file });

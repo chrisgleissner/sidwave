@@ -15,13 +15,16 @@ import { selectScore, type ScoreSelection } from "./select.js";
 import type { PlayTarget } from "./types.js";
 
 export type PlaySource =
-  | { kind: "score"; format: string; doc: ParsedSidwave; notes: string[] }
+  /** `songChosen`: the importer already took the song asked for, so the score holds that song only. */
+  | { kind: "score"; format: string; doc: ParsedSidwave; notes: string[]; songChosen?: boolean }
   | { kind: "sid"; format: "sid"; bytes: Uint8Array; notes: string[] };
 
 export interface SourceOptions {
   name: string;
   /** Input format, as for `sidwave convert --from`; default: detected. */
   from?: string;
+  /** Song of an imported file with several songs, 1-based. For scores and SID files it is chosen by buildPlayTune. */
+  song?: number;
   readOptions?: SidwaveReadOptions;
   createEngine?: (emulation: SidEmulation) => SidEngine;
   signal?: AbortSignal;
@@ -54,15 +57,17 @@ export async function readPlaySource(bytes: Uint8Array, options: SourceOptions):
     return { kind: "sid", format: "sid", bytes, notes: [] };
   }
   if (!format.read) throw new SidwaveOperationError("input", `${options.name} is ${format.id}, which cannot be read; "sidwave formats" lists the formats that can be played`);
+  const { song } = options;
+  if (song !== undefined && song > 1 && !format.songs) throw new SidwaveOperationError("input", `--song ${song}: a ${format.name} file holds one song (1 is the first)`);
   const notes: string[] = [];
   const read = await format.read(bytes, {
-    name: options.name, notice: (message) => options.notice?.(message),
+    name: options.name, ...(song === undefined ? {} : { song }), notice: (message) => options.notice?.(message),
     ...(options.createEngine ? { createEngine: options.createEngine } : {}), ...(options.signal ? { signal: options.signal } : {}),
   });
   const lost = read.losses.reduce((sum, loss) => sum + (loss.severity === "info" ? 0 : 1), 0);
   if (lost) notes.push(`imported from ${format.id} with ${lost} kind${lost === 1 ? "" : "s"} of loss ("sidwave convert" lists them)`);
   else notes.push(`imported from ${format.id}`);
-  return { kind: "score", format: format.id, doc: parse(read.yaml), notes };
+  return { kind: "score", format: format.id, doc: parse(read.yaml), notes, ...(song === undefined ? {} : { songChosen: true }) };
 }
 
 /** A compiled tune, ready for a target. */
@@ -74,6 +79,8 @@ export interface PlayTune {
   sidUnavailable?: string;
   /** The PRG of a score; a SID file has none. */
   prg?: Uint8Array;
+  /** A device must run the PRG, not play the SID file: the PRG switches the CPU to turbo speed. */
+  needsPrg?: boolean;
   /** 1-based song of the SID file; absent for the song of the header. */
   song?: number;
   /** Length of one pass from the start of the compiled tune; unknown for a SID file. */
@@ -111,7 +118,8 @@ export function buildPlayTune(source: PlaySource, options: TuneOptions): PlayTun
     };
   }
   const run = <T>(fn: () => T): T => (options.file === undefined ? fn() : withFile(options.file, fn));
-  let selected = selectScore(source.doc, options, options.loop ?? false);
+  const selection: TuneOptions = source.songChosen ? { ...options, song: undefined } : options;
+  let selected = selectScore(source.doc, selection, options.loop ?? false);
   const compile = (score: ParsedSidwave) => compileSidwaveToPrg(score, { loop: selected.loop });
   let compiled: CompileResult;
   try {
@@ -119,7 +127,7 @@ export function buildPlayTune(source: PlaySource, options: TuneOptions): PlayTun
   } catch (error) {
     // A section that ends on a very short note cannot be followed by its own first note; a bar of rest makes room.
     if (options.loopSection === undefined || !/hard restart calls after the preceding note/.test((error as Error).message)) throw error;
-    selected = selectScore(source.doc, options, options.loop ?? false, 1);
+    selected = selectScore(source.doc, selection, options.loop ?? false, 1);
     compiled = run(() => compile(selected.doc));
   }
   const { doc, loop } = selected;
@@ -153,7 +161,13 @@ export function buildPlayTune(source: PlaySource, options: TuneOptions): PlayTun
     notes.push(`playback starts at bar ${selected.startBar}, the start of the section that contains bar ${options.fromBar}; only the local target starts inside a section`);
     tune.skipSeconds = 0;
   } else if (options.fromBar !== undefined) tune.startBar = options.fromBar;
-  if (doc.cpu === "turbo" && options.target !== "u64") notes.push("the score needs a turbo CPU; at 1 MHz it may not play at the right speed");
+  if (doc.cpu === "turbo") {
+    tune.needsPrg = true;
+    notes.push(options.target === "u64"
+      ? "the score needs a turbo CPU: set Turbo Control of the device to its Turbo Registers mode; the PRG selects the speed"
+      : "the score needs a turbo CPU; at 1 MHz it may not play at the right speed");
+  }
+  if (doc.sids.length > 4 && options.target === "vice") notes.push(`VICE plays at most 4 SIDs; the score has ${doc.sids.length}`);
   if (doc.sids.length > 1 && options.target === "u64") notes.push(`set the SID addresses of the device to ${doc.sids.map((s) => `$${s.address.toString(16).toUpperCase()}`).join(", ")} before playing`);
   return tune;
 }

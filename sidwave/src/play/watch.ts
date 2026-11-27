@@ -144,7 +144,14 @@ export async function watchScore(options: WatchOptions): Promise<WatchSummary> {
       try {
         // Every event of the directory leads to a look at the watched files only; other files are ignored that way.
         const watcher = watch(dir, check);
-        watcher.on("error", (error) => fail(new SidwaveOperationError("input", `cannot watch ${dir}: ${error.message}`, { file: dir })));
+        watcher.on("error", (error) => {
+          if (dir === dirname(path)) fail(new SidwaveOperationError("input", `cannot watch ${dir}: ${error.message}`, { file: dir }));
+          else {
+            // The directory of a sample or library went away; it is watched again when a build reads from it.
+            watcher.close();
+            watchers.delete(dir);
+          }
+        });
         watchers.set(dir, watcher);
       } catch (error) {
         if (dir === dirname(path)) throw new SidwaveOperationError("input", `cannot watch ${dir}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: dir });

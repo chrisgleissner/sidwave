@@ -142,10 +142,10 @@ function findSection(entries: Entry[], name: string): Entry {
 }
 
 /** The score cut to `parts` (in order), with the positional sample triggers moved along. */
-function cut(doc: ParsedSidwave, parts: Entry[], loopTo: number | undefined): ParsedSidwave {
+function cut(doc: ParsedSidwave, parts: Entry[], loopTo: number | undefined, end?: ParsedSidwave["end"]): ParsedSidwave {
   const timeline = parts.map((e) => e.section);
   const length_bars = parts.reduce((sum, e) => sum + e.bars, 0);
-  const result: ParsedSidwave = { ...doc, timeline, loopTo, end: undefined, song: { ...doc.song, length_bars } };
+  const result: ParsedSidwave = { ...doc, timeline, loopTo, end, song: { ...doc.song, length_bars } };
   if (!doc.samples?.triggers.length) return result;
   const before = playedSections(doc).clock;
   const after = playedSections(result).clock;
@@ -185,6 +185,11 @@ export function selectScore(score: ParsedSidwave, selection: ScoreSelection = {}
   const voices = selectVoices(doc, selection.solo ?? [], selection.mute ?? []);
   doc = voices.doc;
   const notes = [...voices.notes];
+  // A score with `end` plays once; the compiler ignores a wish to loop it. One section of it can still be looped.
+  if (loop && doc.end && loopSection === undefined) {
+    loop = false;
+    notes.push("the score has an end, so it plays once");
+  }
   if (fromBar === undefined && loopSection === undefined) return { doc, loop, startBar: 1, skipSeconds: 0, notes };
 
   const { entries, clock } = playedSections(doc);
@@ -211,6 +216,6 @@ export function selectScore(score: ParsedSidwave, selection: ScoreSelection = {}
     ? clock.sections[index]!.at(barBeat) - clock.sections[index]!.startTime
     : (barBeat - entry.startBeat) * 60 / doc.song.tempo;
   // An unchanged score keeps its `end`, so that --from-bar 1 plays what the score plays.
-  const cutDoc = index === 0 && parts.length === entries.length ? doc : cut(doc, parts, loopTo);
+  const cutDoc = index === 0 && parts.length === entries.length ? doc : cut(doc, parts, loopTo, doc.end);
   return { doc: cutDoc, loop, startBar: entry.bar, skipSeconds, notes };
 }

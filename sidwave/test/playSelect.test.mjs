@@ -71,7 +71,7 @@ test("--from-bar inside a section starts at the section and says how much to ski
 });
 
 test("--from-bar with a loop plays the rest of the song and then repeats what the song repeats", () => {
-  const doc = example("chiptune_drive");
+  const doc = { ...example("chiptune_drive"), end: undefined };
   const clock = clockOf(doc);
   const sections = clock.sections.length;
   const bar = clock.barOf(clock.sections[3].startBeat);
@@ -103,6 +103,29 @@ test("--loop-section plays the notes of one section, by name or by position, and
   assert.ok(section);
   assert.throws(() => selectScore(doc, { loopSection: "nowhere" }), /no such section; its sections/);
   assert.throws(() => selectScore(doc, { loopSection: "99" }), /no such section/);
+});
+
+test("a score with an end plays once, also from a bar, and one section of it can loop", () => {
+  const doc = example("drum_and_bass");
+  assert.ok(doc.end);
+  const looped = selectScore(doc, {}, true);
+  assert.equal(looped.loop, false);
+  assert.match(looped.notes.join("\n"), /plays once/);
+  const later = selectScore(doc, { fromBar: 9 }, true);
+  assert.equal(later.loop, false);
+  assert.deepEqual(later.doc.end, doc.end);
+  assert.equal(selectScore(doc, { loopSection: "build" }, false).loop, true);
+});
+
+test("a turbo score runs as a PRG on a device and the notes say what to set", () => {
+  const doc = example("wall_of_sid");
+  assert.equal(doc.cpu, "turbo");
+  const device = buildPlayTune({ kind: "score", format: "sidwave", doc, notes: [] }, { target: "u64" });
+  assert.equal(device.needsPrg, true);
+  assert.match(device.notes.join("\n"), /Turbo Registers/);
+  assert.match(device.notes.join("\n"), /set the SID addresses/);
+  const emulator = buildPlayTune({ kind: "score", format: "sidwave", doc, notes: [] }, { target: "vice" });
+  assert.match(emulator.notes.join("\n"), /at 1 MHz[\s\S]*at most 4 SIDs/);
 });
 
 test("a section that cannot be followed by itself gets a bar of rest between the repeats", () => {
@@ -206,6 +229,16 @@ test("a file that convert reads is imported into a score", async () => {
   assert.match(source.notes[0], /imported from midi/);
   assert.ok(buildPlayTune(source, { target: "local" }).sid);
   await assert.rejects(readPlaySource(bytesOf("not music"), { name: "a.bin" }), /cannot tell the format/);
+});
+
+test("--song reaches the importer of a file with several songs", async () => {
+  const gt = await convert(bytesOf(readExampleScore("chiptune_drive")), { to: "goattracker", inputName: "a.yaml" });
+  const source = await readPlaySource(gt.output, { name: "a.sng", song: 1 });
+  assert.equal(source.songChosen, true);
+  assert.ok(buildPlayTune(source, { target: "local", song: 1 }).sid);
+  await assert.rejects(readPlaySource(gt.output, { name: "a.sng", song: 2 }), /song/i);
+  const midi = await convert(bytesOf(readExampleScore("chiptune_drive")), { to: "midi", inputName: "a.yaml" });
+  await assert.rejects(readPlaySource(midi.output, { name: "a.mid", song: 2 }), /holds one song/);
 });
 
 test("validation paths and lint positions point at line and column", () => {

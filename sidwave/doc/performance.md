@@ -72,6 +72,26 @@ average of 20 to 30 on 8 cores, so it is closer to a worst case than to a best c
 | CLI cold start: `--help` | 200 ms wall | 120-175 ms | Node start-up and module loading |
 | CLI cold start: `validate` | 400 ms wall | 300-370 ms | module loading, then a cold parse |
 | CLI cold start: `compile` | 1 s wall | 0.7-0.85 s | cold code paths of the compiler |
+| CLI cold start: `play --help`, `watch --help` | 180 ms CPU | 160-180 ms | module loading of the compiler and the playback modules |
+| `play`: engine start of a tune | 200 ms CPU | 150 ms | reSIDfp computes its filter model when a tune is loaded (SIDLite: under 20 ms) |
+| `watch`: save to sound, local engine and vsid | 1.5 s wall | see below | debounce, compile, then the engine or the start of vsid |
+
+### Save to sound
+
+Measured from the rename that saves the score to the first non-silent sample, with `sidwave watch`, on 8 cores at a
+load average of 15 to 18 (7 saves per row; the first start of the command is not included). For the local engine the
+audio player was replaced by a program that reads the stream; a real player adds its buffer, about 0.1 to 0.15 s. For
+VICE the sound device was a named pipe.
+
+| Score | Local engine, median (maximum) | VICE, median (maximum) |
+| --- | --- | --- |
+| `fuer_elise` | 0.46 s (0.58 s) | 0.71 s (0.91 s) |
+| `acid_line` | 0.66 s (1.14 s) | 1.02 s (1.35 s) |
+| `chiptune_drive` | 0.82 s (0.93 s) | 1.10 s (1.39 s) |
+| `digi_groove` (x64sc, which boots BASIC first) | not played with samples | 2.23 s (2.60 s) |
+
+At a load average of 41 the medians were 1.4 s (local) and 1.8 s (vsid) for `chiptune_drive`. The first sound after
+starting `watch` takes 1 to 3 s. The target of 1.5 s is not met for scores that need `x64sc` (digi samples, 4 SIDs).
 
 Why these values: the YAML package is the floor for parsing, formatting and merging; the budgets for those leave room
 above what it needs. Compiling has no external floor, so its budget is the measured cost with a margin, and the
