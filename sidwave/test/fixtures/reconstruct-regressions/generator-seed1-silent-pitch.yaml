@@ -1,0 +1,287 @@
+# Library instruments of the generator (ambient style, shrunk): voice 2 holds a frequency register value (0x0116) while its gate is off, before its first note.
+# First difference (register-state F-diff): {"class":"pitch","call":0,"timeSeconds":0,"voice":2,"register":7,"expected":22,"observed":0}
+# Shrunk from the generator score of seed 1 (fixed seed, see test/helpers/reconstructRoundTrip.mjs); the horizon of the test is 3 s.
+sidwave: "1.1"
+title: Signal 1 | ambient
+tempo: 80
+mode: PAL
+speed: 1
+instruments:
+  ambient_bell:
+    waveform: tri
+    adsr:
+      - 0
+      - 4
+      - 7
+      - 5
+    wavetable:
+      - wave: tri
+        note: "+12"
+      - wave: tri
+voices:
+  - id: 1
+    name: Bass and drums
+    instrument: lib:filter_bass
+    patterns:
+      Bass:
+        length: 0.25
+        groove:
+          - C2
+          - "-"
+          - "-"
+          - C3@lib:hat
+          - "-"
+          - "-"
+          - C3
+          - "-"
+          - "-"
+          - "-"
+          - C3@lib:snare
+          - C2
+          - "-"
+          - "-"
+          - C3@lib:kick
+          - "-"
+          - G2
+          - "-"
+          - "-"
+          - C3@lib:hat
+          - "-"
+          - "-"
+          - G3
+          - "-"
+          - "-"
+          - "-"
+          - C3@lib:snare
+          - G2
+          - "-"
+          - "-"
+          - C3@lib:kick
+          - "-"
+          - A2
+          - "-"
+          - "-"
+          - C3@lib:hat
+          - "-"
+          - "-"
+          - A3
+          - "-"
+          - "-"
+          - "-"
+          - C3@lib:snare
+          - A2
+          - "-"
+          - "-"
+          - C3@lib:kick
+          - "-"
+          - F2
+          - "-"
+          - "-"
+          - C3@lib:hat
+          - "-"
+          - "-"
+          - F3
+          - "-"
+          - "-"
+          - "-"
+          - C3@lib:snare
+          - F2
+          - "-"
+          - "-"
+          - C3@lib:kick
+          - "-"
+          - C2
+          - "-"
+          - "-"
+          - C3@lib:hat
+          - "-"
+          - "-"
+          - C3
+          - "-"
+          - "-"
+          - "-"
+          - C3@lib:snare
+          - C2
+          - "-"
+          - "-"
+          - C3@lib:kick
+          - "-"
+          - G2
+          - "-"
+          - "-"
+          - C3@lib:hat
+          - "-"
+          - "-"
+          - G3
+          - "-"
+          - "-"
+          - "-"
+          - C3@lib:snare
+          - G2
+          - "-"
+          - "-"
+          - C3@lib:kick
+          - "-"
+          - A2
+          - "-"
+          - "-"
+          - C3@lib:hat
+          - "-"
+          - "-"
+          - A3
+          - "-"
+          - "-"
+          - "-"
+          - C3@lib:snare
+          - A2
+          - "-"
+          - "-"
+          - C3@lib:kick
+          - "-"
+          - F2
+          - "-"
+          - "-"
+          - C3@lib:hat
+          - "-"
+          - "-"
+          - F3
+          - "-"
+          - "-"
+          - "-"
+          - C3@lib:snare
+          - F2
+          - "-"
+          - "-"
+          - C3@lib:kick
+          - "-"
+  - id: 2
+    name: Harmony
+    patterns:
+      Chords:
+        length: 0.5
+        groove:
+          - note: C3
+            len: 2
+            inst: lib:pad_slow
+          - note: C3
+            len: 1.5
+            inst: lib:chip_arp_major
+          - C3@ambient_bell
+          - note: G3
+            len: 2
+            inst: lib:pad_slow
+          - note: G3
+            len: 1.5
+            inst: lib:chip_arp_major
+          - G3@ambient_bell
+          - note: A3
+            len: 2
+            inst: lib:pad_slow
+          - note: A3
+            len: 1.5
+            inst: lib:chip_arp_minor
+          - A3@ambient_bell
+          - note: F3
+            len: 2
+            inst: lib:pad_slow
+          - note: F3
+            len: 1.5
+            inst: lib:chip_arp_major
+          - F3@ambient_bell
+          - note: C3
+            len: 2
+            inst: lib:pad_slow
+          - note: C3
+            len: 1.5
+            inst: lib:chip_arp_major
+          - C3@ambient_bell
+          - note: G3
+            len: 2
+            inst: lib:pad_slow
+          - note: G3
+            len: 1.5
+            inst: lib:chip_arp_major
+          - G3@ambient_bell
+          - note: A3
+            len: 2
+            inst: lib:pad_slow
+          - note: A3
+            len: 1.5
+            inst: lib:chip_arp_minor
+          - A3@ambient_bell
+          - note: F3
+            len: 2
+            inst: lib:pad_slow
+          - note: F3
+            len: 1.5
+            inst: lib:chip_arp_major
+          - F3@ambient_bell
+  - id: 3
+    name: Lead
+    instrument: lib:lead_pwm
+    patterns:
+      Lead:
+        length: 0.5
+        groove:
+          - note: C3
+            len: 1.5
+          - note: E3
+            len: 0.5
+            legato: true
+            portamento: 7
+          - note: G3
+            len: 1.5
+          - "-"
+          - note: B3
+            len: 1.5
+            inst: ambient_bell
+          - note: A3
+            len: 0.5
+            legato: true
+            portamento: 7
+          - note: B3
+            len: 1.5
+          - "-"
+          - note: E4
+            len: 1.5
+          - note: C4
+            len: 0.5
+            legato: true
+            portamento: 7
+          - note: E4
+            len: 1.5
+          - "-"
+          - note: C4
+            len: 1.5
+            inst: ambient_bell
+          - note: B3
+            len: 0.5
+            legato: true
+            portamento: 7
+          - note: F3
+            len: 1.5
+          - "-"
+          - note: C3
+            len: 1.5
+          - note: E3
+            len: 0.5
+            legato: true
+            portamento: 7
+          - note: G3
+            len: 1.5
+          - "-"
+          - note: B3
+            len: 1.5
+            inst: ambient_bell
+          - note: A3
+            len: 0.5
+            legato: true
+            portamento: 7
+          - note: B3
+            len: 1.5
+          - "-"
+          - note: E3
+timeline:
+  - bars: 8
+    layers:
+      v1: Bass

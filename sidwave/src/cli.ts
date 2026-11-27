@@ -10,6 +10,7 @@ import {
   classifyError, envelope, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, SidwaveOperationError, UsageError, withFile,
   type CliIo,
 } from "./cliCore.js";
+import { RECONSTRUCT_COMMAND_HELP, RECONSTRUCT_USAGE, reconstructCommand } from "./cliReconstruct.js";
 import { RUN_COMMANDS, RUN_HELP, flagName, takeRunFlag, type RunFlags } from "./cliVerify.js";
 import {
   compileSidwaveBytes, confinedReadOptions, describeSidwave, isExampleName, lintSidwave, listSidwaveExamples,
@@ -27,7 +28,7 @@ Usage:
                           [--symbols-all] [--no-measure] [--format bin|sid] [-o <out>] [--loop|--no-loop] [--json]
   sidwave lint     <file> [--loop|--no-loop] [--strict] [--json] [--allow-dir <dir>]
   sidwave examples [<name>] [-o <dir>] [--force] [--json]
-${RUN_HELP.usage}  sidwave --help | --version
+${RUN_HELP.usage}${RECONSTRUCT_USAGE}  sidwave --help | --version
 
 Commands:
   validate   Parse a score. Exit 0 when it is valid, 3 with the path of the first error otherwise.
@@ -46,7 +47,7 @@ Commands:
              finding that is not an informational note.
   examples   Without a name, list the bundled example scores. With a name, print the score, or write
              <name>.yaml into the directory given by -o (it is not overwritten without --force).
-${RUN_HELP.commands}
+${RUN_HELP.commands}${RECONSTRUCT_COMMAND_HELP}
 Options:
   --allow-dir <dir>   Allow "file:" sample sources below <dir>. Without it they must lie below the current
                       directory. May be repeated. The sidwave command never uses the network.
@@ -350,7 +351,7 @@ function examples(io: CliIo, options: Options): number {
 }
 
 type Command = (io: CliIo, options: Options) => number | Promise<number>;
-const COMMANDS: Record<string, Command> = { validate, compile, lint, examples, ...RUN_COMMANDS };
+const COMMANDS: Record<string, Command> = { validate, compile, lint, examples, ...RUN_COMMANDS, reconstruct: reconstructCommand };
 
 /** Reports a failure in the form the caller asked for and returns the exit code of its category. */
 function fail(io: CliIo, json: boolean, command: string, error: unknown): number {
@@ -384,7 +385,7 @@ export function runCli(args: string[], io: CliIo): number | Promise<number> {
     const options = parseArgs(rest, name);
     if (options.help) { io.out(HELP); return EXIT_OK; }
     if (options.version) { io.out(`${packageVersion()}\n`); return EXIT_OK; }
-    if (!Object.prototype.hasOwnProperty.call(RUN_COMMANDS, name)) rejectRunFlags(options, name);
+    if (!Object.prototype.hasOwnProperty.call(RUN_COMMANDS, name) && name !== "reconstruct") rejectRunFlags(options, name);
     const outcome = command(io, options);
     return outcome instanceof Promise ? outcome.catch((error: unknown) => fail(io, json, name, error)) : outcome;
   } catch (error) {

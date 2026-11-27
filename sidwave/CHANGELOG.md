@@ -14,6 +14,7 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 
 - `sidwave verify`, `render`, `trace` and `sid-info` commands; `--json` on every command; `--progress`, `--max-seconds`, `--max-records`, `--max-bytes`; SIGINT cancellation. Library functions `verifyTunes`, `renderTune`, `traceTune`, `sidInfo`, `loadTune`, `classifyError`.
 - Verification level A1 (`compareAudioA1`, `data/verify/a1-rules.json`): a windowed audio comparison with thresholds fitted on score-level mutations. Status: approximate (held-out false accepts 15.3 %, false rejects 22.2 %; see `data/verify/a1-limitations.md`). `scripts/calibrate-a1.mjs` and the mutation generator are included.
+- `sidwave reconstruct` and `reconstructSid` (`sidwave/reconstruct`): recover a SIDWave score from a SID tune, recompile it and compare the two traces call by call. The report carries the horizon, call rate, unsupported features, strict and register-state F-diff verdicts and language-extension candidates with reproducers. Exit 1 with `ok: false` when the strict F-diff is not exact.
 
 ### Changed
 
