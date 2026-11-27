@@ -22,6 +22,16 @@ const SEVERITY_ORDER: Record<LossSeverity, number> = { info: 0, approx: 1, lost:
 
 /** Ordered rules: the first matching pattern gives the code and severity of a sentence. */
 const RULES: Array<[RegExp, string, LossSeverity]> = [
+  [/^\d+ ABC chord\(s\)/i, "abc.chords", "approx"],
+  [/^\d+ ABC chord tone\(s\) are dropped/i, "abc.chord-tones.dropped", "lost"],
+  [/^\d+ ABC note\(s\) are moved or resized/i, "abc.timing.quantized", "approx"],
+  [/^\d+ ABC tempo value\(s\) are rounded/i, "abc.tempo.rounded", "approx"],
+  [/^\d+ ABC title or composer field\(s\) are truncated/i, "abc.metadata.truncated", "approx"],
+  [/^\d+\/\d+ time signature is approximated/i, "meter.approximated", "approx"],
+  [/^\d+ ABC (?:decorations|directives|grace note|lyric|slur)/i, "abc.notation.dropped", "lost"],
+  [/^\d+ ABC tie\(s\) could not be connected/i, "abc.ties.dropped", "lost"],
+  [/^\d+ ABC voice\(s\)/i, "voices.dropped", "lost"],
+  [/^\d+ ABC notes are outside the SIDWave pitch range/i, "pitch.octave", "approx"],
   [/^The voices have [\d, ]+ rows; each voice loops/i, "jch.voices.length", "approx"],
   [/^A groove \(alternating row lengths\)/i, "jch.groove", "approx"],
   [/^Command ".+" \(\d+ uses\) is imported approximately/i, "jch.command.approx", "approx"],
