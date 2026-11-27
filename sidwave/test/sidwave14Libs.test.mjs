@@ -547,7 +547,9 @@ test("the command line compiles a score with imports, reports the libraries, loc
     const json = run(dir, "compile", "score.yaml", "-o", "a.prg", "--json");
     assert.equal(json.code, 0, json.err);
     const report = JSON.parse(json.out);
-    assert.deepEqual(report.libraries.map((l) => l.name), ["fixture-drums", "fixture-base", "sidwave-lib-pad"]);
+    assert.equal(report.ok, true);
+    assert.equal(report.command, "compile");
+    assert.deepEqual(report.result.libraries.map((l) => l.name), ["fixture-drums", "fixture-base", "sidwave-lib-pad"]);
     const text = run(dir, "compile", "score.yaml", "-o", "a.prg");
     assert.match(text.err, /library drums: fixture-drums 1\.2\.0, MIT OR Apache-2\.0, sha256 [0-9a-f]{64}/);
     assert.equal(run(dir, "validate", "score.yaml").code, 0);
@@ -558,15 +560,21 @@ test("the command line compiles a score with imports, reports the libraries, loc
     assert.match(lock.out, /^drums: sha256 [0-9a-f]{64}\npads: sha256/);
     assert.match(fs.readFileSync(path.join(dir, "score.yaml"), "utf8"), /sha256: [0-9a-f]{64}/);
     assert.match(run(dir, "lock", "score.yaml").out, /\(unchanged\)/);
+    const lockJson = JSON.parse(run(dir, "lock", "score.yaml", "--json").out);
+    assert.deepEqual([lockJson.ok, lockJson.command, lockJson.result.file], [true, "lock", "score.yaml"]);
+    assert.deepEqual(lockJson.result.imports.map((i) => [i.as, i.changed]), [["drums", false], ["pads", false]]);
 
     const bundle = run(dir, "bundle", "score.yaml", "-o", "dist");
     assert.equal(bundle.code, 0, bundle.err);
     assert.match(bundle.out, /bundle with 3 libraries/);
     const again = run(dir, "bundle", "score.yaml", "-o", "dist");
-    assert.equal(again.code, 2);
+    assert.equal(again.code, 3);
     assert.match(again.err, /is not empty/);
-    assert.equal(run(dir, "bundle", "score.yaml", "-o", "dist", "--force").code, 0);
-    assert.equal(run(dir, "bundle", "score.yaml").code, 2);
+    const againJson = JSON.parse(run(dir, "bundle", "score.yaml", "-o", "dist", "--json").out);
+    assert.deepEqual([againJson.ok, againJson.command, againJson.error.category], [false, "bundle", "input"]);
+    const forced = JSON.parse(run(dir, "bundle", "score.yaml", "-o", "dist", "--force", "--json").out);
+    assert.deepEqual([forced.ok, forced.command, forced.result.format, forced.result.libraries.length], [true, "bundle", "sidwave-bundle", 3]);
+    assert.equal(run(dir, "bundle", "score.yaml").code, 2, "a missing -o is a usage error");
     const a = run(dir, "compile", "score.yaml", "-o", "-");
     const b = run(path.join(dir, "dist"), "compile", "score.yaml", "-o", "-");
     assert.ok(a.bytes.length > 0 && a.bytes.equals(b.bytes));
@@ -577,13 +585,16 @@ test("the command line reports library errors as invalid input with the path", (
   withProject(({ dir }) => {
     fs.writeFileSync(path.join(dir, "bad.yaml"), scoreWith("  - { as: x, from: \"../escape.yaml\" }"));
     const result = run(dir, "compile", "bad.yaml", "--json");
-    assert.equal(result.code, 1);
-    assert.equal(JSON.parse(result.out).error.path, "$.imports[0].from");
+    assert.equal(result.code, 3);
+    const failure = JSON.parse(result.out);
+    assert.deepEqual([failure.ok, failure.command, failure.error.category, failure.error.details.path], [false, "compile", "validation", "$.imports[0].from"]);
     assert.match(run(dir, "lint", "bad.yaml").err, /outside the score directory/);
-    assert.equal(run(dir, "lock", "bad.yaml").code, 1);
-    assert.equal(run(dir, "bundle", "bad.yaml", "-o", "x").code, 1);
-    const allow = run(dir, "lock", "nothing.yaml");
-    assert.equal(allow.code, 2);
+    assert.equal(run(dir, "lock", "bad.yaml").code, 3);
+    assert.match(run(dir, "lock", "bad.yaml").err, /^bad\.yaml: /);
+    assert.equal(run(dir, "bundle", "bad.yaml", "-o", "x").code, 3);
+    const missing = run(dir, "lock", "nothing.yaml", "--json");
+    assert.equal(missing.code, 3);
+    assert.equal(JSON.parse(missing.out).error.category, "input");
   });
 });
 
@@ -595,7 +606,10 @@ test("--allow-dir adds a directory to the library search path", () => {
       fs.writeFileSync(path.join(dir, "s.yaml"), scoreWith(`  - { as: x, from: ${JSON.stringify(path.join("..", path.basename(shared), "x.yaml"))} }`).replace("instrument: lead", "instrument: x.x"));
       const sub = path.join(dir, "deeper");
       fs.mkdirSync(sub);
-      assert.equal(run(dir, "compile", "s.yaml", "-o", "-").code, 1);
+      assert.equal(run(dir, "compile", "s.yaml", "-o", "-").code, 3);
+      const allowed = run(dir, "compile", "s.yaml", "-o", "-", "--allow-dir", shared);
+      assert.equal(allowed.code, 0, allowed.err);
+      assert.ok(allowed.bytes.length > 0);
       void sub;
     } finally {
       fs.rmSync(shared, { recursive: true, force: true });
