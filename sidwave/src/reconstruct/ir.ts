@@ -216,7 +216,7 @@ export function buildIr(trace: Float64Array, options: IrOptions = {}): FrameIr {
   // write to $D419-$D41F; the trace holds these, but they are not registers of the SID, so they are ignored.
   if (trace.length % 4) throw new VerifyError("invalid_trace", "Trace must contain groups of four Float64 values");
   for (let i = 0; i < trace.length; i += 4) {
-    const [sid, reg, value, cycle] = [trace[i], trace[i + 1], trace[i + 2], trace[i + 3]];
+    const sid = trace[i]!, reg = trace[i + 1]!, value = trace[i + 2]!, cycle = trace[i + 3]!;
     const finite = Number.isFinite(sid) && Number.isFinite(reg) && Number.isFinite(value) && Number.isFinite(cycle);
     if (!finite || sid < 0 || reg < 0 || reg > 0x1f || value < 0 || value > 255 || cycle < 0) {
       throw new VerifyError("invalid_trace", `Invalid SID write at record ${i / 4}`);

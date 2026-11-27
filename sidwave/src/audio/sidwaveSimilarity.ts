@@ -18,7 +18,8 @@ const ENV_HOP_SECONDS = 0.01;
 /** A frame with less RMS than this (about -60 dBFS) in the reference is silence and is not scored. */
 const SILENCE_RMS = 1e-3;
 
-function mixMono(s: Stereo): Float64Array {
+/** The mean of both channels. */
+export function mixMono(s: Stereo): Float64Array {
   const out = new Float64Array(s.left.length);
   for (let i = 0; i < out.length; i += 1) out[i] = (s.left[i]! + s.right[i]!) / 2;
   return out;
@@ -75,13 +76,28 @@ const MIDI_HI = 83; // 1.97 kHz
 function chromaAt(x: Float64Array, sampleRate: number, startSample: number, ctx: ChromaContext): Float64Array | null {
   const n = Math.round(FRAME_SECONDS * sampleRate);
   if (startSample < 0 || startSample + n > x.length) return null;
-  const { size, hann, bins, re, im } = ctx;
+  const { size, hann, bins, re, im, wr, wi } = ctx;
+  const half = size >> 1;
   let energy = 0;
-  for (let i = 0; i < size; i += 1) { re[i] = i < n ? x[startSample + i]! * hann[i]! : 0; im[i] = 0; }
+  // The windowed frame is real, so one complex FFT of half the size holds its spectrum: even samples are the real
+  // parts and odd samples the imaginary parts. Only the bins of the semitone bands are separated afterwards.
+  for (let j = 0; j < half; j += 1) {
+    const i0 = 2 * j, i1 = i0 + 1;
+    re[j] = i0 < n ? x[startSample + i0]! * hann[i0]! : 0;
+    im[j] = i1 < n ? x[startSample + i1]! * hann[i1]! : 0;
+  }
   for (let i = 0; i < n; i += 1) energy += x[startSample + i]! * x[startSample + i]!;
   fft(re, im);
   const band = new Float64Array(MIDI_HI - MIDI_LO + 1);
-  for (const [k, midi] of bins) band[midi - MIDI_LO] += Math.hypot(re[k]!, im[k]!);
+  for (let t = 0; t < bins.length; t += 1) {
+    const [k, midi] = bins[t]!;
+    const m = (half - k) & (half - 1);
+    const a = re[k]!, b = im[k]!, c = re[m]!, d = im[m]!;
+    const er = a + c, ei = b - d, or = b + d, oi = c - a;
+    const xr = er + wr[t]! * or - wi[t]! * oi;
+    const xi = ei + wr[t]! * oi + wi[t]! * or;
+    band[midi - MIDI_LO] += Math.sqrt(xr * xr + xi * xi) / 2;
+  }
   const peak = Math.max(...band, 1e-12);
   const logged = band.map((v) => Math.log1p((v / peak) * 1000));
   const chroma = new Float64Array(12), counts = new Float64Array(12);
@@ -100,9 +116,26 @@ function chromaAt(x: Float64Array, sampleRate: number, startSample: number, ctx:
   return out;
 }
 
-interface ChromaContext { size: number; hann: Float64Array; bins: Array<[number, number]>; re: Float64Array; im: Float64Array }
+interface ChromaContext {
+  size: number; hann: Float64Array; bins: Array<[number, number]>; re: Float64Array; im: Float64Array;
+  /** Twiddle factor exp(-2 pi i k / size) of every bin in `bins`. */
+  wr: Float64Array; wi: Float64Array;
+}
 
+const CHROMA_CONTEXTS = new Map<number, ChromaContext>();
+
+/** The chroma analysis tables of a sample rate, built once; the FFT buffers are reused because the analysis is synchronous. */
 function chromaContext(sampleRate: number): ChromaContext {
+  let context = CHROMA_CONTEXTS.get(sampleRate);
+  if (!context) {
+    context = buildChromaContext(sampleRate);
+    if (CHROMA_CONTEXTS.size > 8) CHROMA_CONTEXTS.clear();
+    CHROMA_CONTEXTS.set(sampleRate, context);
+  }
+  return context;
+}
+
+function buildChromaContext(sampleRate: number): ChromaContext {
   const n = Math.round(FRAME_SECONDS * sampleRate);
   const size = pow2(n * 2);
   const hann = new Float64Array(size).map((_, i) => (i < n ? 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / n) : 0));
@@ -111,7 +144,9 @@ function chromaContext(sampleRate: number): ChromaContext {
     const midi = Math.round(69 + 12 * Math.log2((k * sampleRate) / size / 440));
     if (midi >= MIDI_LO && midi <= MIDI_HI) bins.push([k, midi]);
   }
-  return { size, hann, bins, re: new Float64Array(size), im: new Float64Array(size) };
+  const wr = new Float64Array(bins.length), wi = new Float64Array(bins.length);
+  bins.forEach(([k], t) => { wr[t] = Math.cos((2 * Math.PI * k) / size); wi[t] = -Math.sin((2 * Math.PI * k) / size); });
+  return { size, hann, bins, re: new Float64Array(size >> 1), im: new Float64Array(size >> 1), wr, wi };
 }
 
 const cosine = (a: ArrayLike<number>, b: ArrayLike<number>) => {
@@ -322,7 +357,6 @@ export function compareToReference(reference: Stereo, capture: Stereo, options: 
 }
 
 /** Chroma vectors of 300 ms frames starting at each time (null where the frame is outside the signal). */
-export function chromaSequence(sig: Stereo, startTimes: number[]): Array<Float64Array | null> {
-  const mono = mixMono(sig);
+export function chromaSequence(sig: Stereo, startTimes: number[], mono: Float64Array = mixMono(sig)): Array<Float64Array | null> {
   return features(sig, mono, startTimes).map((f) => f?.chroma ?? null);
 }

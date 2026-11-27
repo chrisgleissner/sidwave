@@ -58,9 +58,35 @@ function classify(path: string): ChangeClass {
   return ROOT_MUSICAL.has(root) ? "musical" : "structural";
 }
 function esc(s: string) { return s.replace(/~/g, "~0").replace(/\//g, "~1"); }
-function equal(a: unknown, b: unknown): boolean { return JSON.stringify(a) === JSON.stringify(b); }
-function compileEqual(a: string, b: string, read?: SidwaveReadOptions): boolean {
-  try { const x = compileSidwaveToPrg(parseSidwave(a, read), { loop: false }).prg; const y = compileSidwaveToPrg(parseSidwave(b, read), { loop: false }).prg; return x.equals(y); }
+/**
+ * Whether two parsed YAML values are the same: same types, same key order, same array contents, numbers compared with
+ * Object.is after the identity check (so NaN equals NaN, and .inf, -.inf and .nan are three different values). It
+ * compares in place and stops at the first difference instead of serialising both values at every level of the walk.
+ */
+function equal(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a === "number" && typeof b === "number") return Object.is(a, b);
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!equal(a[i], b[i])) return false;
+    return true;
+  }
+  const ka = Object.keys(a), kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (let i = 0; i < ka.length; i++) {
+    if (ka[i] !== kb[i] || !equal((a as Record<string, unknown>)[ka[i]!], (b as Record<string, unknown>)[kb[i]!])) return false;
+  }
+  return true;
+}
+/** Whether both texts compile to the same PRG. Texts with equal data (including key order) compile alike, so that case compiles once. */
+function compileEqual(a: string, b: string, sameData: boolean, read?: SidwaveReadOptions): boolean {
+  try {
+    const x = compileSidwaveToPrg(parseSidwave(a, read), { loop: false }).prg;
+    if (sameData) return true;
+    const y = compileSidwaveToPrg(parseSidwave(b, read), { loop: false }).prg;
+    return x.equals(y);
+  }
   catch { return false; }
 }
 /** Schema kind of the value under each key, per parent kind. "named" is a map whose keys are user chosen names and whose values have the given kind; "list" is a sequence of that kind. */
@@ -133,7 +159,7 @@ export function diffSidwave(a: string, b: string, read?: SidwaveReadOptions): Se
   };
   walk(av, bv, "");
   if (!changes.length && a !== b) changes.push({ class: "formatting", path: "", summary: "YAML formatting changed" });
-  return { changes, compiledEqual: compileEqual(a, b, read) };
+  return { changes, compiledEqual: compileEqual(a, b, equal(av, bv), read) };
 }
 
 /**

@@ -50,6 +50,13 @@ function cycleCost(name, mode) {
   return { zp: 3, zpx: 4, zpy: 4, abs: 4, abx: 4, aby: 4, izx: 6, izy: 5 }[mode];
 }
 
+/** Per opcode: mnemonic, mode, base cycles, whether an effective address is formed and whether a page crossing costs a cycle. Computed once. */
+const DECODED = OPS.map(([name, mode]) => ({
+  name, mode, cost: cycleCost(name, mode),
+  noAddress: ["imp", "acc", "imm", "rel"].includes(mode),
+  readPenalty: !name.startsWith("ST") && !RMW_OPS.has(name),
+}));
+
 export class Cpu {
   constructor(mem, hooks = {}) { Object.assign(this, { m: mem, a: 0, x: 0, y: 0, sp: 0xfd, pc: 0, c: 0, z: 0, i: 1, d: 0, v: 0, n: 0, hooks, steps: 0, cycles: 0 }); }
   rd(a) { a &= 0xffff; const r = this.hooks.read?.(a); return r === undefined ? this.m[a] : r; }
@@ -88,30 +95,30 @@ export class Cpu {
       this.pc = this.indexed(this.pc, (off << 24) >> 24, true);
     }
   }
+  val(mode, addr) { return mode === "imm" ? this.fetch() : this.rd(addr); }
+  rmw(mode, addr, fn) { const v = mode === "acc" ? this.a : this.rd(addr); const r = fn(v) & 0xff; this.nz(r); if (mode === "acc") this.a = r; else this.wr(addr, r); }
   step() {
     const at = this.pc;
     const op = this.fetch();
-    const entry = OPS[op];
+    const entry = DECODED[op];
     if (!entry) throw new Error(`illegal opcode $${op.toString(16)} at $${at.toString(16)}`);
-    const [name, mode] = entry;
+    const { name, mode, cost, noAddress, readPenalty } = entry;
     if (this.d) throw new Error("decimal mode is not expected in the player");
-    const addr = ["imp", "acc", "imm", "rel"].includes(mode) ? 0 : this.ea(mode, !name.startsWith("ST") && !RMW_OPS.has(name));
-    const val = () => (mode === "imm" ? this.fetch() : this.rd(addr));
-    const rmw = (fn) => { const v = mode === "acc" ? this.a : this.rd(addr); const r = fn(v) & 0xff; this.nz(r); if (mode === "acc") this.a = r; else this.wr(addr, r); };
+    const addr = noAddress ? 0 : this.ea(mode, readPenalty);
     this.steps += 1;
-    this.cycles += cycleCost(name, mode);
+    this.cycles += cost;
     switch (name) {
-      case "LDA": this.a = this.nz(val()); break; case "LDX": this.x = this.nz(val()); break; case "LDY": this.y = this.nz(val()); break;
+      case "LDA": this.a = this.nz(this.val(mode, addr)); break; case "LDX": this.x = this.nz(this.val(mode, addr)); break; case "LDY": this.y = this.nz(this.val(mode, addr)); break;
       case "STA": this.wr(addr, this.a); break; case "STX": this.wr(addr, this.x); break; case "STY": this.wr(addr, this.y); break;
-      case "ADC": this.adc(val()); break; case "SBC": this.adc(val() ^ 0xff); break;
-      case "AND": this.a = this.nz(this.a & val()); break; case "ORA": this.a = this.nz(this.a | val()); break; case "EOR": this.a = this.nz(this.a ^ val()); break;
-      case "CMP": this.cmp(this.a, val()); break; case "CPX": this.cmp(this.x, val()); break; case "CPY": this.cmp(this.y, val()); break;
-      case "BIT": { const v = val(); this.z = +((this.a & v) === 0); this.n = v >> 7; this.v = (v >> 6) & 1; break; }
-      case "ASL": rmw((v) => { this.c = v >> 7; return v << 1; }); break;
-      case "LSR": rmw((v) => { this.c = v & 1; return v >> 1; }); break;
-      case "ROL": rmw((v) => { const r = (v << 1) | this.c; this.c = v >> 7; return r; }); break;
-      case "ROR": rmw((v) => { const r = (v >> 1) | (this.c << 7); this.c = v & 1; return r; }); break;
-      case "INC": rmw((v) => v + 1); break; case "DEC": rmw((v) => v - 1); break;
+      case "ADC": this.adc(this.val(mode, addr)); break; case "SBC": this.adc(this.val(mode, addr) ^ 0xff); break;
+      case "AND": this.a = this.nz(this.a & this.val(mode, addr)); break; case "ORA": this.a = this.nz(this.a | this.val(mode, addr)); break; case "EOR": this.a = this.nz(this.a ^ this.val(mode, addr)); break;
+      case "CMP": this.cmp(this.a, this.val(mode, addr)); break; case "CPX": this.cmp(this.x, this.val(mode, addr)); break; case "CPY": this.cmp(this.y, this.val(mode, addr)); break;
+      case "BIT": { const v = this.val(mode, addr); this.z = +((this.a & v) === 0); this.n = v >> 7; this.v = (v >> 6) & 1; break; }
+      case "ASL": this.rmw(mode, addr, (v) => { this.c = v >> 7; return v << 1; }); break;
+      case "LSR": this.rmw(mode, addr, (v) => { this.c = v & 1; return v >> 1; }); break;
+      case "ROL": this.rmw(mode, addr, (v) => { const r = (v << 1) | this.c; this.c = v >> 7; return r; }); break;
+      case "ROR": this.rmw(mode, addr, (v) => { const r = (v >> 1) | (this.c << 7); this.c = v & 1; return r; }); break;
+      case "INC": this.rmw(mode, addr, (v) => v + 1); break; case "DEC": this.rmw(mode, addr, (v) => v - 1); break;
       case "INX": this.x = this.nz(this.x + 1); break; case "INY": this.y = this.nz(this.y + 1); break;
       case "DEX": this.x = this.nz(this.x - 1); break; case "DEY": this.y = this.nz(this.y - 1); break;
       case "TAX": this.x = this.nz(this.a); break; case "TAY": this.y = this.nz(this.a); break;

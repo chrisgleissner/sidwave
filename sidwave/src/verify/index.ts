@@ -110,8 +110,8 @@ function records(input: Float64Array): W[] {
   }
   const out: W[] = [];
   for (let i = 0; i < input.length; i += 4) {
-    const [sid, reg, value, cycle] = input.subarray(i, i + 4);
-    const finite = [sid, reg, value, cycle].every(Number.isFinite);
+    const sid = input[i]!, reg = input[i + 1]!, value = input[i + 2]!, cycle = input[i + 3]!;
+    const finite = Number.isFinite(sid) && Number.isFinite(reg) && Number.isFinite(value) && Number.isFinite(cycle);
     if (!finite || sid < 0 || reg < 0 || reg > 0x18 || value < 0 || value > 255 || cycle < 0) {
       throw new VerifyError("invalid_trace", `Invalid SID write at record ${i / 4}`);
     }

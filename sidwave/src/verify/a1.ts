@@ -140,32 +140,49 @@ const BAND_WEIGHTS: Array<{ first: number; weights: Float64Array }> = (() => {
 
 const toDb = (power: number) => (power > 1e-12 ? Math.max(MIN_DB, 10 * Math.log10(power)) : MIN_DB);
 
-const scratchRe = new Float64Array(A1_WINDOW);
-const scratchIm = new Float64Array(A1_WINDOW);
+const HALF_WINDOW = A1_WINDOW / 2;
+/** Highest FFT bin any band reads. */
+const TOP_BIN = Math.max(...BAND_WEIGHTS.map(({ first, weights }) => first + weights.length - 1));
+const packedRe = new Float64Array(HALF_WINDOW);
+const packedIm = new Float64Array(HALF_WINDOW);
+const binPower = new Float64Array(TOP_BIN + 1);
 
 /**
  * Band energies in dBFS (a full-scale sine is -3 dBFS) of the window that starts at `start`. Samples outside the
  * signal read as zero. Writes A1_BANDS values to `out` at `offset` and returns the window RMS level in dBFS.
+ *
+ * The window is real, so its spectrum comes from one complex FFT of half the length: the even samples are the real
+ * parts and the odd samples the imaginary parts, and the two spectra are separated afterwards. The squared magnitude
+ * of each bin is formed directly instead of through `Math.hypot`, which is much slower. The band energies matched the
+ * full-size implementation on every fixture tested; the arithmetic order differs, so last-digit differences are possible.
  */
 function windowFeatures(samples: Int16Array, start: number, out: Float32Array, offset: number): number {
   let sumSquares = 0;
-  for (let i = 0; i < A1_WINDOW; i++) {
-    const index = start + i;
-    const x = index >= 0 && index < samples.length ? samples[index]! / 32768 : 0;
-    sumSquares += x * x;
-    scratchRe[i] = x * HANN[i]!;
-    scratchIm[i] = 0;
+  const inside = start >= 0 && start + A1_WINDOW <= samples.length;
+  for (let j = 0; j < HALF_WINDOW; j++) {
+    const i0 = start + 2 * j;
+    const x0 = inside || (i0 >= 0 && i0 < samples.length) ? samples[i0]! / 32768 : 0;
+    const x1 = inside || (i0 + 1 >= 0 && i0 + 1 < samples.length) ? samples[i0 + 1]! / 32768 : 0;
+    sumSquares += x0 * x0 + x1 * x1;
+    packedRe[j] = x0 * HANN[2 * j]!;
+    packedIm[j] = x1 * HANN[2 * j + 1]!;
   }
-  fft(scratchRe, scratchIm);
-  const norm = 2 / HANN_SUM;
+  fft(packedRe, packedIm);
+  const scale = (2 / HANN_SUM) ** 2 * 0.25;
+  for (let k = 1; k <= TOP_BIN; k++) {
+    const m = HALF_WINDOW - k;
+    const a = packedRe[k]!, b = packedIm[k]!, c = packedRe[m]!, d = packedIm[m]!;
+    const er = a + c, ei = b - d; // twice the even part
+    const or = b + d, oi = c - a; // twice the odd part
+    const wr = COS[k]!, wi = SIN[k]!;
+    const re = er + wr * or - wi * oi;
+    const im = ei + wr * oi + wi * or;
+    binPower[k] = (re * re + im * im) * scale;
+  }
   for (let b = 0; b < A1_BANDS; b++) {
     const { first, weights } = BAND_WEIGHTS[b]!;
     let power = 0;
-    for (let j = 0; j < weights.length; j++) {
-      const i = first + j;
-      const amplitude = Math.hypot(scratchRe[i]!, scratchIm[i]!) * norm;
-      power += weights[j]! * 0.5 * amplitude * amplitude;
-    }
+    for (let j = 0; j < weights.length; j++) power += weights[j]! * 0.5 * binPower[first + j]!;
     out[offset + b] = toDb(power);
   }
   return toDb(sumSquares / A1_WINDOW);

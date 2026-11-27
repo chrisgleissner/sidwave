@@ -93,7 +93,11 @@ for (const model of ["6581", "8580"]) {
         return onset < 0 ? Infinity : onset - 48;
       });
       t.diagnostic(`attack ${attack} onsets relative to scheduled gate (ms): ${onsets.join(", ")}`);
-      assert.ok(onsets.every((ms) => ms >= -2 && ms < 1000 / arrangement.fps + attack * 4), `attack ${attack} onset delays (ms): ${onsets.join(", ")}`);
+      // The delay of every note after the first is the same within a run and differs between runs: sidplayfp starts the
+      // CIA timer at a random phase, so the first play call comes 0 to 1 frame after init. The bound is therefore one
+      // frame, plus the 2 ms of the measuring window, plus the attack time (this measured up to 21 ms in 3 of 20 runs
+      // with a bound of one frame). A note that waits one frame longer than that (a late gate) still fails.
+      assert.ok(onsets.every((ms) => ms >= -2 && ms < 1000 / arrangement.fps + 2 + attack * 4), `attack ${attack} onset delays (ms): ${onsets.join(", ")}`);
     }
   });
 }

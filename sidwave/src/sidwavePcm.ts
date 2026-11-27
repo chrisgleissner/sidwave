@@ -231,6 +231,8 @@ const DECIMATE_TAPS = Array.from({ length: 31 }, (_, i) => {
   return [tap, sinc * (0.5 + 0.5 * Math.cos(Math.PI * tap / 15))] as const;
 });
 const DECIMATE_SUM = DECIMATE_TAPS.reduce((sum, [, weight]) => sum + weight, 0);
+const DECIMATE_OFFSETS = Int32Array.from(DECIMATE_TAPS, ([tap]) => tap);
+const DECIMATE_WEIGHTS = Float64Array.from(DECIMATE_TAPS, ([, weight]) => weight);
 
 /** Windowed sinc low-pass with a fixed work limit, including for very high source rates. */
 export function resamplePcm(input: Float64Array, from: number, to: number): Float64Array {
@@ -242,9 +244,10 @@ export function resamplePcm(input: Float64Array, from: number, to: number): Floa
     const reduced = new Float64Array(Math.ceil(input.length / 2));
     for (let i = 0; i < reduced.length; i++) {
       const center = 2 * i;
+      const last = input.length - 1;
       let sum = 0;
-      for (const [tap, weight] of DECIMATE_TAPS) {
-        sum += input[Math.max(0, Math.min(input.length - 1, center + tap))]! * weight;
+      for (let t = 0; t < DECIMATE_OFFSETS.length; t++) {
+        sum += input[Math.max(0, Math.min(last, center + DECIMATE_OFFSETS[t]!))]! * DECIMATE_WEIGHTS[t]!;
       }
       reduced[i] = sum / DECIMATE_SUM;
     }
@@ -254,14 +257,20 @@ export function resamplePcm(input: Float64Array, from: number, to: number): Floa
   const output = new Float64Array(count);
   const cutoff = Math.min(1, to / from) * 0.9;
   const half = Math.ceil(12 / cutoff);
+  const kernel = (x: number): number => {
+    const z = Math.PI * x * cutoff;
+    const sinc = Math.abs(z) < 1e-8 ? 1 : Math.sin(z) / z;
+    return sinc * (0.5 + 0.5 * Math.cos(Math.PI * x / half));
+  };
+  // For an integer ratio every output position is an integer, so the kernel is only needed at the integers -half..half
+  // and is computed once instead of once per tap of every output sample (same expression, same values).
+  const table = Number.isInteger(from / to) ? Float64Array.from({ length: 2 * half + 1 }, (_, k) => kernel(k - half)) : undefined;
   for (let i = 0; i < output.length; i++) {
     const pos = i * from / to;
     let signal = 0, weight = 0;
     for (let j = Math.max(0, Math.ceil(pos - half)); j <= Math.min(input.length - 1, pos + half); j++) {
       const x = pos - j;
-      const z = Math.PI * x * cutoff;
-      const sinc = Math.abs(z) < 1e-8 ? 1 : Math.sin(z) / z;
-      const w = sinc * (0.5 + 0.5 * Math.cos(Math.PI * x / half));
+      const w = table ? table[x + half]! : kernel(x);
       signal += input[j]! * w;
       weight += w;
     }
