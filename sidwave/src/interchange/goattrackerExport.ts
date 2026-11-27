@@ -4,6 +4,7 @@
 // GoatTracker export: the first three voices of a score as a GTS5 song file (GoatTracker 2.77, gt2reloc).
 
 import type { ParsedSidwave } from "../sidwave.js";
+import { sidwaveFrameRate } from "../sidwaveCompiler.js";
 import { exportEvents, type EventExportOptions, type ExportedInstrument, type ExportedNote } from "./events.js";
 import { GT, writeGoatTracker, type GtInstrument } from "./goattracker.js";
 import { InterchangeInputError } from "./errors.js";
@@ -39,7 +40,9 @@ export function exportGoatTracker(doc: ParsedSidwave, options: EventExportOption
   const score = exportEvents(doc, options);
   const losses = [...score.losses];
   const warnings: string[] = [];
-  const fps = score.callRate;
+  // GoatTracker plays one call per video frame; the call rate of a multispeed score (speed 2 to 4) does not apply.
+  const fps = sidwaveFrameRate(score.mode);
+  if (Math.abs(score.callRate - fps) > 0.01) losses.push(`The score calls its player ${Math.round(score.callRate / fps * 100) / 100} times per frame (multispeed); GoatTracker plays one call per frame, so note times are rounded to frames.`);
   const voices = options.voiceIds ? score.voices.slice(0, 3) : score.voices.filter((v) => v.sid === 0).slice(0, 3);
   if (!options.voiceIds && score.voices.length > voices.length) losses.push(`Only the first three voices of the first SID are exported (the score has ${score.voices.length} voices).`);
   if (voices.length === 0) throw new RangeError("the score has no voice on the first SID");

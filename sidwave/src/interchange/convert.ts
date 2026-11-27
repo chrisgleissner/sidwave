@@ -224,11 +224,11 @@ function rangeToUsage<T>(fn: () => T): T {
 
 // ---- verification -------------------------------------------------------------------------------------------
 
-interface Hit { time: number; pitch: number }
+interface Hit { time: number; pitch: number; drum?: boolean }
 
 function noteList(score: ExportedScore): Hit[] {
   const out: Hit[] = [];
-  for (const v of score.voices) for (const n of v.notes) out.push({ time: n.on.time, pitch: n.percussion ? -1 : n.pitch });
+  for (const v of score.voices) for (const n of v.notes) out.push({ time: n.on.time, pitch: n.percussion ? -1 : n.pitch, ...(n.percussion ? { drum: true } : {}) });
   return out.sort((a, b) => a.time - b.time);
 }
 
@@ -258,20 +258,26 @@ function matchBy(ref: Hit[], out: Hit[], tol: number, key: (h: Hit) => number): 
 export function compareNotes(reference: ExportedScore, output: ExportedScore, toleranceSeconds: number): Omit<ConvertMetrics, "available" | "voicesDropped" | "instruments" | "fdiff"> {
   const ref = noteList(reference), out = noteList(output);
   const exact = matchBy(ref, out, toleranceSeconds, (h) => h.pitch);
-  const octave = matchBy(exact.refLeft, exact.outLeft, toleranceSeconds, (h) => (h.pitch < 0 ? -1 : h.pitch % 12));
+  // A drum hit of the reference is kept when any note starts at its time: trackers have no drum channel, so a hit
+  // becomes a pitched note of a noise instrument, and only the pitch (a key of the drum kit) is not comparable.
+  const drums = matchBy(exact.refLeft.filter((h) => h.drum), exact.outLeft, toleranceSeconds, () => 0);
+  const refAfterDrums = exact.refLeft.filter((h) => !drums.pairs.some(([r]) => r === h));
+  const outAfterDrums = exact.outLeft.filter((h) => !drums.pairs.some(([, o]) => o === h));
+  const octave = matchBy(refAfterDrums, outAfterDrums, toleranceSeconds, (h) => (h.pitch < 0 ? -1 : h.pitch % 12));
   const f1Of = (matched: number): { p: number; r: number; f: number } => {
     const p = out.length ? matched / out.length : ref.length ? 0 : 1;
     const r = ref.length ? matched / ref.length : 1;
     return { p, r, f: p + r ? (2 * p * r) / (p + r) : 0 };
   };
-  const e = f1Of(exact.pairs.length);
-  const o = f1Of(exact.pairs.length + octave.pairs.length);
-  const errors = exact.pairs.map(([a, b]) => Math.abs(a.time - b.time) * 1000);
+  const matchedPairs = [...exact.pairs, ...drums.pairs];
+  const e = f1Of(matchedPairs.length);
+  const o = f1Of(matchedPairs.length + octave.pairs.length);
+  const errors = matchedPairs.map(([a, b]) => Math.abs(a.time - b.time) * 1000);
   const mean = errors.length ? errors.reduce((s, x) => s + x, 0) / errors.length : 0;
   return {
     noteF1: round(e.f), precision: round(e.p), recall: round(e.r), referenceNotes: ref.length, outputNotes: out.length,
     octaveShifted: octave.pairs.length, noteF1OctaveTolerant: round(o.f),
-    onsetError: { meanMs: round(mean, 2), maxMs: round(errors.length ? Math.max(...errors) : 0, 2), matched: exact.pairs.length },
+    onsetError: { meanMs: round(mean, 2), maxMs: round(errors.length ? Math.max(...errors) : 0, 2), matched: matchedPairs.length },
     onsetToleranceMs: round(toleranceSeconds * 1000, 1),
   };
 }

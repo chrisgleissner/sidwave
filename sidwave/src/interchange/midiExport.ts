@@ -113,7 +113,7 @@ export function exportMidi(doc: ParsedSidwave, options: MidiExportOptions = {}):
     for (const note of voice.notes) {
       const inst = instruments.get(note.instrument);
       let key = note.pitch;
-      if (drums || note.percussion) {
+      if (drums) {
         const mapped = drumKey(note.drum);
         key = mapped.key;
         if (!mapped.known) unknownDrum = true;

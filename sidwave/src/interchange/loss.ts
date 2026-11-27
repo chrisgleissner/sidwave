@@ -54,6 +54,7 @@ const RULES: Array<[RegExp, string, LossSeverity]> = [
   [/unpitched notes/i, "notes.unpitched", "lost"],
   [/grace notes|cue notes/i, "notes.ornament", "lost"],
   [/repeat signs/i, "structure.repeats", "lost"],
+  [/times per frame \(multispeed\)/i, "timing.multispeed", "approx"],
   [/rows are whole multiples|nearest row/i, "timing.row-grid", "approx"],
   [/durations are written in ticks/i, "notation.durations", "info"],
   [/controllers other than|dynamics marks/i, "expression.dropped", "lost"],

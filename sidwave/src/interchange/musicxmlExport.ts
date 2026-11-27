@@ -76,11 +76,12 @@ export function exportMusicXml(doc: ParsedSidwave, options: EventExportOptions =
     const channel = drums ? 10 : slotIndex < 9 ? slotIndex + 1 : slotIndex + 2;
     const plan: PartPlan = { voice, pid, slots: new Map(), channel, slotXml: [] };
     for (const note of voice.notes) {
-      const key = drums || note.percussion ? drumKey(note.drum).key : programFor(voice, instruments.get(note.instrument)) + 1000;
+      // A drum hit inside a pitched voice is written as a pitched note: a part with both kinds would be read back as a drum part.
+      const key = drums ? drumKey(note.drum).key : programFor(voice, instruments.get(note.instrument)) + 1000;
       if (plan.slots.has(key)) continue;
       const id = `${pid}-I${plan.slots.size + 1}`;
       plan.slots.set(key, id);
-      if (drums || note.percussion) {
+      if (drums) {
         const mapped = drumKey(note.drum);
         if (!mapped.known) unknownDrum = true;
         plan.slotXml.push(`<score-instrument id="${id}"><instrument-name>${escapeXml(note.drum ?? "drum")}</instrument-name></score-instrument>`);
@@ -161,7 +162,7 @@ export function exportMusicXml(doc: ParsedSidwave, options: EventExportOptions =
         const note = piece.note;
         const tieStop = piece.from > piece.on!;
         const tieStart = piece.to < piece.off!;
-        const percussion = drums || note.percussion;
+        const percussion = drums;
         const slot = plan.slots.get(percussion ? drumKey(note.drum).key : programFor(voice, instruments.get(note.instrument)) + 1000);
         const dynamics = Math.round(note.velocity / 90 * 10000) / 100;
         out.push(`<note dynamics="${dynamics}">${percussion ? "<unpitched><display-step>C</display-step><display-octave>4</display-octave></unpitched>" : pitchXml(note.pitch)}<duration>${duration}</duration>`
