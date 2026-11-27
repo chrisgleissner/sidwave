@@ -68,9 +68,24 @@ export interface ReconstructReport {
   compile?: { ok: boolean; error?: string };
 }
 
+/** Wall time (ms) and process CPU time (ms) of the phases of reconstructSid. CPU time covers the whole process, so concurrent work in the same process is included. */
+export interface ReconstructTimings {
+  traceMs: number;
+  irMs: number;
+  recoverMs: number;
+  compileMs: number;
+  retraceMs: number;
+  fdiffMs: number;
+  totalMs: number;
+  totalCpuMs: number;
+}
+
 export interface ReconstructResult {
   score: string;
   report: ReconstructReport;
+  /** The PSID of the recompiled score; absent when the score did not compile. */
+  compiled?: Uint8Array;
+  timings: ReconstructTimings;
 }
 
 export function summariseFdiff(result: FDiffResult, alignment: { expectedCall: number; observedCall: number }, standardAlignment = true): FDiffSummary {
@@ -137,9 +152,16 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
   void file;
   const seconds = options.seconds ?? DEFAULT_HORIZON_SECONDS;
   const clock: IrClock = psidClock(sidBytes) ?? "PAL";
+  const t0 = performance.now();
+  const cpu0 = process.cpuUsage();
   const trace = await options.engine.trace({ sid: sidBytes, song, seconds, clock });
+  const t1 = performance.now();
   const original = irOfTrace(trace);
+  const t2 = performance.now();
   const recovered = recoverScore(original, { title: options.title });
+  const t3 = performance.now();
+  const timings: ReconstructTimings = { traceMs: t1 - t0, irMs: t2 - t1, recoverMs: t3 - t2, compileMs: 0, retraceMs: 0, fdiffMs: 0, totalMs: 0, totalCpuMs: 0 };
+  let compiledBytes: Uint8Array | undefined;
   const report: ReconstructReport = {
     horizon: { seconds, cycles: trace.horizonCycles, calls: original.calls.length, clock: trace.clock, song },
     callRate: {
@@ -159,12 +181,21 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
     },
   };
   try {
+    const tc0 = performance.now();
     const compiled = compileSidwaveBytes(parseSidwave(recovered.text), { format: "sid", loop: true });
-    const second = await options.engine.trace({ sid: new Uint8Array(compiled.bytes), seconds, clock });
+    compiledBytes = new Uint8Array(compiled.bytes);
+    const tc1 = performance.now();
+    const second = await options.engine.trace({ sid: compiledBytes, seconds, clock });
+    const tc2 = performance.now();
     const recompiled = irOfTrace(second);
+    const tc3 = performance.now();
     report.fdiff = bestFdiff(original, recompiled, recovered.firstCall);
     report.fdiffState = bestFdiff(stateOnlyIr(original), stateOnlyIr(recompiled), recovered.firstCall);
     report.compile = { ok: true };
+    timings.compileMs = tc1 - tc0;
+    timings.retraceMs = tc2 - tc1;
+    timings.irMs += tc3 - tc2;
+    timings.fdiffMs = performance.now() - tc3;
     report.strictExact = report.fdiff.equal && report.fdiff.standardAlignment && !report.fdiff.callCountMismatch;
     report.registerStateExact = report.fdiffState.standardAlignment && !report.fdiffState.callCountMismatch
       && REGISTER_CLASSES.every((c) => c === "timing" || report.fdiffState.classes[c].differingCalls === 0);
@@ -177,5 +208,8 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
     for (const c of REGISTER_CLASSES) report.fdiff.classes[c] = { differingCalls: report.fdiff.comparedCalls, matchShare: 0 };
     report.fdiffState = report.fdiff;
   }
-  return { score: recovered.text, report };
+  const cpu = process.cpuUsage(cpu0);
+  timings.totalMs = performance.now() - t0;
+  timings.totalCpuMs = (cpu.user + cpu.system) / 1000;
+  return { score: recovered.text, report, ...(compiledBytes ? { compiled: compiledBytes } : {}), timings };
 }
