@@ -195,7 +195,10 @@ test("the matrix stays within its time budget", () => {
   const used = process.cpuUsage(startedAt);
   const seconds = (used.user + used.system) / 1e6;
   console.log(`# cpu convert matrix: ${seconds.toFixed(1)} s for ${results.size} conversions`);
-  assert.ok(seconds < 60, `the matrix used ${seconds} s of CPU`);
+  // The matrix grows with every format, so the budget is per conversion. Node 20 on the CI runner is the slowest
+  // runtime at about 0.17 to 0.2 s per conversion.
+  const budget = Math.max(60, results.size * 0.25);
+  assert.ok(seconds < budget, `the matrix used ${seconds} s of CPU for ${results.size} conversions (budget ${budget} s)`);
   const slow = [...results].sort((a, b) => b[1].ms - a[1].ms)[0];
   console.log(`# slowest case: ${slow[0]} ${slow[1].ms.toFixed(0)} ms`);
 });
