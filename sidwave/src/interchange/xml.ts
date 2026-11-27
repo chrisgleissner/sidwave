@@ -16,18 +16,35 @@ export interface XmlLimits { maxDepth?: number; maxNodes?: number; maxAttributes
 
 const PREDEFINED: Record<string, string> = { lt: "<", gt: ">", amp: "&", apos: "'", quot: '"' };
 
+function validXmlChar(code: number): boolean {
+  return code === 9 || code === 10 || code === 13 || (code >= 0x20 && code <= 0xd7ff) || (code >= 0xe000 && code <= 0xfffd) || (code >= 0x10000 && code <= 0x10ffff);
+}
+
+/** Decodes the predefined entities and character references in one pass over the text. */
 function decode(text: string): string {
-  if (!text.includes("&")) return text;
-  return text.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[A-Za-z][A-Za-z0-9]*);/g, (_all, name: string) => {
-    if (name[0] === "#") {
-      const code = name[1] === "x" ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
-      if (!(code >= 9 && code <= 0x10ffff) || (code >= 0xd800 && code <= 0xdfff)) throw new XmlError(`invalid character reference &${name};`);
-      return String.fromCodePoint(code);
-    }
-    const value = PREDEFINED[name];
+  let amp = text.indexOf("&");
+  if (amp < 0) return text;
+  let out = "";
+  let last = 0;
+  while (amp >= 0) {
+    const semi = text.indexOf(";", amp + 1);
+    if (semi < 0 || semi - amp > 12) throw new XmlError("an & that does not start an entity or character reference");
+    const name = text.slice(amp + 1, semi);
+    let value: string | undefined;
+    if (name.charCodeAt(0) === 35) {
+      const hex = name.charCodeAt(1) === 120;
+      const digits = name.slice(hex ? 2 : 1);
+      if (!(hex ? /^[0-9a-fA-F]+$/ : /^[0-9]+$/).test(digits)) throw new XmlError(`invalid character reference &${name};`);
+      const code = parseInt(digits, hex ? 16 : 10);
+      if (!validXmlChar(code)) throw new XmlError(`character reference &${name}; is not a valid XML 1.0 character`);
+      value = String.fromCodePoint(code);
+    } else value = PREDEFINED[name];
     if (value === undefined) throw new XmlError(`the entity &${name}; is not allowed (only the five predefined entities and character references)`);
-    return value;
-  });
+    out += text.slice(last, amp) + value;
+    last = semi + 1;
+    amp = text.indexOf("&", last);
+  }
+  return out + text.slice(last);
 }
 
 /** Parses an XML document; returns its root element. */
@@ -35,6 +52,8 @@ export function parseXml(input: string, limits: XmlLimits = {}): XmlNode {
   const maxDepth = limits.maxDepth ?? 64;
   const maxNodes = limits.maxNodes ?? 1_000_000;
   const maxAttributes = limits.maxAttributes ?? 64;
+  const maxTextBytes = limits.maxTextBytes ?? 16 * 1024 * 1024;
+  let textBytes = 0;
   let pos = 0;
   let nodes = 0;
   const text = input.charCodeAt(0) === 0xfeff ? input.slice(1) : input;
@@ -56,6 +75,8 @@ export function parseXml(input: string, limits: XmlLimits = {}): XmlNode {
     const end = lt === -1 ? n : lt;
     if (end > pos) {
       const chunk = text.slice(pos, end);
+      textBytes += chunk.length;
+      if (textBytes > maxTextBytes) fail(`more than ${maxTextBytes} characters of text`);
       const top = stack[stack.length - 1];
       if (top) top.text += decode(chunk);
       else if (chunk.trim() !== "") fail("text outside the root element");

@@ -179,7 +179,10 @@ export function importGoatTracker(bytes: Uint8Array, options: GoatTrackerImportO
     for (let r = 0; r < totalRows; r++) {
       const row = channels[c]![r];
       if (!row) continue;
-      if (row.inst) instr = row.inst;
+      if (row.inst) {
+        if (row.inst >= GT.MAX_INSTR) throw new GoatTrackerError(`channel ${c + 1}, row ${r}: instrument ${row.inst} is above the limit of ${GT.MAX_INSTR - 1}`);
+        instr = row.inst;
+      }
       if (row.cmd) count(CMD_NAMES[row.cmd] ?? `command ${row.cmd}`);
       if (row.note <= GT.LASTNOTE && row.note >= GT.FIRSTNOTE) {
         let pitch = row.note - GT.FIRSTNOTE + row.trans + 12;

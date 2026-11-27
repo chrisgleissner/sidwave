@@ -24,14 +24,14 @@ export function patBlock(channel, index, withNotes, version = 228) {
 }
 
 /** Version 228 module: INFO header, one 16-row pattern per channel (only channel 0 has notes). */
-export function fur228({ chip = 0x47, speeds = [6], tick = 60 } = {}) {
+export function fur228({ chip = 0x47, speeds = [6], tick = 60, custom } = {}) {
   const info = [];
-  info.push(0, speeds[0], speeds[0], 1, ...f32(tick), ...le16(16), ...le16(1), 4, 16, ...le16(1), ...le16(0), ...le16(0), ...le32(3));
+  info.push(0, speeds[0], speeds[0], 1, ...f32(tick), ...le16(16), ...le16(custom?.ordersLen ?? 1), 4, 16, ...le16(1), ...le16(0), ...le16(0), ...le32(custom ? custom.patterns.length : 3));
   info.push(chip, ...new Array(31).fill(0), ...new Array(32 + 32 + 128).fill(0));
   info.push(...str("Hand"), ...str("Tester"), ...f32(440), ...new Array(20).fill(0));
   const ptrAt = info.length;
-  info.push(...new Array(4 * 4).fill(0)); // 1 instrument + 3 patterns
-  info.push(0, 0, 0); // orders: 1 row x 3 channels
+  info.push(...new Array(4 * (1 + (custom ? custom.patterns.length : 3))).fill(0)); // 1 instrument + patterns
+  info.push(...(custom?.orderBytes ?? [0, 0, 0])); // orders, channels outer
   info.push(1, 1, 1, 0, 0, 0, 0, 0, 0);
   info.push(...str(""), ...str(""), ...str(""), ...str(""), ...str(""), ...str(""), ...str(""), ...f32(1), ...new Array(28).fill(0));
   info.push(...le16(1), ...le16(1), ...str(""), ...str(""), 0, 0, 0, 0);
@@ -39,7 +39,7 @@ export function fur228({ chip = 0x47, speeds = [6], tick = 60 } = {}) {
   info.push(...f32(1), ...f32(0), ...f32(0), ...le32(0), 1, ...new Array(8).fill(0));
   info.push(speeds.length, ...speeds, ...new Array(16 - speeds.length).fill(0), 0, ...le32(0), ...le32(0), ...le32(0));
   const head = [...Buffer.from("-Furnace module-", "latin1"), ...le16(228), 0, 0, ...le32(32), ...new Array(8).fill(0)];
-  const parts = [insBlock(), patBlock(0, 0, true), patBlock(1, 0, false), patBlock(2, 0, false)];
+  const parts = [insBlock(), ...(custom ? custom.patterns.map((p) => block("PATN", [0, p.channel, ...le16(p.index), ...str(""), ...p.rows])) : [patBlock(0, 0, true), patBlock(1, 0, false), patBlock(2, 0, false)])];
   let at = 32 + 8 + info.length;
   parts.forEach((p, i) => { info.splice(ptrAt + 4 * i, 4, ...le32(at)); at += p.length; });
   return Buffer.from([...head, ...block("INFO", info), ...parts.flat()]);

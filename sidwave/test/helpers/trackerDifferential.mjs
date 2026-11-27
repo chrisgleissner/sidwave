@@ -30,29 +30,40 @@ export function compileScoreToSid(yamlText) {
 
 const semitone = (reg) => (reg > 0 ? 12 * Math.log2(reg * 985248 / 16777216 / 440) + 69 : -1);
 
-/** Per-voice agreement between two IRs over the calls both cover, trying call shifts of -2..2 and keeping the best. */
-export function agreement(ref, cand) {
-  let best;
-  for (let shift = -8; shift <= 8; shift++) {
-    const gate = [0, 0, 0], both = [0, 0, 0], same = [0, 0, 0];
-    let total = 0;
-    const n = Math.min(ref.calls.length, cand.calls.length) - 10;
-    for (let i = 10; i < n; i++) {
-      const a = ref.calls[i].sids[0].regs, b = cand.calls[i + shift].sids[0].regs;
-      total++;
-      for (let v = 0; v < 3; v++) {
-        const ga = a[v * 7 + 4] & 1, gb = b[v * 7 + 4] & 1;
-        if (ga === gb) gate[v]++;
-        if (ga && gb) {
-          both[v]++;
-          if (Math.abs(semitone(a[v * 7] | a[v * 7 + 1] << 8) - semitone(b[v * 7] | b[v * 7 + 1] << 8)) < 0.6) same[v]++;
-        }
+/**
+ * Startup offset, in player calls, between the two players. The GoatTracker player starts a song with its call counter at
+ * 5, so the first row is read on call 3 and its note starts on call 5 (tick 0); the wavetable sets the frequency on the
+ * next call, so the first audible note with its pitch is on call 6 to 7. The SIDWave player plays the first note on
+ * call 0. A reference made by gt2reloc therefore lags the SIDWave PSID by 7 calls (143 ms at 50 Hz); on the example songs
+ * the best alignment is 7 or 8 calls (hard restart and the first row differ per song). Agreement is
+ * computed at this pinned shift; a search over -12..12 is only used to check that the pinned value is the best one.
+ */
+export const GT_STARTUP_CALLS = 7;
+
+function agreementAt(ref, cand, shift) {
+  const gate = [0, 0, 0], both = [0, 0, 0], same = [0, 0, 0];
+  let total = 0;
+  const n = Math.min(ref.calls.length, cand.calls.length) - 14;
+  for (let i = 14; i < n; i++) {
+    const a = ref.calls[i].sids[0].regs, b = cand.calls[i + shift].sids[0].regs;
+    total++;
+    for (let v = 0; v < 3; v++) {
+      const ga = a[v * 7 + 4] & 1, gb = b[v * 7 + 4] & 1;
+      if (ga === gb) gate[v]++;
+      if (ga && gb) {
+        both[v]++;
+        if (Math.abs(semitone(a[v * 7] | a[v * 7 + 1] << 8) - semitone(b[v * 7] | b[v * 7 + 1] << 8)) < 0.6) same[v]++;
       }
     }
-    const score = gate.reduce((s, x) => s + x, 0) + same.reduce((s, x) => s + x, 0);
-    if (!best || score > best.score) best = { score, shift, gate: gate.map((x) => x / total), pitch: same.map((x, v) => x / Math.max(1, both[v])), both };
   }
-  return best;
+  return { shift, score: gate.reduce((s, x) => s + x, 0) + same.reduce((s, x) => s + x, 0), gate: gate.map((x) => x / total), pitch: same.map((x, v) => x / Math.max(1, both[v])), both };
+}
+
+/** `shift`: candidate call i + shift is compared with reference call i (negative: the candidate starts earlier). */
+export function agreement(ref, cand, shift) {
+  let best;
+  for (let s = -12; s <= 12; s++) { const r = agreementAt(ref, cand, s); if (!best || r.score > best.score) best = r; }
+  return { ...agreementAt(ref, cand, shift), bestShift: best.shift };
 }
 
 export async function irOf(sid, seconds) {
@@ -72,13 +83,13 @@ export async function ladder(dir, refName, candName, seconds) {
 }
 
 /** Compares a reference PSID with a candidate PSID: ladder, per-call agreement and F-diff class match shares. */
-export async function compareSids(ref, cand, seconds = 6) {
+export async function compareSids(ref, cand, seconds = 6, shift = 0) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-diff-"));
   try {
     fs.writeFileSync(path.join(dir, "ref.sid"), ref);
     fs.writeFileSync(path.join(dir, "cand.sid"), cand);
     const [a, b] = [await irOf(ref, seconds), await irOf(cand, seconds)];
-    const agree = agreement(a, b);
+    const agree = agreement(a, b, shift);
     // shift s: candidate call i + s matches reference call i
     const fd = fdiff(a, b, { alignExpected: Math.max(0, -agree.shift), alignObserved: Math.max(0, agree.shift) });
     return { ladder: await ladder(dir, "ref.sid", "cand.sid", seconds), agree, fdiffClasses: Object.fromEntries(Object.entries(fd.classes).map(([k, c]) => [k, Math.round(c.matchShare * 1000) / 1000])), calls: [a.calls.length, b.calls.length] };
@@ -91,7 +102,7 @@ export async function differential({ sng, yamlText, seconds = 6 }) {
   try {
     fs.writeFileSync(path.join(dir, "song.sng"), sng);
     const ref = gt2reloc(path.join(dir, "song.sng"), path.join(dir, "ref.sid"));
-    return await compareSids(ref, compileScoreToSid(yamlText), seconds);
+    return await compareSids(ref, compileScoreToSid(yamlText), seconds, -GT_STARTUP_CALLS);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -101,6 +112,6 @@ export async function differentialExport({ sng, yamlText, seconds = 6 }) {
   try {
     fs.writeFileSync(path.join(dir, "song.sng"), sng);
     const cand = gt2reloc(path.join(dir, "song.sng"), path.join(dir, "cand.sid"));
-    return await compareSids(compileScoreToSid(yamlText), cand, seconds);
+    return await compareSids(compileScoreToSid(yamlText), cand, seconds, GT_STARTUP_CALLS);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }

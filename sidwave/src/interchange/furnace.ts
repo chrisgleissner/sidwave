@@ -116,6 +116,13 @@ function readInstrument(r: Reader, index: number, blockEnd: number): FurInstrume
 
 /** Parses a Furnace module (zlib-compressed or not). Only the C64 chip is accepted. */
 export function parseFurnace(input: Uint8Array): FurSong {
+  try { return parseFurnaceUnchecked(input); } catch (error) {
+    if (error instanceof RangeError) throw new FurnaceError(`malformed module (${error.message})`);
+    throw error;
+  }
+}
+
+function parseFurnaceUnchecked(input: Uint8Array): FurSong {
   if (input.length > MAX_FUR_BYTES) throw new FurnaceError(`the file has ${input.length} bytes; the limit is ${MAX_FUR_BYTES}`);
   let data = Buffer.from(input.buffer, input.byteOffset, input.length);
   if (data.length >= 2 && data.toString("latin1", 0, 16) !== FUR_MAGIC) data = inflateBounded(data);
@@ -138,7 +145,8 @@ export function parseFurnace(input: Uint8Array): FurSong {
   info.pos = r.pos;
   const readOrders = (rd: Reader, ordLen: number, channels: number): void => {
     if (ordLen * channels > 65536) throw new FurnaceError("the order table is too large");
-    for (let o = 0; o < ordLen; o++) { const row: number[] = []; for (let c = 0; c < channels; c++) row.push(rd.u8()); song.orders.push(row); }
+    for (let o = 0; o < ordLen; o++) song.orders.push(new Array<number>(channels).fill(0));
+    for (let c = 0; c < channels; c++) for (let o = 0; o < ordLen; o++) song.orders[o]![c] = rd.u8(); // channels outer, as Furnace reads and writes it
   };
   if (id === "INFO") {
     if (version >= 240) throw new FurnaceError("an INFO header in a version 240 or later file");
@@ -210,6 +218,7 @@ export function parseFurnace(input: Uint8Array): FurSong {
         song.subsongs = e.pointers.length;
         const p = e.pointers[0];
         if (p === undefined) continue;
+        if (p + 8 > data.length) throw new FurnaceError("a subsong pointer is outside the file");
         const s = new Reader(data, Math.min(data.length, p + 8 + data.readUInt32LE(p + 4)));
         s.pos = p + 8;
         song.tickRate = s.f32(); s.u8(); s.u8();
@@ -252,17 +261,16 @@ export function parseFurnace(input: Uint8Array): FurSong {
       if (mask === 0xff) break;
       if (mask & 0x80) { row += (mask & 0x7f) + 2; continue; }
       if (mask === 0) { row++; continue; }
-      let fx0 = 0, fx1 = 0;
-      let effectMask = mask & 0x18 ? (mask & 0x08 ? 0x01 : 0) | (mask & 0x10 ? 0x02 : 0) : 0;
-      if (mask & 0x20) fx0 = rd.u8();
-      if (mask & 0x40) fx1 = rd.u8();
+      let effectMask = 0;
+      if (mask & 0x20) effectMask |= rd.u8();
+      if (mask & 0x40) effectMask |= rd.u8() << 8;
+      if (mask & 0x08) effectMask |= 1;
+      if (mask & 0x10) effectMask |= 2;
       const note: FurNote = { effects: 0 };
       if (mask & 0x01) { const n = rd.u8(); if (n === 183) rd.skip(4); note.note = n; }
       if (mask & 0x02) note.ins = rd.u8();
       if (mask & 0x04) note.vol = rd.u8();
-      if (effectMask & 0x01) { rd.u8(); note.effects++; }
-      if (effectMask & 0x02) rd.u8();
-      for (const m of [fx0, fx1]) for (let b = 0; b < 8; b += 2) { if (m & (1 << b)) { rd.u8(); note.effects++; } if (m & (2 << b)) rd.u8(); }
+      for (let k = 0; k < 16; k++) if (effectMask & (1 << k)) { rd.u8(); if (!(k & 1)) note.effects++; }
       rows.set(row, note);
       row++;
     }
@@ -369,7 +377,7 @@ export function writeFurnace(song: FurWriteSong, compress = false): Buffer {
   info.zeros(20);
   const pointerAt = info.size;
   info.zeros(4 * (song.instruments.length + patternCount));
-  for (const row of song.orders) for (let c = 0; c < channels; c++) info.u8(row[c] ?? 0);
+  for (let c = 0; c < channels; c++) for (const row of song.orders) info.u8(row[c] ?? 0);
   info.u8(1); info.u8(1); info.u8(1); info.zeros(channels * 2); // effect columns, hide, collapse
   for (let i = 0; i < channels * 2; i++) info.str("");
   info.str(""); info.f32(1);

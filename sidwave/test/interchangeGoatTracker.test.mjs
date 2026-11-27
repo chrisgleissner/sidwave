@@ -12,7 +12,7 @@ import { importGoatTracker } from "../src/interchange/goattrackerImport.js";
 import { exportGoatTracker } from "../src/interchange/goattrackerExport.js";
 import { runCli } from "../src/cli.js";
 import { VERSIONS, gts } from "./helpers/gtFixtures.mjs";
-import { haveGt2reloc, haveEngine, differential, differentialExport, GT2RELOC } from "./helpers/trackerDifferential.mjs";
+import { haveGt2reloc, haveEngine, differential, differentialExport, GT2RELOC, GT_STARTUP_CALLS } from "./helpers/trackerDifferential.mjs";
 
 const pitches = (text) => exportEvents(parseSidwave(text)).voices.map((v) => v.notes.map((n) => n.pitch));
 const expected = [[60, 64, 67, 72], [36, 36, 41, 36], []];
@@ -146,6 +146,7 @@ for (const [magic, make] of Object.entries(VERSIONS)) {
     const diff = await differential({ sng: make(), yamlText: result.yaml, seconds: 6 });
     // gt2reloc converts older formats on load as the importer does; the sequences agree call by call after the
     // startup offset of the SIDWave player. The register levels of the ladder are reported, not required.
+    assert.equal(diff.agree.bestShift, -GT_STARTUP_CALLS, "the startup offset is the best alignment");
     assert.ok(diff.agree.gate[0] >= 0.9 && diff.agree.gate[1] >= 0.9, JSON.stringify(diff.agree));
     assert.ok(diff.agree.pitch[0] >= 0.9 && diff.agree.pitch[1] >= 0.9, JSON.stringify(diff.agree));
     assert.equal(diff.ladder.levels.A1 === "pass" || diff.ladder.levels.A1 === "fail", true);
@@ -163,6 +164,7 @@ test("differential: the exported GTS5 file in gt2reloc against the compiled scor
   });
   const result = exportGoatTracker(parseSidwave(text));
   const diff = await differentialExport({ sng: result.bytes, yamlText: text, seconds: 6 });
+  assert.equal(diff.agree.bestShift, GT_STARTUP_CALLS);
   assert.ok(diff.agree.gate[0] >= 0.9 && diff.agree.gate[1] >= 0.9, JSON.stringify(diff.agree));
   assert.ok(diff.agree.pitch[0] >= 0.9 && diff.agree.pitch[1] >= 0.9, JSON.stringify(diff.agree));
 });
@@ -174,5 +176,39 @@ test("the 14 example songs of GoatTracker 2.77 import when they are available lo
   for (const file of files) {
     const result = importGoatTracker(fs.readFileSync(path.join(EXAMPLES, file)));
     assert.ok(result.report.rows > 0, file);
+  }
+});
+
+test("a pattern row with an instrument above 63 is an input error, and mutated songs only raise typed errors", () => {
+  const bad = Buffer.from(gts());
+  const at = bad.indexOf(Buffer.from([0x90, 1, 0, 0]), 100);
+  assert.ok(at > 0);
+  bad[at + 1] = 200;
+  assert.throws(() => importGoatTracker(bad), (e) => e instanceof GoatTrackerError && /instrument 200/.test(e.message));
+  let seed = 99;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  const makers = Object.values(VERSIONS);
+  let typed = 0;
+  for (let i = 0; i < 2000; i++) {
+    const copy = Buffer.from(makers[i % makers.length]());
+    for (let k = 0; k < 1 + rnd(5); k++) copy[rnd(copy.length)] = rnd(256);
+    const input = rnd(8) === 0 ? copy.subarray(0, rnd(copy.length)) : copy;
+    try { importGoatTracker(input, { validate: false }); } catch (error) {
+      assert.ok(error instanceof GoatTrackerError, `${error.name}: ${error.message}`);
+      typed++;
+    }
+  }
+  assert.ok(typed > 50);
+});
+
+test("differential on example songs of GoatTracker 2.77 (local; per-song figures are printed)", { skip: reason ?? (fs.existsSync(EXAMPLES) ? undefined : "examples not installed") }, async () => {
+  for (const name of ["dojo", "consultant", "sanction", "funktest", "transylvanian"]) {
+    const sng = fs.readFileSync(path.join(EXAMPLES, `${name}.sng`));
+    const result = importGoatTracker(sng);
+    const diff = await differential({ sng, yamlText: result.yaml, seconds: 8 });
+    const f = (list) => list.map((x) => x.toFixed(2)).join("/");
+    console.log(`# ${name}: best shift ${diff.agree.bestShift}, gate ${f(diff.agree.gate)}, note ${f(diff.agree.pitch)}, A1 bad windows ${(diff.ladder.a1.badWindows / diff.ladder.a1.windows).toFixed(2)}`);
+    assert.ok(diff.agree.bestShift >= -9 && diff.agree.bestShift <= -6, `${name}: best shift ${diff.agree.bestShift}`);
+    assert.ok(Math.min(...diff.agree.gate) >= 0.75, `${name}: gate ${f(diff.agree.gate)}`);
   }
 });

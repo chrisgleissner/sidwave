@@ -73,7 +73,11 @@ function convertInstrument(ins: FurInstrument | undefined): { def: Record<string
 
 /** Imports a Furnace module (C64 chip only) as SIDWave text. See doc/interchange.md. */
 export function importFurnace(bytes: Uint8Array, options: FurnaceImportOptions = {}): FurnaceImportResult {
-  const song: FurSong = parseFurnace(bytes);
+  let song: FurSong;
+  try { song = parseFurnace(bytes); } catch (error) {
+    if (error instanceof RangeError) throw new FurnaceError(`malformed module (${error.message})`);
+    throw error;
+  }
   const mode = options.mode ?? "PAL";
   const maxRows = options.maxRows ?? 100_000;
   const losses: string[] = [];

@@ -212,3 +212,18 @@ test("sidwave export and import handle MusicXML on the command line", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("XML text size, input size and character references are bounded", () => {
+  assert.throws(() => parseXml(`<a>${"x".repeat(100)}</a>`, { maxTextBytes: 50 }), /characters of text/);
+  assert.throws(() => importMusicXml(Buffer.alloc(200), { limits: { maxInputBytes: 100 } }), /limit/);
+  assert.throws(() => parseXml("<a>&#0;</a>"), /valid XML 1.0/);
+  assert.throws(() => parseXml("<a>&#xD800;</a>"), /valid XML 1.0/);
+  assert.throws(() => parseXml("<a>&#xFFFF;</a>"), /valid XML 1.0/);
+  assert.throws(() => parseXml("<a>a & b</a>"), XmlError);
+  assert.equal(parseXml("<a>&#x1F600;&#9;&lt;&amp;x</a>").text, "\u{1F600}\t<&x");
+  // Many entities decode in linear time.
+  const before = process.cpuUsage();
+  assert.equal(parseXml(`<a>${"&amp;".repeat(400000)}</a>`).text.length, 400000);
+  const u = process.cpuUsage(before);
+  assert.ok((u.user + u.system) / 1e6 < 2);
+});

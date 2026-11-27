@@ -22,7 +22,7 @@ export interface MusicXmlImportOptions {
   drums?: boolean;
   mode?: "PAL" | "NTSC";
   validate?: boolean;
-  limits?: XmlLimits & { maxBars?: number; maxCells?: number };
+  limits?: XmlLimits & { maxBars?: number; maxCells?: number; maxInputBytes?: number };
 }
 
 export interface MusicXmlImportReport {
@@ -69,6 +69,8 @@ export function importMusicXml(bytes: Uint8Array, options: MusicXmlImportOptions
   const mode = options.mode ?? "PAL";
   const maxBars = options.limits?.maxBars ?? 2048;
   const maxCells = options.limits?.maxCells ?? 400_000;
+  const maxInput = options.limits?.maxInputBytes ?? 16 * 1024 * 1024;
+  if (bytes.length > maxInput) throw new MusicXmlImportError(`the file has ${bytes.length} bytes; the limit is ${maxInput}`);
   if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b) {
     throw new MusicXmlImportError("compressed MusicXML (.mxl, a zip archive) is not supported; export an uncompressed .musicxml file from the notation program");
   }

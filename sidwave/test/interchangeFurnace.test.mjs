@@ -97,3 +97,41 @@ test("sidwave import and export handle Furnace modules on the command line", asy
     assert.equal((await run("import", "bad.fur", "--json")).code, 3);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+const ROW_C4 = [0x03, 108, 0, 0xff]; // note C-4 and instrument 0 on row 0
+const ROW_E4 = [0x03, 112, 0, 0xff];
+
+test("Furnace order tables are channels-outer and a row with two effects reads each effect once", () => {
+  // Two orders, three channels, distinct pattern numbers: bytes are channel 0 (0, 1), channel 1 (0, 0), channel 2 (2, 2).
+  const bytes = fur228({ custom: { ordersLen: 2, orderBytes: [0, 1, 0, 0, 2, 2], patterns: [
+    { channel: 0, index: 0, rows: ROW_C4 }, { channel: 0, index: 1, rows: ROW_E4 }, { channel: 1, index: 0, rows: [0xff] },
+    { channel: 2, index: 2, rows: [0x03, 100, 0, 0xff] },
+  ] } });
+  const song = parseFurnace(bytes);
+  assert.deepEqual(song.orders, [[0, 0, 2], [1, 0, 2]]);
+  assert.deepEqual(importFurnace(bytes, { validate: false }).report.voices.map((v) => v.notes), [2, 0, 2]);
+  // Effect 0 and effect 1 (extended mask 0x0f): the four bytes follow in bit order and each effect counts once.
+  const withFx = parseFurnace(fur228({ custom: { ordersLen: 1, orderBytes: [0, 0, 0], patterns: [{ channel: 0, index: 0, rows: [0x01 | 0x20, 0x0f, 108, 0x00, 0x7f, 0x0d, 0x04, 0xff] }, { channel: 1, index: 0, rows: [0xff] }, { channel: 2, index: 0, rows: [0xff] }] } }));
+  assert.equal(withFx.patterns.get(0).get(0).effects, 2);
+  // The written module has the same channels-outer table.
+  const written = writeFurnace({ name: "x", author: "", chip: 0x47, tickRate: 60, speed: 6, patternLength: 4, orders: [[0, 0, 1], [1, 0, 1]],
+    patterns: [[[], []], [[]], [[], []]], instruments: [] });
+  assert.deepEqual(parseFurnace(written).orders, [[0, 0, 1], [1, 0, 1]]);
+});
+
+test("mutated Furnace modules only raise typed errors", () => {
+  const base = [fur228(), fur240(), deflateSync(fur228())];
+  let seed = 12345;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  let typed = 0;
+  for (let i = 0; i < 1500; i++) {
+    const copy = Buffer.from(base[i % 3]);
+    for (let k = 0; k < 1 + rnd(4); k++) copy[rnd(copy.length)] = rnd(256);
+    const input = rnd(8) === 0 ? copy.subarray(0, rnd(copy.length)) : copy;
+    try { importFurnace(input, { validate: false }); } catch (error) {
+      assert.ok(error instanceof FurnaceError, `${error.name}: ${error.message}`);
+      typed++;
+    }
+  }
+  assert.ok(typed > 100);
+});
