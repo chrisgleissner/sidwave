@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { parseSidwave } from "./sidwave.js";
 import { bundleCommand, lockCommand } from "./cliAssets.js";
+import { runRetarget } from "./retargetCli.js";
 import { SIDWAVE_SYMBOL_FORMATS, compileSidwave, sidwaveGamePsid, type SidwaveSymbolFormat } from "./sidwaveGame.js";
 import {
   classifyError, envelope, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, SidwaveOperationError, UsageError, withFile,
@@ -31,6 +32,8 @@ Usage:
   sidwave lock     <score> [-o <out>] [--json] [--allow-dir <dir>]
   sidwave bundle   <score> -o <dir> [--force] [--json] [--allow-dir <dir>]
   sidwave examples [<name>] [-o <dir>] [--force] [--json]
+  sidwave retarget <file> [--clock pal|ntsc] [--model 6581|8580] [--sids <n>] [--budget-cycles <n>] [--budget-bytes <n>]
+                          [--allow-changes] [-o <out>] [--force] [--json]   (see "sidwave retarget --help")
 ${RUN_HELP.usage}${RECONSTRUCT_USAGE}  sidwave --help | --version
 
 Commands:
@@ -391,11 +394,12 @@ function fail(io: CliIo, json: boolean, command: string, error: unknown): number
 export function runCli(args: string[], io: CliIo): number | Promise<number> {
   const json = args.includes("--json");
   const [first, ...rest] = args;
-  const name = first !== undefined && Object.prototype.hasOwnProperty.call(COMMANDS, first) ? first : "sidwave";
+  const name = first !== undefined && (first === "retarget" || Object.prototype.hasOwnProperty.call(COMMANDS, first)) ? first : "sidwave";
   try {
     if (first === undefined) { io.err(HELP); return EXIT_USAGE; }
     if (first === "-h" || first === "--help" || first === "help") { io.out(HELP); return EXIT_OK; }
     if (first === "-V" || first === "--version") { io.out(`${packageVersion()}\n`); return EXIT_OK; }
+    if (first === "retarget") return runRetarget(io, rest);
     const command = name === "sidwave" ? undefined : COMMANDS[name];
     if (!command) throw new UsageError(`unknown command "${first}"`);
     const options = parseArgs(rest, name);

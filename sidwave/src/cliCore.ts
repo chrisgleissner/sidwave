@@ -7,6 +7,7 @@ import { SonglengthsError } from "./songlengths.js";
 import { SidwaveValidationError } from "./sidwave.js";
 import { A1Error } from "./verify/a1.js";
 import { VerifyError } from "./verify/index.js";
+import { RetargetError } from "./retarget/types.js";
 import { SidEngineError } from "./engine/types.js";
 import type { SidEmulation, SidEngine } from "./engine/types.js";
 
@@ -67,6 +68,7 @@ export interface ErrorReport {
 export function classifyError(error: unknown): ErrorReport {
   if (error instanceof SidwaveOperationError) return { category: error.category, message: error.message, details: error.details };
   if (error instanceof SidwaveValidationError) return { category: "validation", message: error.message, details: { path: error.path } };
+  if (error instanceof RetargetError) return { category: "validation", message: error.message, details: { code: error.code } };
   if (error instanceof SidFileError) return { category: "input", message: error.message, details: { code: error.code } };
   if (error instanceof SonglengthsError) return { category: "input", message: error.message, details: { code: error.code } };
   if (error instanceof A1Error) return { category: error.code === "invalid_input" ? "usage" : "input", message: error.message, details: { code: error.code } };
