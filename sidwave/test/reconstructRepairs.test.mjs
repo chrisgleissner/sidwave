@@ -201,7 +201,6 @@ test("1.5 constructs in a 1.4 document name the version: pulse width 0, wavetabl
 for (const speed of [2, 4, 8]) {
   test(`a score with speed ${speed} round trips with the register state exact`, {
     timeout: 120_000,
-    ...(speed === 8 ? { todo: "open: at speed 8 the first note is one call shorter in the recompiled trace (gate off at call 29 instead of 30): the start-up of the player shifts the first note against the row grid" } : {}),
   }, async () => {
     const score = {
       sidwave: "1.5", title: "multi", tempo: 60 * 50.1245 / 16, mode: "PAL", speed,
@@ -222,14 +221,8 @@ test("staged verification: an exact tune of 12 s is verified over the whole hori
   const full = await reconstructSid(new Uint8Array(compileSidwaveBytes(parseSidwave(buildScore("basic", 1)), { format: "sid", loop: true }).bytes), { engine: sharedEngine(), seconds: 12, verify: "full" });
   assert.equal(full.report.verification.mode, "full");
   assert.equal(full.report.strictExact, true);
-  // The speed-8 score of the round-trip tests below is not register-state exact (a known open case), so its probe fails.
-  const hard = {
-    sidwave: "1.5", title: "multi", tempo: 60 * 50.1245 / 16, mode: "PAL", speed: 8,
-    instruments: { lead: { waveform: "pulse", adsr: [0, 4, 12, 3], hard_restart: { frames: 0 } } },
-    voices: [{ id: 1, instrument: "lead", patterns: { a: { length: 1 / 128, bars: 1, groove: Array.from({ length: 16 }, (_, i) => ({ note: i % 2 ? "C5" : "A4", len: 0.25 })) } } }],
-    timeline: [{ section: "Main", bars: 12, layers: { v1: "a" } }],
-  };
-  const staged = await roundTrip(hard, 12);
+  // Generator scores use legato notes with portamento, which recovery does not reproduce, so the probe fails.
+  const staged = await roundTrip(buildScore("generator", 1), 12);
   assert.equal(staged.report.registerStateExact, false);
   assert.equal(staged.report.verification.mode, "probe");
   assert.equal(staged.report.verification.seconds, 10);
@@ -270,4 +263,16 @@ test("clampRestarts shortens an instrument's hard restart to its shortest note, 
   assert.equal(document.instruments.a.hard_restart.test, undefined);
   assert.equal(document.instruments.b.hard_restart.frames, 1);
   assert.equal(clampRestarts(document, 80, 5), 0);
+});
+
+test("two player calls closer than the burst gap are split: the first row at speed 8 has the length of every other row", async () => {
+  const frame = 19_656 / 8;
+  const writes = [];
+  // Calls 0, 1, 3 and 4 are regular; call 2 starts late and ends 1,500 cycles before call 3, which merges them.
+  for (const [start, late] of [[0, 0], [1, 0], [2, 900], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0]]) {
+    for (let reg = 0; reg < 7; reg++) writes.push(0, reg, start, Math.round(10_000 + start * frame + late + reg * 10));
+  }
+  const ir = buildIr(Float64Array.from(writes), { clock: "PAL" });
+  assert.equal(ir.calls.length, 8);
+  assert.deepEqual(ir.calls.map((c) => c.sids[0].regs[0]), [0, 1, 2, 3, 4, 5, 6, 7]);
 });

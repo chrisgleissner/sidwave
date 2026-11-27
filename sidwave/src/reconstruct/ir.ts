@@ -13,7 +13,7 @@
 import { DEFAULT_BURST_GAP, VerifyError, callGroups, traceWrites, type TraceWrite } from "../verify/index.js";
 
 /** Increment when the IR construction changes in a way that alters features; part of the corpus cache key. */
-export const IR_CODE_VERSION = 2;
+export const IR_CODE_VERSION = 3;
 
 export type IrClock = "PAL" | "NTSC";
 
@@ -197,6 +197,44 @@ function findStreams(
   return { dense, streams };
 }
 
+/**
+ * Splits groups that hold two player calls. At several calls per frame a call whose writes start late (a note start does
+ * more work) can end less than the burst gap before the next call. Such a group is followed by the next one only after
+ * about two periods. It is split at its longest pause when that pause leaves each part about one period from its
+ * neighbour and the second part writes a register that the first part already wrote.
+ */
+export function splitMergedCalls(groups: TraceWrite[][]): TraceWrite[][] {
+  const period = median(groups.slice(1).map((g, i) => g[0]!.cycle - groups[i]![0]!.cycle));
+  if (!period) return groups;
+  const out: TraceWrite[][] = [];
+  for (let i = 0; i < groups.length; i++) {
+    let group = groups[i]!;
+    const next = groups[i + 1]?.[0]?.cycle;
+    while (next !== undefined && next - group[0]!.cycle > 1.6 * period) {
+      const remaining = next - group[0]!.cycle;
+      let at = 0;
+      let pause = 0;
+      const seen = new Set<number>();
+      let repeats = new Set<number>();
+      for (let j = 1; j < group.length; j++) {
+        seen.add(group[j - 1]!.sid * 32 + group[j - 1]!.reg);
+        const gap = group[j]!.cycle - group[j - 1]!.cycle;
+        const first = group[j]!.cycle - group[0]!.cycle;
+        if (gap > pause && first > 0.5 * period && remaining - first > 0.5 * period && remaining - first < 1.5 * period) {
+          pause = gap;
+          at = j;
+          repeats = new Set(seen);
+        }
+      }
+      if (!at || !group.slice(at).some((w) => repeats.has(w.sid * 32 + w.reg))) break;
+      out.push(group.slice(0, at));
+      group = group.slice(at);
+    }
+    out.push(group);
+  }
+  return out;
+}
+
 /** Builds the frame-state IR of a packed trace (four Float64 values per write: sid, register, value, cycle). */
 export function buildIr(trace: Float64Array, options: IrOptions = {}): FrameIr {
   const clock = options.clock ?? "PAL";
@@ -247,7 +285,7 @@ export function buildIr(trace: Float64Array, options: IrOptions = {}): FrameIr {
 
   const { dense, streams } = findStreams(inside, streamGap, streamMin, seconds);
   const periodic = inside.filter((_, i) => !dense[i]);
-  const groups = callGroups(periodic, gap);
+  const groups = splitMergedCalls(callGroups(periodic, gap));
 
   const zero = (): Uint8Array => new Uint8Array(SID_REGISTER_COUNT);
   let current: Uint8Array[] = Array.from({ length: sidCount }, zero);

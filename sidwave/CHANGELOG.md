@@ -62,6 +62,10 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 - `scripts/reconstruct-corpus.mjs` runs `sidwave reconstruct` over the 24 development tunes of the corpus manifest (held-out tunes are never run), caches the original traces and results by content, and writes `data/reconstruct/dev-report.json` and `dev-report.md` (verdicts, first differences, root-cause classes, score size, run time per minute of music). `reconstructSid` also returns the recompiled PSID and the phase timings.
 - Recovery: exact note registers (`tuning.registers`) and exact `reg` pitch steps for instruments with a fixed pitch table, pulse tables with width 0 and wrap, a speed above 4, `player.soft_start: false` when the tune has no volume ramp, `player.idle_writes: false` or `control` for voices that stay unwritten, or write only their control register, until their first note, and `player.start` for the writes before the first note.
 
+### Fixed
+
+- The frame-state IR of reconstruction splits two player calls that are closer than the burst gap (speed 7 and 8). The first row of a recovered speed-8 score now has the length of the original.
+
 ### Changed
 
 - `convert` and `export` exit 5 (limit) instead of 3 when a score exceeds a fixed capacity of the target format, such as the 124 orderlist entries of SID-Wizard.
