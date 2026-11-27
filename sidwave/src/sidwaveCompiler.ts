@@ -193,6 +193,15 @@ export function compileSidwaveToPrg(doc: ParsedSidwave, options: SidwaveCompileO
   return compilePlayer(doc, options);
 }
 
+/**
+ * The compiler's cycle estimate for the worst player call (a bound above every measured call) without assembling the
+ * player: it arranges the score and packs the voice streams only. It throws what the compile would throw for an
+ * invalid or oversize score.
+ */
+export function estimateSidwaveCycles(doc: ParsedSidwave, options: SidwaveCompileOptions = {}): number {
+  return preparePlayer(doc, options).worstCaseCyclesPerCall;
+}
+
 /** Warning for a score whose sawtooth voices could clip one side of the mix, or undefined. */
 function sawtoothWarning(arrangement: Arrangement): string | undefined {
   const level = arrangement.chips!.reduce((sum, chip, i) => {

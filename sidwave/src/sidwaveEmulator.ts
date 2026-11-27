@@ -106,6 +106,9 @@ const HANDLERS: Record<string, Handler> = {
   RTS: (c) => { const low = c.pop(); c.pc = (((c.pop() << 8) | low) + 1) & 0xffff; },
 };
 
+/** Mnemonic, addressing mode, base cycles and read-penalty flag of every official opcode, for other interpreters that share this cycle model. */
+export const OP_TABLE: Array<{ name: string; mode: string; cost: number; penalty: boolean } | undefined> = [];
+
 /** Per opcode: handler, addressing mode, base cycles and whether a page crossing on an indexed read costs a cycle. */
 const OP_FN: Array<Handler | undefined> = [];
 const OP_MODE: Mode[] = [];
@@ -117,6 +120,7 @@ for (const [name, list] of Object.entries(OPCODES)) {
     OP_MODE[op] = mode;
     OP_COST[op] = cycleCost(name, mode);
     OP_PENALTY[op] = !name.startsWith("ST") && !RMW.has(name);
+    OP_TABLE[op] = { name, mode, cost: OP_COST[op]!, penalty: OP_PENALTY[op]! };
   }
 }
 

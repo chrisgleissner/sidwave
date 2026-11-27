@@ -1,0 +1,866 @@
+[
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 0,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "f2f7a0df4137c3162435caefbdffac9f1fc4c6b5c578ac6f29d81528767f5e76"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 0,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "732455b94f8a401281dcfcf294509daa8af8b1148d7d55bf51d3a5db610d32ee"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 0,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "ee8046a111587954bf2bb72d11acae5959a99f31de4ef373f4821a99a2b1843a"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 0,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "0e9a31cdff2dfa31f0d4165553e73ee8ff7fdacac4af2947e5511b093116e2ea"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 1,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "9dc511582244bbc0af123e980b2a74e0581ac5ff7cace25e63a10568b7425cc6"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 1,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "38a95289409140507775a179a3b4b6c3f1cab7e067c41753e7cb665c1b37fa8e"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 1,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "4c4d3760a9598bc0f54bb86322960c0746147904f6983921a92522e1a3be5b58"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 1,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "dc3883215572415ed50df7617b93f3965f572b3c5178292a77274802836ce42b"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 65,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "d317fb2115edf67bc35590621172430b01037dfa524b54498e981fefc9f7d706"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 65,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "d7dd177102167b303114e2e56a28c21b465e4e109a6b74133f45e291cade2b96"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 65,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "d85d9b1f4c70c36b6510bf192f685cd79ad3219cf2f1d9af332778425133f44d"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 65,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "00012ba70bd3edf25cf7f6b67e4905336a24f1a052cad96c537a6a336ea0988b"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 1234,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "662b2ad21a832d4e20ac2b78159e725c5145590e6e6726bc07aa189432a35a6b"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 1234,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "3222d49a759c053bce27699be0d62b0c223bbd26dcb579a63c0676feff7c1f2a"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 1234,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "f34e7eb42746b6c3bee00e89e33c992471edfbb2d92bfd4a7f382ca10dcbb1f1"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 1234,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "4a97bfff8cdf04c4f53c46772266361b516143f457356b6cbfabdac4d2c06471"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 99999,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "267dbd7c30e0018fce5ddc00bda50162c52394b5bb3802dd6f603c5bfd78d15e"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 99999,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "352070d73e64c939955591811ff76c5a93598ebad8ec3c14d2b9075872493742"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 99999,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "4bdc03bf4cda3e706134e061be986d5bc4f4a9686912c75b82be7b33757cb8bd"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 99999,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "d7739ed67b2980b9667c8028252b19f96dde5e19ad76efc3b9fd0aa480e7242c"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 4294967295,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "d08de8f4c3cf3bf011717c2dec5e9faf9a06a6722e64e59224201c3880cb9321"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 4294967295,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "9e0c49674b4bb591a183d12774b2817e2862600e7a70d9ac1b075b7ec254ea40"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 4294967295,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "debe407b10bec6d8061a44d929dba6fbe8e38746749732d4b7b0a5e0e148e31c"
+ },
+ {
+  "options": {
+   "style": "chiptune",
+   "seed": 4294967295,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "a03f47ba4861c39d709ad4f0a9dedb2f7c833c15ded109f255b2acb1a35f4e78"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 0,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "408d2c3d21d972562c7b043ede83e5a0bd2dd7b5710f5e8690563b2a9f26e167"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 0,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "4c8ba83b7e865f8464e2f51053ffcd9e1eb1647272c148334b03a6e56331807a"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 0,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "1af5a5db1402a0bea100d04068a731ba0a77cf29d5faae98a0c119b73c1117a2"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 0,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "ea62698d8d75322a2c396b97bad92da63ee50a6e1fd0a9218c5025d976ac0338"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 1,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "392939cb3c19c198a430d02235a6de2f7b506b96d79e9353b4e856a2e528e5bc"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 1,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "c557e7a5253b011d22c9dcf9257b96298779bf2c12a19d60a8ecf190e6727a5e"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 1,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "a85c6740d0740eb247fce4c42c6513d02a566b395cd2472c6d0580c742157fce"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 1,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "4b7c7ab2986ae736e9d4e141d3da4464aa7b53022f406dbb739a05f5bc793590"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 65,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "39c7cda4f323c123e86005f576fa435be68db288f5bb78823d745861e2f82743"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 65,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "54e35eef32164f651bb5a1240de36d65f2620a91717d2e501f55dd819ed53782"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 65,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "87084ff0b2e7a695b6d2ee70e6de3872ef85af43a7130a793fa5ecfabc70278b"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 65,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "6cac26efe0703c900814ab5a3690458dc29a7b209abaf7ee94bdfbace6b98200"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 1234,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "77cc63a62647e989668828dd70b27b87e13d42790a0b17200f79fb4d2f2d3235"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 1234,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "002d804e07dfae90eeffd2b2cece66dc2779115ae3e6318f20b6217639dd0fc0"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 1234,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "9620e105a7e626e52cdff4c0d6fee2e692d6a25cd5ecec1f1af9c3e5b867e2b6"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 1234,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "8a3a6a53e5a1450ac42ee8b6f6f19e5982bf721b4579d575182771a716526906"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 99999,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "68b9a9d2989aad2834986b4af05c24b15cd0c09c503dbf8d5338e0bef9534865"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 99999,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "ad6d625b411baa68b6f558ca6d37cb25814c3015f85939a5cf09c73b0218bb14"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 99999,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "11ee703fd4b4f645f24a8a22873439a2464ee90688daa1decb23171cf625cbd2"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 99999,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "b5569a8c48b25dc5389931f94f37436d20060884785f0aee267f28a3486a8039"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 4294967295,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "5d5a31c3d3a404877740742fc93d730b408e40214bcc647d7920181078d8eb21"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 4294967295,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "a73a395de49f9fdc181899168b421a82f2a47c6a9ce430200b5a0d2e5061c4bd"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 4294967295,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "38153b82f42db843fa1e9e624b71e1c3f0f134fdba37039d1c622f4f3908b439"
+ },
+ {
+  "options": {
+   "style": "ambient",
+   "seed": 4294967295,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "03c18dd47df1cc23d79fc0300e3320ca1fe3630cc608fd7629d2129aa769e03d"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 0,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "2d5fa8eb4376046cc8e9bd11528f0c10aa5e3e5155c1cdcb2cdbb88ac3f1a274"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 0,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "7fe57a9ccb3f986f02d7ecf0a2965ccb34350e0c4f2f17bb1a53d0947d03241c"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 0,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "3687435ee8c6838bb65e8dc1c2760a9d55f3dd8cb2e2261e5e3230ca28764e32"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 0,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "83dd5bfac42d9efa62f7fd2890e191492c4135bf2fb8b0c478b5d98627e103bd"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 1,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "4e02ca545f1518f59ac7332cfcc2d641cfeeebebf5a4eb138706deb251947889"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 1,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "eefa4718cbec63ca774408b944516c60a074014acb9ecdd871229746effec962"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 1,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "550463704218bbe69c2e1cacd1e9ad49cba87207d436e12c162796b50926a6e7"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 1,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "bf03d78073a7380230af5a6ad09ecd7c7b0ababd7f03561b63dccd268cab6f2a"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 65,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "0fb97236c572adfb415a08cc1c3c97bfb491467961230dcf7c5ade385f78fcdd"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 65,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "e4b572689bac96a56a843c8d92b7cae9dd50a4c5cc7929d1e37b41660c157d01"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 65,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "5888eb9acdf994648368bf5c5dd89d2ebbbf815ffabeae0d6c1b3c41e36ab05c"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 65,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "079c19f93e2c986f686e31486c5fe7f9008a62a08cee8853f550a94da0a1fafb"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 1234,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "cfb0beb7c1ef81d7a5b2081140757f2f3623f7068552153136d2c3cad35e1ff3"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 1234,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "c5ed5e6fe8eede7eec9969ccd3df8b04e930403c283ba7cfff8ef944e1c80fb0"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 1234,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "f447dd2e914735f731e17f608f2279b99969faeb444e4cea6c9c74acec986fb9"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 1234,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "54f396d49834d1590cbdd327a3cc9c8aaeb3c9df03c98185f20c8af26898857b"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 99999,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "83abe3f616b5976785f2fa388376490a6f848fc779c9b47783639d8301270a39"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 99999,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "0e4f759aee916242fde38f29da2226167934e2a5db31f673c456c1eca1e59eab"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 99999,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "84670c160bcb733bb7e5a5df23a8d9991831d6278b97b8f545c08d39163ec8f8"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 99999,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "752db47b515202dc1572b89ca0d2551bdd55aa327afb031e95343eeabd03ec58"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 4294967295,
+   "root": "C3",
+   "preset": "classic",
+   "system": "PAL"
+  },
+  "sha256": "3ca5c0de6d37853ed4bcce8b479aa77e7ab470b893d171cac09139b8440dc2cd"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 4294967295,
+   "root": "F#4",
+   "preset": "expression",
+   "system": "NTSC"
+  },
+  "sha256": "ccd5f26371fddbb7f484d6933511d1cf444716736fa5daecf54db79baf53a2c0"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 4294967295,
+   "root": "A2",
+   "preset": "classic",
+   "system": "PAL",
+   "steps": 12,
+   "tempoMs": 150
+  },
+  "sha256": "c659789fe75592662377eb4cf1425d1c0b074edb520414ab691ea9646073255f"
+ },
+ {
+  "options": {
+   "style": "funk",
+   "seed": 4294967295,
+   "root": "D3",
+   "preset": "classic",
+   "system": "PAL",
+   "waveform": "saw",
+   "intervals": [
+    0,
+    3,
+    7
+   ]
+  },
+  "sha256": "448e2b60401ee2e22d5477fd5fa00d8b74c687d60df52eb2c7e036e18c033f13"
+ }
+]

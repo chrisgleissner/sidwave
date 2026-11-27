@@ -4,6 +4,7 @@
 
 import { midiToNoteName, noteNameToMidi, type SidwaveDocument, type SidwaveGrooveNote, type SystemMode } from "../sidwave.js";
 import { maxSidwaveMidi, sidwaveFrameRate } from "../sidwaveCompiler.js";
+import { composeSidwave } from "../compose/compose.js";
 
 export const MUSIC_STYLES = {
   chiptune: { tempo: 130, speed: 2, bass: "lib:filter_bass", drumLine: "kB.hO.sB.hOkBhs." },
@@ -14,7 +15,25 @@ export const MUSIC_STYLES = {
 export const DEFAULT_MUSIC_SEED = 65;
 export type MusicStyle = keyof typeof MUSIC_STYLES;
 
-interface GenerateOptions {
+/** Composer 2 profile used when `composer: 2` is given without a `profile`, by style. */
+export const DEFAULT_COMPOSER2_PROFILES: Record<MusicStyle, string> = {
+  chiptune: "chip-aaba-minor",
+  ambient: "soft-aaba-minor",
+  funk: "funk-vc-dorian",
+};
+
+export interface GenerateOptions {
+  /**
+   * Composer version. Omitted or 1 selects the original generator, whose output is unchanged. 2 selects the composer with
+   * form, harmony, melody, counterpoint, motif development, rhythm and instrumentation (see `compose/`); it uses `root`,
+   * `style` (to choose a default profile), `seed` and `system`, and ignores `intervals`, `steps`, `tempoMs`,
+   * `waveform` and `preset`.
+   */
+  composer?: 1 | 2;
+  /** Composer 2 only: the name of a profile from `PROFILES`. */
+  profile?: string;
+  /** Composer 2 only: largest cycles for one player call (default 80 % of a video frame divided by the speed). */
+  cycleBudget?: number;
   root: string;
   intervals?: number[];
   steps?: number;
@@ -48,6 +67,20 @@ function randomSource(seed: number): () => number {
 const pitchClass = (midi: number) => ((midi % 12) + 12) % 12;
 
 export function generateSidwave(options: GenerateOptions) {
+  if (options.composer === 2) {
+    const result = composeSidwave({
+      profile: options.profile ?? DEFAULT_COMPOSER2_PROFILES[options.style], seed: options.seed, system: options.system,
+      root: options.root, ...(options.cycleBudget === undefined ? {} : { cycleBudget: options.cycleBudget }),
+    });
+    // Options of the version 1 generator that composer 2 does not use are reported, not dropped silently.
+    const warnings = [...result.warnings];
+    for (const name of ["steps", "tempoMs", "intervals", "waveform"] as const) {
+      if (options[name] !== undefined) warnings.push(`option "${name}" belongs to the version 1 generator and is ignored by composer 2`);
+    }
+    if (options.preset === "expression") warnings.push(`option "preset: expression" belongs to the version 1 generator and is ignored by composer 2`);
+    if (options.profile !== undefined && options.style !== undefined) warnings.push(`option "style" only selects a default profile and is ignored because profile "${options.profile}" was given`);
+    return { ...result, warnings };
+  }
   const { style, system, seed, preset } = options;
   const { tempo, bass, drumLine } = MUSIC_STYLES[style];
   const random = randomSource(seed);
