@@ -5,8 +5,8 @@
 //
 // Usage: node scripts/bench-perf.mjs [--filter <substring>] [--runs <n>] [--out <file>] [--dist <dir>] [--examples a,b] [--no-engine] [--no-cli]
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +24,7 @@ const { parseSidwave, compileSidwaveToPrg, compileSidwaveToSid, lintSidwave, SID
 const { compileSidwave } = await import(`${pkg}/sidwaveGame.js`);
 const { formatSidwave, diffSidwave, mergeSidwave } = await import(`${pkg}/format/sidwaveFormat.js`);
 const { transpose } = await import(`${pkg}/transform/index.js`);
+const { runCli } = await import(`${pkg}/cli.js`);
 const { compareTraces } = await import(`${pkg}/verify/index.js`);
 const { compareAudioA1, loadA1Rules } = await import(`${pkg}/verify/a1.js`);
 const { buildIr } = await import(`${pkg}/reconstruct/ir.js`);
@@ -86,6 +87,21 @@ for (const name of names) {
   measure(`transpose/${name}`, () => transpose(text, { semitones: 1, validate: false }));
   measure(`diff/${name}`, () => diffSidwave(text, shifted));
   measure(`merge/${name}`, () => mergeSidwave(text, shifted, text));
+  // The authoring commands in the process (file reads and writes included, node start-up not).
+  {
+    const dir = mkdtempSync(join(tmpdir(), "sidwave-bench-"));
+    const put = (file, content) => { writeFileSync(join(dir, file), content); return file; };
+    const a = put("a.yaml", text), b = put("b.yaml", shifted), formatted = put("f.yaml", formatSidwave(text));
+    const cli = (...argv) => { runCli(argv, { cwd: dir, out() {}, err() {}, outBytes() {} }); };
+    measure(`cli.format/${name}`, () => cli("format", formatted, "--check"));
+    measure(`cli.diff/${name}`, () => cli("diff", a, b));
+    measure(`cli.diff.compile/${name}`, () => cli("diff", a, b, "--compile"));
+    measure(`cli.merge/${name}`, () => cli("merge", a, b, a));
+    measure(`cli.transform/${name}`, () => cli("transform", a, "--transpose", "1"));
+    measure(`cli.transform.compile/${name}`, () => cli("transform", a, "--transpose", "1", "--validate", "compile"));
+    measure(`cli.transform.parse/${name}`, () => cli("transform", a, "--transpose", "1", "--validate", "parse"));
+    rmSync(dir, { recursive: true, force: true });
+  }
   if (name !== "fuer_elise" && !name.startsWith("game_")) {
     measure(`gameBuild/${name}`, () => compileSidwave(doc, { target: "game", origin: 0x1000, symbols: ["acme", "json"] }));
   }
@@ -106,6 +122,16 @@ for (const name of names) {
   for (const [name, bytes, to, verify] of jobs) {
     await measureAsync(name, () => convert(bytes, { to, ...(verify ? { verify: true } : {}) }));
   }
+}
+
+// ---- generate (composer 2 and the original generator) and the command ------------------------------------------
+{
+  const dir = mkdtempSync(join(tmpdir(), "sidwave-bench-"));
+  const cli = (...argv) => { runCli(argv, { cwd: dir, out() {}, err() {}, outBytes() {} }); };
+  measure("cli.generate/composer2", () => cli("generate", "--seed", "3"));
+  measure("cli.generate/composer1", () => cli("generate", "--composer", "1", "--seed", "3"));
+  measure("cli.generate.compile/composer2", () => cli("generate", "--seed", "3", "--prg", "g.prg", "--sid", "g.sid", "--force"), { warmRuns: 3 });
+  rmSync(dir, { recursive: true, force: true });
 }
 
 // ---- SID file, songlengths ------------------------------------------------------------------------------------
@@ -252,7 +278,9 @@ if (!flag("--no-engine")) {
 if (!flag("--no-cli")) {
   const bin = join(pkg, "bin.js");
   const file = join(root, "sidwave", "data", "sound", "examples", "chiptune_drive.yaml");
-  for (const [label, argv] of [["validate", ["validate", file]], ["compile", ["compile", file, "-o", "-"]], ["lint", ["lint", file]], ["help", ["--help"]]]) {
+  for (const [label, argv] of [["validate", ["validate", file]], ["compile", ["compile", file, "-o", "-"]], ["lint", ["lint", file]], ["help", ["--help"]],
+    ["format", ["format", file, "--check"]], ["diff", ["diff", file, file]], ["transform", ["transform", file, "--tempo", "99"]],
+    ["merge", ["merge", file, file, file]], ["generate", ["generate", "--seed", "3"]]]) {
     if (filter && !`cli/${label}`.includes(filter)) continue;
     const samples = [];
     for (let i = 0; i < runs; i++) {

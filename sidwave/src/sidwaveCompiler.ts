@@ -479,18 +479,8 @@ function lintPlan(doc: ParsedSidwave, arrangement: Arrangement): void {
   for (const found of lintSongs(doc)) findings.add(found.code, found.first, found.message);
 }
 
-function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
-  planned?: Arrangement): CompileResult {
-  const { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly, tightest } =
-    preparePlayer(doc, options, planned);
-  // Check the size before assembling the streams: the player and its tables are assembled once with
-  // empty streams, which gives the exact start of the stream data. Songs larger than 64 KB would
-  // otherwise wrap the address counter inside the assembler.
-  const layout = assemblyToPrgDetailed(buildPlayerAsm(arrangement, streams.map(() => [OP.LOOP]), loop, turboOnly, false), {
-    fileName: "sidwave_player.asm",
-    loadAddress: SIDWAVE_LOAD_ADDRESS,
-  });
-  const streamStart = layout.symbols.get("stream0")!;
+/** The error of a song that does not fit below $D000. `streamStart` is where the stream data starts in the assembled player. */
+function checkMemoryFit({ streams, arrangement }: PreparedPlayer, streamStart: number): void {
   const sampleBytes = [...(arrangement.samples?.defs.values() ?? [])].reduce((sum, sample) => sum + sample.data.length, 0);
   const projectedEnd = streamStart + streams.reduce((sum, st) => sum + st.length, 0) + sampleBytes;
   // The PRG installer also writes three bytes after the program (an empty BASIC program).
@@ -502,6 +492,63 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
         (sampleBytes ? `. With the BASIC terminator it needs ${projectedEnd + 3 - SIDWAVE_LOAD_ADDRESS} bytes and includes ${sampleBytes} sample bytes. Use a lower sample rate or shorter samples` : ""),
     );
   }
+}
+
+/** The error of a score whose play call needs more cycles than a 1 MHz C64 has, unless it declares `cpu: turbo`. */
+function checkCycleBudget(doc: ParsedSidwave, { arrangement, digiCycles, requiresTurbo, tightest }: PreparedPlayer, planned?: Arrangement): void {
+  if (!arrangement.chips) return;
+  const availableCycles = tightest.available;
+  const required = tightest.cycles / availableCycles;
+  if (!planned && requiresTurbo(arrangement.system) && !doc.cpu) {
+    throw new SidwaveValidationError("$.cpu",
+      `the player needs up to ${tightest.cycles} cycles per call at speed ${tightest.speed}${digiCycles ? ` including ${digiCycles} for the CIA2 digi NMI` : ""} (${availableCycles} available at 1 MHz ${arrangement.system}); use cpu: turbo for a CPU speed of at least ${Math.ceil(required)} MHz`);
+  }
+}
+
+/** True for the assembler's errors about a program that does not fit in the 64 KB address space. */
+function isPastAddressSpace(error: unknown): boolean {
+  return error instanceof AssemblyError && /passes \$FFFF|outside \$0000-\$FFFF/.test(error.message);
+}
+
+/**
+ * The size check of the PRG: the player and its tables are assembled with empty streams, which gives the exact start of
+ * the stream data without the cost of assembling the streams. Streams larger than 64 KB would otherwise wrap the
+ * address counter inside the assembler. Only the step records of effects (up to 32 effects of 255 steps, 11 bytes each)
+ * can make the player itself larger than 64 KB. buildPlayerAsm also rejects instrument tables that are too long.
+ */
+function checkPlayerFits(prepared: PreparedPlayer): void {
+  const { loop, streams, arrangement, turboOnly } = prepared;
+  const asm = buildPlayerAsm(arrangement, streams.map(() => [OP.LOOP]), loop, turboOnly, false);
+  let layout;
+  try {
+    layout = assemblyToPrgDetailed(asm, { fileName: "sidwave_player.asm", loadAddress: SIDWAVE_LOAD_ADDRESS });
+  } catch (error) {
+    if (!arrangement.effects || !isPastAddressSpace(error)) throw error;
+    const bytes = arrangement.effects.reduce((sum, effect) => sum + effect.steps.length * SIDWAVE_EFFECT_STEP_BYTES, 0);
+    throw new SidwaveValidationError("$.effects",
+      `the compiled player would end past the $D000 limit (about 50 KB); the sound effect steps alone take ${bytes} bytes; use fewer or shorter effects`);
+  }
+  checkMemoryFit(prepared, layout.symbols.get("stream0")!);
+}
+
+/**
+ * Every check of compileSidwaveToPrg, without assembling the note data: the score is arranged and packed, the player and
+ * its tables are built and assembled with empty streams (table limits and memory size), then the cycle budget
+ * (`cpu: turbo`) is checked. Throws what the compile would throw, except an error of the assembler in the note data.
+ */
+export function checkSidwaveCompiles(doc: ParsedSidwave, options: SidwaveCompileOptions = {}): void {
+  const prepared = preparePlayer(doc, options);
+  checkPlayerFits(prepared);
+  checkCycleBudget(doc, prepared);
+}
+
+function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
+  planned?: Arrangement): CompileResult {
+  const prepared = preparePlayer(doc, options, planned);
+  const { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly, tightest } = prepared;
+  // Check the size before assembling the streams.
+  checkPlayerFits(prepared);
+  const sampleBytes = [...(arrangement.samples?.defs.values() ?? [])].reduce((sum, sample) => sum + sample.data.length, 0);
   const warnings: string[] = [];
   for (const field of doc.ignoredFields ?? []) warnings.push(`${field} has no effect before sidwave: 1.2 and was ignored`);
   if (arrangement.findings) {
@@ -512,12 +559,7 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
     warnings.push(`CIA2 digi playback reserves up to ${digiCycles} CPU cycles per player call and temporarily replaces the sample SID's master volume.`);
   }
   if (arrangement.chips) {
-    const availableCycles = tightest.available;
-    const required = tightest.cycles / availableCycles;
-    if (!planned && requiresTurbo(arrangement.system) && !doc.cpu) {
-      throw new SidwaveValidationError("$.cpu",
-        `the player needs up to ${tightest.cycles} cycles per call at speed ${tightest.speed}${digiCycles ? ` including ${digiCycles} for the CIA2 digi NMI` : ""} (${availableCycles} available at 1 MHz ${arrangement.system}); use cpu: turbo for a CPU speed of at least ${Math.ceil(required)} MHz`);
-    }
+    checkCycleBudget(doc, prepared, planned);
     const sawtooth = sawtoothWarning(arrangement);
     if (sawtooth) warnings.push(sawtooth);
   }
@@ -719,6 +761,10 @@ export function compileSidwaveGameImage(doc: ParsedSidwave, layout: SidwaveGameL
     } catch (error) {
       if (error instanceof AssemblyError && /Overlapping output/.test(error.message)) {
         throw new SidwaveValidationError("$.dataOrigin", "the data block overlaps the player; move it or the origin");
+      }
+      if (isPastAddressSpace(error)) {
+        throw new SidwaveValidationError(arrangement.effects ? "$.effects" : split ? "$.dataOrigin" : "$.origin",
+          `the player and its data would end past $FFFF, far beyond the $D000 limit; lower the origin or the data origin${arrangement.effects ? ", or use fewer or shorter effects" : ""}`);
       }
       throw error;
     }
