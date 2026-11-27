@@ -5,7 +5,7 @@
 // Parts shared by the HVSC commands (sid, songlengths, stil): a small flag parser, the lookup of the HVSC root and
 // databases, and the writing of output files.
 
-import { existsSync, mkdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { SidwaveOperationError, UsageError, envelope, type CliIo } from "./cliCore.js";
 import {
@@ -44,7 +44,8 @@ export function parseFlags(args: readonly string[], spec: FlagSpec): ParsedFlags
     if (spec.values.includes(arg)) {
       const next = args[i + 1];
       // A value that is itself one of the flags means the value was left out.
-      const missing = inline === undefined && (next === undefined || (next.startsWith("--") && (spec.values.includes(spec.aliases?.[next] ?? next) || spec.switches.includes(spec.aliases?.[next] ?? next) || next === "--help")));
+      const known = next !== undefined && (next === "-h" || spec.values.includes(next) || spec.switches.includes(next) || Object.prototype.hasOwnProperty.call(spec.aliases ?? {}, next) || Object.values(spec.aliases ?? {}).includes(next));
+      const missing = inline === undefined && (next === undefined || known || (next.startsWith("--") && (spec.values.includes(spec.aliases?.[next] ?? next) || spec.switches.includes(spec.aliases?.[next] ?? next) || next === "--help")));
       if (missing) throw new UsageError(`${arg} needs a value`);
       const value = inline ?? args[++i]!;
       const list = out.values.get(arg);
@@ -140,11 +141,14 @@ export const sameFile = (a: string, b: string): boolean => real(a) === real(b);
 
 /** Writes a file by writing a temporary file beside it and renaming it, so an interrupted write cannot truncate the target. */
 export function writeFileAtomic(path: string, bytes: Uint8Array | string): void {
-  const temporary = join(dirname(path), `.${basename(path)}.${process.pid}.tmp`);
+  const existed = existsSync(path);
+  const realPath = existed ? realpathSync(path) : resolve(path);
+  const temporary = join(dirname(realPath), `.${basename(realPath)}.${process.pid}.tmp`);
   try {
-    mkdirSync(dirname(path), { recursive: true });
+    mkdirSync(dirname(realPath), { recursive: true });
     writeFileSync(temporary, bytes);
-    renameSync(temporary, path);
+    if (existed) chmodSync(temporary, statSync(realPath).mode & 0o7777);
+    renameSync(temporary, realPath);
   } catch (error) {
     try { rmSync(temporary, { force: true }); } catch { /* nothing to clean */ }
     throw new SidwaveOperationError("input", `cannot write ${path}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: path });

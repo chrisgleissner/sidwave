@@ -74,6 +74,7 @@ export function parseSidIdConfig(text: string, options: { maxBytes?: number } = 
   const maxBytes = options.maxBytes ?? DEFAULT_SIDID_MAX_BYTES;
   if (text.length > maxBytes) throw new HvscError("too_large", `the SIDId signature file is ${text.length} bytes, over the limit of ${maxBytes}`);
   const db: SidIdDb = { players: [], signatures: 0 };
+  const usesEnd = /(?:^|\s)end(?:$|\s)/im.test(text);
   let player: SidIdPlayer | undefined;
   let fragments: number[][] = [];
   let current: number[] = [];
@@ -91,7 +92,7 @@ export function parseSidIdConfig(text: string, options: { maxBytes?: number } = 
   };
   for (const line of text.split(/\r?\n/)) {
     const tokens = line.split(/\s+/).filter((t) => t !== "");
-    if (tokens.length === 0) { finishSignature(); continue; }
+    if (tokens.length === 0) { if (!usesEnd) finishSignature(); continue; }
     const isSignatureToken = (t: string): boolean => isHexByte(t) || t === "??" || /^(?:end|and|&&)$/i.test(t);
     if (tokens.length === 1 && !isSignatureToken(tokens[0]!)) {
       finishSignature();
@@ -107,7 +108,7 @@ export function parseSidIdConfig(text: string, options: { maxBytes?: number } = 
       // Any other token inside a signature line is ignored.
       if (current.length > MAX_SIGNATURE_BYTES) throw new HvscError("bad_format", `a signature of player ${player?.name ?? "?"} is longer than ${MAX_SIGNATURE_BYTES} bytes`);
     }
-    finishSignature(); // the newer file format has no END
+    if (!usesEnd) finishSignature(); // the newer file format has no END
   }
   finishSignature();
   return db;

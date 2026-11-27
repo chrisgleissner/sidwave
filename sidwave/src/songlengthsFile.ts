@@ -15,6 +15,16 @@ import { legacyMd5ForSonglengths, parseDuration, scanSonglengths, type Songlengt
 
 export type SonglengthsFormat = "md5" | "txt";
 
+/** Compares paths in HVSC order: case-insensitive first, then by original UTF-16 code units. */
+export function hvscPathCompare(a: string, b: string): number {
+  const compare = (left: string, right: string): number => {
+    const length = Math.min(left.length, right.length);
+    for (let i = 0; i < length; i++) if (left.charCodeAt(i) !== right.charCodeAt(i)) return left.charCodeAt(i)! < right.charCodeAt(i)! ? -1 : 1;
+    return left.length === right.length ? 0 : left.length < right.length ? -1 : 1;
+  };
+  return compare(a.toUpperCase(), b.toUpperCase()) || compare(a, b);
+}
+
 /** The old format for a file named *.txt, else the new one. */
 export function songlengthsFormatOf(path: string): SonglengthsFormat {
   return /\.txt$/i.test(path) ? "txt" : "md5";
@@ -222,7 +232,7 @@ export function writeSonglengthsEntry(text: string, write: SonglengthsWrite, for
       if (!/^\/[^\r\n]+$/.test(write.path)) throw new HvscError("bad_value", `the HVSC path ${write.path} must start with "/"`);
       action = "added";
       const eol = eolOf(text);
-      const next = entries.find((entry) => entry.path !== "" && entry.path > write.path!);
+      const next = entries.find((entry) => entry.path !== "" && hvscPathCompare(entry.path, write.path!) > 0);
       const block = `; ${write.path}${eol}${md5}=${valueOf(write.durations, format)}${eol}`;
       if (next !== undefined) {
         const at = next.commentStart >= 0 ? next.commentStart : next.lineStart;

@@ -3,14 +3,17 @@ import assert from "#test/assert";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { runCli, EXIT_OK, EXIT_FAILED, EXIT_USAGE, EXIT_INPUT, EXIT_LIMIT } from "../src/cli.ts";
 import { md5ForSonglengths, parseSidFile, writeSidFile } from "../src/sidFile.ts";
 import { legacyMd5ForSonglengths } from "../src/songlengths.ts";
+import { writeFileAtomic } from "../src/cliHvscCommon.ts";
 
 async function run(cwd, args, env = {}) {
   const out = [], err = [], bytes = [];
   const saved = {};
-  for (const [key, value] of Object.entries(env)) { saved[key] = process.env[key]; if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  for (const [key, value] of Object.entries({ HVSC_ROOT: undefined, HVSC_DIR: undefined, ...env })) { saved[key] = process.env[key]; if (value === undefined) delete process.env[key]; else process.env[key] = value; }
   try {
     const code = await runCli(args, { cwd, out: (t) => out.push(t), err: (t) => err.push(t), outBytes: (b) => bytes.push(Buffer.from(b)) });
     return { code, out: out.join(""), err: err.join(""), bytes: Buffer.concat(bytes) };
@@ -304,6 +307,74 @@ test("songlengths write: add a new entry in path order, in the old format too, a
   } finally { done(); }
 });
 
+test("songlengths write inserts new paths in HVSC collation order", async () => {
+  const { root, done } = hvscTree();
+  try {
+    const db = path.join(root, "order.md5");
+    const content = "; /DEMOS/0-9/1st_Sound.sid\n" + "1".repeat(32) + "=1:00\n; /DEMOS/0-9/1_45_Tune.sid\n" + "2".repeat(32) + "=1:00\n";
+    fs.writeFileSync(db, content);
+    fs.writeFileSync(path.join(root, "New.sid"), sid({ songs: 1 }));
+    const result = await run(root, ["songlengths", "write", db, "New.sid", "--path", "/DEMOS/0-9/1st_Sound2.sid", "--times", "1:00"]);
+    assert.equal(result.code, EXIT_OK);
+    const written = fs.readFileSync(db, "latin1");
+    assert.ok(written.indexOf("; /DEMOS/0-9/1st_Sound2.sid") > written.indexOf("; /DEMOS/0-9/1st_Sound.sid"));
+    assert.ok(written.indexOf("; /DEMOS/0-9/1st_Sound2.sid") < written.indexOf("; /DEMOS/0-9/1_45_Tune.sid"));
+    assert.ok(written.indexOf("=1:00", written.indexOf("; /DEMOS/0-9/1st_Sound2.sid")) < written.indexOf("; /DEMOS/0-9/1_45_Tune.sid"));
+  } finally { done(); }
+});
+
+test("sid edit rejects a short flag where --title needs a value", async () => {
+  const { root, done } = hvscTree();
+  try {
+    const input = path.join(root, "input.sid"); fs.writeFileSync(input, sid());
+    const result = await run(root, ["sid", "edit", input, "--title", "-o", "out.sid"]);
+    assert.equal(result.code, EXIT_USAGE);
+    assert.match(result.err, /--title needs a value/);
+    assert.equal(fs.existsSync(path.join(root, "out.sid")), false);
+  } finally { done(); }
+});
+
+test("sid edit rejects RSID header version 1", async () => {
+  const { root, done } = hvscTree();
+  try {
+    const input = path.join(root, "rsid.sid"); fs.writeFileSync(input, sid({ magic: "RSID", playAddress: 0, speed: 0 }));
+    const result = await run(root, ["sid", "edit", input, "--version", "1", "--dry-run"]);
+    assert.equal(result.code, EXIT_USAGE);
+    assert.match(result.err, /RSID files need header version 2/);
+  } finally { done(); }
+});
+
+test("writeFileAtomic preserves mode and follows symlinks", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-atomic-"));
+  try {
+    const target = path.join(root, "target"); fs.writeFileSync(target, "old"); fs.chmodSync(target, 0o640);
+    writeFileAtomic(target, "mode");
+    if (process.platform !== "win32") assert.equal(fs.statSync(target).mode & 0o7777, 0o640);
+    const real = path.join(root, "real"); const link = path.join(root, "link"); fs.writeFileSync(real, "before"); fs.symlinkSync(real, link);
+    writeFileAtomic(link, "after");
+    assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
+    assert.equal(fs.readFileSync(real, "utf8"), "after");
+    const fresh = path.join(root, "sub", "fresh");
+    writeFileAtomic(fresh, "new");
+    assert.equal(fs.readFileSync(fresh, "utf8"), "new");
+    assert.deepEqual(fs.readdirSync(path.dirname(fresh)), ["fresh"]);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const launcher = path.join(packageRoot, "bin", "sidwave.js");
+test("the CLI exits quietly when stdout is closed before it writes", { skip: !fs.existsSync(launcher) || !fs.existsSync(path.join(packageRoot, "dist", "bin.js")) }, async () => {
+  const child = spawn(process.execPath, [launcher, "--help"], { cwd: packageRoot, stdio: ["ignore", "pipe", "pipe"] });
+  let stderr = "";
+  child.stderr.setEncoding("utf8"); child.stderr.on("data", (chunk) => { stderr += chunk; });
+  // Close the read end at once. The child needs longer than this to start, so its first write on stdout fails with EPIPE.
+  child.stdout.destroy();
+  const code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); });
+  assert.equal(code, 0, `exit code ${code}: ${stderr}`);
+  assert.doesNotMatch(stderr, /EPIPE/);
+  assert.doesNotMatch(stderr, /\n\s+at /);
+});
+
 test("songlengths verify reports problems with exit 1 and takes its arguments in any order", async () => {
   const { root, done } = hvscTree();
   try {
@@ -379,10 +450,10 @@ test("sid player needs a signature file, reads it from --sidid or SIDID_CFG, and
   } finally { done(); }
 });
 
-const HVSC = process.env.HVSC_ROOT ?? process.env.HVSC_DIR ?? "/home/chris/dev/c64/C64Music";
-const hvscPresent = fs.existsSync(path.join(HVSC, "DOCUMENTS", "Songlengths.md5")) && fs.existsSync(path.join(HVSC, "DOCUMENTS", "STIL.txt"));
+const HVSC = process.env.HVSC_ROOT ?? process.env.HVSC_DIR ?? "";
+const hvscPresent = HVSC !== "" && fs.existsSync(path.join(HVSC, "DOCUMENTS", "Songlengths.md5")) && fs.existsSync(path.join(HVSC, "DOCUMENTS", "STIL.txt"));
 
-test("HVSC (local only): sid info over the whole collection with Songlengths and STIL, and the Songlengths file verifies", { skip: hvscPresent ? false : `no HVSC at ${HVSC}` }, async () => {
+test("HVSC (local only): sid info over the whole collection with Songlengths and STIL, and the Songlengths file verifies", { skip: hvscPresent ? false : "set HVSC_ROOT to run" }, async () => {
   const started = Date.now();
   const before = process.cpuUsage();
   const info = await run(os.tmpdir(), ["sid", "info", HVSC, "--json"], { HVSC_ROOT: undefined });

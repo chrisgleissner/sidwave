@@ -216,6 +216,7 @@ export function editSidHeader(bytes: Uint8Array, fields: SidEditFields, options:
     const why = reasons.filter(([v]) => v > oldVersion).map(([, w]) => w).join(", ");
     warnings.push(`raised the header version from ${oldVersion} to ${newVersion} for ${why}; players that only know version ${oldVersion} ignore these fields`);
   }
+  if (f.version !== undefined && f.version < 2 && newMagic === "RSID") throw new HvscError("bad_combination", "RSID files need header version 2 or later; leave --version out or use 2, 3 or 4");
   if (newMagic === "RSID" && newVersion < 2) newVersion = 2;
 
   // A lower version drops fields of the later ones; refuse when that would lose data.

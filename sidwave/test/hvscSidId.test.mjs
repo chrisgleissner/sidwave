@@ -43,6 +43,14 @@ test("the newer file format has one signature per line, '&&' between fragments a
   assert.equal(db.players[0].signatures[1].fixedBytes, 1);
 });
 
+test("END format signatures continue across lines", () => {
+  const db = parseSidIdConfig("P1\nA9 00 8D\n?? ?? 4C END\n");
+  const signature = db.players[0].signatures[0];
+  assert.deepEqual([...signature.fragments[0]], [0xa9, 0x00, 0x8d, -1, -1, 0x4c]);
+  assert.equal(matchSignature(bytes(0xa9, 0x00, 0x8d, 0x01, 0x02, 0x4c), signature), 0);
+  assert.equal(matchSignature(bytes(0xa9, 0x00, 0x8d), signature), -1);
+});
+
 test("matching: fragments in order, wildcards, no overlap, first fragment offset", () => {
   const db = parseSidIdConfig(CFG);
   const [alpha, beta] = db.players;
