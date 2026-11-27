@@ -260,7 +260,14 @@ test("independent reader: SWMconvert (the SID-Wizard author's converter, built f
   const doc = parseSidwave(fs.readFileSync(new URL("fur-elise.yaml", traces), "utf8"));
   const swm = path.join(dir, "fe.swm");
   fs.writeFileSync(swm, exportSwm(doc).bytes);
-  execFileSync(path.join(dir, "swmconvert"), [swm, path.join(dir, "fe.mid")], { cwd: dir, input: "\n", stdio: ["pipe", "ignore", "ignore"], timeout: 60_000 });
+  // The converter waits for a key press at the end; feed it from a file so that an early exit cannot raise EPIPE.
+  fs.writeFileSync(path.join(dir, "key.txt"), "\n");
+  const keyFd = fs.openSync(path.join(dir, "key.txt"), "r");
+  try {
+    execFileSync(path.join(dir, "swmconvert"), [swm, path.join(dir, "fe.mid")], { cwd: dir, stdio: [keyFd, "ignore", "ignore"], timeout: 60_000 });
+  } finally {
+    fs.closeSync(keyFd);
+  }
   const mid = parseSmf(fs.readFileSync(path.join(dir, "fe.mid")));
   const ev = exportEvents(doc);
   assert.equal(mid.tracks.length, 3);
