@@ -23,3 +23,4 @@ export * from "./audio/sidwaveFidelity.js";
 export * from "./audio/sidwaveQuality.js";
 export * from "./sidwaveTools.js";
 export { classifyError, SidwaveOperationError, EXIT_CODES, type ErrorCategory, type ErrorReport } from "./cliCore.js";
+export { convert, detectFormat, listFormats, type ConvertOptions, type ConvertResult, type Detection, type FormatInfo, type Loss } from "./interchange/index.js";

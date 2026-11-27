@@ -25,3 +25,7 @@ export * from "./traceReconstruct.js";
 export * from "./swm.js";
 export * from "./swmImport.js";
 export * from "./swmExport.js";
+export * from "./loss.js";
+export * from "./scorePlan.js";
+export * from "./registry.js";
+export * from "./convert.js";

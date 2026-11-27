@@ -30,9 +30,9 @@ export function exportFurnace(doc: ParsedSidwave, options: EventExportOptions = 
   const losses = [...score.losses];
   const warnings: string[] = [];
   const fps = score.callRate;
-  const voices = score.voices.filter((v) => v.sid === 0).slice(0, 3);
+  const voices = options.voiceIds ? score.voices.slice(0, 3) : score.voices.filter((v) => v.sid === 0).slice(0, 3);
   if (voices.length === 0) throw new RangeError("the score has no voice on the first SID");
-  if (score.voices.length > voices.length) losses.push(`Only the first three voices of the first SID are exported (the score has ${score.voices.length} voices).`);
+  if (!options.voiceIds && score.voices.length > voices.length) losses.push(`Only the first three voices of the first SID are exported (the score has ${score.voices.length} voices).`);
   const frameOf = (seconds: number): number => Math.round(seconds * fps);
   const frames: number[] = [frameOf(score.durationSeconds)];
   for (const v of voices) for (const n of v.notes) frames.push(frameOf(n.on.time), frameOf(n.off.time));

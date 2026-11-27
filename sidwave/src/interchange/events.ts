@@ -106,6 +106,11 @@ export interface EventExportOptions {
   song?: number;
   /** Ticks per quarter note, 24..9600. Default 480. */
   ppq?: number;
+  /**
+   * Declared voice ids to export; the other voices are left out. Set by the convert hub's ScorePlan after it has
+   * ranked the voices for a target with a voice limit. Default: all voices.
+   */
+  voiceIds?: readonly number[];
 }
 
 const round6 = (value: number): number => Math.round(value * 1e6) / 1e6;
@@ -263,7 +268,9 @@ export function exportEvents(doc: ParsedSidwave, options: EventExportOptions = {
   let hidden = 0;
   let nextId = 0;
   const mirrorTargets = new Set((arr.mirrors ?? []).map(([, target]) => target));
+  const wanted = options.voiceIds === undefined ? undefined : new Set(options.voiceIds);
   for (const voice of doc.voices) {
+    if (wanted && !wanted.has(voice.id)) continue;
     const slot = doc.voiceSlots.get(voice.id)!;
     if (mirrorTargets.has(slot)) continue;
     const arranged = arr.voices[slot];
