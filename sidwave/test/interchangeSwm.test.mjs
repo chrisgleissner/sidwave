@@ -194,7 +194,8 @@ test("differential against the SID-Wizard player: SID files exported by SID-Make
     const B = onsets(irOfTrace(await engine.trace({ sid: mine, seconds: 20, clock })));
     // The player reads a row at tick 0 and writes the note at tick 2 (player.asm: TICK_0 reads the row, TICK_1 is the first
     // hard-restart phase, TICK_2 starts the note), so the stock note start is 2 calls after the imported one. The echo-test
-    // SID is built with the echo player, whose short repeated calls shift the first start by one more call.
+    // SID is built with the echo player; its offset of 3 is measured, and the cause of the extra call is not verified
+    // (doc/interchange.md says so).
     const shift = name === "echo-test" ? 3 : 2;
     let hit = 0, same = 0, n = 0;
     A.forEach((list, v) => { const used = new Set(); for (const [t, p] of list) { n++; const j = B[v].findIndex((x, k) => !used.has(k) && x[0] + shift === t); if (j >= 0) { used.add(j); hit++; if (B[v][j][1] === p) same++; } } });
