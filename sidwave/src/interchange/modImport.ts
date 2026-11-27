@@ -87,7 +87,7 @@ export function planBars(rowSeconds: number[], rpb: number): { bars: Array<{ sta
   return { bars, mistimed, aligned };
 }
 
-function chooseRowsPerBeat(rowSeconds: number[]): number {
+export function chooseRowsPerBeat(rowSeconds: number[]): number {
   let best = 4, bestClamped = Infinity;
   for (const rpb of [4, 8, 2, 16, 1]) {
     const plan = planBars(rowSeconds, rpb);

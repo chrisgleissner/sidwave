@@ -7,7 +7,7 @@ All commands read at most 16 MiB, never modify their input, never overwrite the 
 ```
 sidwave export <file> [--format events|midi|musicxml|goattracker|furnace|vice-dump|swm|swi] [--instrument <name|n>] [--pattern-rows 16|32|64] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--seconds <s>] [--json]
 sidwave reconstruct <trace> [--from vice-dump|siddump] [--clock PAL|NTSC] [--seconds <s>] [--title <text>] [-o <score.yaml>] [--json]
-sidwave import <file> [--format midi|musicxml|goattracker|furnace|mod|swm|swi] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>] [--subtune <n>]
+sidwave import <file> [--format midi|musicxml|goattracker|furnace|mod|jch|swm|swi] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>] [--subtune <n>]
                       [--sids 1-10] [--transpose <n>] [--quality]
                       [--no-drums] [--no-bend] [--title <text>] [--mode PAL|NTSC] [--no-validate] [--force] [--json]
 sidwave render <score> --stems [-o <dir>] [--force] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite] [--model 6581|8580] [--song <n>]
@@ -456,6 +456,28 @@ and `siddump` source is read by reconstruct with a 4 s horizon. The tables are p
 | sidwizard | sidwizard | 1.00 | 1.00 | 0.83 | 1.00 | notes and ends move to the row grid |
 <!-- quality:sidwizard:end -->
 
+<!-- quality:mod:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| mod | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| mod | midi | 1.00 | 1.00 | 0.95 | 1.00 | the tracker's row grid is read back on the 0.25 beat grid |
+| mod | musicxml | 1.00 | 1.00 | 0.95 | 1.00 | the tracker's row grid is read back on the 0.25 beat grid |
+| mod | goattracker | 0.55 | 0.55 | 0.90 | 1.00 | a MOD note rate that the GoatTracker row length (3 to 12 calls) cannot hold moves notes; notes and ends move to the row grid |
+| mod | furnace | 0.55 | 0.55 | 0.90 | 1.00 | notes and ends move to the row grid |
+| mod | sidwizard | 0.70 | 0.70 | 0.90 | 1.00 | notes and ends move to the row grid |
+<!-- quality:mod:end -->
+
+<!-- quality:jch:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| jch | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| jch | midi | 1.00 | 1.00 | 0.95 | 1.00 | the tracker's row grid is read back on the 0.25 beat grid |
+| jch | musicxml | 1.00 | 1.00 | 0.95 | 1.00 | the tracker's row grid is read back on the 0.25 beat grid |
+| jch | goattracker | 1.00 | 1.00 | 0.85 | 1.00 | notes and ends move to the row grid |
+| jch | furnace | 1.00 | 1.00 | 0.85 | 1.00 | notes and ends move to the row grid |
+| jch | sidwizard | 1.00 | 1.00 | 0.85 | 1.00 | notes and ends move to the row grid |
+<!-- quality:jch:end -->
+
 <!-- quality:vice-dump:start -->
 | Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
 |---|---|---|---|---|---|---|
@@ -573,4 +595,25 @@ Measured with `process.cpuUsage` on Node 24 on a loaded machine (`test/interchan
 ### Where this differs from the SID Factory II converter
 
 SID Factory II (`converter_mod`) converts only `M.K.` and `FLT` modules, asks the user to name the one channel to ignore, gives every instrument a triangle with a fixed envelope, tunes slides by a fixed factor, turns `Cxx` into a sustain/release command, and reports `5xy`, `6xy`, `7xy`, `8xx`, `9xx`, `Axx`, `E#x` and BPM tempo as unsupported. Matched here: the 4-channel to 3-voice reduction (the channel to drop is chosen by the score above instead of by the user), the nearest-note rule for periods, the arpeggio, slide, portamento, vibrato, set-volume and speed commands, the cut of a pattern at `Bxx` and `Dxx`, and a report of the commands that were used and not converted. Added: all 31-sample variants with 6 or 8 channels and the 15-sample layout, samples chosen by their waveform, drums, ADSR from the sample envelope, volume slides, fine slides, note cut and delay, tempo in BPM, the loop, the quality measure, and two SIDs.
+
+## JCH NewPlayer 20.G (`sidwave import tune.prg`, `tune.sid`)
+
+SID Factory II ships a converter for the editor data of JCH NewPlayer 20.G (`converter_jch`, GPL-2.0, read for behaviour only). It accepts a file loaded at `$0F00` with the mark `20.G` at `$0FEE`: the memory dump that the JCH editor saves (player code, a pointer block at `$0FA0` and the song data). SIDWave reads the same input: a PRG with load address `$0F00`, or a PSID/RSID file with that load address (an unpacked rip; HVSC holds about 250 of them, 201 of version `20.G4`, 28 of `20.G2`, 19 of `20.G0`). The format is detected by content. Packed or relocated tunes (load address other than `$0F00`, the larger HVSC share of JCH NewPlayer tunes, and other player versions such as 21.G5 and NP22 to NP25) are a typed error (exit 3) that says so. The layout is taken from the published description of the editor format (pointer block, 8-byte instrument records, two-column wave table, 4-byte pulse entries, order list pairs, 2-byte sequence events); no player code is read or reproduced.
+
+Input bounds: 64 KiB, 104 sequences of at most 128 events, order lists of at most 512 entries, at most 20,000 rows per voice, pointers inside `$1000-$CFFF`.
+
+| JCH | SIDWave |
+| --- | --- |
+| Order lists 1 to 3 (pairs of transposition and sequence number; transposition is the byte minus `$80`; the list ends at `$FE` or `$FF`) | Voices 1 to 3, one pass, expanded to one grid cell per sequence row |
+| Sequence event (byte0, note): note 1 to `$7D` plays MIDI note `12 + note + transposition`; `0` is gate off; `$7E` holds | Note, rest, tie |
+| byte0 `$A0`-`$BF` | Selects instrument 0 to 31 for the notes that follow |
+| byte0 `$90` | Legato note (no new gate) |
+| byte0 `$C0`-`$DF` | Command from the command table (below) |
+| Tempo: a value of 2 or more lasts value + 1 frames per row; 0 or 1 reads the break-speed table (the first filter table entry) as a groove | Per bar tempo from the real length of its rows, bars split at tempo changes as for MOD (`planBars`), 4 rows per beat unless the tempo needs another value; `e0 xx` sets the speed from its row |
+| Instrument: AD, SR, restart byte, wave pointer, pulse pointer | ADSR; wave table rows as wavetable steps (waveform bits, gate, ring, sync, test; relative notes `+n`, absolute notes, `$7F` jump as the loop, `$7E` stop); pulse table entries as `set` and `add` steps with loop; hard restart omitted only for the hard-restart mode `$8x`, otherwise the plain gate restart |
+| Commands `60 xy` vibrato, `8x xx` portamento, `0x yy` / `2x yy` slides | Per-note vibrato (depth `0.15 y` semitones, rate `1 + 0.75 x` Hz), legato note with `portamento` frames from the frequency distance and speed, `bend` from the speed and the length of the note (at most 12 semitones). Approximate: the units were estimated, not measured |
+
+Not imported, counted in `commands` and `losses`: instrument alternate wave pointer (`4x`), set AD/SR (`9x`, `ax`), wave pointer (`c0`), filter and pulse pointer commands (`dx`), master volume (`f0`), the filter (instrument filter setting and filter table), the wave table dwell (low nibble of the restart byte), per-voice looping (each JCH voice loops on its own; SIDWave plays one pass and pads shorter voices), pitch offsets of wave table rows that would leave the playable range (limited to it).
+
+Verification (`test/interchangeJch.test.mjs`): the committed image is hand-built (`test/helpers/jchKit.mjs`) without the player code, which is third-party, so it parses and imports but does not play. The differential test runs the tune's own player (libsidplayfp, SIDLite) on local HVSC tunes of versions 20.G0, 20.G2 and 20.G4 (not committed; skipped without HVSC and the engine; none of the held-out reconstruct tunes) against the compiled import and compares gate and note per player call after a search for the best start shift (2 or 3 calls). Measured, gate agreement / pitch agreement of voices 1/2/3: `24th_Amaranth_Grand_Prix_3` (20.G4) 0.57/0.96/1.00 and 0.52/0.78/-; `5KJ5` (20.G0) 0.97/0.80/0.86 and 0.26/0.82/0.86; `24th_Amaranth_GP_2_channels` (20.G2) 0.69/0.86/1.00 and 0.29/0.28/-. Rhythm agrees well and pitch less, because of unmapped commands, the dwell and the units of the pitch commands. The A1 level fails on all of them (status approximate). Across all 254 JCH NewPlayer tunes of the HVSC catalogue with load address `$0F00` and `20.G` mark, every one imports without error (the same score is compiled), median 53 ms and 95th percentile 214 ms of CPU, maximum 569 ms. The step from `20.G` to later versions was not attempted: their table bases differ and the layout was not verified.
 
