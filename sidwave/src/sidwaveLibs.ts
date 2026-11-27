@@ -99,10 +99,11 @@ export function satisfiesVersion(version: string, range: string): boolean {
       const op = m[1] ?? "";
       const upper = (kind: "caret" | "tilde" | "partial"): Version => {
         if (given === 0) return [Infinity, 0, 0];
-        if (kind === "caret" && low[0] > 0) return [low[0] + 1, 0, 0];
-        if (kind === "caret" && given >= 2 && low[1] > 0) return [0, low[1] + 1, 0];
-        if (kind === "caret" && given === 3) return [0, 0, low[2] + 1];
-        if (kind === "caret") return [low[0] + 1, 0, 0];
+        if (kind === "caret") {
+          if (low[0] > 0 || given === 1) return [low[0] + 1, 0, 0];
+          if (given === 2 || low[1] > 0) return [0, low[1] + 1, 0];
+          return [0, 0, low[2] + 1];
+        }
         if (kind === "tilde" && given === 1) return [low[0] + 1, 0, 0];
         if (given === 1) return [low[0] + 1, 0, 0];
         return [low[0], low[1] + 1, 0];
@@ -222,18 +223,19 @@ class Loader {
     });
   }
 
+  /** The file relative to the directory it was found in, so that messages never show host paths. */
   label(file: string): string {
-    const rel = relative(this.scoreRoot, file);
-    return rel.startsWith("..") || isAbsolute(rel) ? file : rel.split(sep).join("/");
+    const root = this.roots.find((r) => this.insideRoot(r, file)) ?? this.scoreRoot;
+    return relative(root, file).split(sep).join("/");
   }
 
   /** The real path of the file an import names, or a validation error. */
   locate(from: string, importingFile: string, path: string): string {
     if (from.includes("\0")) fail(path, "the library path contains a NUL character");
-    if (/^[A-Za-z]{2,}[A-Za-z0-9+.-]*:/.test(from) && !from.startsWith("pkg:") || from.startsWith("//")) {
+    if (/^(?:https?|file|data|ftp|sftp|wss?):/i.test(from) || /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(from) || from.startsWith("//")) {
       fail(path, `${JSON.stringify(from)} is a URL; SIDWave never fetches libraries from the network`);
     }
-    if (isAbsolute(from) || from.startsWith("/") || from.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(from)) {
+    if (isAbsolute(from) || from.startsWith("/") || from.startsWith("\\") || /^[A-Za-z]:/.test(from)) {
       fail(path, `absolute library paths are not allowed (${JSON.stringify(from)}); use a path relative to the importing file`);
     }
     if (from.startsWith("pkg:")) return this.locatePackage(from.slice(4), importingFile, path);
@@ -271,11 +273,11 @@ class Loader {
     try {
       real = realpathSync(candidate);
     } catch (error) {
-      if (!this.inside(resolve(candidate))) fail(path, `library ${JSON.stringify(shown)} is outside the score directory and the library search path (${this.roots.join(", ")}); pass --allow-dir to add a directory`);
+      if (!this.inside(resolve(candidate))) fail(path, `library ${JSON.stringify(shown)} is outside the score directory and the library search path; pass --allow-dir to add a directory`);
       return fail(path, `library ${JSON.stringify(shown)} cannot be read (${(error as NodeJS.ErrnoException).code ?? "error"})`);
     }
     if (!this.inside(real)) {
-      fail(path, `library ${JSON.stringify(shown)} is outside the score directory and the library search path (${this.roots.join(", ")}); pass --allow-dir to add a directory`);
+      fail(path, `library ${JSON.stringify(shown)} is outside the score directory and the library search path; pass --allow-dir to add a directory`);
     }
     if (!statSync(real).isFile()) fail(path, `library ${JSON.stringify(shown)} is not a file`);
     return real;
@@ -511,7 +513,15 @@ export function expandImports(raw: Record<string, unknown>, options: ImportResol
 
   // Instruments: every library instrument a name in the score (or in an added library pattern) refers to.
   const mentioned = new Set<string>();
-  walkStrings(score, (s) => { for (const m of s.matchAll(QUALIFIED)) mentioned.add(m[0]); });
+  const note = (s: string) => { for (const m of s.matchAll(QUALIFIED)) mentioned.add(m[0]); };
+  // Only the fields that name instruments: voice defaults, followers, pattern text and the kit; not titles or names.
+  for (const voice of voices) {
+    if (!isMap(voice)) continue;
+    if (typeof voice.instrument === "string") note(voice.instrument);
+    if (isMap(voice.follow) && typeof voice.follow.instrument === "string") note(voice.follow.instrument);
+    walkStrings(voice.patterns, note);
+  }
+  if (isMap(score.kit)) walkStrings(score.kit, note);
   const add: Item[] = [];
   for (const name of mentioned) {
     const item = instruments.get(name);

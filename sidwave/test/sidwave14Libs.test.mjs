@@ -679,3 +679,55 @@ test("the closure hash of a library without imports is the hash of its canonical
     assert.notEqual(drums.sha256, canonicalLibraryHash(fs.readFileSync(path.join(dir, "libs", "drums.yaml"), "utf8")));
   });
 });
+
+test("^0.0 and ^0 ranges", () => {
+  assert.equal(satisfiesVersion("0.0.9", "^0.0"), true);
+  assert.equal(satisfiesVersion("0.1.0", "^0.0"), false);
+  assert.equal(satisfiesVersion("0.9.0", "^0"), true);
+  assert.equal(satisfiesVersion("1.0.0", "^0"), false);
+  assert.equal(satisfiesVersion("0.2.9", "^0.2"), true);
+  assert.equal(satisfiesVersion("0.3.0", "^0.2"), false);
+  assert.equal(satisfiesVersion("0.0.3", "^0.0.3"), true);
+  assert.equal(satisfiesVersion("0.0.4", "^0.0.3"), false);
+});
+
+test("only instrument, pattern and kit fields pull library items in, not free text", () => {
+  withProject(({ dir }) => {
+    writeLib(dir, "libs/x.yaml", { body: "instruments:\n  x: { waveform: pulse, adsr: [0, 5, 10, 4] }\n" });
+    const file = path.join(dir, "s.yaml");
+    fs.writeFileSync(file, scoreWith("  - { as: p, from: ./libs/x.yaml }").replace("title: T", "title: p.x").replace("- { id: 1,", "- { id: 1, name: p.x,"));
+    const doc = parseFile(file);
+    assert.deepEqual(Object.keys(doc.instruments), ["lead"]);
+    assert.equal(doc.libraries, undefined);
+    fs.writeFileSync(file, scoreWith("  - { as: p, from: ./libs/x.yaml }").replace("a: { length: 1, bars: 1, groove: \"C4 E4 G4 E4\" }", "a: { length: 1, bars: 1, groove: \"C4@p.x E4 G4 E4\" }"));
+    assert.deepEqual(Object.keys(parseFile(file).instruments), ["lead", "p.x"]);
+    fs.writeFileSync(file, scoreWith("  - { as: p, from: ./libs/x.yaml }").replace("instrument: lead", "instrument: p.x"));
+    assert.deepEqual(Object.keys(parseFile(file).instruments), ["lead", "p.x"]);
+    fs.writeFileSync(file, scoreWith("  - { as: p, from: ./libs/x.yaml }").replace("instruments:", "kit: { k: p.x }\ninstruments:"));
+    assert.deepEqual(Object.keys(parseFile(file).instruments), ["lead", "p.x"]);
+  });
+});
+
+test("resolution errors do not show absolute host paths, and only URL schemes are URLs", () => {
+  withProject(({ dir }) => {
+    const file = path.join(dir, "s.yaml");
+    const attempt = (from) => { fs.writeFileSync(file, scoreWith(`  - { as: e, from: ${JSON.stringify(from)} }`)); return () => parseFile(file); };
+    for (const from of ["../escape.yaml", "./libs/../../escape.yaml", "pkg:nothing/here.yaml", "./missing.yaml"]) {
+      assert.throws(attempt(from), (error) => { assert.ok(!error.message.includes(dir), error.message); assert.ok(!error.message.includes(os.tmpdir()), error.message); return true; });
+    }
+    expectError(attempt("data:text/plain,x"), /URL/);
+    expectError(attempt("ftp://host/x.yaml"), /URL/);
+    expectError(attempt("gopher://host/x.yaml"), /URL/);
+    expectError(attempt("C:x.yaml"), /absolute library paths/);
+    expectError(attempt("c:\\x.yaml"), /absolute library paths/);
+    // A name with a colon that is not a URL scheme is a relative file name.
+    expectError(attempt("foo:bar.yaml"), /cannot be read \(ENOENT\)/);
+    writeLib(dir, "foo:bar.yaml", { body: "instruments:\n  x: { waveform: pulse, adsr: [0, 5, 10, 4] }\n" });
+    assert.equal(attempt("foo:bar.yaml")().voices.length, 1);
+  });
+});
+
+test("the package ships the tutorial that the lesson scores refer to", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(here, "..", "package.json"), "utf8"));
+  assert.ok(manifest.files.includes("doc/tutorial.md"));
+});
