@@ -190,7 +190,8 @@ test("the YAML example of the 1.5 chapter of the specification parses with the t
   const spec = readFileSync(new URL("../data/sound/sidwave.md", import.meta.url), "utf8");
   const chapter = spec.slice(spec.indexOf("## SIDWave 1.5"), spec.indexOf("## Playable examples"));
   const blocks = [...chapter.matchAll(/```yaml\n([\s\S]*?)```/g)].map((m) => m[1]);
-  assert.equal(blocks.length, 1);
-  const tuned = parseSidwave(score("1.5", blocks[0].replace(/^sidwave: .*\n/, "")));
-  assert.deepEqual(tuned.tuning, { cents: -12, registers: [[69, 0x1cd6], [72, 0x2222]] });
+  assert.equal(blocks.length, 2);
+  const [tuning, global] = blocks.map((block) => parseSidwave(score("1.5", block.replace(/^sidwave: .*\n/, ""))));
+  assert.deepEqual(tuning.tuning, { cents: -12, registers: [[69, 0x1cd6], [72, 0x2222]] });
+  assert.equal(global.globalTable.steps.length, 3);
 });

@@ -13,8 +13,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
    }
   ]
  },
@@ -32,8 +32,15 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -72,8 +79,15 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -126,8 +140,15 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -166,8 +187,15 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -206,8 +234,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 150,
-    "message": "F-diff: the recovered score differs from the tune in 150 register-class differences over 50 compared player calls (a call can differ in several classes)."
+    "count": 100,
+    "message": "F-diff: the recovered score differs from the tune in 100 register-class differences over 50 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "plan",
@@ -239,8 +267,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "plan",
@@ -265,8 +293,15 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -291,8 +326,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "plan",
@@ -324,8 +359,15 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -364,8 +406,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "plan",
@@ -373,6 +415,13 @@
     "severity": "info",
     "count": 1,
     "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -411,8 +460,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 600,
-    "message": "F-diff: the recovered score differs from the tune in 600 register-class differences over 200 compared player calls (a call can differ in several classes)."
+    "count": 400,
+    "message": "F-diff: the recovered score differs from the tune in 400 register-class differences over 200 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "write",
@@ -420,6 +469,13 @@
     "severity": "info",
     "count": 1,
     "message": "Rows are one player call long (note starts and ends fall on odd calls): the module is correct but large and uses the fastest tempo."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The SID filter settings of the score are not exported."
    }
   ]
  },
@@ -437,8 +493,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 150,
-    "message": "F-diff: the recovered score differs from the tune in 150 register-class differences over 50 compared player calls (a call can differ in several classes)."
+    "count": 100,
+    "message": "F-diff: the recovered score differs from the tune in 100 register-class differences over 50 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "plan",

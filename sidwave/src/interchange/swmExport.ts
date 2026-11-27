@@ -129,7 +129,7 @@ export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): S
   if (copies) losses.push(`${copies} voices are echo, unison or follow copies of another voice; the copies are not exported.`);
   if (ev.tempoMap.length > 1) losses.push(`${ev.tempoMap.length - 1} tempo changes are not exported; the module has one tempo.`);
   if (doc.swing) losses.push("Swing is not exported.");
-  if (doc.sids.some((sid) => sid.filter) || doc.song.global_fx.filter_env) losses.push("The SID filter settings of the score are not exported.");
+  if (doc.sids.some((sid) => sid.filter) || doc.song.global_fx.filter_env || doc.globalTable) losses.push("The SID filter settings of the score are not exported.");
 
   // Patterns and orderlists.
   const P = options.patternRows ?? 32;

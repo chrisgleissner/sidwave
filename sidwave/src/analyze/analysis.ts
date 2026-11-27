@@ -252,7 +252,7 @@ export async function analyzeSid(sidBytes: Uint8Array, options: AnalyzeSidOption
   };
 }
 
-/** Voices of the reconstruction with their trace facts, plus the traced voices the reconstruction does not model (for example the second SID). */
+/** Voices of the reconstruction with their trace facts, plus the traced voices the reconstruction does not model (for example the second SID of a trace without SID addresses). */
 function voicesOf(modelled: VoiceUse[], facts: Map<number, TraceVoiceFacts>): AnalysisReport["voices"] {
   const out: AnalysisReport["voices"] = modelled.map((v) => ({ ...v, ...(facts.has(v.voice) ? { trace: facts.get(v.voice)! } : {}) }));
   const have = new Set(modelled.map((v) => v.voice));

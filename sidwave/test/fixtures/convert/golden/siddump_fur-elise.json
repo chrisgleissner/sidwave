@@ -13,8 +13,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -39,8 +39,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -72,8 +72,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -81,6 +81,13 @@
     "severity": "approx",
     "count": 1,
     "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -119,8 +126,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -128,6 +135,13 @@
     "severity": "approx",
     "count": 1,
     "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -173,8 +187,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -182,6 +196,13 @@
     "severity": "approx",
     "count": 1,
     "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -227,8 +248,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -236,6 +257,13 @@
     "severity": "approx",
     "count": 1,
     "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -281,8 +309,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 39,
-    "message": "F-diff: the recovered score differs from the tune in 39 register-class differences over 17 compared player calls (a call can differ in several classes)."
+    "count": 23,
+    "message": "F-diff: the recovered score differs from the tune in 23 register-class differences over 17 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -321,8 +349,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -361,8 +389,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -370,6 +398,13 @@
     "severity": "approx",
     "count": 1,
     "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -394,8 +429,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -415,8 +450,8 @@
     "stage": "write",
     "code": "basic.filter.sampled",
     "severity": "approx",
-    "count": 13,
-    "message": "13 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+    "count": 12,
+    "message": "12 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
    },
    {
     "stage": "write",
@@ -448,8 +483,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -457,6 +492,13 @@
     "severity": "approx",
     "count": 1,
     "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -502,8 +544,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -518,6 +560,13 @@
     "severity": "info",
     "count": 1,
     "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The global_table (per-call values of the filter and volume registers) is not exported."
    },
    {
     "stage": "write",
@@ -563,8 +612,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 63,
-    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+    "count": 25,
+    "message": "F-diff: the recovered score differs from the tune in 25 register-class differences over 24 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",
@@ -579,6 +628,13 @@
     "severity": "info",
     "count": 1,
     "message": "Rows are one player call long (note starts and ends fall on odd calls): the module is correct but large and uses the fastest tempo."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The SID filter settings of the score are not exported."
    }
   ]
  },
@@ -596,8 +652,8 @@
     "stage": "read",
     "code": "reconstruct.fdiff",
     "severity": "approx",
-    "count": 39,
-    "message": "F-diff: the recovered score differs from the tune in 39 register-class differences over 17 compared player calls (a call can differ in several classes)."
+    "count": 23,
+    "message": "F-diff: the recovered score differs from the tune in 23 register-class differences over 17 compared player calls (a call can differ in several classes)."
    },
    {
     "stage": "read",

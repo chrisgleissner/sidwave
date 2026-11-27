@@ -299,6 +299,8 @@ export interface ParsedSidwave {
   player?: PlayerOptions;
   /** SIDWave 1.5: the note-to-register table of the document's clock: a shift of every note in cents and exact register values for single notes (MIDI note to register). */
   tuning?: { cents: number; registers: Array<[number, number]> };
+  /** SIDWave 1.5: per-call values of the filter and volume registers; absent when the document sets none. */
+  globalTable?: GlobalTable;
   song: Required<Pick<SidwaveSongMeta, "title" | "tempo" | "mode">> & {
     author?: string;
     length_bars: number;
@@ -372,7 +374,7 @@ let rowMinimum = 1 / 64;
 /** The highest speed of the document being parsed: 4, or 8 in 1.5. Set at the start of every parseSidwave call. */
 let speedMaximum = 4;
 
-const TOP_LEVEL_KEYS = new Set(["player", "tuning", "sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs", "effects"]);
+const TOP_LEVEL_KEYS = new Set(["player", "tuning", "global_table", "sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs", "effects"]);
 const LEGACY_KEYS = new Set(["song", "voices", "timeline"]);
 const LEGACY_SONG_KEYS = new Set(["title", "author", "tempo", "mode", "length_bars", "global_fx"]);
 const VOICE_KEYS = new Set(["id", "sid", "channel", "name", "waveform", "pulse_width", "adsr", "patterns", "instrument", "echo", "unison", "detune", "level", "role", "center"]);
@@ -440,6 +442,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   const v13 = obj.sidwave === 1.3 || obj.sidwave === "1.3" || v14;
   if (obj.player !== undefined && !v15) throw new SidwaveValidationError("$.player", "player options require sidwave: 1.5; the document declares " + (obj.sidwave === undefined ? "no version" : `sidwave: ${scalarText(obj.sidwave, "$.sidwave")}`));
   if (obj.tuning !== undefined && !v15) throw new SidwaveValidationError("$.tuning", "tuning requires sidwave: 1.5; the document declares " + (obj.sidwave === undefined ? "no version" : `sidwave: ${scalarText(obj.sidwave, "$.sidwave")}`));
+  if (obj.global_table !== undefined && !v15) throw new SidwaveValidationError("$.global_table", "global_table requires sidwave: 1.5; the document declares " + (obj.sidwave === undefined ? "no version" : `sidwave: ${scalarText(obj.sidwave, "$.sidwave")}`));
   if (obj.songs !== undefined && !v14) throw new SidwaveValidationError("$.songs", "songs require sidwave: 1.4");
   if (obj.effects !== undefined && !v14) throw new SidwaveValidationError("$.effects", "effects require sidwave: 1.4");
   const modern = obj.sidwave === 1.2 || obj.sidwave === "1.2" || v13;
@@ -600,7 +603,16 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     sid.filter!.route ??= [slot % 3 + 1];
   }
   const effects = obj.effects === undefined ? undefined : parseEffects(obj.effects);
-  return { version, ...(player ? { player } : {}), ...(tuning ? { tuning } : {}), song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,
+  const globalTable = obj.global_table === undefined ? undefined : parseGlobalTable(obj.global_table);
+  if (globalTable) {
+    if (songs) throw new SidwaveValidationError("$.global_table", "global_table cannot be combined with songs");
+    if (effects?.length) throw new SidwaveValidationError("$.global_table", "global_table cannot be combined with effects");
+    if (sids.length > 1) throw new SidwaveValidationError("$.global_table", "global_table supports one SID");
+    // The digi interrupt writes $D418 from the player's own copy of the filter mode, which the table does not update.
+    if (samples && globalTable.registers.includes(0x18)) throw new SidwaveValidationError("$.global_table", "a table that sets d418 cannot be combined with samples, which also write that register");
+    if (globalTable.registers.includes(0x18) && player?.softStart !== false) throw new SidwaveValidationError("$.global_table", "a table that sets d418 needs player.soft_start: false, because the volume ramp also writes that register");
+  }
+  return { version, ...(player ? { player } : {}), ...(tuning ? { tuning } : {}), ...(globalTable ? { globalTable } : {}), song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,
     accent, swing, swingUnit, loopTo, end, layout, digiVoices, ...(effects?.length ? { effects } : {}), ...(songs ? { songs, definedSections: isPlainObject(obj.sections) ? Object.keys(obj.sections) : [] } : {}), ...(ignoredFields.length ? { ignoredFields } : {}), ...(libraries ? { libraries } : {}) };
 
 }
@@ -858,7 +870,8 @@ function normalizeInstruments(raw: unknown, path: string, modern: boolean, v13 =
         if (modern && step.wave !== undefined && /noise\+|\+noise/.test(requireText(step.wave, sp + ".wave"))) {
           throw new SidwaveValidationError(`${sp}.wave`, "noise combined with another waveform can lock the noise register; use noise alone");
         }
-        if (step.wave !== undefined && !waves.has(requireText(step.wave, sp + ".wave"))) throw new SidwaveValidationError(`${sp}.wave`, "unknown wavetable waveform");
+        if (step.wave === "none" && !v15) throw new SidwaveValidationError(sp + ".wave", "the waveform none requires sidwave: 1.5");
+        if (step.wave !== undefined && step.wave !== "none" && !waves.has(requireText(step.wave, sp + ".wave"))) throw new SidwaveValidationError(`${sp}.wave`, "unknown wavetable waveform");
         for (const flag of ["test", "gate", "ring", "sync"]) if (step[flag] !== undefined && typeof step[flag] !== "boolean") throw new SidwaveValidationError(`${sp}.${flag}`, "expected a boolean");
         if (step.frames !== undefined && step.calls !== undefined) throw new SidwaveValidationError(sp, "choose frames or calls");
         if (step.frames !== undefined) requireNumber(step.frames, `${sp}.frames`, { min: 1, max: 255, integer: true });
@@ -871,17 +884,18 @@ function normalizeInstruments(raw: unknown, path: string, modern: boolean, v13 =
     }
     if (modern && inst.hard_restart !== undefined) {
       const hp = `${ip}.hard_restart`;
-      const restart = requireObject(inst.hard_restart, hp, ["frames", "adsr", "test"]);
+      const restart = requireObject(inst.hard_restart, hp, ["frames", "adsr", "test", ...(v15 ? ["wave"] : [])]);
+      if (restart.wave !== undefined && restart.wave !== "none") throw new SidwaveValidationError(`${hp}.wave`, "expected none");
       const frames = requireNumber(restart.frames ?? 2, `${hp}.frames`, { min: 0, max: 255, integer: true });
       if (restart.test !== undefined && typeof restart.test !== "boolean") throw new SidwaveValidationError(`${hp}.test`, "expected a boolean");
-      if (!frames && (restart.test || restart.adsr !== undefined)) throw new SidwaveValidationError(hp, "zero frames disables the restart and cannot set ADSR or TEST");
+      if (!frames && (restart.test || restart.adsr !== undefined || restart.wave !== undefined)) throw new SidwaveValidationError(hp, "zero frames disables the restart and cannot set ADSR or TEST");
       let adsr = [0, 0, 0, 0];
       if (restart.adsr !== undefined) {
         if (!Array.isArray(restart.adsr) || restart.adsr.length !== 4) throw new SidwaveValidationError(`${hp}.adsr`, "expected [attack, decay, sustain, release]");
         adsr = restart.adsr.map((value: unknown, i: number) =>
           requireNumber(value, `${hp}.adsr[${i}]`, { min: 0, max: 15, integer: true }));
       }
-      inst.hard_restart = { frames, adsr, test: restart.test === true };
+      inst.hard_restart = { frames, adsr, test: restart.test === true, ...(restart.wave === "none" ? { wave: "none" } : {}) };
     }
     if (inst.pulsetable !== undefined) inst.pulsetable = normalizeRegisterTable(inst.pulsetable, inst.loop, `${ip}.pulsetable`, "set", modern, v15);
     if (inst.filtertable !== undefined) inst.filtertable = normalizeRegisterTable(inst.filtertable, inst.loop, `${ip}.filtertable`, "cutoff", modern);
@@ -1578,6 +1592,54 @@ function parseTuning(raw: unknown): { cents: number; registers: Array<[number, n
   return { cents, registers };
 }
 
+export const GLOBAL_TABLE_MAX_STEPS = 2048;
+
+export interface GlobalTableStep {
+  /** Values written to $D415 to $D418; a register without a value keeps the previous one. */
+  d415?: number;
+  d416?: number;
+  d417?: number;
+  d418?: number;
+  /** Added to $D416 (modulo 256) in every call of the step. */
+  d416Add?: number;
+  calls: number;
+}
+
+export interface GlobalTable {
+  steps: GlobalTableStep[];
+  /** Step the table continues with after the last one; without it the last values are kept. */
+  loop?: number;
+  /** The SID register offsets ($15 to $18) that the table writes; the player computes the others as usual. */
+  registers: number[];
+}
+
+/**
+ * SIDWave 1.5: parses `global_table`, the per-call values of the filter and volume registers. The first step names every
+ * register that the table sets, so that the table never depends on what the player computed. A loop continues with the values
+ * that the registers hold at the end of the table.
+ */
+function parseGlobalTable(raw: unknown): GlobalTable {
+  const value = requireObject(raw, "$.global_table", ["steps", "loop"]);
+  if (!Array.isArray(value.steps) || !value.steps.length || value.steps.length > GLOBAL_TABLE_MAX_STEPS) throw new SidwaveValidationError("$.global_table.steps", `expected a list of 1 to ${GLOBAL_TABLE_MAX_STEPS} steps`);
+  const names = ["d415", "d416", "d417", "d418"] as const;
+  const steps = value.steps.map((entry: unknown, i: number) => {
+    const path = `$.global_table.steps[${i}]`;
+    const step = requireObject(entry, path, [...names, "d416_add", "calls"]);
+    const out: GlobalTableStep = { calls: step.calls === undefined ? 1 : requireNumber(step.calls, `${path}.calls`, { min: 1, max: 255, integer: true }) };
+    for (const name of names) if (step[name] !== undefined) out[name] = requireNumber(step[name], `${path}.${name}`, { min: 0, max: 255, integer: true });
+    if (step.d416_add !== undefined) {
+      if (step.d416 !== undefined) throw new SidwaveValidationError(path, "choose d416 or d416_add");
+      out.d416Add = requireNumber(step.d416_add, `${path}.d416_add`, { min: -255, max: 255, integer: true });
+    }
+    return out;
+  });
+  const loop = value.loop === undefined ? undefined : requireNumber(value.loop, "$.global_table.loop", { min: 0, max: steps.length - 1, integer: true });
+  const registers = names.map((name, r) => ({ name, r })).filter(({ name }) => steps.some((step) => step[name] !== undefined || (name === "d416" && step.d416Add !== undefined)));
+  if (!registers.length) throw new SidwaveValidationError("$.global_table.steps", "no step sets a register");
+  for (const { name } of registers) if (steps[0]![name] === undefined) throw new SidwaveValidationError("$.global_table.steps[0]", `the first step sets every register of the table; ${name} is missing`);
+  return { steps, registers: registers.map(({ r }) => 0x15 + r), ...(loop === undefined ? {} : { loop }) };
+}
+
 /** SIDWave 1.5 player options. */
 export interface PlayerOptions {
   /** false removes the volume ramp over the first calls. */
@@ -1586,6 +1648,8 @@ export interface PlayerOptions {
   idleWrites: boolean | "control";
   /** Register writes of the first player calls, in order; one entry per call. The song starts after the last one. */
   start?: Array<Array<{ reg: number; value: number }>>;
+  /** Register writes that init makes after clearing the SID. */
+  init?: Array<{ reg: number; value: number }>;
 }
 
 export const PLAYER_START_MAX_STEPS = 8;
@@ -1596,27 +1660,28 @@ export const PLAYER_START_MAX_WRITES = 32;
  * `idle_writes` is true (default), false or "control". `start` lists the register writes ($D400 to $D418 of the first SID) of the first player calls.
  */
 function parsePlayer(raw: unknown): PlayerOptions {
-  const value = requireObject(raw, "$.player", ["soft_start", "idle_writes", "start"]);
+  const value = requireObject(raw, "$.player", ["soft_start", "idle_writes", "start", "init"]);
   if (value.idle_writes !== undefined && typeof value.idle_writes !== "boolean" && value.idle_writes !== "control") throw new SidwaveValidationError("$.player.idle_writes", "expected true, false or control");
   if (value.soft_start !== undefined && typeof value.soft_start !== "boolean") throw new SidwaveValidationError("$.player.soft_start", "expected true or false");
+  const writes = (list: unknown, path: string, min: number) => {
+    if (!Array.isArray(list) || list.length < min || list.length > PLAYER_START_MAX_WRITES) throw new SidwaveValidationError(path, `expected a list of ${min} to ${PLAYER_START_MAX_WRITES} writes`);
+    return list.map((write: unknown, j: number) => {
+      const writePath = `${path}[${j}]`;
+      const w = requireObject(write, writePath, ["reg", "value"]);
+      const reg = typeof w.reg === "string" && /^\$[0-9a-fA-F]{4}$/.test(w.reg.trim()) ? Number.parseInt(w.reg.trim().slice(1), 16) : w.reg;
+      if (typeof reg !== "number" || !Number.isInteger(reg) || reg < 0xd400 || reg > 0xd418) throw new SidwaveValidationError(`${writePath}.reg`, "expected a register from $D400 to $D418");
+      if (typeof w.value !== "number" || !Number.isInteger(w.value) || w.value < 0 || w.value > 255) throw new SidwaveValidationError(`${writePath}.value`, "expected a byte value from 0 to 255");
+      return { reg: reg - 0xd400, value: w.value };
+    });
+  };
   let start: PlayerOptions["start"];
   if (value.start !== undefined) {
     const path = "$.player.start";
     if (!Array.isArray(value.start) || value.start.length === 0 || value.start.length > PLAYER_START_MAX_STEPS) throw new SidwaveValidationError(path, `expected a list of 1 to ${PLAYER_START_MAX_STEPS} steps, one per player call`);
-    start = value.start.map((step: unknown, i: number) => {
-      const stepPath = `${path}[${i}]`;
-      if (!Array.isArray(step) || step.length === 0 || step.length > PLAYER_START_MAX_WRITES) throw new SidwaveValidationError(stepPath, `expected a list of 1 to ${PLAYER_START_MAX_WRITES} writes`);
-      return step.map((write: unknown, j: number) => {
-        const writePath = `${stepPath}[${j}]`;
-        const w = requireObject(write, writePath, ["reg", "value"]);
-        const reg = typeof w.reg === "string" && /^\$[0-9a-fA-F]{4}$/.test(w.reg.trim()) ? Number.parseInt(w.reg.trim().slice(1), 16) : w.reg;
-        if (typeof reg !== "number" || !Number.isInteger(reg) || reg < 0xd400 || reg > 0xd418) throw new SidwaveValidationError(`${writePath}.reg`, "expected a register from $D400 to $D418");
-        if (typeof w.value !== "number" || !Number.isInteger(w.value) || w.value < 0 || w.value > 255) throw new SidwaveValidationError(`${writePath}.value`, "expected a byte value from 0 to 255");
-        return { reg: reg - 0xd400, value: w.value };
-      });
-    });
+    start = value.start.map((step: unknown, i: number) => writes(step, `${path}[${i}]`, 0));
   }
-  return { softStart: value.soft_start !== false, idleWrites: value.idle_writes === "control" ? "control" : value.idle_writes !== false, ...(start ? { start } : {}) };
+  const init = value.init === undefined ? undefined : writes(value.init, "$.player.init", 1);
+  return { softStart: value.soft_start !== false, idleWrites: value.idle_writes === "control" ? "control" : value.idle_writes !== false, ...(start ? { start } : {}), ...(init ? { init } : {}) };
 }
 
 /**

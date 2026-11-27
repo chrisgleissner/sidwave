@@ -6,12 +6,12 @@
 // traces call by call (F-diff).
 
 import { parseSidFile, type SidFile } from "../sidFile.js";
-import { parseSidwave } from "../sidwave.js";
+import { SidwaveValidationError, parseSidwave } from "../sidwave.js";
 import { compileSidwaveBytes } from "../sidwaveOps.js";
 import { psidClock, type SidEngine } from "../engine/libsidplayfp.js";
 import { fdiff, REGISTER_CLASSES, type FDiffResult, type RegisterClass } from "./fdiff.js";
 import { buildIr, type FrameIr, type IrClock } from "./ir.js";
-import { leadingCalls, recoverScore, type LanguageExtension, type RecoveredScore, type UnsupportedFeature } from "./recover.js";
+import { leadingCalls, recoverScore, withGlobalTable, type LanguageExtension, type RecoveredScore, type RecoverOptions, type UnsupportedFeature } from "./recover.js";
 
 /** What a user needs to know about a recovered score that does not fit one call period at 1 MHz. */
 export const TURBO_MESSAGE = "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers";
@@ -42,6 +42,24 @@ export interface ReconstructOptions {
 
 /** Seconds of the first, cheap verification trace of the recompiled score. */
 export const PROBE_SECONDS = 10;
+
+function recoverySummary(recovered: RecoveredScore): ReconstructReport["recovery"] {
+  return {
+    speed: recovered.speed, tempo: recovered.tempo, firstCall: recovered.firstCall, rows: recovered.rows,
+    tuningCents: recovered.tuningCents, noteCount: recovered.noteCount, phantomNotes: recovered.phantomNotes, instrumentCount: recovered.instrumentCount,
+    patternCount: recovered.patternCount, structure: recovered.structure, tuningEvidence: recovered.tuningEvidence,
+    languageVersion: recovered.languageVersion, softStartOff: recovered.softStartOff,
+  };
+}
+
+/**
+ * How far a candidate score is from the tune: its register-class differences, with every call of the tune that was not
+ * compared counted as differing in all classes. Without that term a recompiled trace that loses the call alignment, and so
+ * compares almost nothing, would look closest.
+ */
+export function candidateCost(fd: { differingCalls: number; comparedCalls: number; expectedCalls: number }): number {
+  return fd.differingCalls + REGISTER_CLASSES.length * Math.max(0, fd.expectedCalls - fd.comparedCalls);
+}
 
 /** The calls of an IR that start within `seconds` of the call at `first` (the alignment point), together with the calls before it. */
 export function trimIr(ir: FrameIr, first: number, seconds: number): FrameIr {
@@ -199,7 +217,6 @@ export function irOfTrace(trace: { records: Float64Array; clock: IrClock; horizo
 export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructOptions): Promise<ReconstructResult> {
   const file: SidFile = parseSidFile(sidBytes);
   const song = options.song ?? file.startSong;
-  void file;
   const seconds = options.seconds ?? DEFAULT_HORIZON_SECONDS;
   const clock: IrClock = psidClock(sidBytes) ?? "PAL";
   const t0 = performance.now();
@@ -208,7 +225,13 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
   const t1 = performance.now();
   const original = irOfTrace(trace);
   const t2 = performance.now();
-  const recovered = recoverScore(original, { title: options.title });
+  const addresses = [0xd400, file.secondSidAddress, file.thirdSidAddress];
+  const sids: NonNullable<RecoverOptions["sids"]> = [];
+  for (let i = 0; i < addresses.length && addresses[i] !== undefined; i++) {
+    const model = String(file.sidModels[i]);
+    sids.push({ address: addresses[i]!, ...(model === "6581" || model === "8580" ? { model } : {}) });
+  }
+  let recovered = recoverScore(original, { title: options.title, sids });
   const t3 = performance.now();
   const timings: ReconstructTimings = { traceMs: t1 - t0, irMs: t2 - t1, recoverMs: t3 - t2, compileMs: 0, retraceMs: 0, fdiffMs: 0, totalMs: 0, totalCpuMs: 0 };
   let compiledBytes: Uint8Array | undefined;
@@ -226,49 +249,82 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
     strictExact: false,
     registerStateExact: false,
     languageExtensions: recovered.extensions,
-    recovery: {
-      speed: recovered.speed, tempo: recovered.tempo, firstCall: recovered.firstCall, rows: recovered.rows,
-      tuningCents: recovered.tuningCents, noteCount: recovered.noteCount, phantomNotes: recovered.phantomNotes, instrumentCount: recovered.instrumentCount,
-      patternCount: recovered.patternCount, structure: recovered.structure, tuningEvidence: recovered.tuningEvidence,
-      languageVersion: recovered.languageVersion, softStartOff: recovered.softStartOff,
-    },
+    recovery: recoverySummary(recovered),
   };
   try {
-    const tc0 = performance.now();
-    let compiled;
-    try {
-      compiled = compileSidwaveBytes(parseSidwave(recovered.text), { format: "sid", loop: true });
-    } catch (error) {
-      // The player needs more cycles per call than one call period holds at 1 MHz. The score is compiled for a faster CPU
-      // (`cpu: turbo`) so that the F-diff can still show what else differs; the report says so and the result is never a strict pass at 1 MHz.
-      if (!(error instanceof Error) || !/use cpu: turbo/.test(error.message)) throw error;
-      scoreText = withTurbo(recovered.text);
-      compiled = compileSidwaveBytes(parseSidwave(scoreText), { format: "sid", loop: true });
-      cycleBudgetExceeded = error.message;
-    }
-    compiledBytes = new Uint8Array(compiled.bytes);
-    const tc1 = performance.now();
     const staged = (options.verify ?? "staged") === "staged" && seconds > PROBE_SECONDS;
-    const compare = async (horizonSeconds: number, trim: boolean) => {
-      const trace = await options.engine.trace({ sid: compiledBytes!, seconds: trim ? horizonSeconds + 1 : horizonSeconds, clock });
+    const compare = async (bytes: Uint8Array, horizonSeconds: number, trim: boolean) => {
+      const tr0 = performance.now();
+      const trace = await options.engine.trace({ sid: bytes, seconds: trim ? horizonSeconds + 1 : horizonSeconds, clock });
       const recompiled = irOfTrace(trace);
       const first = leadingCalls(recompiled);
       const exp = trim ? trimIr(original, recovered.firstCall, horizonSeconds) : original;
       const obs = trim ? trimIr(recompiled, first, horizonSeconds) : recompiled;
       const fd = bestFdiff(exp, obs, recovered.firstCall);
       const state = fd.equal && fd.standardAlignment ? fd : bestFdiff(stateOnlyIr(exp), stateOnlyIr(obs), recovered.firstCall);
+      timings.retraceMs += performance.now() - tr0;
       return { fd, state };
     };
-    let result = await compare(staged ? PROBE_SECONDS : seconds, staged);
+    /** Compiles a candidate score and compares its trace (the probe horizon when staged). */
+    const attempt = async (candidate: RecoveredScore) => {
+      const tc0 = performance.now();
+      let text = candidate.text;
+      let exceeded: string | undefined;
+      let compiled;
+      try {
+        compiled = compileSidwaveBytes(parseSidwave(text), { format: "sid", loop: true });
+      } catch (error) {
+        // The player needs more cycles per call than one call period holds at 1 MHz. The score is compiled for a faster CPU
+        // (`cpu: turbo`) so that the F-diff can still show what else differs; the report says so and the result is never a strict pass at 1 MHz.
+        if (!(error instanceof Error) || !/use cpu: turbo/.test(error.message)) throw error;
+        text = withTurbo(candidate.text);
+        compiled = compileSidwaveBytes(parseSidwave(text), { format: "sid", loop: true });
+        exceeded = error.message;
+      }
+      const bytes = new Uint8Array(compiled.bytes);
+      timings.compileMs += performance.now() - tc0;
+      return { candidate, text, exceeded, bytes, result: await compare(bytes, staged ? PROBE_SECONDS : seconds, staged) };
+    };
+    let best: Awaited<ReturnType<typeof attempt>>;
+    try {
+      best = await attempt(recovered);
+    } catch (error) {
+      // The voices of several SIDs can exceed a limit of one score (instrument variants, table steps, memory). The first SID alone is then recovered.
+      if (!(error instanceof SidwaveValidationError) || !recovered.document.sids) throw error;
+      recovered = recoverScore(original, { title: options.title });
+      scoreText = recovered.text;
+      best = await attempt(recovered);
+    }
+    // When filter or volume differ, a second candidate writes those registers from a global_table; the closer one is kept.
+    if (best.result.fd.classes.filter.differingCalls + best.result.fd.classes.volume.differingCalls > 0) {
+      const alternative = withGlobalTable(original, recovered);
+      if (alternative) {
+        try {
+          const other = await attempt(alternative);
+          const cost = (a: typeof best) => candidateCost(a.result.fd) + (a.exceeded ? 1 : 0);
+          if (cost(other) < cost(best) && (!other.exceeded || best.exceeded)) best = other;
+        } catch (error) {
+          // The alternative does not compile (memory, cycles): the first candidate stands.
+          if (!(error instanceof Error)) throw error;
+        }
+      }
+    }
+    recovered = best.candidate;
+    report.unsupported = recovered.unsupported;
+    report.languageExtensions = recovered.extensions;
+    report.recovery = recoverySummary(recovered);
+    scoreText = best.text;
+    cycleBudgetExceeded = best.exceeded;
+    compiledBytes = best.bytes;
+    let result = best.result;
     const stateExact = (r: typeof result) => r.state.standardAlignment && !r.state.callCountMismatch
       && REGISTER_CLASSES.every((c) => c === "timing" || r.state.classes[c].differingCalls === 0);
     let verifiedSeconds = seconds;
     if (staged) {
-      if (stateExact(result) || (result.fd.equal && result.fd.standardAlignment)) result = await compare(seconds, false);
+      if (stateExact(result) || (result.fd.equal && result.fd.standardAlignment)) result = await compare(best.bytes, seconds, false);
       else verifiedSeconds = PROBE_SECONDS;
     }
-    const tc2 = performance.now();
-    const tc3 = tc2;
+    const tc3 = performance.now();
     report.verification = { mode: verifiedSeconds === seconds ? "full" : "probe", seconds: verifiedSeconds };
     report.fdiff = result.fd;
     report.fdiffState = result.state;
@@ -276,9 +332,6 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
       ok: true,
       ...(cycleBudgetExceeded ? { cycleBudgetExceeded, turboFallback: { scoreIncludesTurbo: true as const, message: TURBO_MESSAGE } } : {}),
     };
-    timings.compileMs = tc1 - tc0;
-    timings.retraceMs = tc2 - tc1;
-    timings.irMs += tc3 - tc2;
     timings.fdiffMs = performance.now() - tc3;
     report.strictExact = report.fdiff.equal && report.fdiff.standardAlignment && !report.fdiff.callCountMismatch && !cycleBudgetExceeded && verifiedSeconds === seconds;
     report.registerStateExact = stateExact(result) && verifiedSeconds === seconds;

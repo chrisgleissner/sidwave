@@ -10,7 +10,8 @@ import { digiTriggers, makeTimelineClock, rampValue, timelinePatternPasses, type
 import type { SampleStats } from "./sidwavePcm.js";
 import { addDigiPlayer, digiCyclesPerCall, digiDataAsm, digiPeakCycles, digiPeriod, validateDigiRate } from "./sidwaveDigi.js";
 import { AssemblyError, assemblyToPrgDetailed } from "6502-toolkit/assembler";
-import { isModern, isV13, patternBeats, sectionBarBeats } from "./sidwave.js";
+import { isModern, isV13, patternBeats, sectionBarBeats, type GlobalTable } from "./sidwave.js";
+import { Cpu6502 } from "./sidwaveEmulator.js";
 import { SIDWAVE_EFFECT_STEP_BYTES, effectCode, effectCyclesBound, effectFrames, effectRam, effectTables } from "./sidwaveEffects.js";
 import { SongSelect, hasSongSelect, lintSongs, mergeSampleCommands, psidSpeedBits, songDoc } from "./sidwaveSongs.js";
 import type { ParsedEffect, ParsedSidwave, SystemMode, SidwaveVoice, SidwavePattern, SidwavePatternGroove, MotifEntry, SidwaveRegisterTable, FilterModSpec, SidwaveSamples, SidwaveGrooveNote } from "./sidwave.js";
@@ -494,15 +495,76 @@ function checkMemoryFit({ streams, arrangement }: PreparedPlayer, streamStart: n
   }
 }
 
-/** The error of a score whose play call needs more cycles than a 1 MHz C64 has, unless it declares `cpu: turbo`. */
-function checkCycleBudget(doc: ParsedSidwave, { arrangement, digiCycles, requiresTurbo, tightest }: PreparedPlayer, planned?: Arrangement): void {
-  if (!arrangement.chips) return;
+/** Calls beyond which a player is not measured; the static estimate then decides. */
+const MEASURED_MAX_CALLS = 100_000;
+/** Cycles kept free above the measured worst call, for player state that differs in later passes of a loop. */
+const MEASURED_MARGIN_CYCLES = 50;
+/** How much more the slowest `gt_tick` (a loop back and a step that sets four registers) costs than the fastest one. */
+const GLOBAL_TABLE_VARIATION_CYCLES = 170;
+
+function gcd(a: number, b: number): number {
+  return b ? gcd(b, a % b) : a;
+}
+
+/**
+ * The calls that cover the song, one further pass of its loop and every alignment of a `global_table` with it: the table
+ * loops on its own, so its heavy steps move against the song from pass to pass. `aligned` is false when all alignments
+ * need more than MEASURED_MAX_CALLS calls; the count then covers the song only.
+ */
+function measuredCalls(arrangement: Arrangement, loop: boolean): { calls: number; aligned: boolean } {
+  const { totalFrames, globalTable: table } = arrangement;
+  const lead = (arrangement.startSteps?.length ?? 0) + 4;
+  const loopFrame = arrangement.clock?.loopFrame ?? 0;
+  const pass = loop ? totalFrames - loopFrame : 0;
+  const song = lead + totalFrames + pass;
+  // A song that stops after one pass meets each table step once.
+  if (!table || (!loop && !arrangement.explicitEnd)) return { calls: song, aligned: true };
+  // After an explicit end the player keeps running, and a looping table with it, for as long as the machine does.
+  if (!loop) return { calls: song, aligned: table.loop === undefined };
+  const length = (from: number) => table.steps.slice(from).reduce((sum, step) => sum + step.calls, 0);
+  const total = length(0);
+  const period = table.loop === undefined ? 1 : length(table.loop);
+  const tableStart = table.loop === undefined ? total : total - period;
+  const calls = lead + Math.max(loopFrame, tableStart) + (pass / gcd(pass, period)) * period + pass;
+  return calls <= MEASURED_MAX_CALLS ? { calls, aligned: true } : { calls: song, aligned: false };
+}
+
+/**
+ * SIDWave 1.5: the worst call of the assembled player on the bundled 6502 emulator, over init and the calls of
+ * measuredCalls (the player has no input, so these calls are the ones it will make), plus the table variation when not
+ * every alignment was run. It stops at the first call above `limit`. Undefined for what is not measured: documents before
+ * 1.5, several songs, effects, samples, and songs longer than MEASURED_MAX_CALLS.
+ */
+function measurePlayerCycles(doc: ParsedSidwave, { arrangement, loop, streams, turboOnly }: PreparedPlayer, limit: number): number | undefined {
+  if (doc.version !== "1.5" || arrangement.songs || arrangement.effects || arrangement.samples) return undefined;
+  const { calls, aligned } = measuredCalls(arrangement, loop);
+  if (calls > MEASURED_MAX_CALLS) return undefined;
+  const extra = aligned ? 0 : GLOBAL_TABLE_VARIATION_CYCLES;
+  const prg = assemblyToPrgDetailed(buildPlayerAsm(arrangement, streams, loop, turboOnly), { fileName: "sidwave_player.asm", loadAddress: SIDWAVE_LOAD_ADDRESS }).prg;
+  const mem = new Uint8Array(0x10000);
+  mem.set(prg.subarray(2), SIDWAVE_LOAD_ADDRESS);
+  mem[1] = 0x37;
+  const cpu = new Cpu6502(mem);
+  cpu.call(SIDWAVE_INIT_ADDRESS);
+  let worst = 0;
+  for (let i = 0; i < calls && worst + extra <= limit; i++) worst = Math.max(worst, cpu.call(SIDWAVE_PLAY_ADDRESS));
+  return worst + extra;
+}
+
+/** Throws when the player does not fit its call period at 1 MHz. Returns the measured worst call when only the measurement shows that it fits. */
+function checkCycleBudget(doc: ParsedSidwave, prepared: PreparedPlayer, planned?: Arrangement): number | undefined {
+  const { arrangement, digiCycles, requiresTurbo, tightest } = prepared;
+  if (!arrangement.chips) return undefined;
   const availableCycles = tightest.available;
   const required = tightest.cycles / availableCycles;
   if (!planned && requiresTurbo(arrangement.system) && !doc.cpu) {
+    const limit = availableCycles - MEASURED_MARGIN_CYCLES;
+    const measured = measurePlayerCycles(doc, prepared, limit);
+    if (measured !== undefined && measured <= limit) return measured;
     throw new SidwaveValidationError("$.cpu",
       `the player needs up to ${tightest.cycles} cycles per call at speed ${tightest.speed}${digiCycles ? ` including ${digiCycles} for the CIA2 digi NMI` : ""} (${availableCycles} available at 1 MHz ${arrangement.system}); use cpu: turbo for a CPU speed of at least ${Math.ceil(required)} MHz`);
   }
+  return undefined;
 }
 
 /** True for the assembler's errors about a program that does not fit in the 64 KB address space. */
@@ -558,8 +620,12 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
   if (arrangement.samples) {
     warnings.push(`CIA2 digi playback reserves up to ${digiCycles} CPU cycles per player call and temporarily replaces the sample SID's master volume.`);
   }
+  let measuredCycles: number | undefined;
   if (arrangement.chips) {
-    checkCycleBudget(doc, prepared, planned);
+    measuredCycles = checkCycleBudget(doc, prepared, planned);
+    if (measuredCycles !== undefined) {
+      warnings.push(`the cycle estimate of ${tightest.cycles} per call exceeds the ${tightest.available} available at 1 MHz; the player was measured at ${measuredCycles} cycles in its worst call and fits.`);
+    }
     const sawtooth = sawtoothWarning(arrangement);
     if (sawtooth) warnings.push(sawtooth);
   }
@@ -607,7 +673,7 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
     sampleBytes,
     sampleDefinitions: Object.fromEntries([...(arrangement.samples?.defs ?? [])].map(([name, sample]) => [name, sample.stats])),
     bytesBelowD000: SIDWAVE_MEMORY_END - (endAddress + 3),
-    requiresTurbo: requiresTurbo(arrangement.system),
+    requiresTurbo: measuredCycles === undefined && requiresTurbo(arrangement.system),
     irqAddress: assembled.symbols.get("irq")!,
     digiNmiAddress: assembled.symbols.get("digi_nmi"),
     digiChainAddress: assembled.symbols.get("digi_chain"),
@@ -1006,6 +1072,8 @@ export function maxSidwaveMidi(system: SystemMode): number {
 
 function waveformToCtrl(w: string): number {
   const wf = (w || "pulse").toLowerCase();
+  // SIDWave 1.5 wavetable steps: no waveform bits (test, gate, ring and sync alone).
+  if (wf === "none") return 0;
   if (wf.includes("tri") && wf.includes("saw") && wf.includes("pulse")) return 0x70;
   if (wf.includes("tri") && wf.includes("pulse")) return 0x50;
   if (wf.includes("saw") && wf.includes("pulse")) return 0x60;
@@ -1054,7 +1122,7 @@ export interface Instrument {
   waveloop?: number;
   pulsetable?: SidwaveRegisterTable;
   filtertable?: SidwaveRegisterTable;
-  restart?: { frames: number; ad: number; sr: number; test: boolean };
+  restart?: { frames: number; ad: number; sr: number; test: boolean; silent?: boolean };
 }
 
 export interface ArrangedNote {
@@ -1120,6 +1188,10 @@ export interface Arrangement {
   idleControl?: boolean;
   /** SIDWave 1.5 `player.start`: the register writes of the first player calls. */
   startSteps?: Array<Array<{ reg: number; value: number }>>;
+  /** SIDWave 1.5 `player.init`: register writes at the end of init. */
+  initWrites?: Array<{ reg: number; value: number }>;
+  /** SIDWave 1.5 `global_table`: per-call values of the filter and volume registers. */
+  globalTable?: GlobalTable;
   /** SIDWave 1.5 `tuning`: the 96 register values C0..B7 of the document's clock; absent without a tuning. */
   noteTable?: number[];
   clock?: TimelineClock;
@@ -1332,6 +1404,8 @@ function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrange
     ...(doc.player?.idleWrites === false ? { idleSilent: true } : {}),
     ...(doc.player?.idleWrites === "control" ? { idleControl: true } : {}),
     ...(doc.player?.start ? { startSteps: doc.player.start } : {}),
+    ...(doc.player?.init ? { initWrites: doc.player.init } : {}),
+    ...(doc.globalTable ? { globalTable: doc.globalTable } : {}),
     ...(doc.tuning && (doc.tuning.cents || doc.tuning.registers.length) ? { noteTable: noteTableOf(doc) } : {}),
   };
 }
@@ -2201,6 +2275,7 @@ function buildInstrument(voice: SidwaveVoice, fx: Record<string, any>, arp: numb
       ad: ((fx.hard_restart?.adsr?.[0] ?? 0) << 4) | (fx.hard_restart?.adsr?.[1] ?? 0),
       sr: ((fx.hard_restart?.adsr?.[2] ?? 0) << 4) | (fx.hard_restart?.adsr?.[3] ?? 0),
       test: fx.hard_restart?.test ?? false,
+      ...(fx.hard_restart?.wave === "none" ? { silent: true } : {}),
     } : undefined,
   };
 }
@@ -2367,7 +2442,7 @@ function buildVoiceEvents(notes: ArrangedNote[], instruments: Instrument[], tota
       }
       if (gateOff < hr) events.push({ frame: wrap(gateOff), order: ORDER.gate, bytes: [OP.GATEOFF] });
       const bytes = !restart ? [OP.HARDRESTART] : !restart.frames
-        ? [OP.GATEOFF] : [OP.RESTART, restart.ad, restart.sr, restart.test ? 8 : 0];
+        ? [OP.GATEOFF] : [OP.RESTART, restart.ad, restart.sr, (restart.test ? 8 : 0) | (restart.silent ? RESTART_SILENT : 0)];
       events.push({ frame: wrap(hr), order: ORDER.gate, bytes });
     } else if (!continues) {
       events.push({ frame: gateOff, order: ORDER.gate, bytes: [OP.GATEOFF] });
@@ -2592,7 +2667,8 @@ function estimatePlayerCycles(arr: Arrangement, loop: boolean): number {
   const hasFade = arr.instruments.some((inst) => inst.vibFade);
   const bursts = new Map<number, number>();
   const add = (frame: number, cycles: number) => bursts.set(frame, (bursts.get(frame) ?? 0) + cycles);
-  let regular = (arr.startSteps ? 6 : 0) + 180 + (arr.softVolume ? 35 + 135 * (arr.chips?.length ?? 1) : 0) + (arr.samples ? 48 * (arr.chips?.length ?? 1) : 0); // entry, pointer/banking saves, play-once wrapper and return
+  // global_table: the step load and the four writes of gt_tick, at most 170 cycles (a loop back adds the reload).
+  let regular = (arr.globalTable ? 200 : 0) + (arr.startSteps ? 6 : 0) + 180 + (arr.softVolume ? 35 + 135 * (arr.chips?.length ?? 1) : 0) + (arr.samples ? 48 * (arr.chips?.length ?? 1) : 0); // entry, pointer/banking saves, play-once wrapper and return
   for (const chip of arr.chips ?? [{ filter: arr.filter, hasFilterTable: hasFilter }]) {
     regular += arr.chips ? 155 : 0; // base table lookup, 3-channel dispatch and unfiltered volume
     if (chip.filter.used || chip.hasFilterTable || !arr.chips) {
@@ -3541,7 +3617,10 @@ va_vf_done:
   return code;
 }
 
-function customRestartCode(wave: boolean, pulse: boolean, filter: boolean): string {
+/** Bit of the control operand of OP.RESTART: drop the waveform bits during the restart. */
+const RESTART_SILENT = 0x80;
+
+function customRestartCode(wave: boolean, pulse: boolean, filter: boolean, silent: boolean): string {
   return `
 c_restart:
 ${pulse ? "  jsr pt_stop" : ""}
@@ -3553,9 +3632,17 @@ ${wave ? "  lda #0\n  sta v_wtleft,x" : ""}
   sta v_sr,x
   jsr fetch
   sta t_lo
+${silent ? `  lda t_lo
+  bpl cr_keep
+  and #$7F
+  sta t_lo
   lda v_ctrl,x
+  and #$06
+  jmp cr_set
+cr_keep:
+` : ""}  lda v_ctrl,x
   and #$F6
-  ora t_lo
+${silent ? "cr_set:\n" : ""}  ora t_lo
   sta v_ctrl,x
   jmp v_read
 `;
@@ -3618,6 +3705,143 @@ tune_sub_hi:
   rts
 tune_clock: .res 1
 ${banks.join("\n")}
+`;
+}
+
+/** SIDWave 1.5 `player.init`: writes the listed registers of the first SID at the end of init, while the I/O area is mapped in. */
+function addInitWrites(code: string, writes: Array<{ reg: number; value: number }>, address: number): string {
+  const start = code.indexOf("\ninit_core:\n");
+  const end = code.indexOf("  pla\n  sta $01\n", start);
+  if (start < 0 || end < 0) throw new Error("SIDWAVE player code changed: the init write patch point was not found");
+  const stores = writes.map((w) => `  lda #$${hex2(w.value)}\n  sta $${(address + w.reg).toString(16).toUpperCase()} ; init\n`).join("");
+  return code.slice(0, end) + stores + code.slice(end);
+}
+
+/** Bytes of one `global_table` step in the player: calls, mode, $D415, $D416 or its increment, $D417, $D418. A zero call count ends the table. */
+const GLOBAL_STEP_BYTES = 6;
+
+function globalTableBytes(table: GlobalTable): number[] {
+  const carried: [number, number, number, number] = [0, 0, 0, 0];
+  const bytes: number[] = [];
+  for (const step of table.steps) {
+    const values = [step.d415, step.d416, step.d417, step.d418];
+    // Mode bit 0: add the third byte to $D416 in every call. Bits 4 to 7: the step sets $D415 to $D418; the others keep their value.
+    let mode = step.d416Add === undefined ? 0 : 1;
+    values.forEach((value, r) => {
+      if (value === undefined) return;
+      carried[r] = value;
+      mode |= 16 << r;
+    });
+    bytes.push(step.calls, mode, carried[0], step.d416Add === undefined ? carried[1] : step.d416Add & 255, carried[2], carried[3]);
+  }
+  bytes.push(0);
+  return bytes;
+}
+
+/**
+ * SIDWave 1.5 `global_table`: the player's own writes of the registers that the table sets are removed from the play routine,
+ * and `gt_tick` writes the table's values once per call after the voices. init restarts the table; a song loop does not.
+ */
+function addGlobalTable(code: string, table: GlobalTable, address: number): string {
+  const play = code.indexOf("\nplay:\n");
+  const init = "\nini_voice:\n";
+  const done = "play_chips_done:\n";
+  if (play < 0 || !code.includes(init) || !code.includes(done)) throw new Error("SIDWAVE player code changed: the global table patch points were not found");
+  const head = code.slice(0, play);
+  let body = code.slice(play);
+  for (const reg of table.registers) {
+    const offset = reg.toString(16);
+    body = body.split(`  ldy #$${offset}\n  sta (sid_io),y\n`).join("");
+  }
+  code = (head + body).replace(init, `\n  jsr gt_reset${init}`).replace(done, `${done}  jsr gt_tick\n`);
+  const writes = table.registers.map((reg) => `  lda gt_v${reg.toString(16)}\n  sta $${(address + reg).toString(16).toUpperCase()}`).join("\n");
+  const loop = table.loop === undefined ? `  rts` : `  lda #<(gt_data+${table.loop * GLOBAL_STEP_BYTES})
+  sta ptr
+  lda #>(gt_data+${table.loop * GLOBAL_STEP_BYTES})
+  sta ptr+1
+  jmp gt_load`;
+  // The caller saves and restores ptr around the whole play call.
+  return `${code}
+gt_reset:
+  lda #<gt_data
+  sta gt_posl
+  lda #>gt_data
+  sta gt_posh
+  lda #0
+  sta gt_left
+  sta gt_mode
+  rts
+gt_tick:
+  lda gt_left
+  bne gt_run
+  lda gt_posl
+  sta ptr
+  lda gt_posh
+  sta ptr+1
+gt_load:
+  ldy #0
+  lda (ptr),y
+  bne gt_step
+  jmp gt_end
+gt_step:
+  sta gt_left
+  iny
+  lda (ptr),y
+  sta gt_mode
+  asl
+  bcc gt_keep18
+  pha
+  ldy #5
+  lda (ptr),y
+  sta gt_v18
+  pla
+gt_keep18:
+  asl
+  bcc gt_keep17
+  pha
+  ldy #4
+  lda (ptr),y
+  sta gt_v17
+  pla
+gt_keep17:
+  asl
+  bcc gt_keep16
+  pha
+  ldy #3
+  lda (ptr),y
+  sta gt_v16
+  pla
+gt_keep16:
+  asl
+  bcc gt_keep15
+  ldy #2
+  lda (ptr),y
+  sta gt_v15
+gt_keep15:
+  ldy #3
+  lda (ptr),y
+  sta gt_add
+  clc
+  lda ptr
+  adc #${GLOBAL_STEP_BYTES}
+  sta gt_posl
+  lda ptr+1
+  adc #0
+  sta gt_posh
+gt_run:
+  dec gt_left
+  lda gt_mode
+  lsr
+  bcc gt_write
+  clc
+  lda gt_v16
+  adc gt_add
+  sta gt_v16
+gt_write:
+${writes}
+  rts
+gt_end:
+${table.loop === undefined ? "  sta gt_mode\n  jmp gt_write" : loop}
 `;
 }
 
@@ -3832,7 +4056,8 @@ vr_wt_integer:
     playerCode = playerCode.replace("  dec v_wtleft,x\n", "  lda v_wtleft,x\n  beq va_return\n  dec v_wtleft,x\n");
   }
   if (hasRestart) {
-    playerCode += customRestartCode(Boolean(hasWavetable), Boolean(hasPulseTable), Boolean(hasFilterTable));
+    playerCode += customRestartCode(Boolean(hasWavetable), Boolean(hasPulseTable), Boolean(hasFilterTable),
+      arr.voices.some(({ events }) => events.some(({ bytes }) => bytes[0] === OP.RESTART && (bytes[3]! as number) & RESTART_SILENT)));
     if (hasWavetable) {
       playerCode = playerCode.replace("  and #$FE\n  jmp vr_wt_ctrl", `  and #$F6
   sta t_lo
@@ -3915,7 +4140,7 @@ st_run_${k}:
   pha
   lda #$36
   sta $01
-${step.map((w) => `  lda #$${hex2(w.value)}\n  sta $${(0xd400 + w.reg).toString(16).toUpperCase()} ; start`).join("\n")}
+${step.map((w) => `  lda #$${hex2(w.value)}\n  sta $${((arr.chips?.[0]?.address ?? 0xd400) + w.reg).toString(16).toUpperCase()} ; start`).join("\n")}
   pla
   sta $01
   inc st_i
@@ -3978,6 +4203,8 @@ c_ret:
     if (arr.tuning) playerCode = addTunedLookup(playerCode, arr.tuning);
     if (arr.samples) playerCode = addDigiPlayer(playerCode, arr.samples, arr.chips, [CLOCK_HZ.PAL, CLOCK_HZ.NTSC]);
   }
+  if (arr.initWrites) playerCode = addInitWrites(playerCode, arr.initWrites, arr.chips![0]!.address);
+  if (arr.globalTable) playerCode = addGlobalTable(playerCode, arr.globalTable, arr.chips![0]!.address);
   if (arr.idleControl) playerCode = playerCode.replace("  sta $D400,y ; idle control", arr.chips ? "  sta (sid_io),y" : "  sta $D400,y");
   if (songs) {
     // The song selector copies each song's loop targets into loop_lo and loop_hi.
@@ -4201,6 +4428,7 @@ c_ret:
   }
   if (arr.chips?.some((chip) => chip.hasOffset)) for (const name of ["g_so0", "g_so1", "g_so2", "g_sres"]) R.push(`${name}: .res 1`);
   if (arr.startSteps) R.push("st_i: .res 1");
+  if (arr.globalTable) R.push("gt_left: .res 1", "gt_posl: .res 1", "gt_posh: .res 1", "gt_mode: .res 1", "gt_add: .res 1", "gt_v15: .res 1", "gt_v16: .res 1", "gt_v17: .res 1", "gt_v18: .res 1");
   R.push(`vars_end:`);
   if (arr.effects) R.push(...effectRam(channels, arr.chips!.length, arr.effects.some((effect) => effect.steps.some((step) => step.filter === "off"))));
 
@@ -4208,6 +4436,7 @@ c_ret:
     effectTables({ effects: arr.effects, filterOff: arr.effects.some((effect) => effect.steps.some((step) => step.filter === "off")), hzToRegister: hzToSidFrequency, midiToHz },
       (label, items) => pushByteRows(T, label, items, SIDWAVE_EFFECT_STEP_BYTES), (text) => T.push(text));
   }
+  if (arr.globalTable) pushByteRows(T, "gt_data", globalTableBytes(arr.globalTable).map((v) => `$${hex2(v)}`));
   streams.forEach((s, i) => pushByteRows(T, `stream${i}`, s.map((b) => typeof b === "string" ? b : `$${hex2(b)}`)));
   if (arr.samples) L.push(includeSamples ? digiDataAsm(arr.samples) :
     [...arr.samples.defs.keys()].map((_, i) => `digi_data${i}:`).join("\n"));

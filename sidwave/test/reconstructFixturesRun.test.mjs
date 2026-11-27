@@ -10,7 +10,7 @@ import { reconstructSid } from "../src/reconstruct/reconstruct.ts";
 
 /** Per fixture: the strict verdict and unsupported kinds the recovery reports (all of them; the lists are exact sets). */
 const EXPECTED = {
-  hardRestart: ["different", []],
+  hardRestart: ["state_exact", []],
   arpeggio: ["state_exact", ["pitch"]],
   vibrato: ["state_exact", ["pitch"]],
   pulseSweep: ["state_exact", []],
@@ -19,8 +19,8 @@ const EXPECTED = {
   ring: ["state_exact", ["pitch"]],
   multispeed: ["different", ["instrument_budget", "wavetable"]],
   multispeed9: ["compile_failed", ["instrument_budget", "wavetable"]],
-  twoSids: ["different", ["multi_sid", "pitch"]],
-  testBit: ["different", ["pitch"]],
+  twoSids: ["different", ["instrument_budget", "pitch"]],
+  testBit: ["state_exact", ["pitch"]],
   nmiSampler: ["call_count", ["non_periodic_writes", "pitch"]],
 };
 
