@@ -4,7 +4,7 @@
   "note": "Development tunes only. No SID data, no scores. Held-out tunes are not run.",
   "manifestSha256": "a555e5955e28c138177036629f2a56739d4ac8121e19a6e9bbbb1567e879f491",
   "versions": {
-    "code": "fcb20655cf529d3c",
+    "code": "4d1898059a7a627c",
     "engine": "1.1.1",
     "distFiles": 100
   },
@@ -15,7 +15,7 @@
     "scriptVersion": 4
   },
   "source": {
-    "commit": "331ae838f89cefbbf853cacb95ca89961b16ed54",
+    "commit": "ec7c680173fdb13c6fb422b43b4e63b0c5c16640",
     "dirty": false
   },
   "cacheKeyInputs": {
@@ -26,7 +26,7 @@
       "verify": "staged",
       "scriptVersion": 4
     },
-    "codeSha256Prefix": "fcb20655cf529d3c",
+    "codeSha256Prefix": "4d1898059a7a627c",
     "engine": "1.1.1",
     "key": "sha256(sid sha256, subtune, horizon, settings, versions)"
   },
@@ -34,9 +34,9 @@
     "tunes": 24,
     "strictExact": 0,
     "registerStateExact": 0,
-    "compileFailures": 1,
+    "compileFailures": 0,
     "a1Pass": 0,
-    "a1Evaluated": 14,
+    "a1Evaluated": 15,
     "turbo": 8,
     "turboTunes": [
       "MUSICIANS/D/Dr_Piotr/Defibrylacja.sid:1",
@@ -50,22 +50,20 @@
     ],
     "horizonReduced": 0,
     "rootCauseCounts": {
+      "pitch": 8,
       "gate/hard restart": 7,
-      "pitch": 7,
-      "timing/call rate": 5,
-      "volume": 2,
+      "timing/call rate": 7,
       "filter": 1,
-      "ADSR": 1,
-      "unsupported": 1
+      "ADSR": 1
     },
-    "differingCalls": 380824,
-    "scoreBytes": 2187194,
+    "differingCalls": 137282,
+    "scoreBytes": 2187150,
     "musicMinutes": 52.3,
-    "probeOnly": 23,
+    "probeOnly": 24,
     "fullVerifyCpuSecondsPerMusicMinute": 7.88,
-    "callZeroFirstDifferences": 12,
-    "reconstructCpuSecondsPerMusicMinute": 1.71,
-    "recoverMsPerMusicMinute": 1602.2
+    "callZeroFirstDifferences": 10,
+    "reconstructCpuSecondsPerMusicMinute": 4.73,
+    "recoverMsPerMusicMinute": 2130.4
   },
   "tunes": [
     {
@@ -343,30 +341,30 @@
       ],
       "scoreBytes": 68240,
       "scoreSha256": "af767ae0f38aefbe05e49243b50a077b036be65ebfbeea9a70007c037df00c55",
-      "compiledBytes": 8124,
+      "compiledBytes": 8102,
       "timing": {
-        "wallSeconds": 3.48,
-        "cpuSeconds": 2.79,
+        "wallSeconds": 35.89,
+        "cpuSeconds": 9.21,
         "phasesMs": {
-          "trace": 20,
-          "ir": 536,
-          "recover": 1499,
-          "compile": 302,
-          "retrace": 1119,
+          "trace": 24963,
+          "ir": 2526,
+          "recover": 4686,
+          "compile": 770,
+          "retrace": 2943,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.2,
-        "recoverMsPerMusicMinute": 647
+        "reconstructCpuPerMusicMinute": 3.97,
+        "recoverMsPerMusicMinute": 2022.9
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 13030,
-        "badWindows": 5513,
+        "badWindows": 5522,
         "lagMs": 12,
-        "wallSeconds": 128.7
+        "wallSeconds": 241.4
       },
-      "finishedAt": "2026-11-27T11:24:13.096Z"
+      "finishedAt": "2026-11-27T12:03:14.785Z"
     },
     {
       "path": "MUSICIANS/M/Mythus/Odd_Jam.sid",
@@ -410,7 +408,7 @@
           "call": 1,
           "timeSeconds": 0.019527063236870312,
           "expected": 19239,
-          "observed": 19666,
+          "observed": 19668,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -455,7 +453,7 @@
           "call": 1,
           "timeSeconds": 0.019527063236870312,
           "expected": 19239,
-          "observed": 19666,
+          "observed": 19668,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -3387,30 +3385,30 @@
       ],
       "scoreBytes": 148742,
       "scoreSha256": "964c4ef4bacb0331e550f55f4202d07240fbc77f1d9ae8ced1c13fbf4cd14ded",
-      "compiledBytes": 16432,
+      "compiledBytes": 16273,
       "timing": {
-        "wallSeconds": 5.41,
-        "cpuSeconds": 4.11,
+        "wallSeconds": 49.81,
+        "cpuSeconds": 11.19,
         "phasesMs": {
-          "trace": 19,
-          "ir": 493,
-          "recover": 3390,
-          "compile": 550,
-          "retrace": 953,
+          "trace": 28610,
+          "ir": 4371,
+          "recover": 9288,
+          "compile": 2739,
+          "retrace": 4792,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.61,
-        "recoverMsPerMusicMinute": 1327.7
+        "reconstructCpuPerMusicMinute": 4.38,
+        "recoverMsPerMusicMinute": 3637.2
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 14363,
-        "badWindows": 12987,
+        "badWindows": 12974,
         "lagMs": 0,
-        "wallSeconds": 131.9
+        "wallSeconds": 213.8
       },
-      "finishedAt": "2026-11-27T11:24:13.082Z"
+      "finishedAt": "2026-11-27T12:03:15.131Z"
     },
     {
       "path": "MUSICIANS/D/Dr_Piotr/Defibrylacja.sid",
@@ -4162,26 +4160,26 @@
       ],
       "scoreBytes": 80742,
       "scoreSha256": "2d5f2525328010459eb5bd729881e01fff87c4021db5b29df864a4c7da7797e6",
-      "compiledBytes": 12606,
+      "compiledBytes": 12584,
       "timing": {
-        "wallSeconds": 6.97,
-        "cpuSeconds": 4.95,
+        "wallSeconds": 65.7,
+        "cpuSeconds": 14.26,
         "phasesMs": {
-          "trace": 90,
-          "ir": 1485,
-          "recover": 2287,
-          "compile": 1663,
-          "retrace": 1445,
+          "trace": 50875,
+          "ir": 2394,
+          "recover": 6820,
+          "compile": 1883,
+          "retrace": 3725,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.65,
-        "recoverMsPerMusicMinute": 762.2
+        "reconstructCpuPerMusicMinute": 4.75,
+        "recoverMsPerMusicMinute": 2273.2
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T11:24:13.064Z"
+      "finishedAt": "2026-11-27T12:03:14.961Z"
     },
     {
       "path": "MUSICIANS/W/Wijnhoven_Joachim/Bomb_Jack_Title_Deluxe_2SID.sid",
@@ -4677,30 +4675,30 @@
       ],
       "scoreBytes": 33699,
       "scoreSha256": "74aa86c7ef3b3aece922a5efd3b303b67427c34cf20502363f11642f5ddd08a7",
-      "compiledBytes": 5824,
+      "compiledBytes": 5665,
       "timing": {
-        "wallSeconds": 3.05,
-        "cpuSeconds": 2.45,
+        "wallSeconds": 28.54,
+        "cpuSeconds": 5.02,
         "phasesMs": {
-          "trace": 19,
-          "ir": 405,
-          "recover": 1045,
-          "compile": 311,
-          "retrace": 1265,
+          "trace": 13701,
+          "ir": 1461,
+          "recover": 5427,
+          "compile": 1472,
+          "retrace": 6478,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.95,
-        "recoverMsPerMusicMinute": 1259.1
+        "reconstructCpuPerMusicMinute": 6.05,
+        "recoverMsPerMusicMinute": 6539.3
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 4667,
-        "badWindows": 3646,
+        "badWindows": 3626,
         "lagMs": 0,
-        "wallSeconds": 62.6
+        "wallSeconds": 155.3
       },
-      "finishedAt": "2026-11-27T11:24:13.074Z"
+      "finishedAt": "2026-11-27T12:03:14.915Z"
     },
     {
       "path": "MUSICIANS/N/Nordischsound/Ninjas_Delight.sid",
@@ -4744,7 +4742,7 @@
           "call": 1,
           "timeSeconds": 0.006230918509857417,
           "expected": 6139,
-          "observed": 6564,
+          "observed": 6563,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -4789,7 +4787,7 @@
           "call": 1,
           "timeSeconds": 0.006230918509857417,
           "expected": 6139,
-          "observed": 6564,
+          "observed": 6563,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -6681,30 +6679,30 @@
       ],
       "scoreBytes": 75725,
       "scoreSha256": "ee397d9ea6cd81b0f72aa30125f20593f17bd9c3e84051d0e3da9dc512355a17",
-      "compiledBytes": 12056,
+      "compiledBytes": 11874,
       "timing": {
-        "wallSeconds": 5.69,
-        "cpuSeconds": 3.97,
+        "wallSeconds": 33.6,
+        "cpuSeconds": 11.54,
         "phasesMs": {
-          "trace": 161,
-          "ir": 1375,
-          "recover": 2275,
-          "compile": 207,
-          "retrace": 1674,
+          "trace": 24336,
+          "ir": 1830,
+          "recover": 5269,
+          "compile": 494,
+          "retrace": 1670,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.61,
-        "recoverMsPerMusicMinute": 921.6
+        "reconstructCpuPerMusicMinute": 4.67,
+        "recoverMsPerMusicMinute": 2134.4
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 13886,
-        "badWindows": 9981,
+        "badWindows": 9978,
         "lagMs": 2,
-        "wallSeconds": 135.3
+        "wallSeconds": 218.5
       },
-      "finishedAt": "2026-11-27T11:24:21.227Z"
+      "finishedAt": "2026-11-27T12:04:22.394Z"
     },
     {
       "path": "MUSICIANS/B/Beggerow_Alan/Meet_Me_in_St_Louis.sid",
@@ -6794,7 +6792,7 @@
           "call": 1,
           "timeSeconds": 0.2946103896738817,
           "expected": 301306,
-          "observed": 16836,
+          "observed": 16835,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -6893,30 +6891,30 @@
       "languageExtensions": [],
       "scoreBytes": 74234,
       "scoreSha256": "a8f910d9b54382189fbd5bc99d0fb664e1b2e949d40518592712de13df85777f",
-      "compiledBytes": 6123,
+      "compiledBytes": 6102,
       "timing": {
-        "wallSeconds": 4.03,
-        "cpuSeconds": 2.24,
+        "wallSeconds": 20.61,
+        "cpuSeconds": 8.79,
         "phasesMs": {
-          "trace": 3,
-          "ir": 127,
-          "recover": 2362,
-          "compile": 522,
-          "retrace": 1012,
+          "trace": 14785,
+          "ir": 142,
+          "recover": 2445,
+          "compile": 411,
+          "retrace": 2824,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 0.99,
-        "recoverMsPerMusicMinute": 1042.3
+        "reconstructCpuPerMusicMinute": 3.88,
+        "recoverMsPerMusicMinute": 1078.6
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 12747,
-        "badWindows": 11765,
-        "lagMs": -18,
-        "wallSeconds": 146.1
+        "badWindows": 11749,
+        "lagMs": 0,
+        "wallSeconds": 175
       },
-      "finishedAt": "2026-11-27T11:25:20.155Z"
+      "finishedAt": "2026-11-27T12:06:19.686Z"
     },
     {
       "path": "MUSICIANS/H/Hubbard_Rob/Skate_or_Die_intro.sid",
@@ -6931,8 +6929,8 @@
       "model": "6581",
       "sidCount": 1,
       "speed": "VBI",
-      "rootCause": "volume",
-      "why": "first difference in volume",
+      "rootCause": "timing/call rate",
+      "why": "first difference in timing",
       "strictExact": false,
       "registerStateExact": false,
       "verification": {
@@ -6949,19 +6947,19 @@
         "irregularShare": 0.07679502829874597
       },
       "fdiff": {
-        "differingCalls": 2030,
-        "callsWithDifference": 502,
+        "differingCalls": 2028,
+        "callsWithDifference": 500,
         "comparedCalls": 502,
         "expectedCalls": 502,
         "observedCalls": 503,
         "standardAlignment": true,
         "first": {
-          "class": "volume",
-          "call": 0,
-          "timeSeconds": 0,
-          "register": 24,
-          "expected": 15,
-          "observed": 0
+          "class": "timing",
+          "call": 1,
+          "timeSeconds": 0.017890926954431778,
+          "expected": 17627,
+          "observed": 19668,
+          "detail": "call spacing in cycles"
         },
         "classes": {
           "pitch": {
@@ -6989,24 +6987,24 @@
             "matchShare": 1
           },
           "volume": {
-            "differingCalls": 501,
-            "matchShare": 0.001992
+            "differingCalls": 498,
+            "matchShare": 0.007968
           },
           "timing": {
-            "differingCalls": 40,
-            "matchShare": 0.920319
+            "differingCalls": 41,
+            "matchShare": 0.918327
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 2030,
+        "differingCalls": 2028,
         "first": {
-          "class": "volume",
-          "call": 0,
-          "timeSeconds": 0,
-          "register": 24,
-          "expected": 15,
-          "observed": 0
+          "class": "timing",
+          "call": 1,
+          "timeSeconds": 0.017890926954431778,
+          "expected": 17627,
+          "observed": 19668,
+          "detail": "call spacing in cycles"
         },
         "classes": {
           "pitch": {
@@ -7034,12 +7032,12 @@
             "matchShare": 1
           },
           "volume": {
-            "differingCalls": 501,
-            "matchShare": 0.001992
+            "differingCalls": 498,
+            "matchShare": 0.007968
           },
           "timing": {
-            "differingCalls": 40,
-            "matchShare": 0.920319
+            "differingCalls": 41,
+            "matchShare": 0.918327
           }
         }
       },
@@ -7131,30 +7129,30 @@
       ],
       "scoreBytes": 80009,
       "scoreSha256": "992d418740619fdc15adc0135b5ac4b4153334b62dbdf5e4f371bd91c172faef",
-      "compiledBytes": 10661,
+      "compiledBytes": 10600,
       "timing": {
-        "wallSeconds": 5.96,
-        "cpuSeconds": 3.85,
+        "wallSeconds": 29.13,
+        "cpuSeconds": 13.58,
         "phasesMs": {
-          "trace": 620,
-          "ir": 2138,
-          "recover": 1870,
-          "compile": 650,
-          "retrace": 687,
+          "trace": 22061,
+          "ir": 2112,
+          "recover": 3720,
+          "compile": 407,
+          "retrace": 829,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.28,
-        "recoverMsPerMusicMinute": 623.2
+        "reconstructCpuPerMusicMinute": 4.53,
+        "recoverMsPerMusicMinute": 1239.9
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 16874,
-        "badWindows": 12673,
+        "badWindows": 12663,
         "lagMs": 16,
-        "wallSeconds": 294.7
+        "wallSeconds": 335.4
       },
-      "finishedAt": "2026-11-27T11:26:26.155Z"
+      "finishedAt": "2026-11-27T12:07:39.216Z"
     },
     {
       "path": "MUSICIANS/T/Toggle/Cheers_and_Tributes.sid",
@@ -7198,7 +7196,7 @@
           "call": 1,
           "timeSeconds": 0.010991141316704018,
           "expected": 10829,
-          "observed": 9883,
+          "observed": 9882,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -7243,7 +7241,7 @@
           "call": 1,
           "timeSeconds": 0.010991141316704018,
           "expected": 10829,
-          "observed": 9883,
+          "observed": 9882,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -8285,26 +8283,26 @@
       ],
       "scoreBytes": 89751,
       "scoreSha256": "75e13293eb3c3e002d920a1d7a4c108734deb46eba2570f5806609b60a12881f",
-      "compiledBytes": 12341,
+      "compiledBytes": 12221,
       "timing": {
-        "wallSeconds": 5.7,
-        "cpuSeconds": 3.91,
+        "wallSeconds": 26.67,
+        "cpuSeconds": 12.32,
         "phasesMs": {
-          "trace": 56,
-          "ir": 575,
-          "recover": 2573,
-          "compile": 822,
-          "retrace": 1674,
+          "trace": 20773,
+          "ir": 647,
+          "recover": 2275,
+          "compile": 980,
+          "retrace": 1994,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.3,
-        "recoverMsPerMusicMinute": 857.7
+        "reconstructCpuPerMusicMinute": 4.11,
+        "recoverMsPerMusicMinute": 758.2
       },
       "a1": {
         "status": "error",
         "error": "Invalid SID write at record 1"
       },
-      "finishedAt": "2026-11-27T11:26:31.091Z"
+      "finishedAt": "2026-11-27T12:07:52.616Z"
     },
     {
       "path": "MUSICIANS/Z/Zonzo/Xcellent_part_3.sid",
@@ -8319,8 +8317,8 @@
       "model": "6581",
       "sidCount": 1,
       "speed": "VBI",
-      "rootCause": "volume",
-      "why": "first difference in volume",
+      "rootCause": "pitch",
+      "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
       "verification": {
@@ -8337,19 +8335,20 @@
         "irregularShare": 0.002996005326231691
       },
       "fdiff": {
-        "differingCalls": 70,
-        "callsWithDifference": 23,
+        "differingCalls": 62,
+        "callsWithDifference": 15,
         "comparedCalls": 23,
         "expectedCalls": 504,
         "observedCalls": 24,
         "standardAlignment": true,
         "first": {
-          "class": "volume",
-          "call": 0,
-          "timeSeconds": 0,
-          "register": 24,
-          "expected": 9,
-          "observed": 0
+          "class": "pitch",
+          "call": 8,
+          "timeSeconds": 0.15944716457176264,
+          "voice": 1,
+          "register": 0,
+          "expected": 158,
+          "observed": 124
         },
         "classes": {
           "pitch": {
@@ -8377,8 +8376,8 @@
             "matchShare": 0.347826
           },
           "volume": {
-            "differingCalls": 22,
-            "matchShare": 0.043478
+            "differingCalls": 14,
+            "matchShare": 0.391304
           },
           "timing": {
             "differingCalls": 1,
@@ -8387,14 +8386,15 @@
         }
       },
       "fdiffState": {
-        "differingCalls": 65,
+        "differingCalls": 57,
         "first": {
-          "class": "volume",
-          "call": 0,
-          "timeSeconds": 0,
-          "register": 24,
-          "expected": 9,
-          "observed": 0
+          "class": "pitch",
+          "call": 8,
+          "timeSeconds": 0.15944716457176264,
+          "voice": 1,
+          "register": 0,
+          "expected": 158,
+          "observed": 124
         },
         "classes": {
           "pitch": {
@@ -8422,8 +8422,8 @@
             "matchShare": 0.347826
           },
           "volume": {
-            "differingCalls": 22,
-            "matchShare": 0.043478
+            "differingCalls": 14,
+            "matchShare": 0.391304
           },
           "timing": {
             "differingCalls": 1,
@@ -8526,30 +8526,30 @@
       ],
       "scoreBytes": 27166,
       "scoreSha256": "1ae006dbf72e5c307094a1d1be6058cc8704e174f1099c40f82f8d044c36365e",
-      "compiledBytes": 2999,
+      "compiledBytes": 2823,
       "timing": {
-        "wallSeconds": 3.17,
-        "cpuSeconds": 2.3,
+        "wallSeconds": 25.56,
+        "cpuSeconds": 11.08,
         "phasesMs": {
-          "trace": 164,
-          "ir": 793,
-          "recover": 1062,
-          "compile": 115,
-          "retrace": 1036,
+          "trace": 20541,
+          "ir": 1212,
+          "recover": 2379,
+          "compile": 267,
+          "retrace": 1158,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 0.77,
-        "recoverMsPerMusicMinute": 353.9
+        "reconstructCpuPerMusicMinute": 3.69,
+        "recoverMsPerMusicMinute": 793
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 16874,
-        "badWindows": 16746,
-        "lagMs": 12,
-        "wallSeconds": 248.5
+        "badWindows": 16757,
+        "lagMs": 0,
+        "wallSeconds": 277.2
       },
-      "finishedAt": "2026-11-27T11:26:42.828Z"
+      "finishedAt": "2026-11-27T12:08:35.101Z"
     },
     {
       "path": "MUSICIANS/S/SIDwave/Electro_Mechanica.sid",
@@ -8585,8 +8585,8 @@
         "irregularShare": 0.6876439601818656
       },
       "fdiff": {
-        "differingCalls": 15138,
-        "callsWithDifference": 2911,
+        "differingCalls": 15136,
+        "callsWithDifference": 2910,
         "comparedCalls": 2912,
         "expectedCalls": 2912,
         "observedCalls": 2971,
@@ -8630,13 +8630,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2151,
-            "matchShare": 0.261332
+            "differingCalls": 2149,
+            "matchShare": 0.262019
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 15089,
+        "differingCalls": 15087,
         "first": {
           "class": "pitch",
           "call": 1,
@@ -8676,8 +8676,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2151,
-            "matchShare": 0.261332
+            "differingCalls": 2149,
+            "matchShare": 0.262019
           }
         }
       },
@@ -12147,26 +12147,26 @@
       ],
       "scoreBytes": 222452,
       "scoreSha256": "e6c007af4dbac8313f6fe8002e3d5747ca843f296cec5a3131d9a9ea9261d088",
-      "compiledBytes": 17256,
+      "compiledBytes": 17212,
       "timing": {
-        "wallSeconds": 15.13,
-        "cpuSeconds": 6.62,
+        "wallSeconds": 37.96,
+        "cpuSeconds": 16.44,
         "phasesMs": {
-          "trace": 133,
-          "ir": 2468,
-          "recover": 7042,
-          "compile": 2436,
-          "retrace": 3048,
+          "trace": 25420,
+          "ir": 1564,
+          "recover": 6094,
+          "compile": 2114,
+          "retrace": 2765,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.21,
-        "recoverMsPerMusicMinute": 2347.4
+        "reconstructCpuPerMusicMinute": 5.48,
+        "recoverMsPerMusicMinute": 2031.3
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T11:26:54.264Z"
+      "finishedAt": "2026-11-27T12:08:41.620Z"
     },
     {
       "path": "MUSICIANS/L/Linus/Your_Time_Is_Running_Thin.sid",
@@ -12213,7 +12213,7 @@
           "call": 2,
           "timeSeconds": 0.005032235538666407,
           "expected": 2500,
-          "observed": 2467,
+          "observed": 2469,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -12258,7 +12258,7 @@
           "call": 2,
           "timeSeconds": 0.005032235538666407,
           "expected": 2500,
-          "observed": 2467,
+          "observed": 2469,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -13414,26 +13414,26 @@
       ],
       "scoreBytes": 117562,
       "scoreSha256": "d16e11293e5d2e32985f1b642d213fe5859847fc2adf2b36cecd4af5ab4182f0",
-      "compiledBytes": 8651,
+      "compiledBytes": 8459,
       "timing": {
-        "wallSeconds": 11.83,
-        "cpuSeconds": 4.73,
+        "wallSeconds": 14.91,
+        "cpuSeconds": 7.95,
         "phasesMs": {
-          "trace": 829,
-          "ir": 4149,
-          "recover": 3607,
-          "compile": 1175,
-          "retrace": 2074,
+          "trace": 6543,
+          "ir": 1159,
+          "recover": 3121,
+          "compile": 945,
+          "retrace": 3145,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 4.63,
-        "recoverMsPerMusicMinute": 3531.3
+        "reconstructCpuPerMusicMinute": 7.79,
+        "recoverMsPerMusicMinute": 3055.1
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T11:27:10.161Z"
+      "finishedAt": "2026-11-27T12:09:20.573Z"
     },
     {
       "path": "MUSICIANS/H/Hancock_John/Die_Hard_2_Die_Harder.sid",
@@ -13648,18 +13648,18 @@
       "scoreSha256": "ce95c568ded93ca52f48c993af5d8020066de4ee3d663c302e39a4e70898e887",
       "compiledBytes": 3823,
       "timing": {
-        "wallSeconds": 2.36,
-        "cpuSeconds": 1.57,
+        "wallSeconds": 7.29,
+        "cpuSeconds": 3.29,
         "phasesMs": {
-          "trace": 4,
+          "trace": 4792,
           "ir": 57,
-          "recover": 943,
-          "compile": 182,
-          "retrace": 1171,
+          "recover": 960,
+          "compile": 235,
+          "retrace": 1241,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.35,
-        "recoverMsPerMusicMinute": 1413.9
+        "reconstructCpuPerMusicMinute": 4.93,
+        "recoverMsPerMusicMinute": 1439.6
       },
       "a1": {
         "level": "fail",
@@ -13667,9 +13667,9 @@
         "windows": 3749,
         "badWindows": 2744,
         "lagMs": 8,
-        "wallSeconds": 47
+        "wallSeconds": 80.4
       },
-      "finishedAt": "2026-11-27T11:27:22.427Z"
+      "finishedAt": "2026-11-27T12:09:36.192Z"
     },
     {
       "path": "MUSICIANS/D/Dgazz/Icy_Slide.sid",
@@ -13705,7 +13705,7 @@
         "irregularShare": 0.41569193208300964
       },
       "fdiff": {
-        "differingCalls": 8659,
+        "differingCalls": 8657,
         "callsWithDifference": 2501,
         "comparedCalls": 2507,
         "expectedCalls": 2508,
@@ -13716,7 +13716,7 @@
           "call": 4,
           "timeSeconds": 0.01595841859105525,
           "expected": 3870,
-          "observed": 3944,
+          "observed": 3941,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -13749,19 +13749,19 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 879,
-            "matchShare": 0.649382
+            "differingCalls": 877,
+            "matchShare": 0.650179
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 8659,
+        "differingCalls": 8657,
         "first": {
           "class": "timing",
           "call": 4,
           "timeSeconds": 0.01595841859105525,
           "expected": 3870,
-          "observed": 3944,
+          "observed": 3941,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -13794,8 +13794,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 879,
-            "matchShare": 0.649382
+            "differingCalls": 877,
+            "matchShare": 0.650179
           }
         }
       },
@@ -17881,26 +17881,26 @@
       ],
       "scoreBytes": 222612,
       "scoreSha256": "bf30ef0128264f4addfffca840f81eaa003f664efbaa2b5a94a674e6985d609d",
-      "compiledBytes": 17990,
+      "compiledBytes": 17946,
       "timing": {
-        "wallSeconds": 17.3,
-        "cpuSeconds": 6.98,
+        "wallSeconds": 56.28,
+        "cpuSeconds": 17.09,
         "phasesMs": {
-          "trace": 757,
-          "ir": 2224,
-          "recover": 8132,
-          "compile": 3150,
-          "retrace": 3033,
+          "trace": 20500,
+          "ir": 5804,
+          "recover": 15943,
+          "compile": 6620,
+          "retrace": 7408,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.33,
-        "recoverMsPerMusicMinute": 2710.8
+        "reconstructCpuPerMusicMinute": 5.7,
+        "recoverMsPerMusicMinute": 5314.3
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T11:27:51.446Z"
+      "finishedAt": "2026-11-27T12:09:36.246Z"
     },
     {
       "path": "MUSICIANS/P/PCH/Music_Dream.sid",
@@ -18555,30 +18555,30 @@
       ],
       "scoreBytes": 161921,
       "scoreSha256": "737ba6f6c84d634e3600944118741eb1205ce8bebad36701827688b51e046879",
-      "compiledBytes": 15638,
+      "compiledBytes": 15617,
       "timing": {
-        "wallSeconds": 8.68,
-        "cpuSeconds": 5.07,
+        "wallSeconds": 28.44,
+        "cpuSeconds": 10.34,
         "phasesMs": {
-          "trace": 271,
-          "ir": 1290,
-          "recover": 4362,
-          "compile": 1249,
-          "retrace": 1508,
+          "trace": 17081,
+          "ir": 1275,
+          "recover": 5552,
+          "compile": 1545,
+          "retrace": 2988,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.95,
-        "recoverMsPerMusicMinute": 2541.1
+        "reconstructCpuPerMusicMinute": 6.03,
+        "recoverMsPerMusicMinute": 3234.3
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 9655,
-        "badWindows": 5762,
+        "badWindows": 5778,
         "lagMs": 4,
-        "wallSeconds": 170.8
+        "wallSeconds": 157.7
       },
-      "finishedAt": "2026-11-27T11:28:09.459Z"
+      "finishedAt": "2026-11-27T12:10:34.827Z"
     },
     {
       "path": "DEMOS/UNKNOWN/Music_Shop/At_the_Hop.sid",
@@ -18840,24 +18840,24 @@
       "scoreSha256": "872926e1523bfe630187a227950790047243663aae842b0e50730c50c3f1eabd",
       "compiledBytes": 5068,
       "timing": {
-        "wallSeconds": 4.01,
-        "cpuSeconds": 2.05,
+        "wallSeconds": 13.8,
+        "cpuSeconds": 4.52,
         "phasesMs": {
-          "trace": 3,
-          "ir": 138,
-          "recover": 1303,
-          "compile": 320,
-          "retrace": 2248,
+          "trace": 6412,
+          "ir": 320,
+          "recover": 2041,
+          "compile": 768,
+          "retrace": 4258,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.51,
-        "recoverMsPerMusicMinute": 1595.4
+        "reconstructCpuPerMusicMinute": 5.53,
+        "recoverMsPerMusicMinute": 2498.7
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T11:28:13.214Z"
+      "finishedAt": "2026-11-27T12:11:04.439Z"
     },
     {
       "path": "MUSICIANS/B/Bakewell_Dwayne/Experiment_2.sid",
@@ -18890,8 +18890,8 @@
         "irregularShare": 0.6789072398692956
       },
       "fdiff": {
-        "differingCalls": 16251,
-        "callsWithDifference": 2503,
+        "differingCalls": 16246,
+        "callsWithDifference": 2504,
         "comparedCalls": 2505,
         "expectedCalls": 2508,
         "observedCalls": 2509,
@@ -18935,13 +18935,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 1885,
-            "matchShare": 0.247505
+            "differingCalls": 1880,
+            "matchShare": 0.249501
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 16251,
+        "differingCalls": 16246,
         "first": {
           "class": "adsr",
           "call": 0,
@@ -18981,8 +18981,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 1885,
-            "matchShare": 0.247505
+            "differingCalls": 1880,
+            "matchShare": 0.249501
           }
         }
       },
@@ -20884,30 +20884,30 @@
       ],
       "scoreBytes": 233240,
       "scoreSha256": "78a0979e5154ae4dda45a918f879aab0d39a51df20b2147887a80822c2a41a84",
-      "compiledBytes": 15610,
+      "compiledBytes": 15586,
       "timing": {
-        "wallSeconds": 13.76,
-        "cpuSeconds": 6.53,
+        "wallSeconds": 34.83,
+        "cpuSeconds": 15.09,
         "phasesMs": {
-          "trace": 171,
-          "ir": 2927,
-          "recover": 6150,
-          "compile": 1834,
-          "retrace": 2679,
+          "trace": 22288,
+          "ir": 1962,
+          "recover": 7186,
+          "compile": 930,
+          "retrace": 2466,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.18,
-        "recoverMsPerMusicMinute": 2050
+        "reconstructCpuPerMusicMinute": 5.03,
+        "recoverMsPerMusicMinute": 2395.4
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 16874,
-        "badWindows": 14072,
-        "lagMs": -20,
-        "wallSeconds": 338.7
+        "badWindows": 14142,
+        "lagMs": -12,
+        "wallSeconds": 329.5
       },
-      "finishedAt": "2026-11-27T11:28:17.715Z"
+      "finishedAt": "2026-11-27T12:11:19.021Z"
     },
     {
       "path": "DEMOS/A-F/City_of_New_Orleans.sid",
@@ -21256,24 +21256,24 @@
       "scoreSha256": "82a8e0af00ffe4f697edb93095adca25e912c657e8ea573e6b5f5e6d95634b21",
       "compiledBytes": 6661,
       "timing": {
-        "wallSeconds": 16.68,
-        "cpuSeconds": 3.14,
+        "wallSeconds": 26.72,
+        "cpuSeconds": 10.52,
         "phasesMs": {
-          "trace": 72,
-          "ir": 973,
-          "recover": 2908,
-          "compile": 4180,
-          "retrace": 8549,
+          "trace": 20006,
+          "ir": 399,
+          "recover": 2751,
+          "compile": 348,
+          "retrace": 3213,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.19,
-        "recoverMsPerMusicMinute": 1097.5
+        "reconstructCpuPerMusicMinute": 3.97,
+        "recoverMsPerMusicMinute": 1038.1
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T11:30:55.370Z"
+      "finishedAt": "2026-11-27T12:13:38.398Z"
     },
     {
       "path": "MUSICIANS/S/Sad/Pahos.sid",
@@ -21309,7 +21309,7 @@
         "irregularShare": 0.2971603881278539
       },
       "fdiff": {
-        "differingCalls": 4573,
+        "differingCalls": 4571,
         "callsWithDifference": 2504,
         "comparedCalls": 2504,
         "expectedCalls": 2504,
@@ -21354,13 +21354,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 1305,
-            "matchShare": 0.478834
+            "differingCalls": 1303,
+            "matchShare": 0.479633
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 4571,
+        "differingCalls": 4569,
         "first": {
           "class": "gate",
           "call": 0,
@@ -21400,8 +21400,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 1305,
-            "matchShare": 0.478834
+            "differingCalls": 1303,
+            "matchShare": 0.479633
           }
         }
       },
@@ -21621,26 +21621,26 @@
       ],
       "scoreBytes": 97308,
       "scoreSha256": "d94e9ba531e2f33404b620250c93368f682fe33cdaae3f57edd0695de59ce216",
-      "compiledBytes": 8755,
+      "compiledBytes": 8734,
       "timing": {
-        "wallSeconds": 12.95,
-        "cpuSeconds": 4.48,
+        "wallSeconds": 26.86,
+        "cpuSeconds": 9.86,
         "phasesMs": {
-          "trace": 105,
-          "ir": 943,
-          "recover": 2435,
-          "compile": 3160,
-          "retrace": 6304,
+          "trace": 15663,
+          "ir": 2078,
+          "recover": 4569,
+          "compile": 1259,
+          "retrace": 3295,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.4,
-        "recoverMsPerMusicMinute": 1304.4
+        "reconstructCpuPerMusicMinute": 5.28,
+        "recoverMsPerMusicMinute": 2447.5
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T11:31:09.735Z"
+      "finishedAt": "2026-11-27T12:13:41.520Z"
     },
     {
       "path": "MUSICIANS/Z/Zirias/EX_Beach.sid",
@@ -22103,30 +22103,30 @@
       ],
       "scoreBytes": 20480,
       "scoreSha256": "af83533bcc5a362e8b22a36d536003cab2440bd72c9a30d911f0d750dc980c7f",
-      "compiledBytes": 5245,
+      "compiledBytes": 5173,
       "timing": {
-        "wallSeconds": 12.83,
-        "cpuSeconds": 1.99,
+        "wallSeconds": 18.45,
+        "cpuSeconds": 4.9,
         "phasesMs": {
-          "trace": 102,
-          "ir": 795,
-          "recover": 4264,
-          "compile": 1967,
-          "retrace": 5592,
+          "trace": 12734,
+          "ir": 561,
+          "recover": 1927,
+          "compile": 261,
+          "retrace": 2965,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.8,
-        "recoverMsPerMusicMinute": 3844.5
+        "reconstructCpuPerMusicMinute": 4.41,
+        "recoverMsPerMusicMinute": 1737.5
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 6238,
-        "badWindows": 4583,
+        "badWindows": 4582,
         "lagMs": -16,
-        "wallSeconds": 145
+        "wallSeconds": 127.3
       },
-      "finishedAt": "2026-11-27T11:31:13.332Z"
+      "finishedAt": "2026-11-27T12:13:44.684Z"
     },
     {
       "path": "MUSICIANS/A/Avory_Sarah_Jane/Soul_Force.sid",
@@ -22787,30 +22787,30 @@
       ],
       "scoreBytes": 40482,
       "scoreSha256": "10f4b4f97772b81503a13c5cc10da262a8782dab4a7380272a75581bb5e61233",
-      "compiledBytes": 6302,
+      "compiledBytes": 6239,
       "timing": {
-        "wallSeconds": 11.36,
-        "cpuSeconds": 2.19,
+        "wallSeconds": 16.27,
+        "cpuSeconds": 5.15,
         "phasesMs": {
-          "trace": 75,
-          "ir": 1575,
-          "recover": 6835,
-          "compile": 174,
-          "retrace": 2702,
+          "trace": 9630,
+          "ir": 566,
+          "recover": 2577,
+          "compile": 238,
+          "retrace": 3260,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.96,
-        "recoverMsPerMusicMinute": 6117.5
+        "reconstructCpuPerMusicMinute": 4.61,
+        "recoverMsPerMusicMinute": 2306.8
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 6283,
-        "badWindows": 4017,
+        "badWindows": 4014,
         "lagMs": 0,
-        "wallSeconds": 137.7
+        "wallSeconds": 128.5
       },
-      "finishedAt": "2026-11-27T11:31:24.456Z"
+      "finishedAt": "2026-11-27T12:14:05.646Z"
     },
     {
       "path": "MUSICIANS/C/Chiummo_Gaetano/A_Walk_in_the_Countryside_3SID.sid",
@@ -22900,7 +22900,7 @@
           "call": 1,
           "timeSeconds": 0.014835858585858586,
           "expected": 14617,
-          "observed": 19666,
+          "observed": 19665,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -23180,20 +23180,20 @@
       ],
       "scoreBytes": 16404,
       "scoreSha256": "9cb639869ec97ec42522d0d5ed4956950a3d5d1b86f320e6a2bf78fbbc14cf9d",
-      "compiledBytes": 15070,
+      "compiledBytes": 14895,
       "timing": {
-        "wallSeconds": 12.13,
-        "cpuSeconds": 2.98,
+        "wallSeconds": 34.03,
+        "cpuSeconds": 13.19,
         "phasesMs": {
-          "trace": 608,
-          "ir": 2374,
-          "recover": 4494,
-          "compile": 1835,
-          "retrace": 2815,
+          "trace": 26451,
+          "ir": 1487,
+          "recover": 1891,
+          "compile": 922,
+          "retrace": 3279,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 0.99,
-        "recoverMsPerMusicMinute": 1497.9
+        "reconstructCpuPerMusicMinute": 4.4,
+        "recoverMsPerMusicMinute": 630.4
       },
       "a1": {
         "level": "fail",
@@ -23201,9 +23201,9 @@
         "windows": 16874,
         "badWindows": 16874,
         "lagMs": 20,
-        "wallSeconds": 740.5
+        "wallSeconds": 529.6
       },
-      "finishedAt": "2026-11-27T11:31:32.120Z"
+      "finishedAt": "2026-11-27T12:14:09.292Z"
     },
     {
       "path": "MUSICIANS/P/PRI/Hit_n_Run.sid",
@@ -23218,14 +23218,16 @@
       "model": "8580",
       "sidCount": 1,
       "speed": "CIA",
-      "rootCause": "unsupported",
-      "why": "recovered score did not compile: Invalid SIDWAVE at $.timeline[0].layers.v1: the note needs at least 10 frames including its hard restart",
+      "rootCause": "timing/call rate",
+      "why": "first difference in timing",
       "strictExact": false,
       "registerStateExact": false,
-      "verification": null,
-      "compileOk": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
+      "compileOk": true,
       "turbo": false,
-      "compileError": "Invalid SIDWAVE at $.timeline[0].layers.v1: the note needs at least 10 frames including its hard restart",
       "calls": 31634,
       "callRate": {
         "periodCycles": 4062,
@@ -23234,83 +23236,97 @@
         "irregularShare": 0.523061359972181
       },
       "fdiff": {
-        "differingCalls": 253072,
-        "callsWithDifference": 31634,
-        "comparedCalls": 31634,
-        "expectedCalls": 31634,
-        "observedCalls": 31634,
+        "differingCalls": 9547,
+        "callsWithDifference": 2003,
+        "comparedCalls": 2004,
+        "expectedCalls": 2005,
+        "observedCalls": 2509,
         "standardAlignment": true,
-        "first": null,
+        "first": {
+          "class": "timing",
+          "call": 1,
+          "timeSeconds": 0.01647909967845659,
+          "expected": 16236,
+          "observed": 3942,
+          "detail": "call spacing in cycles"
+        },
         "classes": {
           "pitch": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 1999,
+            "matchShare": 0.002495
           },
           "gate": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 1624,
+            "matchShare": 0.189621
           },
           "waveform": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 1578,
+            "matchShare": 0.212575
           },
           "pulse": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 1999,
+            "matchShare": 0.002495
           },
           "adsr": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 344,
+            "matchShare": 0.828343
           },
           "filter": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 0,
+            "matchShare": 1
           },
           "volume": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 0,
+            "matchShare": 1
           },
           "timing": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 2003,
+            "matchShare": 0.000499
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 253072,
-        "first": null,
+        "differingCalls": 9547,
+        "first": {
+          "class": "timing",
+          "call": 1,
+          "timeSeconds": 0.01647909967845659,
+          "expected": 16236,
+          "observed": 3942,
+          "detail": "call spacing in cycles"
+        },
         "classes": {
           "pitch": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 1999,
+            "matchShare": 0.002495
           },
           "gate": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 1624,
+            "matchShare": 0.189621
           },
           "waveform": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 1578,
+            "matchShare": 0.212575
           },
           "pulse": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 1999,
+            "matchShare": 0.002495
           },
           "adsr": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 344,
+            "matchShare": 0.828343
           },
           "filter": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 0,
+            "matchShare": 1
           },
           "volume": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 0,
+            "matchShare": 1
           },
           "timing": {
-            "differingCalls": 31634,
-            "matchShare": 0
+            "differingCalls": 2003,
+            "matchShare": 0.000499
           }
         }
       },
@@ -23326,7 +23342,7 @@
         "patternCount": 204,
         "structure": {
           "blockBars": 1,
-          "bytes": 114697,
+          "bytes": 114653,
           "alternatives": [
             {
               "blockBars": 1,
@@ -24890,6 +24906,10 @@
         {
           "kind": "global_state",
           "detail": "filter, resonance, routing, mode or volume registers change during the tune; global filter and volume sequences are not recovered"
+        },
+        {
+          "kind": "hard_restart",
+          "detail": "1 instruments have a hard restart that was shortened to fit their shortest note"
         }
       ],
       "languageExtensions": [
@@ -24936,28 +24956,32 @@
           "reason": "the language has no construct for an arbitrary cutoff, resonance, routing, mode or volume sequence"
         }
       ],
-      "scoreBytes": 114697,
-      "scoreSha256": "253d40c0bdbf216b776d9a0b5aa6ad8610c34f95ce8cade8c1a8b7ad626f0045",
-      "compiledBytes": null,
+      "scoreBytes": 114653,
+      "scoreSha256": "96b7111ec1ff9629e98f5f9792e2bcb81289c319dd15f428824f278a9f111946",
+      "compiledBytes": 13351,
       "timing": {
-        "wallSeconds": 7.07,
-        "cpuSeconds": 3.31,
+        "wallSeconds": 43.56,
+        "cpuSeconds": 12.52,
         "phasesMs": {
-          "trace": 675,
-          "ir": 2561,
-          "recover": 2971,
-          "compile": 0,
-          "retrace": 0,
+          "trace": 31428,
+          "ir": 3293,
+          "recover": 6978,
+          "compile": 409,
+          "retrace": 1450,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.26,
-        "recoverMsPerMusicMinute": 1128.1
+        "reconstructCpuPerMusicMinute": 4.75,
+        "recoverMsPerMusicMinute": 2649.8
       },
       "a1": {
-        "status": "not evaluated",
-        "reason": "recompiled score missing"
+        "level": "fail",
+        "status": "approximate",
+        "windows": 14811,
+        "badWindows": 14542,
+        "lagMs": -18,
+        "wallSeconds": 301.8
       },
-      "finishedAt": "2026-11-27T11:33:52.586Z"
+      "finishedAt": "2026-11-27T12:16:11.559Z"
     },
     {
       "path": "MUSICIANS/A/Avory_Sarah_Jane/Soul_Force.sid",
@@ -25558,30 +25582,30 @@
       ],
       "scoreBytes": 28360,
       "scoreSha256": "ac2ac5c3df5b1afa54f0bf0dbcd940df4178a974655d54f7908c329feb42b7d5",
-      "compiledBytes": 6060,
+      "compiledBytes": 5997,
       "timing": {
-        "wallSeconds": 5.02,
-        "cpuSeconds": 1.98,
+        "wallSeconds": 18.72,
+        "cpuSeconds": 5.84,
         "phasesMs": {
-          "trace": 153,
-          "ir": 634,
-          "recover": 1944,
-          "compile": 368,
-          "retrace": 1924,
+          "trace": 12390,
+          "ir": 737,
+          "recover": 2475,
+          "compile": 965,
+          "retrace": 2154,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.34,
-        "recoverMsPerMusicMinute": 1311
+        "reconstructCpuPerMusicMinute": 3.94,
+        "recoverMsPerMusicMinute": 1669
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 8340,
-        "badWindows": 7803,
+        "badWindows": 7801,
         "lagMs": 18,
-        "wallSeconds": 221.2
+        "wallSeconds": 154.3
       },
-      "finishedAt": "2026-11-27T11:33:54.639Z"
+      "finishedAt": "2026-11-27T12:16:30.833Z"
     },
     {
       "path": "MUSICIANS/S/SIDwave/Gnumpf_Espresso.sid",
@@ -25617,7 +25641,7 @@
         "irregularShare": 0.6262259353432619
       },
       "fdiff": {
-        "differingCalls": 18258,
+        "differingCalls": 18262,
         "callsWithDifference": 2977,
         "comparedCalls": 2978,
         "expectedCalls": 2995,
@@ -25662,13 +25686,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2607,
-            "matchShare": 0.12458
+            "differingCalls": 2611,
+            "matchShare": 0.123237
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 17969,
+        "differingCalls": 17973,
         "first": {
           "class": "pitch",
           "call": 1,
@@ -25708,8 +25732,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2607,
-            "matchShare": 0.12458
+            "differingCalls": 2611,
+            "matchShare": 0.123237
           }
         }
       },
@@ -26175,26 +26199,26 @@
       ],
       "scoreBytes": 126232,
       "scoreSha256": "1d31ceab7b3926e2b27c67bf270c5e8f9c786950c773b74e69fbdd90ba41195c",
-      "compiledBytes": 11246,
+      "compiledBytes": 11202,
       "timing": {
-        "wallSeconds": 15.85,
-        "cpuSeconds": 5.49,
+        "wallSeconds": 35.77,
+        "cpuSeconds": 13.56,
         "phasesMs": {
-          "trace": 313,
-          "ir": 2026,
-          "recover": 8040,
-          "compile": 2833,
-          "retrace": 2634,
+          "trace": 23208,
+          "ir": 1746,
+          "recover": 5043,
+          "compile": 2194,
+          "retrace": 3579,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.97,
-        "recoverMsPerMusicMinute": 2888.5
+        "reconstructCpuPerMusicMinute": 4.87,
+        "recoverMsPerMusicMinute": 1811.8
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T11:34:00.756Z"
+      "finishedAt": "2026-11-27T12:17:24.037Z"
     }
   ]
 }
