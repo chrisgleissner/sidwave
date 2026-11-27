@@ -221,6 +221,53 @@
    }
   ]
  },
+ "midi:chiptune-drive -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 source part(s) do not fit in 3 voices and are not imported (Voice1: 16 notes)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.modulation.dropped",
+    "severity": "lost",
+    "count": 36,
+    "message": "36 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 12,
+    "message": "12 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 87,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 7 ms mean, 61 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 62 gate-offs shortly before the next note of a voice are written together with that note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.dense",
+    "severity": "approx",
+    "count": 4,
+    "message": "4 events are too dense for BASIC V2 and are delayed by more than 25 ms, at most 61 ms (predicted). --voices 2 or 1 writes fewer registers."
+   }
+  ]
+ },
  "midi:chiptune-drive -> sidwizard": {
   "ok": true,
   "losses": [

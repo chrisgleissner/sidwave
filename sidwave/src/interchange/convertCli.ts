@@ -44,7 +44,7 @@ Options:
   --voices <n>         Keep at most n voices. The voices with the most notes x pitch range are kept; the others are listed as lost.
   --grid <beats>       Quantisation grid of MIDI and MusicXML input, in quarter notes (default 0.25).
   --mode PAL|NTSC      Clock of imported scores (default PAL).
-  --seconds <s>        Horizon of a .sid read and length of a WAV render.
+  --seconds <s>        Horizon of a .sid read, length of a WAV render, end of a BASIC program.
   --model 6581|8580    SID model of a WAV render (default 6581).
   --keep-score <file>  Also write the intermediate SIDWave score.
   --report <file>|-    Write the full report (detection, chain, losses, metrics) as JSON; - prints it.

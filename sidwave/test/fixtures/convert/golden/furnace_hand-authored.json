@@ -207,6 +207,46 @@
    }
   ]
  },
+ "furnace:hand-authored -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.modulation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "3 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 13,
+    "message": "13 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 4,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 5 ms mean, 7 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 2 gate-offs shortly before the next note of a voice are written together with that note."
+   }
+  ]
+ },
  "furnace:hand-authored -> sidwizard": {
   "ok": true,
   "losses": [

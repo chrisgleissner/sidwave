@@ -450,6 +450,60 @@
    }
   ]
  },
+ "jch:hand-built -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "jch.command.approx",
+    "severity": "approx",
+    "count": 4,
+    "message": "Command \"vibrato\" (2 uses) is imported approximately. | Command \"portamento\" (2 uses) is imported approximately."
+   },
+   {
+    "stage": "read",
+    "code": "jch.command.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Command \"set AD and SR\" (2 uses) is not imported."
+   },
+   {
+    "stage": "read",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "order list 3 is empty"
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.modulation.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 12,
+    "message": "12 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 16,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 8 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 14 gate-offs shortly before the next note of a voice are written together with that note."
+   }
+  ]
+ },
  "jch:hand-built -> sidwizard": {
   "ok": true,
   "losses": [
