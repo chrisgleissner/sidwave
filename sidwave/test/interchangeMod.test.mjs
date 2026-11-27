@@ -32,14 +32,18 @@ test("committed hand-built fixtures are the bytes of the test kit", () => {
   }
 });
 
-test("period to note: 428 is MIDI 48, finetune shifts the period", () => {
+test("period to note: 428 is MIDI 48, finetune shifts the pitch", () => {
   assert.equal(periodToMidi(428), 48);
   assert.equal(periodToMidi(214), 60);
   assert.equal(periodToMidi(856), 36);
   assert.equal(periodToMidi(113), 71);
-  // Finetune -8 plays a period 2^(8/96) (5.9 %) higher in ProTracker's table... the note a period maps to does not move.
-  assert.equal(periodToMidi(Math.round(428 * 2 ** (-3 / 96)), 3), 48);
-  assert.equal(periodToMidi(Math.round(428 * 2 ** (8 / 96)), -8), 48);
+  // A pattern period is the period without finetune; a positive finetune raises the pitch by eighths of a semitone.
+  assert.equal(periodToMidi(428, 7), 49);
+  assert.equal(periodToMidi(428, 3), 48);
+  assert.equal(periodToMidi(428, -3), 48);
+  assert.equal(periodToMidi(428, 4), 48);
+  assert.equal(periodToMidi(428, -4), 47);
+  assert.equal(periodToMidi(428, -8), 47);
 });
 
 test("reader: every layout gives its channel count, patterns and cells", () => {
@@ -205,6 +209,73 @@ test("pitch is that of a 64-point cycle without a loop or a measurable pitch", (
   ]) assert.equal(importedPitch(sample, 428), 48, label);
   assert.equal(measureLoopCycle(loopOf("sine", 2)), 0);
   assert.equal(measureLoopCycle(loopOf("sine", 4096, 64)), 64);
+});
+
+test("finetune: the nibble 0..7 raises and 8..15 lowers the pitch, as in the ProTracker period tables", () => {
+  // The period ProTracker plays for a pattern period of 428 (C-2), by finetune nibble: 0 to +7, then -8 to -1.
+  const played = [428, 425, 422, 419, 416, 413, 410, 407, 453, 450, 447, 444, 441, 437, 434, 431];
+  for (const [nibble, period] of played.entries()) {
+    const mod = buildMod({ samples: [{ name: "tone", volume: 64, data: loopOf("sine", 64), loop: [0, 64] }], patterns: [[[{ period: 428, sample: 1 }]]], finetune: { 0: nibble } });
+    const midi = exportEvents(parseSidwave(importMod(mod).yaml)).voices[0].notes[0].pitch;
+    // The nearest semitone of the table entry, counted from period 428 = MIDI 48.
+    assert.equal(midi, 48 + Math.round(12 * Math.log2(428 / period)), `finetune nibble ${nibble}, played period ${period}`);
+  }
+});
+
+/** A sum of sine partials `[bin, amplitude]` over `length` points, scaled to a peak near 100. */
+const partials = (length, list) => {
+  const sum = list.reduce((t, [, a]) => t + a, 0);
+  return Int8Array.from({ length }, (_, i) => Math.round(100 * list.reduce((t, [k, a]) => t + a * Math.sin(2 * Math.PI * k * i / length), 0) / sum));
+};
+
+const unmeasuredLoss = (sample) => {
+  const mod = buildMod({ samples: [{ name: "tone", volume: 64, ...sample }], patterns: [[[{ period: 428, sample: 1 }]]] });
+  return importMod(mod).report.losses.filter((l) => l.startsWith("The cycle length of the loop"));
+};
+
+test("a loop without a reliable cycle keeps the pitch of a 64-point cycle and is reported", () => {
+  const whole = (data) => ({ data, loop: [0, data.length] });
+  const cases = [];
+  // Chords repeat at a cycle that holds no energy of its own: it would transpose the sample down by one or two octaves.
+  for (const length of [64, 256, 512, 600, 2048, 8192, 20000]) {
+    const k = Math.max(4, Math.round(length / 64));
+    cases.push([`major chord, ${length}`, whole(partials(length, [[k, 1], [Math.round(k * 1.25), 1], [Math.round(k * 1.5), 1]]))]);
+    cases.push([`fifth, ${length}`, whole(partials(length, [[k - (k % 2), 1], [(k - (k % 2)) * 3 / 2, 1]]))]);
+  }
+  for (const length of [256, 600, 8192]) cases.push([`noise, ${length}`, whole(noiseData(length))]);
+  // A long loop that is periodic at its start only.
+  const mixed = noiseData(16384);
+  mixed.set(loopOf("sine", 4096, 41));
+  cases.push(["periodic start, then noise", whole(mixed)]);
+  // A quiet tail loop after a loud attack: 4 points would raise the notes by four octaves.
+  const tail = new Int8Array(2048);
+  tail.set(loopOf("square", 2000, 20));
+  for (let i = 0; i < 48; i++) tail[2000 + i] = i % 4 < 2 ? 8 : -8;
+  cases.push(["quiet tail", { data: tail, loop: [2000, 48] }]);
+  const short = loopOf("square", 2004, 20);
+  short.set([60, 60, -60, -60], 2000);
+  cases.push(["loop of 4 points after a long attack", { data: short, loop: [2000, 4] }]);
+  for (const [label, sample] of cases) {
+    assert.equal(importedPitch(sample, 428), 48, label);
+    assert.equal(unmeasuredLoss(sample).length, 1, label);
+  }
+  // Nothing to report: no loop, a silent loop, and a loop that is measured.
+  for (const sample of [{ data: loopOf("sine", 2048, 64) }, whole(new Int8Array(64)), whole(loopOf("square", 32))]) assert.deepEqual(unmeasuredLoss(sample), []);
+});
+
+test("a weak fundamental below a dominant harmonic still sets the cycle", () => {
+  for (const [length, harmonic, period] of [[64, 2, 428], [64, 3, 428], [256, 2, 214], [512, 3, 214]]) {
+    assert.equal(measureLoopCycle(partials(length, [[1, 0.35], [harmonic, 1]])), length, `harmonic ${harmonic} of ${length}`);
+    assertPitch({ data: partials(length, [[1, 0.35], [harmonic, 1]]), loop: [0, length] }, period, length, `harmonic ${harmonic} of ${length}`);
+  }
+});
+
+test("pitch of a long sampled loop with noise, a decay and a cycle between whole points", () => {
+  const noise = noiseData(20000);
+  for (const [length, cycle] of [[2048, 90], [8192, 67.3], [20000, 67.3]]) {
+    const data = Int8Array.from({ length }, (_, i) => Math.round((100 - 40 * i / length) * Math.sin(2 * Math.PI * i / cycle) + noise[i] / 32));
+    assert.ok(Math.abs(12 * Math.log2(measureLoopCycle(data) / cycle)) < 0.3, `${length} points, cycle ${cycle}: ${measureLoopCycle(data)}`);
+  }
 });
 
 /** The autocorrelation written out directly: all three sums inside the lag loop. */

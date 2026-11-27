@@ -24,6 +24,8 @@ export interface SampleAnalysis {
   periodPoints: number;
   /** Length in sample points of one cycle of the looped section (may be fractional), 0 without a loop or a measurable pitch. */
   loopCycle: number;
+  /** True for an audible loop whose cycle could not be measured reliably. */
+  loopUnmeasured?: boolean;
   /** Amplitude of harmonics 2 to 6 relative to the first, when the sample is periodic. */
   harmonics: number[];
   zeroCrossings: number;
@@ -111,9 +113,18 @@ function shortestPeriod(r: number[]): { best: number; lag: number } {
   return { best, lag: 0 };
 }
 
+/** Share of the energy (without the mean) that one frequency must hold to count as a component of its own. */
+const STRONG_BIN = 0.05;
+/** Share of the energy that the harmonics of a cycle must hold in a loop of up to 600 points. */
+const HARMONIC_SHARE = 0.85;
+/** Correlation of one stretch of a long loop with itself one cycle later that counts as repeating. */
+const REPEAT_CORRELATION = 0.8;
+
 /**
- * Number of cycles in a short loop, from its discrete Fourier transform: the largest number k whose multiples (the bins of
- * a waveform that repeats k times) hold at least 85 % of the energy without the mean. O(length squared).
+ * Number of cycles in a short loop, from its discrete Fourier transform: the largest k for which bin k holds at least 5 %
+ * of the energy without the mean, the multiples of k hold at least 85 %, and no other bin holds 5 % or more. The first
+ * condition rejects chords, whose common cycle has no energy of its own; the last one rejects a k that skips a weaker
+ * fundamental below a dominant harmonic. 0 when no k meets all three. O(length squared).
  */
 function cyclesFromSpectrum(loop: Int8Array, mean: number): number {
   const L = loop.length;
@@ -129,20 +140,68 @@ function cyclesFromSpectrum(loop: Int8Array, mean: number): number {
     power[k] = (re * re + im * im) * (2 * k === L ? 1 : 2);
     total += power[k]!;
   }
-  for (let k = half; k > 1; k--) {
+  const strong: number[] = [];
+  for (let k = 1; k <= half; k++) if (power[k]! >= STRONG_BIN * total) strong.push(k);
+  for (let i = strong.length - 1; i >= 0; i--) {
+    const k = strong[i]!;
+    if (!strong.every((m) => m % k === 0)) continue;
     let sum = 0;
     for (let m = k; m <= half; m += k) sum += power[m]!;
-    if (sum >= 0.85 * total) return k;
+    if (sum >= HARMONIC_SHARE * total) return k;
   }
-  return 1;
+  return 0;
 }
 
-/** Number of cycles in a loop above 600 points, from the autocorrelation of its first 2048 points; 0 without a period. */
+/**
+ * True when at least three quarters of up to 8 stretches of 2048 points, spread over the loop, correlate with themselves
+ * at a lag within 4 % of `period`. This covers the parts of a long loop that the period was not measured from.
+ */
+function periodHolds(x: Float64Array, L: number, period: number): boolean {
+  const windows = Math.min(8, Math.ceil(L / 2048));
+  const reach = Math.max(1, Math.round(period * 0.04));
+  const from = Math.max(2, Math.round(period) - reach), to = Math.round(period) + reach;
+  let holding = 0;
+  for (let w = 0; w < windows; w++) {
+    const start = Math.floor(w * L / windows);
+    for (let lag = from; lag <= to; lag++) {
+      let num = 0, e1 = 0, e2 = 0;
+      for (let i = start; i < start + 2048; i++) { const p = x[i]!, q = x[i + lag]!; num += p * q; e1 += p * p; e2 += q * q; }
+      if (num > 0 && num >= REPEAT_CORRELATION * Math.sqrt(e1 * e2)) { holding++; break; }
+    }
+  }
+  return holding >= Math.ceil(0.75 * windows);
+}
+
+/** True when the bins within 3 % (at most 4 bins) of `cycles` hold at least 5 % of the energy of the loop. */
+function hasFundamental(x: Float64Array, L: number, cycles: number): boolean {
+  let total = 0;
+  for (let i = 0; i < L; i++) total += x[i]! * x[i]!;
+  const spread = Math.min(4, Math.floor(cycles * 0.03));
+  let sum = 0;
+  for (let k = cycles - spread; k <= cycles + spread; k++) {
+    // The point (c, s) turns by one bin step per sample.
+    const dc = Math.cos(2 * Math.PI * k / L), ds = Math.sin(2 * Math.PI * k / L);
+    let re = 0, im = 0, c = 1, s = 0;
+    for (let i = 0; i < L; i++) {
+      re += x[i]! * c; im += x[i]! * s;
+      const next = c * dc - s * ds;
+      s = s * dc + c * ds; c = next;
+    }
+    sum += 2 * (re * re + im * im) / L;
+  }
+  return sum >= STRONG_BIN * total;
+}
+
+/**
+ * Number of cycles in a loop above 600 points: the period comes from the autocorrelation of its first 2048 points and must
+ * hold over the whole loop and carry energy of its own (a chord repeats at a period that none of its notes has). 0 otherwise.
+ */
 function cyclesFromAutocorrelation(loop: Int8Array, mean: number): number {
   const L = loop.length;
-  const x = new Float64Array(2048);
+  // The loop without its mean, continued past its end far enough for every window and lag.
+  const x = new Float64Array(L + 2048 + MAX_CYCLE + 32);
   for (let i = 0; i < x.length; i++) x[i] = loop[i % L]! - mean;
-  const r = normalisedAutocorrelation(x, MAX_CYCLE);
+  const r = normalisedAutocorrelation(x.subarray(0, 2048), MAX_CYCLE);
   const { best, lag } = shortestPeriod(r);
   if (best < 0.55 || lag === 0) return 0;
   // The shortest lag may lie below the top of its peak, and an integer lag is too coarse for short cycles: climb to the top,
@@ -160,12 +219,14 @@ function cyclesFromAutocorrelation(loop: Int8Array, mean: number): number {
     period = (at + shift) / m;
   }
   // The loop repeats exactly, so it holds a whole number of cycles.
-  return Math.max(1, Math.round(L / period));
+  const cycles = Math.max(1, Math.round(L / period));
+  return periodHolds(x, L, period) && hasFundamental(x, L, cycles) ? cycles : 0;
 }
 
 /**
  * Length in sample points of one cycle of a looped section, as it sounds when it repeats: the loop length divided by the
- * number of cycles in it. Returns 0 for silence, for noise, and for a cycle above 600 points in a loop above 600 points.
+ * number of cycles in it. Returns 0 when there is no reliable value: silence, noise, a chord or other sound without one
+ * dominant repetition, and a cycle above 600 points in a loop above 600 points.
  */
 export function measureLoopCycle(loop: Int8Array): number {
   const L = loop.length;
@@ -180,6 +241,31 @@ export function measureLoopCycle(loop: Int8Array): number {
   return cycles > 0 && changes <= MAX_SIGN_CHANGES_PER_CYCLE * cycles ? L / cycles : 0;
 }
 
+/** Root mean square around the mean of the points from `from` to `to`. */
+function level(data: Int8Array, from: number, to: number): number {
+  let sum = 0, squares = 0;
+  for (let i = from; i < to; i++) { sum += data[i]!; squares += data[i]! * data[i]!; }
+  const n = Math.max(1, to - from);
+  return Math.sqrt(Math.max(0, squares / n - (sum / n) ** 2));
+}
+
+/**
+ * The cycle of the loop of a sample. A loop with a level below 4 (of 127) is silence. A loop below a tenth of the loudest
+ * 256 points of the sample, or one under 16 points after 256 points or more, is a tail whose cycle says little about the
+ * sound: it is not measured but reported.
+ */
+function loopPitch(s: ModSample): { loopCycle: number; loopUnmeasured?: boolean } {
+  if (!s.looped) return { loopCycle: 0 };
+  const loop = s.data.subarray(s.loopStart, s.loopStart + s.loopLength);
+  const loopLevel = level(loop, 0, loop.length);
+  if (loopLevel < 4) return { loopCycle: 0 };
+  let peak = 0;
+  for (let at = 0; at < s.data.length; at += 256) peak = Math.max(peak, level(s.data, at, Math.min(s.data.length, at + 256)));
+  const tail = loopLevel < 0.1 * peak || (loop.length < 16 && s.loopStart >= 256);
+  const loopCycle = tail ? 0 : measureLoopCycle(loop);
+  return loopCycle > 0 ? { loopCycle } : { loopCycle, loopUnmeasured: true };
+}
+
 /** Recent analyses by sample content, oldest first. Bounded, because a long-running process imports many modules. */
 const analysisCache = new Map<string, SampleAnalysis>();
 const ANALYSIS_CACHE_LIMIT = 256;
@@ -187,8 +273,8 @@ const ANALYSIS_CACHE_LIMIT = 256;
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
 /**
- * Analyses one sample. Reads at most 2048 points for the periodicity, the harmonics and the cycle of a loop above 600
- * points, and every point once for the envelope and the sign changes of a loop.
+ * Analyses one sample. Reads at most 2048 points for the periodicity and the harmonics, and every point a bounded number of
+ * times for the envelope, the levels and the cycle of a loop (up to 8 stretches of 2048 points of a long loop).
  * A sample with the same name, loop and data as an earlier one gets a copy of that analysis.
  */
 export function analyzeSample(s: ModSample): SampleAnalysis {
@@ -209,7 +295,7 @@ function measureSample(s: ModSample): SampleAnalysis {
   const base: SampleAnalysis = {
     name: s.name, bytes: n, looped: s.looped, seconds, periodicity: 0, periodPoints: 0, harmonics: [], zeroCrossings: 0,
     waveform: "pulse", pulseWidth: 0.5, adsr: [0, 4, 10, 4],
-    loopCycle: s.looped ? measureLoopCycle(s.data.subarray(s.loopStart, s.loopStart + s.loopLength)) : 0,
+    ...loopPitch(s),
   };
   if (n < 32) {
     const drum = drumFromName(s.name);

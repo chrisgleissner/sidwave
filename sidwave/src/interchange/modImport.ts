@@ -451,6 +451,8 @@ export function importMod(bytes: Uint8Array, options: ModImportOptions = {}): Mo
   if (shiftedTotal) losses.push(`${shiftedTotal} notes are outside the SIDWave range and were moved by octaves.`);
   const collisionTotal = built.stats.reduce((t, v) => t + v.drumCollisions, 0);
   if (collisionTotal) losses.push(`${collisionTotal} drum hit(s) fell on the same row as a harder-priority hit of another channel in a merged drum voice and are dropped.`);
+  const unmeasured = [...analysis].filter(([, a]) => a.loopUnmeasured && a.drum === undefined).sort((a, b) => a[0] - b[0]);
+  if (unmeasured.length) losses.push(`The cycle length of the loop of ${unmeasured.length === 1 ? "sample" : "samples"} ${unmeasured.map(([s]) => s).join(", ")} could not be measured (noise, a chord, a quiet or very short tail, or no clear period); their notes use the pitch of a 64-point cycle and may be at the wrong pitch.`);
   losses.push("Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported.");
 
   const instrumentReports: ModImportReport["instruments"] = [];

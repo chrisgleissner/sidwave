@@ -193,7 +193,9 @@ export function looksLikeFifteenSampleMod(bytes: Uint8Array): boolean {
   }
 }
 
-// Period of a note, in note numbers relative to period 428 = MIDI 48 (ProTracker C-2). Finetune scales a period by 2^(-ft/96).
+// Period of a note, in note numbers relative to period 428 = MIDI 48 (ProTracker C-2). Patterns hold periods without
+// finetune; ProTracker replaces each by the entry of the period table of the sample's finetune, about period x 2^(-ft/96), so
+// a positive finetune (in eighths of a semitone) raises the pitch.
 // The sample is played at 7093789.2 / (2 x period) points per second (PAL), so period 428 sounds as MIDI 48 (129.5 Hz) when
 // one cycle of the waveform is 64 points long. Other cycle lengths shift the pitch.
 export const MOD_REFERENCE_PERIOD = 428;
@@ -205,8 +207,8 @@ export const MOD_REFERENCE_CYCLE = 64;
  * the semitones by which the sample sounds above a sample with a cycle of 64 points.
  */
 export function periodToMidi(period: number, finetune = 0, tuning = 0): number {
-  const base = period * 2 ** (finetune / 96);
-  return MOD_REFERENCE_MIDI + Math.round(12 * Math.log2(MOD_REFERENCE_PERIOD / base) + tuning);
+  // A tie rounds down, as the table entries do: finetune +4 is just below half a semitone, -4 just above.
+  return MOD_REFERENCE_MIDI + Math.round(12 * Math.log2(MOD_REFERENCE_PERIOD / period) + finetune / 8 + tuning - 1e-9);
 }
 
 /** Period of a MIDI note at finetune 0, as a real number. */
