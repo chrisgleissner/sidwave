@@ -17,8 +17,8 @@ import { compileSidwaveBytes } from "../sidwaveOps.js";
 import type { SidwaveReadOptions } from "../sidwavePcm.js";
 import { globalVoice, md5, memoEngine, noteName, sha256, voiceRegs, type Marked } from "./common.js";
 import {
-  analyzeForm, estimateKey, estimateMetre, mineMotifs, modelOfScore, round, voiceUse,
-  type FormReport, type KeyEstimate, type Motif, type MetreEstimate, type VoiceUse,
+  analyzeForm, estimateKey, estimateMetre, mineMotifs, modelOfScore, modelOfScoreText, round, voiceUse,
+  type ScoreModel, type FormReport, type KeyEstimate, type Motif, type MetreEstimate, type VoiceUse,
 } from "./music.js";
 import { techniquesFromIr, techniquesFromScore, type Technique } from "./techniques.js";
 
@@ -141,22 +141,21 @@ export function traceResources(ir: FrameIr): NonNullable<ResourceReport["trace"]
   };
 }
 
-function musicSections(doc: ParsedSidwave, basis: "observed" | "inferred") {
-  const model = modelOfScore(doc);
+function musicSections(model: ScoreModel, doc: ParsedSidwave | undefined, basis: "observed" | "inferred") {
   return {
     model,
     key: estimateKey(model.notes),
     metre: estimateMetre(model, basis),
     form: analyzeForm(model, basis),
     motifs: mineMotifs(model),
-    voices: voiceUse(model, basis === "observed" ? declaredRoles(doc) : new Map()),
+    voices: voiceUse(model, basis === "observed" && doc ? declaredRoles(doc) : new Map()),
   };
 }
 
 /** Analysis of a SIDWave score. Without an engine the score is analysed statically. */
 export async function analyzeScore(text: string, options: AnalyzeScoreOptions = {}): Promise<AnalysisReport> {
   const doc = parseSidwave(text, options.read ?? {});
-  const parts = musicSections(doc, "observed");
+  const parts = musicSections(modelOfScore(doc), doc, "observed");
   const compiled = compileSidwaveBytes(doc, { format: "prg" });
   const s = compiled.summary;
   const report: AnalysisReport = {
@@ -207,10 +206,19 @@ export async function analyzeSid(sidBytes: Uint8Array, options: AnalyzeSidOption
   const ir = irOfTrace(trace);
   let parts: ReturnType<typeof musicSections> | undefined;
   let musicError: string | undefined;
+  let approximate = false;
   try {
-    parts = musicSections(parseSidwave(score), "inferred");
+    const doc = parseSidwave(score);
+    parts = musicSections(modelOfScore(doc), doc, "inferred");
   } catch (error) {
     musicError = error instanceof Error ? error.message : String(error);
+    try {
+      // The compiler rejects the reconstruction; read the notes from the score text instead.
+      parts = musicSections(modelOfScoreText(score), undefined, "inferred");
+      approximate = true;
+    } catch {
+      parts = undefined;
+    }
   }
   const facts = new Map(traceVoiceFacts(ir).map((f) => [f.voice, f]));
   const differing = rec.fdiff.differingCalls;
@@ -235,7 +243,8 @@ export async function analyzeSid(sidBytes: Uint8Array, options: AnalyzeSidOption
       "Notes, key, metre, form, motifs and roles come from the SIDWave reconstruction of the tune within the horizon; they are inferred and are only as good as the reconstruction (see reconstruction).",
       "Techniques, voice register ranges and resources are observed in the register trace of the original tune within the horizon.",
       "The cycle figures are the span between the first and last SID write of a call; the engine does not report the CPU cycles of the player.",
-      ...(musicError ? [`The reconstruction could not be used for musical facts (${musicError}); key, metre, form, motifs and voice roles are omitted.`] : []),
+      ...(musicError && approximate ? [`The compiler rejects the reconstruction (${musicError}); the musical facts were computed from the note list read from the score text, without ties, legato, portamento or chords.`] : []),
+      ...(musicError && !approximate ? [`The reconstruction could not be used for musical facts (${musicError}); key, metre, form, motifs and voice roles are omitted.`] : []),
       ...(rec.unsupported.length ? [`The trace holds ${rec.unsupported.length} feature(s) the language cannot express (see sample playback and the reconstruction report); musical facts leave them out.`] : []),
     ],
   };

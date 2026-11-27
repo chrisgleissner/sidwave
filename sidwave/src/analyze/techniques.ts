@@ -9,6 +9,7 @@
 
 import { IR_CLOCK_HZ, type FrameIr } from "../reconstruct/ir.js";
 import { isInitCall } from "../reconstruct/recover.js";
+import type { Arrangement } from "../sidwaveCompiler.js";
 import type { ScoreModel } from "./music.js";
 import { round } from "./music.js";
 import { globalVoice, voiceRegs, type Marked } from "./common.js";
@@ -365,13 +366,14 @@ function mostCommon(values: string[]): string | undefined {
 /** Techniques of a score, read from the instruments the voices use. All facts are observed in the score. */
 export function techniquesFromScore(model: ScoreModel): Technique[] {
   const arr = model.arrangement;
+  if (!arr) throw new Error("techniquesFromScore needs the arrangement of the compiler");
   const usedBy = new Map<number, Set<number>>();
   for (const n of model.notes) {
     let s = usedBy.get(n.inst);
     if (!s) usedBy.set(n.inst, (s = new Set()));
     s.add(n.voice);
   }
-  const voicesOf = (pred: (i: (typeof arr.instruments)[number]) => boolean): number[] => {
+  const voicesOf = (pred: (i: Arrangement["instruments"][number]) => boolean): number[] => {
     const voices = new Set<number>();
     for (const [index, set] of usedBy) if (pred(arr.instruments[index]!)) for (const v of set) voices.add(v);
     return [...voices].sort((a, b) => a - b);

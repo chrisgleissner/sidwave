@@ -7,7 +7,9 @@
 // (`arrangeSidwave`), so a score and a reconstructed tune are analysed by the same code.
 
 import type { ParsedSidwave } from "../sidwave.js";
-import { arrangeSidwave, type Arrangement } from "../sidwaveCompiler.js";
+import YAML from "yaml";
+import { noteNameToMidi } from "../sidwave.js";
+import { arrangeSidwave, sidwaveFrameRate, type Arrangement } from "../sidwaveCompiler.js";
 import { noteName, PITCH_CLASS_NAMES, type Basis, type Marked } from "./common.js";
 
 export interface NoteEvent {
@@ -40,7 +42,10 @@ export interface ScoreModel {
   /** First call of the loop, when the score declares `loop_to`. */
   loopFrame?: number;
   voiceCount: number;
-  arrangement: Arrangement;
+  /** The arrangement of the production compiler; absent for a model read from the text of a score that does not compile. */
+  arrangement?: Arrangement;
+  /** True when the notes were read from the pattern text without the compiler (see modelOfScoreText). */
+  approximate?: boolean;
 }
 
 export function modelOfScore(doc: ParsedSidwave): ScoreModel {
@@ -85,6 +90,63 @@ export function modelOfScore(doc: ParsedSidwave): ScoreModel {
     totalFrames: arr.totalFrames, ...(arr.clock?.loopFrame === undefined ? {} : { loopFrame: arr.clock.loopFrame }),
     voiceCount: arr.voices.length, arrangement: arr,
   };
+}
+
+/**
+ * Note list read from the text of a score without the compiler: plain pattern references (`P`, `P*2`) in the layers,
+ * groove entries (note names, rests, `{ note, len }`) and a constant tempo. Used for a reconstruction that the compiler
+ * rejects (for example a pitch outside the playable range), so that the musical facts exist for it as well.
+ * Timing is rounded to whole calls as in the arranger, but ties, legato, portamento, echo and chords are not modelled.
+ */
+export function modelOfScoreText(text: string): ScoreModel {
+  const doc = YAML.parse(text) as Record<string, any>;
+  const mode = doc.mode === "NTSC" ? "NTSC" : "PAL";
+  const speed = Number(doc.speed ?? 1);
+  const fps = sidwaveFrameRate(mode) * speed;
+  const tempo = Number(doc.tempo ?? 120);
+  const framesPerBeat = (fps * 60) / tempo;
+  const meter = typeof doc.meter === "number" ? doc.meter : 4;
+  const voices: any[] = Array.isArray(doc.voices) ? doc.voices : [];
+  const timeline: any[] = Array.isArray(doc.timeline) ? doc.timeline : [];
+  const barStarts = [0];
+  const sections: ScoreModel["sections"] = [];
+  const notes: NoteEvent[] = [];
+  let beat = 0;
+  timeline.forEach((section, index) => {
+    const bars = Number(section.bars ?? 1);
+    const startBeat = beat;
+    const endBeat = beat + bars * meter;
+    for (let b = 1; b <= bars; b++) barStarts.push(Math.round((startBeat + b * meter) * framesPerBeat));
+    sections.push({ name: String(section.section ?? `section ${index + 1}`), startFrame: Math.round(startBeat * framesPerBeat), endFrame: Math.round(endBeat * framesPerBeat), bars });
+    voices.forEach((voice, v) => {
+      const spec = section.layers?.[`v${voice.id ?? v + 1}`];
+      if (typeof spec !== "string") return;
+      const instrument = doc.instruments?.[voice.instrument];
+      const percussion = String(instrument?.waveform ?? "").startsWith("noise") || voice.role === "drums";
+      let at = startBeat;
+      for (const token of spec.trim().split(/\s+/)) {
+        const m = /^([A-Za-z_][A-Za-z0-9_]*)(?:\*(\d+))?$/.exec(token);
+        const pattern = m ? voice.patterns?.[m[1]!] : undefined;
+        if (!m || !pattern || !Array.isArray(pattern.groove)) continue;
+        for (let pass = 0; pass < Number(m[2] ?? 1); pass++) {
+          const length = Number(pattern.length ?? 1);
+          for (const entry of pattern.groove) {
+            const name = typeof entry === "string" ? entry : entry?.note;
+            const duration = typeof entry === "object" && entry?.len !== undefined ? Number(entry.len) : length;
+            if (at >= endBeat - 1e-9) break;
+            const midi = typeof name === "string" ? noteNameToMidi(name) : undefined;
+            if (midi !== undefined) {
+              notes.push({ voice: v + 1, start: Math.round(at * framesPerBeat), end: Math.round(Math.min(at + duration, endBeat) * framesPerBeat), midi, inst: 0, percussion, section: index });
+            }
+            at += duration;
+          }
+        }
+      }
+    });
+    beat = endBeat;
+  });
+  notes.sort((a, b) => a.start - b.start || a.voice - b.voice);
+  return { notes, fps, framesPerBeat, tempo, meterBeats: meter, barStarts, sections, totalFrames: barStarts[barStarts.length - 1]!, voiceCount: Math.max(3, voices.length), approximate: true };
 }
 
 // ---- key -----------------------------------------------------------------------------------------------------------

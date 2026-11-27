@@ -5,6 +5,9 @@ import { analyzeSid, formatAnalysis } from "../src/analyze/analysis.ts";
 import { buildFixture } from "./helpers/reconstructFixtures.mjs";
 import { sharedEngine } from "./helpers/reconstructRoundTrip.mjs";
 import { checkMarks, seededSid } from "./helpers/analyzeKit.mjs";
+import { estimateKey, modelOfScore, modelOfScoreText } from "../src/analyze/music.ts";
+import { reconstructSid } from "../src/reconstruct/reconstruct.ts";
+import { parseSidwave } from "../src/sidwave.ts";
 
 test("a reconstructed SIDWave tune: observed trace facts, inferred musical facts, every inferred fact names its method", { timeout: 120_000 }, async () => {
   const sid = seededSid("combined", 1);
@@ -54,13 +57,31 @@ test("sample playback and two SIDs: the trace facts that the language cannot exp
   assert.ok(second.length >= 1 && second.every((v) => v.trace.gateShare > 0 && v.role.value === "unreconstructed" && v.role.basis === "inferred"), "the voices of the second SID are traced and marked as not reconstructed");
 });
 
-test("a tune whose reconstruction does not parse still gets the observed facts, with the reason in the limits", { timeout: 120_000 }, async () => {
+test("a reconstruction that the compiler rejects: musical facts come from the score text, marked as approximate in the limits", { timeout: 120_000 }, async () => {
   const report = await analyzeSid(new Uint8Array(buildFixture("testBit").sid), { engine: sharedEngine(), seconds: 3 });
-  assert.equal(report.key, undefined);
-  assert.equal(report.metre, undefined);
-  assert.ok(report.limits.some((l) => /could not be used for musical facts/.test(l)));
+  assert.ok(report.limits.some((l) => /compiler rejects the reconstruction/.test(l) && /read from the score text/.test(l)), report.limits.join("\n"));
+  assert.ok(report.key && report.metre && report.form, "key, metre and form are computed from the note list read from the text");
   assert.ok(report.techniques.some((t) => t.name === "test bit"));
   assert.match(formatAnalysis(report), /Techniques/);
+});
+
+test("the note list read from the score text agrees with the arranger on a reconstruction that compiles", { timeout: 120_000 }, async () => {
+  for (const [feature, seed] of [["combined", 3], ["hard_restart", 4], ["basic", 1]]) {
+    const { score } = await reconstructSid(seededSid(feature, seed), { engine: sharedEngine(), seconds: 4 });
+    const arranged = modelOfScore(parseSidwave(score));
+    const text = modelOfScoreText(score);
+    assert.equal(text.approximate, true);
+    const key = (m) => m.notes.filter((n) => !n.percussion).map((n) => `${n.voice}:${n.midi}`).join(",");
+    assert.equal(key(text), key(arranged), `${feature} ${seed}: same notes in the same order`);
+    const worst = Math.max(...arranged.notes.map((n, i) => Math.abs(n.start - text.notes[i].start)));
+    assert.ok(worst <= 1, `${feature} ${seed}: starts within one call, worst ${worst}`);
+    const a = estimateKey(arranged.notes);
+    const b = estimateKey(text.notes);
+    // Note lengths differ (the arranger ends a note at its gate-off), so the key can differ; the pitch-class histograms stay close.
+    const dot = a.histogram.reduce((n, x, i) => n + x * b.histogram[i], 0);
+    const norm = (h) => Math.sqrt(h.reduce((n, x) => n + x * x, 0));
+    assert.ok(dot / (norm(a.histogram) * norm(b.histogram)) > 0.9, `${feature} ${seed}: histogram similarity`);
+  }
 });
 
 test("the subtune argument selects the tune that is traced", { timeout: 120_000 }, async () => {

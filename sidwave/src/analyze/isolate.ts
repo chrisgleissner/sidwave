@@ -128,6 +128,9 @@ export async function isolateVoice(sidBytes: Uint8Array, options: IsolateOptions
     throw new SidwaveOperationError("usage", `--voice ${options.voice} is outside 1..${voices}, the voices of ${ir.sidCount} SID${ir.sidCount === 1 ? "" : "s"}`);
   }
   const silenced = Array.from({ length: voices }, (_, i) => i + 1).filter((v) => (mode === "solo" ? v !== options.voice : v === options.voice));
+  if (report.compile?.ok === false) {
+    throw new SidwaveOperationError("input", `the reconstruction of this tune does not compile (${report.compile.error ?? "unknown error"}), so a voice cannot be isolated by reconstruct-and-recompile`, { reason: "reconstruction_not_compilable" });
+  }
   const masked = silenceVoices(score, silenced);
   const compiled = compileSidwaveBytes(parseSidwave(masked), { format: "sid", loop: true });
   const sampleRate = options.sampleRate ?? 48_000;
