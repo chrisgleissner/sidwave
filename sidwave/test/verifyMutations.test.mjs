@@ -19,7 +19,8 @@ function apply(name, cls, severity, context = {}) {
 }
 
 test("the catalogue lists every class of the design with its label", () => {
-  const byClass = Object.groupBy(MUTATION_CATALOG, (k) => k.class);
+  const byClass = {};
+  for (const k of MUTATION_CATALOG) (byClass[k.class] ??= []).push(k);
   const summary = Object.fromEntries(Object.entries(byClass).map(([c, ks]) => [c, ks.map((k) => `${k.severity}:${k.label}`).join(" ")]));
   assert.deepEqual(summary, {
     wrong_note: "1:M 2:M", octave_error: "12:M", missing_note: "1:M", extra_note: "1:M",
