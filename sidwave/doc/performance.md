@@ -90,7 +90,8 @@ VICE the sound device was a named pipe.
 | `chiptune_drive` | 0.82 s (0.93 s) | 1.10 s (1.39 s) |
 | `digi_groove` (x64sc, which boots BASIC first) | not played with samples | 2.23 s (2.60 s) |
 
-At a load average of 41 the medians were 1.4 s (local) and 1.8 s (vsid) for `chiptune_drive`. The first sound after
+An earlier build with a 100 ms debounce, at a load average of 41, had medians of 1.4 s (local) and 1.8 s (vsid) for
+`chiptune_drive`. The first sound after
 starting `watch` takes 1 to 3 s. The target of 1.5 s is not met for scores that need `x64sc` (digi samples, 4 SIDs).
 
 Why these values: the YAML package is the floor for parsing, formatting and merging; the budgets for those leave room
