@@ -724,21 +724,27 @@ function wavetableSteps(program: ProgramCall[], regSteps: boolean): Array<Record
   return steps;
 }
 
-/** Run-length encodes the per-call pulse width into table steps: `set` for the first call, `add` for runs of equal difference. */
-function pulseSteps(program: ProgramCall[]): Array<Record<string, unknown>> | undefined {
+/**
+ * Run-length encodes the per-call pulse width into table steps: `set` for the first call, `add` for runs of equal difference.
+ * A width of 0 or 4095, or a difference that wraps modulo 4096, cannot be written with clamping adds; the table then
+ * uses SIDWave 1.5 `wrap: true` (adds modulo 4096, width 0 allowed) and every step after the first is an `add`.
+ */
+function pulseSteps(program: ProgramCall[]): { steps: Array<Record<string, unknown>>; wrap: boolean } | undefined {
   const pw = program.map((c) => c.pw);
   if (pw.every((v) => v === pw[0])) return undefined;
-  const steps: Array<Record<string, unknown>> = [];
+  const signed = (d: number): number => ((d + 2048 + 4096 * 2) % 4096) - 2048;
+  let wrap = pw.some((v, i) => (i > 0 && (v === 0 || v === 4095)) || (i > 0 && signed(v - pw[i - 1]!) !== v - pw[i - 1]!));
   const first = pw[0]!;
-  if (first < 1 || first > 4094) return undefined;
-  steps.push({ set: first, calls: 1 });
+  if (first < 1 || first > 4094) wrap = true;
+  const steps: Array<Record<string, unknown>> = [];
+  if (first <= 4094) steps.push({ set: first, calls: 1 });
+  else steps.push({ add: signed(first - 2048), calls: 1 });
   let i = 1;
   while (i < pw.length) {
-    const d = pw[i]! - pw[i - 1]!;
+    const d = wrap ? signed(pw[i]! - pw[i - 1]!) : pw[i]! - pw[i - 1]!;
     let j = i + 1;
-    while (j < pw.length && pw[j]! - pw[j - 1]! === d) j++;
-    if (d < -2048 || d > 2047) {
-      if (pw[i]! < 1 || pw[i]! > 4094) return undefined;
+    while (j < pw.length && (wrap ? signed(pw[j]! - pw[j - 1]!) : pw[j]! - pw[j - 1]!) === d) j++;
+    if (!wrap && (d < -2048 || d > 2047)) {
       steps.push({ set: pw[i], calls: 1 });
       j = i + 1;
     } else {
@@ -747,7 +753,7 @@ function pulseSteps(program: ProgramCall[]): Array<Record<string, unknown>> | un
     }
     i = j;
   }
-  return steps;
+  return { steps, wrap };
 }
 
 
@@ -829,20 +835,22 @@ function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, res
   if (first.wave & 0x04) inst.ring = true;
   if (first.wave & 0x02) inst.sync = true;
   inst.adsr = [ad >> 4, ad & 15, sr >> 4, sr & 15];
-  const pulse = pulseSteps(program);
+  const pulseResult = pulseSteps(program);
+  const pulse = pulseResult?.steps;
   if (pulse) {
     const folded = foldLoop(pulse);
     const table: Record<string, unknown> = { steps: folded.steps };
     if (folded.loop !== undefined) table.loop = folded.loop;
+    if (pulseResult!.wrap) table.wrap = true;
     if (folded.steps.length > MAX_TABLE_STEPS) gap.unsupported.push({ kind: "pulsetable", detail: `${folded.steps.length} steps exceed ${MAX_TABLE_STEPS}` });
     inst.pulsetable = table;
   } else if (first.pw !== 0x800 && first.pw >= 1 && first.pw <= 4094) {
     inst.pulse_width = first.pw;
   }
-  if (!pulse && program.some((c) => c.pw !== first.pw)) {
-    gap.unsupported.push({ kind: "pulsetable", detail: "the pulse width sequence reaches 0 or 4095 or wraps; the language clamps pulse width to 1..4094" });
+  if (!pulse && first.pw === 0) {
+    // A constant width of 0 is a one-step pulse table (SIDWave 1.5 accepts `set: 0`).
+    inst.pulsetable = { steps: [{ set: 0, calls: 1 }] };
   }
-  if (!pulse && first.pw === 0) gap.unsupported.push({ kind: "pulsetable", detail: "pulse width 0 is not expressible (1..4094)" });
   const filter = filterSteps(program);
   if (filter) {
     const folded = foldLoop(filter);
@@ -1328,8 +1336,12 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   });
   // SIDWave 1.5 is declared only when the score needs it: a speed above 4, or a player without the soft-start volume ramp.
   const useTable = tune.override.size > 0;
+  const usesWide = Object.values(instruments).some((y) => {
+    const t = (y as { pulsetable?: { wrap?: boolean; steps: Array<{ set?: number }> } }).pulsetable;
+    return !!t && (t.wrap === true || t.steps.some((st) => st.set === 0));
+  });
   const usesReg = Object.values(instruments).some((y) => ((y as { wavetable?: Array<Record<string, unknown>> }).wavetable ?? []).some((step) => step.reg !== undefined));
-  const v15 = speed > 4 || softStartOff || useTable || usesReg;
+  const v15 = speed > 4 || softStartOff || useTable || usesReg || usesWide;
   const build = (layout: Layout): Record<string, unknown> => ({
     sidwave: v15 ? "1.5" : "1.4",
     ...(softStartOff ? { player: { soft_start: false } } : {}),

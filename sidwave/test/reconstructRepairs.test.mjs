@@ -161,3 +161,16 @@ test("existing exact round trips stay exact (basic, seed 1)", async () => {
   const r = await roundTrip(buildScore("basic", 1));
   assert.equal(verdict(r.report), "exact");
 });
+
+test("a pulse width that wraps modulo 4096 or reaches 0 is recovered as a wrap table and round trips in the pulse class", async () => {
+  const score = buildScore("basic", 4);
+  score.sidwave = "1.5";
+  score.instruments[score.voices[0].instrument] = {
+    waveform: "pulse", adsr: [0, 4, 12, 3],
+    pulsetable: { wrap: true, steps: [{ set: 3900, calls: 1 }, { add: 150, calls: 3 }, { add: -90, calls: 6 }] },
+  };
+  const r = await roundTrip(score, 4);
+  assert.equal(r.report.compile?.ok, true, r.report.compile?.error);
+  assert.match(r.score, /wrap: true/);
+  assert.equal(r.report.fdiffState.classes.pulse.differingCalls, 0, JSON.stringify(r.report.fdiff.first));
+});
