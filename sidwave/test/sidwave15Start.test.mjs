@@ -122,7 +122,7 @@ timeline:
   }
   const peak = Math.max(...run.calls.map((c) => c.cycles));
   assert.ok(peak <= run.compiled.worstCaseCyclesPerCall, `peak ${peak} within estimate ${run.compiled.worstCaseCyclesPerCall}`);
-  // after the start the dispatch chain is not run: a steady-state call costs at most 6 cycles (the jump) more than without start
+  // after the start the dispatch chain is not run: a steady-state call costs a few cycles more than without start (at most 6 for this score; a review measured up to 10 at speed 1 on another score)
   for (let k = 8; k < 14; k++) assert.ok(run.calls[k].cycles - plain.calls[k - 8].cycles <= 6, `call ${k}: ${run.calls[k].cycles} vs ${plain.calls[k - 8].cycles}`);
   // a second init restores the start phase
   run.cpu.call(run.compiled.initAddress);
