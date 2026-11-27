@@ -79,6 +79,19 @@ function equal(a: unknown, b: unknown): boolean {
   }
   return true;
 }
+/** Like `equal`, but the order of the keys of a mapping does not matter. */
+function sameData(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a === "number" && typeof b === "number") return Object.is(a, b);
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((value, i) => sameData(value, b[i]));
+  }
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  return ka.every((key) => Object.prototype.hasOwnProperty.call(b, key) && sameData((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]));
+}
 /** Whether both texts compile to the same PRG. Texts with equal data (including key order) compile alike, so that case compiles once. */
 function compileEqual(a: string, b: string, sameData: boolean, read?: SidwaveReadOptions): boolean {
   try {
@@ -191,7 +204,7 @@ function applyToOurs(ours: string, oursValue: any, merged: any): { text: string;
     };
     apply(oursValue, merged, []);
     const text = doc.toString();
-    if (!equal(YAML.parse(text), JSON.parse(JSON.stringify(merged)))) throw new Error("in-place merge differs from the merged data");
+    if (!sameData(YAML.parse(text), JSON.parse(JSON.stringify(merged)))) throw new Error("in-place merge differs from the merged data");
     return { text, preserved: true };
   } catch (e) {
     return { text: YAML.stringify(merged), preserved: false, reason: e instanceof Error ? e.message : String(e) };

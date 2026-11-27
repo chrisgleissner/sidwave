@@ -10,7 +10,7 @@ with a direct call.
 ## format
 
 ```sh
-sidwave format song.yaml                 # canonical text on standard output
+sidwave format song.yaml                 # canonical text on standard output (the file must be a valid score)
 sidwave format songs/*.yaml --check      # exit 1 and list the files that are not formatted
 sidwave format songs/*.yaml --write      # rewrite them in place
 ```
@@ -36,20 +36,22 @@ sidwave transform song.yaml --order intro,verse,chorus,verse,chorus -o long.yaml
 Operations are `--transpose`, `--tempo`, `--tempo-factor`, `--swap-instrument`, `--quantise`, `--humanise` (with
 `--seed`) and `--order`; several can be given and run in the order written. Without `-o` the score goes to standard
 output and the report to standard error, so nothing is overwritten; an existing `-o` file, and the input file, need
-`--force`. The result is parsed and compiled before it is written; `--validate parse` skips the compile and is
-several times faster on a large score.
+`--force`. The result is checked before it is written: by default it is parsed and the compiler runs up to the assembler
+(`--validate arrange`), which finds a valid score that cannot be compiled; `--validate compile` also assembles the
+player, and `--validate parse` only parses it (fastest).
 
 ## diff
 
 ```sh
 sidwave diff song-v1.yaml song-v2.yaml
 sidwave diff a.yaml b.yaml --json
-sidwave diff a.yaml b.yaml --no-compile   # skip the compile of both scores: about ten times faster on a large score
+sidwave diff a.yaml b.yaml --compile      # also compare the compiled PRG (several times slower)
 ```
 
 The comparison is on parsed values. Each change has a class (`musical`, `synthesis`, `hardware`, `structural`,
-`formatting`), a JSON pointer path and the values before and after, and the last line tells whether both scores compile
-to the same PRG. Exit 0 when equal, 1 when different (like `diff(1)`); `--ignore-formatting` counts a difference of
+`formatting`), a JSON pointer path and the values before and after (a long value is shown around the changed tokens),
+and with `--compile` the last line tells whether both scores compile to the same PRG. Input that is not a valid score
+is an error (exit 3). The compile is off by default. Exit 0 when equal, 1 when different (like `diff(1)`); `--ignore-formatting` counts a difference of
 formatting alone as equal.
 
 ### As a git diff driver
@@ -73,8 +75,9 @@ only normalise the text first, use `git config diff.sidwave.textconv "sidwave fo
 sidwave merge base.yaml mine.yaml theirs.yaml -o merged.yaml
 ```
 
-A value that only one side changed takes that side's change; lists of equal length merge entry by entry; the result
-keeps the comments and aliases of `mine.yaml` where the merge did not touch them and must be a valid score. When both
+A value that only one side changed takes that side's change; lists of equal length merge entry by entry. The edits are
+applied in place to `mine.yaml`, so its comments, anchors and aliases stay except those inside a value the merge
+replaced; comments that exist only in the base or theirs are not carried over. The result must be a valid score. When both
 sides changed the same value differently, or the result is not valid, the command exits 1, writes nothing and lists each
 conflict with the path and the base, ours and theirs values.
 
@@ -113,6 +116,6 @@ sidwave generate --composer 1 --minutes 2 -o long.yaml
 ```
 
 The same options and seed give the same score. The default is composer 2 (see `data/compose/`), whose length follows the
-profile (8 to 36 bars). `--bars` and `--minutes` apply to composer 1 and select it when `--composer` is not given;
+profile (8 to 36 bars). `--bars` and `--minutes` need `--composer 1`;
 to extend a composed score use `sidwave complete --op continue --bars <n>`. `--prg` and `--sid` write the same bytes
 as `sidwave compile` of the written score. Without `-o` the score is printed, unless `--prg` or `--sid` is given.

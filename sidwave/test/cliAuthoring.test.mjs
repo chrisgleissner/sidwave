@@ -11,6 +11,7 @@ import { listSidwaveExamples, readExampleScore, compileSidwaveBytes } from "../s
 import { parseSidwave } from "../src/sidwave.js";
 import { formatSidwave, diffSidwave, mergeSidwave } from "../src/format/sidwaveFormat.js";
 import { transpose, setTempo, scaleTempo, substituteInstrument, quantise, humanise, restructure } from "../src/transform/index.js";
+import { describeChange } from "../src/cliDiff.js";
 import { generateSidwave } from "../src/audio/generateSidwave.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -72,6 +73,24 @@ test("format --check exits 1 for a file that is not formatted and lists it; --wr
   } finally { done(); }
 });
 
+test("format rejects anything that is not a valid score and never rewrites it", () => {
+  const { dir, done } = sandbox();
+  try {
+    const cases = { "other.yaml": "hello: world\n", "words.txt": "random words without structure\n", "list.yaml": "- 1\n- 2\n", "empty.yaml": "" };
+    for (const [name, content] of Object.entries(cases)) {
+      write(dir, name, content);
+      for (const args of [["format", name], ["format", name, "--check"], ["format", name, "--write"]]) {
+        const result = run(dir, ...args);
+        assert.equal(result.code, EXIT_INPUT, args.join(" "));
+        assert.match(result.err, new RegExp(`^${name}: `));
+        assert.equal(result.out, "", "nothing is printed");
+      }
+      assert.equal(fs.readFileSync(path.join(dir, name), "utf8"), content, `${name} is unchanged`);
+    }
+    assert.match(run(dir, "format", "missing.yaml").err, /^sidwave: no such file: missing\.yaml/);
+  } finally { done(); }
+});
+
 test("format reports usage errors and invalid YAML with their exit codes", () => {
   const { dir, done } = sandbox();
   try {
@@ -82,7 +101,7 @@ test("format reports usage errors and invalid YAML with their exit codes", () =>
     }
     const broken = run(dir, "format", "broken.yaml");
     assert.equal(broken.code, EXIT_INPUT);
-    assert.match(broken.err, /^broken\.yaml: not valid YAML/);
+    assert.match(broken.err, /^broken\.yaml: .*could not be parsed/);
     assert.equal(run(dir, "format", "missing.yaml").code, EXIT_INPUT);
     write(dir, "out.yaml", "x");
     const clash = run(dir, "format", "a.yaml", "-o", "out.yaml");
@@ -111,13 +130,15 @@ test("diff exits 0 for equal scores and 1 for different ones, and --json matches
     assert.equal(different.code, EXIT_FAILED);
     assert.match(different.out, /1 change \(1 musical\)/);
     assert.match(different.out, /\/tempo/);
-    assert.match(different.out, /compiled output: different/);
-    const json = JSON.parse(run(dir, "diff", "a.yaml", "b.yaml", "--json").out);
+    assert.doesNotMatch(different.out, /compiled output/);
+    assert.match(run(dir, "diff", "a.yaml", "b.yaml", "--compile").out, /compiled output: different/);
+    const json = JSON.parse(run(dir, "diff", "a.yaml", "b.yaml", "--json", "--compile").out);
     const direct = diffSidwave(SCORE, changed);
     assert.equal(json.ok, false);
     assert.equal(json.result.equal, false);
     assert.deepEqual(json.result.changes, direct.changes);
     assert.equal(json.result.compiledEqual, direct.compiledEqual);
+    assert.equal(JSON.parse(run(dir, "diff", "a.yaml", "b.yaml", "--json").out).result.compiledEqual, null, "the compile is opt-in");
   } finally { done(); }
 });
 
@@ -128,14 +149,14 @@ test("diff treats a formatting-only difference as a difference unless --ignore-f
     write(dir, "b.yaml", formatSidwave(SCORE));
     const plain = run(dir, "diff", "a.yaml", "b.yaml");
     assert.equal(plain.code, EXIT_FAILED);
-    assert.match(plain.out, /only the formatting differs/);
+    assert.match(plain.out, /formatting only \(no musical change\)/);
     assert.equal(run(dir, "diff", "a.yaml", "b.yaml", "--ignore-formatting").code, EXIT_OK);
     assert.equal(run(dir, "diff", "a.yaml").code, EXIT_USAGE);
     assert.equal(run(dir, "diff", "a.yaml", "nope.yaml").code, EXIT_INPUT);
   } finally { done(); }
 });
 
-test("diff --no-compile gives the same changes without compiling", () => {
+test("diff without --compile gives the same changes as the library without compiling", () => {
   const { dir, done } = sandbox();
   try {
     const changed = withTempo(SCORE, 99);
@@ -145,22 +166,42 @@ test("diff --no-compile gives the same changes without compiling", () => {
     const fast = diffSidwave(SCORE, changed, undefined, { compile: false });
     assert.deepEqual(fast.changes, full.changes);
     assert.equal(fast.compiledEqual, null);
-    const result = run(dir, "diff", "a.yaml", "b.yaml", "--no-compile");
-    assert.equal(result.code, EXIT_FAILED);
-    assert.match(result.out, /not compared \(--no-compile\)/);
-    const json = JSON.parse(run(dir, "diff", "a.yaml", "b.yaml", "--no-compile", "--json").out);
+    const json = JSON.parse(run(dir, "diff", "a.yaml", "b.yaml", "--json").out);
     assert.deepEqual(json.result.changes, full.changes);
-    assert.equal(json.result.compiledEqual, null);
-    assert.equal(run(dir, "diff", "a.yaml", "a.yaml", "--no-compile").code, EXIT_OK);
+    assert.equal(run(dir, "diff", "a.yaml", "a.yaml").code, EXIT_OK);
   } finally { done(); }
 });
 
-test("transform validate result checks only the result, and a chain gives the text of the stepwise library calls", () => {
+test("diff shows the changed tokens of a long value and rejects input that is not a score", () => {
+  const { dir, done } = sandbox();
+  try {
+    const long = "C3 D3 E3 F3 G3 A3 B3 C4 D4 E4 F4 G4 A4 B4 C5 D5 E5 F5 G5 A5 B5 C6 D6 E6 F6 G6 A6 B6 C7 D7 E7 F7";
+    assert.equal(describeChange("C3", "D3"), '"C3" -> "D3"');
+    const shown = describeChange(long, long.replace("A4 B4 C5", "A4 Bb4 C5"));
+    assert.match(shown, /\[B4 -> Bb4\]/, shown);
+    assert.ok(shown.startsWith('"...'), "the common start is cut");
+    assert.ok(shown.length < long.length, "shorter than the value");
+    write(dir, "a.yaml", SCORE);
+    write(dir, "text.yaml", "just some words\n");
+    write(dir, "other.yaml", "hello: world\n");
+    for (const bad of ["text.yaml", "other.yaml", "missing.yaml"]) {
+      const result = run(dir, "diff", "a.yaml", bad);
+      assert.equal(result.code, EXIT_INPUT, bad);
+      assert.match(result.err, new RegExp(bad === "missing.yaml" ? "no such file: missing.yaml" : `^${bad}: `));
+    }
+    assert.match(run(dir, "diff", "a.yaml", ".").err, /is a directory: \./);
+  } finally { done(); }
+});
+
+test("transform validation levels: arrange finds a result the compiler rejects, parse does not, and a chain gives the stepwise library text", () => {
+  // A tempo 1.25 times faster is a valid score for which a bend no longer fits its note.
+  const slow = (validate) => () => scaleTempo(SCORE, { factor: 1.25, validate });
+  assert.doesNotThrow(slow("parse"));
+  assert.throws(slow("arrange"), /does not compile/);
+  assert.throws(slow("compile"), /does not compile/);
   const first = transpose(SCORE, { semitones: 2, validate: "parse" });
-  const stepwise = setTempo(first.text, { bpm: 120 });
-  const skipped = setTempo(first.text, { bpm: 120, validate: "result" });
-  assert.equal(skipped.text, stepwise.text);
-  assert.throws(() => setTempo(first.text, { bpm: 120, validate: "result" }) && scaleTempo(first.text, { factor: 1.25, validate: "result" }), /does not compile/);
+  const checkedTwice = setTempo(first.text, { bpm: 120, validate: "arrange" });
+  assert.equal(setTempo(first.text, { bpm: 120, validate: "arrange", inputChecked: true }).text, checkedTwice.text, "inputChecked only skips the parse of the input");
   const { dir, done } = sandbox();
   try {
     write(dir, "s.yaml", SCORE);
@@ -168,8 +209,14 @@ test("transform validate result checks only the result, and a chain gives the te
     assert.equal(chain.code, EXIT_OK, chain.err);
     assert.equal(chain.out, setTempo(quantise(first.text, { grid: 0.25, validate: "none" }).text, { bpm: 120 }).text);
     write(dir, "bad.yaml", "title: x\nvoices: nope\n");
-    assert.equal(run(dir, "transform", "bad.yaml", "--tempo", "99", "--quantise", "0.25").code, EXIT_INPUT, "the input is still checked");
-    assert.equal(run(dir, "transform", "s.yaml", "--tempo", "99", "--tempo-factor", "1.9", "--quantise", "0.25").code, EXIT_INPUT, "the final result is checked");
+    assert.equal(run(dir, "transform", "bad.yaml", "--tempo", "99", "--quantise", "0.25").code, EXIT_INPUT, "the input of a chain is checked");
+    const last = run(dir, "transform", "s.yaml", "--tempo", "140", "--tempo-factor", "1.25", "--quantise", "0.25");
+    assert.equal(last.code, EXIT_INPUT, "the final result of a chain is checked");
+    assert.match(last.err, /does not compile/);
+    assert.match(last.err, /tempo closer to the original/, "the hint names the tempo, not the transposition");
+    assert.equal(run(dir, "transform", "s.yaml", "--tempo-factor", "1.25", "--validate", "parse").code, EXIT_OK);
+    assert.equal(run(dir, "transform", "s.yaml", "--tempo-factor", "1.25", "--validate", "compile").code, EXIT_INPUT);
+    assert.equal(run(dir, "transform", "s.yaml", "--tempo", "99", "--validate", "none").code, EXIT_USAGE);
   } finally { done(); }
 });
 
@@ -214,6 +261,30 @@ test("merge of changes in different places writes the same text as mergeSidwave"
     const json = JSON.parse(run(dir, "merge", "base.yaml", "ours.yaml", "theirs.yaml", "--json").out);
     assert.equal(json.ok, true);
     assert.equal(json.result.text, direct.merged);
+  } finally { done(); }
+});
+
+test("merge keeps the comments of ours when both sides changed different values", () => {
+  const { dir, done } = sandbox();
+  try {
+    const commentLines = (text) => text.split("\n").filter((line) => /^\s*#/.test(line));
+    const base = SCORE;
+    const ours = transpose(base, { semitones: 1, scope: { voices: ["1"] }, validate: "none" }).text;
+    const theirs = setTempo(transpose(base, { semitones: -1, scope: { voices: ["2"] }, validate: "none" }).text, { bpm: 101, validate: "none" }).text;
+    assert.ok(commentLines(ours).length > 20, "the example has comments");
+    write(dir, "base.yaml", base);
+    write(dir, "ours.yaml", ours);
+    write(dir, "theirs.yaml", theirs);
+    const merged = run(dir, "merge", "base.yaml", "ours.yaml", "theirs.yaml");
+    assert.equal(merged.code, EXIT_OK, merged.err);
+    assert.equal(merged.err, "", "no warning: the edits were applied in place");
+    const kept = new Set(commentLines(merged.out).map((l) => l.trim()));
+    const lost = commentLines(ours).filter((line) => !kept.has(line.trim()));
+    assert.deepEqual(lost, [], "every comment line of ours is still there");
+    const parsed = YAML.parse(merged.out);
+    assert.equal(parsed.tempo ?? parsed.song?.tempo, 101, "theirs tempo and both voice changes are merged");
+    assert.equal(merged.out, mergeSidwave(base, ours, theirs).merged);
+    assert.equal(mergeSidwave(base, ours, theirs).preserved, true);
   } finally { done(); }
 });
 
@@ -341,7 +412,6 @@ test("transform --validate parse gives the library result without the compile ch
   const { dir, done } = sandbox();
   try {
     write(dir, "s.yaml", SCORE);
-    // A tempo 1.25 times faster is a valid score that no longer compiles (a bend does not fit its note).
     const checked = run(dir, "transform", "s.yaml", "--tempo-factor", "1.25");
     assert.equal(checked.code, EXIT_INPUT);
     assert.match(checked.err, /does not compile/);
@@ -402,6 +472,21 @@ test("transform errors say what to do and use the exit codes of the contract", (
   } finally { done(); }
 });
 
+test("file errors name the path; /dev/null needs no --force", () => {
+  const { dir, done } = sandbox();
+  try {
+    write(dir, "s.yaml", SCORE);
+    fs.mkdirSync(path.join(dir, "folder"));
+    for (const command of [["format"], ["transform", "--tempo", "99"]]) {
+      assert.match(run(dir, command[0], "nope.yaml", ...command.slice(1)).err, /^sidwave: no such file: nope\.yaml/);
+      assert.match(run(dir, command[0], "folder", ...command.slice(1)).err, /^sidwave: is a directory: folder/);
+    }
+    assert.equal(run(dir, "transform", "s.yaml", "--tempo", "99", "-o", "/dev/null").code, EXIT_OK);
+    assert.equal(run(dir, "format", "s.yaml", "-o", "/dev/null").code, EXIT_OK);
+    assert.equal(run(dir, "merge", "s.yaml", "s.yaml", "s.yaml", "-o", "/dev/null").code, EXIT_OK);
+  } finally { done(); }
+});
+
 // ---- generate --------------------------------------------------------------------------------------------------
 
 const direct = (options) => formatSidwave(YAML.stringify(generateSidwave({ root: "C3", preset: "classic", system: "PAL", ...options }).score));
@@ -423,26 +508,48 @@ test("generate prints the score of generateSidwave, deterministically for a seed
   } finally { done(); }
 });
 
-test("generate --bars and --minutes select composer 1 and give the requested length", () => {
+test("generate --bars and --minutes need --composer 1 and give the requested length", () => {
   const { dir, done } = sandbox();
   try {
-    const bars = run(dir, "generate", "--bars", "16", "--seed", "2", "--json");
+    const bars = run(dir, "generate", "--composer", "1", "--bars", "16", "--seed", "2", "--json");
     assert.equal(bars.code, EXIT_OK);
     const json = JSON.parse(bars.out);
     assert.equal(json.result.composer, 1);
     assert.equal(json.result.bars, 16);
     assert.equal(json.result.text, direct({ composer: 1, style: "chiptune", seed: 2, steps: 128 }));
-    assert.match(json.result.warnings.join(" "), /selected composer 1/);
-    const minutes = JSON.parse(run(dir, "generate", "--minutes", "2", "--style", "ambient", "--json").out);
+    const minutes = JSON.parse(run(dir, "generate", "--composer", "1", "--minutes", "2", "--style", "ambient", "--json").out);
     assert.equal(minutes.result.bars, 40, "2 minutes at 80 bpm is 40 bars of four beats");
     assert.ok(minutes.result.seconds >= 120 && minutes.result.seconds < 125);
-    const eight = run(dir, "generate", "--bars", "8", "--seed", "2");
+    const eight = run(dir, "generate", "--composer", "1", "--bars", "8", "--seed", "2");
     assert.equal(eight.out, direct({ composer: 1, style: "chiptune", seed: 2 }), "eight bars is the default composer 1 score");
-    for (const args of [["--composer", "2", "--bars", "8"], ["--bars", "4", "--minutes", "1"], ["--bars", "0"], ["--profile", "soft-arch-lydian", "--bars", "4"], ["--composer", "1", "--profile", "soft-arch-lydian"]]) {
+    for (const args of [["--bars", "8"], ["--minutes", "1"], ["--composer", "2", "--bars", "8"], ["--composer", "1", "--bars", "4", "--minutes", "1"], ["--composer", "1", "--bars", "0"],
+      ["--composer", "1", "--minutes", "0"], ["--composer", "1", "--minutes", "-1"], ["--composer", "1", "--minutes", "x"], ["--profile", "soft-arch-lydian", "--bars", "4"], ["--composer", "1", "--profile", "soft-arch-lydian"]]) {
       const result = run(dir, "generate", ...args);
       assert.equal(result.code, EXIT_USAGE, args.join(" "));
       assert.match(result.err, /Run "sidwave generate --help"/);
     }
+    assert.match(run(dir, "generate", "--bars", "8").err, /need --composer 1/);
+  } finally { done(); }
+});
+
+test("generate checks every output before it writes the first one", () => {
+  const { dir, done } = sandbox();
+  try {
+    write(dir, "taken.sid", "keep");
+    const refused = run(dir, "generate", "--seed", "4", "-o", "new.yaml", "--prg", "new.prg", "--sid", "taken.sid");
+    assert.equal(refused.code, EXIT_USAGE);
+    assert.match(refused.err, /taken\.sid exists/);
+    assert.equal(fs.existsSync(path.join(dir, "new.yaml")), false, "no score was written");
+    assert.equal(fs.existsSync(path.join(dir, "new.prg")), false, "no program was written");
+    assert.equal(fs.readFileSync(path.join(dir, "taken.sid"), "utf8"), "keep");
+    assert.equal(run(dir, "generate", "--seed", "4", "-o", "same", "--prg", "same").code, EXIT_USAGE, "two outputs with one name");
+    // Character devices need no --force, and "-" is standard output for a binary.
+    assert.equal(run(dir, "generate", "--seed", "4", "-o", "/dev/null").code, EXIT_OK);
+    const bytes = [];
+    const piped = runCli(["generate", "--seed", "4", "--prg", "-"], { cwd: dir, out: () => {}, err: () => {}, outBytes: (b) => bytes.push(Buffer.from(b)) });
+    assert.equal(piped, EXIT_OK);
+    assert.equal(Buffer.concat(bytes).length > 100, true);
+    assert.equal(run(dir, "generate", "--seed", "4", "--prg", "-", "-o", "-").code, EXIT_USAGE);
   } finally { done(); }
 });
 
@@ -498,7 +605,7 @@ test("every authoring command has --help with at least two examples", () => {
 });
 
 test("the built command line runs the authoring commands", () => {
-  if (!fs.existsSync(binJs)) return;
+  assert.ok(fs.existsSync(binJs), `${binJs} is missing: run "npm run build" before the tests`);
   const { dir, done } = sandbox();
   try {
     write(dir, "s.yaml", SCORE);

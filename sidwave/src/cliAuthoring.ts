@@ -5,8 +5,10 @@
 // Shared parts of the authoring commands (transform, format, diff, merge, generate): flag parsing, the error report
 // in the form of the command line contract (see cliCore.ts), reading scores and writing output files.
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { parseSidwave, type ParsedSidwave } from "./sidwave.js";
+import { confinedReadOptions } from "./sidwaveOps.js";
 import {
   EXIT_CODES, SidwaveOperationError, UsageError, classifyError, envelope, type CliIo,
 } from "./cliCore.js";
@@ -109,8 +111,16 @@ export function readText(io: CliIo, file: string): { text: string; path: string 
   try {
     return { text: readFileSync(path, "utf8"), path };
   } catch (error) {
-    throw new SidwaveOperationError("input", `cannot read ${file}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file });
+    const code = (error as NodeJS.ErrnoException).code;
+    const reason = code === "ENOENT" ? `no such file: ${file}` : code === "EISDIR" ? `is a directory: ${file}; name a score file`
+      : code === "EACCES" ? `permission denied: ${file}` : `cannot read ${file}: ${code ?? (error as Error).message}`;
+    throw new SidwaveOperationError("input", reason, { file, code });
   }
+}
+
+/** Parses `text` as a score and throws a validation error that names `file` when it is not one. */
+export function requireScore(io: CliIo, file: string, text: string, path: string, allowDirs: readonly string[] = []): ParsedSidwave {
+  return guard(file, () => parseSidwave(text, confinedReadOptions(io.cwd, allowDirs, path)));
 }
 
 /**
@@ -132,6 +142,20 @@ export function guard<T>(file: string, fn: () => T): T {
   }
 }
 
+export function isCharacterDevice(path: string): boolean {
+  try { return statSync(path).isCharacterDevice(); } catch { return false; }
+}
+
+/** Fails with the usage error that writeOutput would raise, without writing: call it for every output before the first write. */
+export function checkOutput(io: CliIo, output: string, options: { force: boolean; inputs?: readonly string[] }): void {
+  const path = resolve(io.cwd, output);
+  if (options.force || isCharacterDevice(path)) return;
+  if ((options.inputs ?? []).some((input) => sameFile(input, path))) {
+    throw new UsageError(`${output} is an input file; use --force to rewrite it in place, or choose another -o`);
+  }
+  if (existsSync(path)) throw new UsageError(`${output} exists; use --force to overwrite it, or choose another -o`);
+}
+
 const real = (p: string) => (existsSync(p) ? realpathSync(p) : resolve(p));
 export const sameFile = (a: string, b: string): boolean => real(a) === real(b);
 
@@ -141,6 +165,13 @@ export const sameFile = (a: string, b: string): boolean => real(a) === real(b);
  */
 export function writeOutput(io: CliIo, output: string, bytes: Uint8Array | string, options: { force: boolean; inputs?: readonly string[] }): string {
   const path = resolve(io.cwd, output);
+  if (isCharacterDevice(path)) {
+    // /dev/null, /dev/stdout and the like: nothing to protect, and nothing to create.
+    try { writeFileSync(path, bytes); } catch (error) {
+      throw new SidwaveOperationError("input", `cannot write ${path}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: path });
+    }
+    return path;
+  }
   if (!options.force) {
     if ((options.inputs ?? []).some((input) => sameFile(input, path))) {
       throw new UsageError(`${output} is an input file; use --force to rewrite it in place, or choose another -o`);

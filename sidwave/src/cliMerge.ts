@@ -14,8 +14,13 @@ Usage:
 
 Merges on the parsed values: a value that only one side changed takes that side's change, and a value that both
 sides changed to the same thing is kept. Lists of equal length (voices, timeline entries, groove entries) merge
-entry by entry. Comments, anchors and aliases of <ours> are kept where the merge did not change them. The result
-must parse as a valid score, otherwise it is reported as a conflict.
+entry by entry. The result must parse as a valid score, otherwise it is reported as a conflict.
+
+What is kept: the merge edits the text of <ours> in place, so every comment, anchor and alias of <ours> stays except
+the ones inside a value that the merge replaced (a comment on a changed value is lost with the old value; a comment
+on the line above it stays). Comments that exist only in <base> or <theirs> are not carried over. The layout is
+then normalised as "sidwave format" does. If an edit cannot be applied in place (for example below an alias), the
+result is written from plain data, which drops every comment, and the command prints a warning saying so.
 
 Exit 0 when the merge is clean (the merged score goes to -o, or to standard output). Exit 1 when both sides changed
 the same value differently, or the lists differ in length: nothing is written, and standard error lists each

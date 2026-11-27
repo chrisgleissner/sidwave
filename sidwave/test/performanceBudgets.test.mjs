@@ -219,11 +219,13 @@ test("the authoring commands of the command line stay within their budgets", () 
       if (code > 1) throw new Error(`sidwave ${args.join(" ")} exited ${code}`);
     };
     within("cli format --check", () => cli("format", formatted, "--check"), 8);
-    within("cli diff", () => cli("diff", base, ours), 50, 3);
+    within("cli diff", () => cli("diff", base, ours), 10, 3);
     within("cli transform --transpose --validate parse", () => cli("transform", base, "--transpose", "2", "--validate", "parse"), 10, 3);
-    within("cli diff --no-compile", () => cli("diff", base, ours, "--no-compile"), 8, 3);
+    within("cli transform chain of three", () => cli("transform", base, "--transpose", "2", "--tempo", "120", "--quantise", "0.25"), 25, 3);
+    within("cli diff --compile", () => cli("diff", base, ours, "--compile"), 50, 3);
     within("cli merge", () => cli("merge", base, ours, theirs), 30, 3);
-    within("cli transform --transpose", () => cli("transform", base, "--transpose", "2"), 35, 3);
+    within("cli transform --transpose (default check)", () => cli("transform", base, "--transpose", "2"), 22, 3);
+    within("cli transform --transpose --validate compile", () => cli("transform", base, "--transpose", "2", "--validate", "compile"), 35, 3);
     within("cli generate (composer 2)", () => cli("generate", "--seed", "3"), 6, 3);
     within("cli generate --prg --sid", () => cli("generate", "--seed", "3", "--prg", path.join(dir, "g.prg"), "--sid", path.join(dir, "g.sid"), "--force"), 12, 3);
   } finally {

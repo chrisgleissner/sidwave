@@ -9,7 +9,7 @@ import {
 import { confinedReadOptions } from "./sidwaveOps.js";
 import {
   SidwaveTransformError, humanise, quantise, restructure, scaleTempo, setTempo, substituteInstrument, transpose,
-  type TransformOptions, type TransformReport, type TransformResult,
+  type TransformOptions, type TransformReport, type TransformResult, type TransformValidation,
 } from "./transform/index.js";
 
 export const TRANSFORM_HELP = `sidwave transform: change a SIDWave score and report what changed
@@ -35,17 +35,18 @@ Operations (one or more; they are applied in the order given):
       --seed <n>                 Seed of --humanise.
   --order <a>,<b>,...        Set the timeline to the named sections, in this order (repeats allowed).
 
-Every result is formatted canonically and is parsed and compiled again before it is written; a result that does not
-compile is never written. Without -o the transformed score goes to standard output and an existing file is never
+Every result is formatted canonically and checked before it is written (see --validate); a result that fails the
+check is never written. Without -o the transformed score goes to standard output and an existing file is never
 touched. The report says what changed: the number of values and their paths (--json lists all of them), what was
 preserved, and warnings for parts that were left alone.
 
 Options:
   -o <file>          Write the score to <file>. An existing file needs --force (also when it is the input file).
   --force            Replace an existing -o file.
-  --validate <level> What to check on the result: compile (default; parse and compile it, which also finds a
-                     result that is valid but cannot be compiled, such as a bend that no longer fits a faster
-                     tempo) or parse (parse only; several times faster on a large score).
+  --validate <level> What to check on the result: arrange (default; parse it and run the compiler up to the
+                     assembler, which finds a valid score that cannot be compiled, such as a bend that no longer
+                     fits a faster tempo), compile (also assemble the player; about 2.5 times slower) or parse
+                     (parse only; fastest).
   --allow-dir <dir>  Allow "file:" sources and library files below <dir>. May be repeated.
   --json             Machine-readable output; without -o the score is in result.text.
   -h, --help         Show this text.
@@ -114,10 +115,21 @@ function buildSteps(p: ParsedFlags): Step[] {
   return steps;
 }
 
-const HINTS: Record<string, string> = {
-  out_of_range: "Use a smaller value, or limit the change with --voice or --section.",
-  unsupported: "Limit the change with --voice or --section, or edit that part by hand.",
-};
+/** What to do about a failed transformation, or undefined when the message already says it. */
+function hintFor(steps: readonly Step[], step: Step | undefined, error: SidwaveTransformError): string | undefined {
+  if (error.code === "precondition" && /does not compile/.test(error.message)) {
+    // The check runs on the final result, so every operation of the chain may be the cause.
+    const ops = new Set(steps.map((s) => s.op));
+    const hints: string[] = [];
+    if (ops.has("transpose")) hints.push("transpose by a smaller amount or leave the voice out with --voice (a note may be too high or low for its instrument, or a bend may no longer fit)");
+    if (ops.has("tempo") || ops.has("tempo-factor")) hints.push("use a tempo closer to the original (at the new tempo a note or bend at the path above no longer fits its length)");
+    return hints.length ? `The result is valid but the compiler rejects it at the path above; ${hints.join("; or ")}` : undefined;
+  }
+  if (step?.op === "transpose" && error.code === "out_of_range") return "Use a smaller shift, or limit the change with --voice or --section";
+  if (step?.op === "transpose" && error.code === "unsupported") return "Limit the change with --voice or --section, or edit that part by hand";
+  if (step?.op === "quantise" && error.code === "unsupported") return "Use a coarser or finer grid, or edit that pattern by hand";
+  return undefined;
+}
 
 /** `sidwave transform`. `args` excludes the command name. */
 export function runTransformCli(args: string[], io: CliIo): number {
@@ -133,26 +145,28 @@ export function runTransformCli(args: string[], io: CliIo): number {
     if (p.values.has("--section") && !ops.has("transpose")) throw new UsageError("--section applies to --transpose only");
     if (p.values.has("--seed") && !ops.has("humanise")) throw new UsageError("--seed applies to --humanise only");
     const output = last(p, "-o");
-    const level = last(p, "--validate") ?? "compile";
-    if (level !== "compile" && level !== "parse") throw new UsageError(`--validate must be compile or parse, not "${level}"`);
+    const levelText = last(p, "--validate") ?? "arrange";
+    if (levelText !== "arrange" && levelText !== "compile" && levelText !== "parse") throw new UsageError(`--validate must be arrange, compile or parse, not "${levelText}"`);
+    const level: TransformValidation = levelText;
     const { text: input, path } = readText(io, file);
     const read = confinedReadOptions(io.cwd, p.values.get("--allow-dir") ?? [], path);
 
     let text = input;
+    let current: Step | undefined;
     const reports: Array<{ op: string; param: unknown } & TransformReport> = [];
     try {
       steps.forEach((step, index) => {
-        // The first step checks the input, the last one the final result (compiled with --validate compile).
-        // The steps between need no check of their own: each reads the previous result and the last step checks the end.
+        // The first step checks the input; the steps between check nothing, and the last one checks the final result.
         const first = index === 0, final = index === steps.length - 1;
-        const validate = steps.length === 1 ? level : first ? "parse" : final ? (level === "compile" ? "result" : "none") : "none";
-        const result = step.run(text, { validate, read });
+        const validate = steps.length === 1 ? level : first ? "parse" : final ? level : "none";
+        current = step;
+        const result = step.run(text, { validate, read, inputChecked: !first });
         text = result.text;
         reports.push({ op: step.op, param: step.param, ...result.report });
       });
     } catch (error) {
       if (error instanceof SidwaveTransformError) {
-        const hint = HINTS[error.code];
+        const hint = hintFor(steps, current, error);
         throw new SidwaveOperationError("validation", `${error.message}${hint ? `. ${hint}` : ""}`, { file, code: error.code }, { cause: error });
       }
       throw error;

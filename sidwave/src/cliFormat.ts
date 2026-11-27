@@ -4,7 +4,7 @@
 
 import { writeFileSync } from "node:fs";
 import { EXIT_FAILED, EXIT_OK, SidwaveOperationError, UsageError, type CliIo } from "./cliCore.js";
-import { emit, guard, last, readText, runAuthoring, writeOutput } from "./cliAuthoring.js";
+import { emit, guard, last, readText, requireScore, runAuthoring, writeOutput } from "./cliAuthoring.js";
 import { formatSidwave } from "./format/sidwaveFormat.js";
 
 export const FORMAT_HELP = `sidwave format: write a SIDWave score in its canonical layout
@@ -18,6 +18,8 @@ The canonical layout has a fixed key order, two-space indentation, double-quoted
 style. Comments, anchors and aliases are kept. Formatting does not change what the score plays, and it is
 idempotent: formatting a formatted file changes nothing.
 
+A file that is not a valid SIDWave score is an error (exit 3) and is never rewritten.
+
 Without --check and --write the formatted text goes to -o, or to standard output; that form takes one file.
 
 Options:
@@ -26,6 +28,8 @@ Options:
   --write          Rewrite each file that is not formatted, in place, and list the files changed.
   -o <file>        Write the formatted text to <file>. An existing file needs --force.
   --force          Replace an existing -o file.
+  --allow-dir <dir>  Allow "file:" sources and library files below <dir> when checking that the file is a valid
+                   score. May be repeated.
   --json           Machine-readable output.
   -h, --help       Show this text.
 
@@ -36,14 +40,14 @@ Examples:
   # Pre-commit hook (.git/hooks/pre-commit): sidwave format $(git diff --cached --name-only -- '*.yaml') --check
 
 Exit codes: 0 formatted or written; 1 --check found a file that is not formatted; 2 usage; 3 unreadable file or
-invalid YAML.
+not a valid score.
 `;
 
 interface FileResult { file: string; changed: boolean }
 
 /** `sidwave format`. `args` excludes the command name. */
 export function runFormatCli(args: string[], io: CliIo): number {
-  return runAuthoring("format", FORMAT_HELP, { value: ["-o"], bool: ["--check", "--write", "--force"] }, args, io, (p, { json }) => {
+  return runAuthoring("format", FORMAT_HELP, { value: ["-o", "--allow-dir"], bool: ["--check", "--write", "--force"] }, args, io, (p, { json }) => {
     const check = p.flags.has("--check");
     const write = p.flags.has("--write");
     const output = last(p, "-o");
@@ -56,7 +60,9 @@ export function runFormatCli(args: string[], io: CliIo): number {
     const results: FileResult[] = [];
     const formatted = new Map<string, string>();
     for (const file of p.positional) {
-      const { text } = readText(io, file);
+      const { text, path } = readText(io, file);
+      // Only a valid score is rewritten: any other YAML file, or a text that is not YAML, is an error (exit 3).
+      requireScore(io, file, text, path, p.values.get("--allow-dir") ?? []);
       const next = guard(file, () => formatSidwave(text));
       formatted.set(file, next);
       results.push({ file, changed: next !== text });
