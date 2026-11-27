@@ -14,3 +14,6 @@ export * from "./errors.js";
 export * from "./musicxmlExport.js";
 export * from "./musicxmlImport.js";
 export { parseXml, XmlError, type XmlNode } from "./xml.js";
+export * from "./goattracker.js";
+export * from "./goattrackerImport.js";
+export * from "./goattrackerExport.js";

@@ -211,10 +211,11 @@ export function importMusicXml(bytes: Uint8Array, options: MusicXmlImportOptions
   const allTempos = parts.flatMap((p) => p.measures.flatMap((m) => m.tempos)).sort((a, b) => a.beat - b.beat);
   let movedTempos = 0, clamped = 0;
   let lastSig = "";
-  const tempoFor = (start: number): number => {
-    let bpm = 120;
-    for (const t of allTempos) { if (t.beat <= start + 1e-6) bpm = t.bpm; else break; }
-    return bpm;
+  let tempoIdx = 0;
+  let tempoNow = 120;
+  const tempoFor = (start: number): number => { // bar starts increase, so one forward pass over the sorted tempos suffices
+    while (tempoIdx < allTempos.length && allTempos[tempoIdx]!.beat <= start + 1e-6) tempoNow = allTempos[tempoIdx++]!.bpm;
+    return tempoNow;
   };
   for (const [i, m] of reference.measures.entries()) {
     const metre = sidwaveMetre(m.sig.numerator, m.sig.denominator);
@@ -229,7 +230,8 @@ export function importMusicXml(bytes: Uint8Array, options: MusicXmlImportOptions
     barBeats.push(m.start);
   }
   if (!allTempos.length) warnings.push("The file has no tempo; 120 BPM is assumed.");
-  for (const t of allTempos) if (!reference.measures.some((m) => Math.abs(m.start - t.beat) < 1e-6)) movedTempos++;
+  const startKeys = new Set(reference.measures.map((m) => Math.round(m.start * 1e6)));
+  for (const t of allTempos) if (!startKeys.has(Math.round(t.beat * 1e6))) movedTempos++;
   if (movedTempos) losses.push(`${movedTempos} tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line.`);
   const totalCells = bars.reduce((n, b) => n + b.cells, 0);
   if (totalCells > maxCells) throw new MusicXmlImportError(`the piece has more than ${maxCells} grid cells`);

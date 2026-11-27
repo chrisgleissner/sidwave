@@ -140,7 +140,11 @@ export function exportMusicXml(doc: ParsedSidwave, options: EventExportOptions =
       const split: Piece[] = [];
       for (const piece of pieces) {
         let from = piece.from;
-        for (const t of tempoTicks) if (t > from && t < piece.to && partIndex === 0) { split.push({ ...piece, from, to: t }); from = t; }
+        if (partIndex === 0) {
+          let lo = 0, hi = tempoTicks.length; // first tempo tick > from
+          while (lo < hi) { const mid = (lo + hi) >>> 1; if (tempoTicks[mid]! > from) hi = mid; else lo = mid + 1; }
+          for (let k = lo; k < tempoTicks.length && tempoTicks[k]! < piece.to; k++) { split.push({ ...piece, from, to: tempoTicks[k]! }); from = tempoTicks[k]!; }
+        }
         split.push({ ...piece, from });
       }
       if (partIndex === 0 && sectionAt.has(bs)) out.push(`<direction placement="above"><direction-type><rehearsal>${escapeXml(sectionAt.get(bs)!)}</rehearsal></direction-type></direction>`);
