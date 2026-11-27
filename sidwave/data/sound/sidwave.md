@@ -1308,8 +1308,8 @@ speed 5 or more is less than one player call at tempos up to 220.
 
 **Design.** In 1.5, `speed` is 1 to 8 and pattern length and groove `len` are at least 1/128 beat. A note still lasts at least
 one frame (`speed` calls). The compiler's cycle budget check still applies: at the higher speeds the 1.4 player needs more cycles per
-call than one call period holds at 1 MHz, and such a score is rejected with `use cpu: turbo`. Five of the ten tunes are
-rejected for that reason, so the recovered score does not compile for them.
+call than one call period holds at 1 MHz, and such a score is rejected with `use cpu: turbo`. Seven of the 24 development tunes are
+rejected for that reason (speeds 4 to 8), so the recovered score does not compile for them.
 
 **Rejected alternative.** Mapping a multi-speed tune onto a slower grid: the call timing then differs.
 
