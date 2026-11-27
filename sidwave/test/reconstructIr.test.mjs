@@ -217,11 +217,14 @@ test("every fixture assembles and produces one init call plus periodic play call
     "sync",
     "ring",
     "multispeed",
+    "multispeed9",
     "twoSids",
     "testBit",
     "nmiSampler",
   ]);
   for (const name of FIXTURE_NAMES) {
+    // multispeed9 (nine calls per frame) exists for the recovery tests: its call rate is above the language limit.
+    if (name === "multispeed9") continue;
     const { ir, trace } = await fixture(name);
     assert.equal(trace.droppedRecords, 0);
     const multispeed = name === "multispeed";
