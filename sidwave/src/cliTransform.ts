@@ -43,10 +43,14 @@ preserved, and warnings for parts that were left alone.
 Options:
   -o <file>          Write the score to <file>. An existing file needs --force (also when it is the input file).
   --force            Replace an existing -o file.
-  --validate <level> What to check on the result: arrange (default; parse it and run the compiler up to the
-                     assembler, which finds a valid score that cannot be compiled, such as a bend that no longer
-                     fits a faster tempo), compile (also assemble the player; about 2.5 times slower) or parse
-                     (parse only; fastest).
+  --validate <level> What to check on the result:
+                       arrange (default) parses it and runs every check of the compiler except the assembler:
+                         the score rules (a bend that no longer fits its note, an invalid value), the cycle
+                         budget ("cpu: turbo" needed) and the memory size below $D000 (checked when the streams and
+                         samples exceed 20,000 bytes, which is the only case in which a song can be too big).
+                         Not checked: errors of the assembler itself, which no score has produced so far.
+                       compile also assembles the player (about 2.5 times slower), so it checks everything.
+                       parse only parses the result (fastest).
   --allow-dir <dir>  Allow "file:" sources and library files below <dir>. May be repeated.
   --json             Machine-readable output; without -o the score is in result.text.
   -h, --help         Show this text.
@@ -117,6 +121,9 @@ function buildSteps(p: ParsedFlags): Step[] {
 
 /** What to do about a failed transformation, or undefined when the message already says it. */
 function hintFor(steps: readonly Step[], step: Step | undefined, error: SidwaveTransformError): string | undefined {
+  if (error.code === "precondition" && /cpu: turbo/.test(error.message)) {
+    return "The result needs a faster CPU than a 1 MHz C64 offers; add \"cpu: turbo\" to the score, or use a lower tempo or fewer notes";
+  }
   if (error.code === "precondition" && /does not compile/.test(error.message)) {
     // The check runs on the final result, so every operation of the chain may be the cause.
     const ops = new Set(steps.map((s) => s.op));

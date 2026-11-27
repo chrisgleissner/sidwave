@@ -479,18 +479,8 @@ function lintPlan(doc: ParsedSidwave, arrangement: Arrangement): void {
   for (const found of lintSongs(doc)) findings.add(found.code, found.first, found.message);
 }
 
-function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
-  planned?: Arrangement): CompileResult {
-  const { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly, tightest } =
-    preparePlayer(doc, options, planned);
-  // Check the size before assembling the streams: the player and its tables are assembled once with
-  // empty streams, which gives the exact start of the stream data. Songs larger than 64 KB would
-  // otherwise wrap the address counter inside the assembler.
-  const layout = assemblyToPrgDetailed(buildPlayerAsm(arrangement, streams.map(() => [OP.LOOP]), loop, turboOnly, false), {
-    fileName: "sidwave_player.asm",
-    loadAddress: SIDWAVE_LOAD_ADDRESS,
-  });
-  const streamStart = layout.symbols.get("stream0")!;
+/** The error of a song that does not fit below $D000. `streamStart` is where the stream data starts in the assembled player. */
+function checkMemoryFit({ streams, arrangement }: PreparedPlayer, streamStart: number): void {
   const sampleBytes = [...(arrangement.samples?.defs.values() ?? [])].reduce((sum, sample) => sum + sample.data.length, 0);
   const projectedEnd = streamStart + streams.reduce((sum, st) => sum + st.length, 0) + sampleBytes;
   // The PRG installer also writes three bytes after the program (an empty BASIC program).
@@ -502,6 +492,55 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
         (sampleBytes ? `. With the BASIC terminator it needs ${projectedEnd + 3 - SIDWAVE_LOAD_ADDRESS} bytes and includes ${sampleBytes} sample bytes. Use a lower sample rate or shorter samples` : ""),
     );
   }
+}
+
+/** The error of a score whose play call needs more cycles than a 1 MHz C64 has, unless it declares `cpu: turbo`. */
+function checkCycleBudget(doc: ParsedSidwave, { arrangement, digiCycles, requiresTurbo, tightest }: PreparedPlayer, planned?: Arrangement): void {
+  if (!arrangement.chips) return;
+  const availableCycles = tightest.available;
+  const required = tightest.cycles / availableCycles;
+  if (!planned && requiresTurbo(arrangement.system) && !doc.cpu) {
+    throw new SidwaveValidationError("$.cpu",
+      `the player needs up to ${tightest.cycles} cycles per call at speed ${tightest.speed}${digiCycles ? ` including ${digiCycles} for the CIA2 digi NMI` : ""} (${availableCycles} available at 1 MHz ${arrangement.system}); use cpu: turbo for a CPU speed of at least ${Math.ceil(required)} MHz`);
+  }
+}
+
+/** Streams and samples of at most this many bytes cannot reach $D000: the player and its tables of every bundled score and test score are below 18 KB. */
+const MEMORY_CHECK_THRESHOLD = 20_000;
+
+/**
+ * Everything compileSidwaveToPrg checks except the assembler: the score is arranged and packed, then the cycle budget
+ * (`cpu: turbo`) and the memory size are checked. The size needs the assembled length of the player, so it is
+ * checked here only when the streams and samples exceed 20,000 bytes; a smaller score cannot reach $D000 with any
+ * player seen so far. It takes about 40 % of the time of a compile. Throws what the compile would throw, except an
+ * error of the assembler itself.
+ */
+export function checkSidwaveCompiles(doc: ParsedSidwave, options: SidwaveCompileOptions = {}): void {
+  const prepared = preparePlayer(doc, options);
+  const sampleBytes = [...(prepared.arrangement.samples?.defs.values() ?? [])].reduce((sum, sample) => sum + sample.data.length, 0);
+  if (prepared.streams.reduce((sum, st) => sum + st.length, 0) + sampleBytes > MEMORY_CHECK_THRESHOLD) {
+    const layout = assemblyToPrgDetailed(buildPlayerAsm(prepared.arrangement, prepared.streams.map(() => [OP.LOOP]), prepared.loop, prepared.turboOnly, false), {
+      fileName: "sidwave_player.asm",
+      loadAddress: SIDWAVE_LOAD_ADDRESS,
+    });
+    checkMemoryFit(prepared, layout.symbols.get("stream0")!);
+  }
+  checkCycleBudget(doc, prepared);
+}
+
+function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
+  planned?: Arrangement): CompileResult {
+  const prepared = preparePlayer(doc, options, planned);
+  const { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly, tightest } = prepared;
+  // Check the size before assembling the streams: the player and its tables are assembled once with
+  // empty streams, which gives the exact start of the stream data. Songs larger than 64 KB would
+  // otherwise wrap the address counter inside the assembler.
+  const layout = assemblyToPrgDetailed(buildPlayerAsm(arrangement, streams.map(() => [OP.LOOP]), loop, turboOnly, false), {
+    fileName: "sidwave_player.asm",
+    loadAddress: SIDWAVE_LOAD_ADDRESS,
+  });
+  checkMemoryFit(prepared, layout.symbols.get("stream0")!);
+  const sampleBytes = [...(arrangement.samples?.defs.values() ?? [])].reduce((sum, sample) => sum + sample.data.length, 0);
   const warnings: string[] = [];
   for (const field of doc.ignoredFields ?? []) warnings.push(`${field} has no effect before sidwave: 1.2 and was ignored`);
   if (arrangement.findings) {
@@ -512,12 +551,7 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
     warnings.push(`CIA2 digi playback reserves up to ${digiCycles} CPU cycles per player call and temporarily replaces the sample SID's master volume.`);
   }
   if (arrangement.chips) {
-    const availableCycles = tightest.available;
-    const required = tightest.cycles / availableCycles;
-    if (!planned && requiresTurbo(arrangement.system) && !doc.cpu) {
-      throw new SidwaveValidationError("$.cpu",
-        `the player needs up to ${tightest.cycles} cycles per call at speed ${tightest.speed}${digiCycles ? ` including ${digiCycles} for the CIA2 digi NMI` : ""} (${availableCycles} available at 1 MHz ${arrangement.system}); use cpu: turbo for a CPU speed of at least ${Math.ceil(required)} MHz`);
-    }
+    checkCycleBudget(doc, prepared, planned);
     const sawtooth = sawtoothWarning(arrangement);
     if (sawtooth) warnings.push(sawtooth);
   }

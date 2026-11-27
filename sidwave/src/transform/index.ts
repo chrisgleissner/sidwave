@@ -4,7 +4,7 @@
 import YAML from "yaml";
 import type { SidwaveReadOptions } from "../sidwavePcm.js";
 import { parseSidwave, SIDWAVE_NOTE_RANGE, SIDWAVE_TEMPO_RANGE, noteNameToMidi } from "../sidwave.js";
-import { compileSidwaveToPrg, estimateSidwaveCycles, maxSidwaveMidi } from "../sidwaveCompiler.js";
+import { checkSidwaveCompiles, compileSidwaveToPrg, maxSidwaveMidi } from "../sidwaveCompiler.js";
 import { formatSidwave } from "../format/sidwaveFormat.js";
 
 export class SidwaveTransformError extends Error {
@@ -17,8 +17,9 @@ export interface TransformResult { text: string; report: TransformReport }
  * "parse" only parses it, "none" skips the check (for fragments that are not complete scores). The input must parse
  * (otherwise code "input"); a result that does not pass the check is never returned, the transformation throws
  * code "precondition" with the message of the parser or compiler instead. "arrange" parses the result and runs the
- * compiler up to the assembler (it finds the errors of the score, such as a bend that does not fit its note, in about
- * 40 % of the time of "compile"; it does not assemble the player).
+ * compiler up to the assembler (it finds the errors of the score, such as a bend that does not fit its note, a play call that needs
+ * `cpu: turbo` and a song that does not fit in memory, in about 40 % of the time of "compile"; only an error of the
+ * assembler itself is left to "compile").
  */
 export type TransformValidation = "compile" | "arrange" | "parse" | "none";
 export interface TransformOptions {
@@ -46,7 +47,7 @@ function finish(doc: AnyDoc, changed: string[], preserved: string[], warnings: s
     let parsed;
     try { parsed = parseSidwave(text, read); } catch (e) { throw new SidwaveTransformError("precondition", `The result is not a valid SIDWave score: ${e instanceof Error ? e.message : String(e)}`); }
     if (validate === "arrange") {
-      try { estimateSidwaveCycles(parsed, { loop: false }); } catch (e) { throw new SidwaveTransformError("precondition", `The result does not compile: ${e instanceof Error ? e.message : String(e)}`); }
+      try { checkSidwaveCompiles(parsed, { loop: false }); } catch (e) { throw new SidwaveTransformError("precondition", `The result does not compile: ${e instanceof Error ? e.message : String(e)}`); }
     }
     if (validate === "compile") {
       try { compileSidwaveToPrg(parsed, { loop: false }); } catch (e) { throw new SidwaveTransformError("precondition", `The result does not compile: ${e instanceof Error ? e.message : String(e)}`); }
