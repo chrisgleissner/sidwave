@@ -105,6 +105,10 @@
       "types": "./dist/interchange/index.d.ts",
       "default": "./dist/interchange/index.js"
     },
+    "./analyze": {
+      "types": "./dist/analyze/index.d.ts",
+      "default": "./dist/analyze/index.js"
+    },
     "./data/*": "./data/*",
     "./package.json": "./package.json"
   },
@@ -120,6 +124,8 @@
     "doc/licensing.md",
     "doc/tutorial.md",
     "doc/interchange.md",
+    "doc/analysis.md",
+    "doc/preservation.md",
     "CHANGELOG.md",
     "LICENSE",
     "LICENSE-EXCEPTION.md",

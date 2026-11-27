@@ -12,6 +12,7 @@ import {
   classifyError, envelope, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, SidwaveOperationError, UsageError, withFile,
   type CliIo,
 } from "./cliCore.js";
+import { ANALYZE_COMMANDS, ANALYZE_HELP, ANALYZE_USAGE, takeAnalyzeFlag, type AnalyzeFlags } from "./cliAnalyze.js";
 import { RECONSTRUCT_COMMAND_HELP, RECONSTRUCT_USAGE, reconstructCommand } from "./cliReconstruct.js";
 import { INTERCHANGE_COMMANDS, INTERCHANGE_HELP } from "./interchange/cli.js";
 import { runCompleteCli } from "./cliComplete.js";
@@ -37,7 +38,7 @@ Usage:
   sidwave retarget <file> [--clock pal|ntsc] [--model 6581|8580] [--sids <n>] [--budget-cycles <n>] [--budget-bytes <n>]
                           [--allow-changes] [-o <out>] [--force] [--json]   (see "sidwave retarget --help")
   sidwave complete <score> --op continue|harmonise|accompany|fill-section [options]   (see "sidwave complete --help")
-${INTERCHANGE_HELP}${RUN_HELP.usage}${RECONSTRUCT_USAGE}  sidwave --help | --version
+${INTERCHANGE_HELP}${RUN_HELP.usage}${RECONSTRUCT_USAGE}${ANALYZE_USAGE}  sidwave --help | --version
 
 Commands:
   validate   Parse a score. Exit 0 when it is valid, 3 with the path of the first error otherwise.
@@ -62,7 +63,7 @@ Commands:
              samples/ (read relative to the current directory); compile the bundle from inside its directory.
   examples   Without a name, list the bundled example scores. With a name, print the score, or write
              <name>.yaml into the directory given by -o (it is not overwritten without --force).
-${RUN_HELP.commands}${RECONSTRUCT_COMMAND_HELP}
+${RUN_HELP.commands}${RECONSTRUCT_COMMAND_HELP}${ANALYZE_HELP}
 Options:
   --allow-dir <dir>   Allow "file:" sample sources below <dir>, and library files of "imports" (the library search
                       path). Without it samples must lie below the current
@@ -102,6 +103,8 @@ interface Options {
   noMeasure: boolean;
   /** Flags of verify, render, trace and sid-info. */
   run: RunFlags;
+  /** Flags of analyze, compare, isolate, preserve and extract-instruments. */
+  analyze: AnalyzeFlags;
 }
 
 const VALUE_FLAGS = new Set(["-o", "--output", "--format", "--allow-dir", "--target", "--origin", "--data-origin", "--zp", "--symbols", "--song"]);
@@ -121,7 +124,7 @@ function parseAddress(flag: string, text: string): number {
 }
 
 function parseArgs(args: string[], command: string): Options {
-  const options: Options = { positional: [], json: false, strict: false, force: false, help: false, version: false, allowDirs: [], symbols: [], symbolsAll: false, noMeasure: false, run: {} };
+  const options: Options = { positional: [], json: false, strict: false, force: false, help: false, version: false, allowDirs: [], symbols: [], symbolsAll: false, noMeasure: false, run: {}, analyze: {} };
   for (let i = 0; i < args.length; i++) {
     let arg = args[i]!;
     let inline: string | undefined;
@@ -130,6 +133,7 @@ function parseArgs(args: string[], command: string): Options {
       arg = arg.slice(0, arg.indexOf("="));
     }
     if (arg === "--") { options.positional.push(...args.slice(i + 1)); break; }
+    if (takeAnalyzeFlag(command, options.analyze, arg, inline, () => args[++i])) continue;
     if (!(command === "compile" && arg === "--song") && takeRunFlag(options.run, arg, inline, () => args[++i])) continue;
     if (VALUE_FLAGS.has(arg)) {
       const value = inline ?? args[++i];
@@ -373,7 +377,7 @@ const assetArgs = (options: Options, command: string) => ({ file: pickFile(optio
 const lock: Command = (io, options) => lockCommand(io, assetArgs(options, "lock"));
 const bundle: Command = (io, options) => bundleCommand(io, assetArgs(options, "bundle"));
 
-const COMMANDS: Record<string, Command> = { validate, compile, lint, examples, lock, bundle, ...RUN_COMMANDS, reconstruct: reconstructCommand };
+const COMMANDS: Record<string, Command> = { validate, compile, lint, examples, lock, bundle, ...RUN_COMMANDS, reconstruct: reconstructCommand, ...ANALYZE_COMMANDS };
 
 /** Reports a failure in the form the caller asked for and returns the exit code of its category. */
 function fail(io: CliIo, json: boolean, command: string, error: unknown): number {
@@ -411,7 +415,7 @@ export function runCli(args: string[], io: CliIo): number | Promise<number> {
     const options = parseArgs(rest, name);
     if (options.help) { io.out(HELP); return EXIT_OK; }
     if (options.version) { io.out(`${packageVersion()}\n`); return EXIT_OK; }
-    if (!Object.prototype.hasOwnProperty.call(RUN_COMMANDS, name) && name !== "reconstruct") rejectRunFlags(options, name);
+    if (!Object.prototype.hasOwnProperty.call(RUN_COMMANDS, name) && name !== "reconstruct" && !Object.prototype.hasOwnProperty.call(ANALYZE_COMMANDS, name)) rejectRunFlags(options, name);
     const outcome = command(io, options);
     return outcome instanceof Promise ? outcome.catch((error: unknown) => fail(io, json, name, error)) : outcome;
   } catch (error) {

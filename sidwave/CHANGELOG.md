@@ -22,6 +22,12 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 - Composer 2, opt-in with `generateSidwave({ composer: 2, profile })`: 33 profiles with form, functional harmony, melody, motif development, counterpoint with a rule checker (`checkCounterpoint`), groove and drum patterns, and instrumentation on at most three voices per SID under a measured cycle budget. The default generator and its output are unchanged (`test/composeBaseline.test.mjs` pins them).
 - `sidwave complete` and `completeScore`: continue, harmonise, accompany and fill-section on an existing score. Target voices must be free; protected voices keep their SID register writes, verified by tracing both scores. `verifyProtected`, `analyseScore`, `measureScore`, `traceDocument` are exported. The result lists what is not compared (the ring-out tail when new entries follow, and the hard restart before a continued voice).
 - `scripts/evaluate-composer.mjs` and `data/compose/` (profile list, evaluation of composer 2 against the version 1 generator on proxy measures).
+- `sidwave analyze` and `analyzeScore`/`analyzeSid` (`sidwave/analyze`): structural analysis of a score or SID tune (key and mode, metre, form, motifs, voice use, techniques, resources). Every fact is marked `observed` (trace or score) or `inferred` (method named).
+- `sidwave compare` and `compare`: F-diff (total, per class, per voice), the verification ladder with the A1 calibration status, and the semantic diff of two scores.
+- `sidwave isolate` and `isolateVoice`: one voice alone (or all but one) as a WAV by reconstruct-and-recompile, with the coupling (filter, sync, ring, sample playback) that makes the result non-additive.
+- `sidwave preserve` and `createPreservation`/`verifyPreservation`: a preservation bundle (score, checksums, configuration, tool identities, horizon, verdict, ambiguities, rights) with a manifest `preservation.json` that verifies offline. The original SID is stored only with `--include-original --rights-permitted`.
+- `sidwave extract-instruments` and `extractInstruments`: the instruments of a score or of a reconstruction as a SIDWave 1.4 library with provenance; `checkInstrumentReuse` compares an extracted instrument in a new score with the source.
+- Documentation: `doc/analysis.md`, `doc/preservation.md`.
 
 ### Changed
 
