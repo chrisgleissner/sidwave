@@ -395,7 +395,7 @@ The thresholds come from `data/verify/a1-rules.json`, which `scripts/calibrate-a
 
 - The package follows semantic versioning from 1.0.0. Before 1.0.0, a minor version may contain breaking changes. They are listed in [CHANGELOG.md](CHANGELOG.md).
 - A deprecated export or option is announced in the changelog one minor release before it is removed.
-- Supported runtimes: Node.js 20.19 or later (the oldest version in CI is 20) and Bun 1.3.1 or later. The package uses Node.js modules (`node:fs`, `node:buffer`) and is not meant for browsers; the player it compiles runs on a C64.
+- Supported runtimes: Node.js 20.19 or later (the oldest version in CI is 20) and Bun 1.4.5 or later. The package uses Node.js modules (`node:fs`, `node:buffer`) and is not meant for browsers; the player it compiles runs on a C64.
 - The package is ESM only. On Node.js 20.19 and later, 22.12 and later, and all later versions, `require("sidwave")` loads it through `require(esm)`. On older versions, use `await import("sidwave")`.
 
 ## More
