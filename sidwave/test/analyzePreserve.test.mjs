@@ -12,7 +12,6 @@ import { seededSid } from "./helpers/analyzeKit.mjs";
 
 const dirs = [];
 const temp = () => { const d = mkdtempSync(join(tmpdir(), "sidwave-preserve-")); dirs.push(d); return d; };
-test.after?.(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
 
 const make = (sid, extra = {}) => createPreservation(sid, { engine: sharedEngine(), seconds: 3, level: "A0", ...extra });
 
@@ -184,4 +183,8 @@ test("STIL entries are copied from a local STIL file by their HVSC path", () => 
 
 test("a subtune outside the file is rejected", async () => {
   await assert.rejects(() => make(seededSid("basic", 1), { song: 2 }), /song 2 is outside 1\.\.1/);
+});
+
+test("temporary directories of this file are removed", () => {
+  for (const d of dirs) rmSync(d, { recursive: true, force: true });
 });
