@@ -121,7 +121,7 @@ sidwave watch song.yaml --no-play --json                # check only, one JSON o
 | --- | --- | --- |
 | `local` (default) | The libsidplayfp engine renders in 20 ms slices into `paplay`, `pw-play`, `aplay`, `ffplay`, `mpv` or sox `play`, the first one on `PATH`. `--player` or `SIDWAVE_PLAYER` names another program, which receives a WAV stream on standard input. | Needs the optional package `libsidplayfp-wasm`. Plays at most 3 SIDs. Does not play digi samples; the other voices of such a score are played. |
 | `vice` | `vsid` for a SID file, else `x64sc` or `x64` with the PRG, without a window. `--vice` or `SIDWAVE_VICE` names the program, `--vice-arg` passes arguments to it. | Needed for digi samples (PRG) and 4 SIDs. Your VICE settings apply; they are not saved. |
-| `u64` | The Ultimate REST API: upload and run (`runners:sidplay`, or `runners:run_prg` for a score with samples, more than 3 SIDs or `cpu: turbo`), and `machine:reset` to stop. | Only with `--target u64 --host <h>`. The network password is read from `SIDWAVE_U64_PASSWORD`. Redirects are refused. `--detach` leaves the machine playing. The command does not change the device configuration. |
+| `u64` | The Ultimate REST API: upload and run (`runners:sidplay`, or `runners:run_prg` for a score with samples, more than 3 SIDs or `cpu: turbo`), and `machine:reset` to stop. | Only with `--target u64 --host <h>`. The network password is read from `SIDWAVE_U64_PASSWORD`. Redirects are refused. Under Bun, nothing is sent while a proxy variable applies to the host, because Bun would send the password to the proxy. `--detach` leaves the machine playing. The command does not change the device configuration. |
 
 Behaviour:
 
@@ -131,7 +131,7 @@ Behaviour:
 - `--solo` and `--mute` take voice ids, voice names or digi voice ids. A voice that echoes, follows or doubles another voice is heard only together with its source. Ring modulation, hard sync and a shared filter still depend on the voices that were silenced.
 - `--from-bar` cuts the score at the section that contains the bar. The local target then discards the audio up to the bar and starts exactly there. VICE and the Ultimate start at the first bar of that section. Voice state that earlier sections would have left behind is not reproduced.
 - `--loop-section` loops one section, named or given by its position in the timeline. If its last note is too short to be followed by its first note, a bar of rest separates the repeats, and the command says so.
-- `watch` watches the directories of the score, of the `file:` samples it reads and of the libraries it imports, so it follows editors that save by renaming a new file over the old one. It waits for 60 ms without changes (`--debounce`). A save that changes nothing does not restart the music. An invalid version is reported as `file:line:column` and the last valid version keeps playing.
+- `watch` watches the directories of the score, of the `file:` samples it reads and of the libraries it imports, so it follows editors that save by renaming a new file over the old one. It also follows the targets of symbolic links and directories that are removed and created again. It waits for 60 ms without changes (`--debounce`). A save that changes nothing does not restart the music. An invalid version is reported as `file:line:column` and the last valid version keeps playing.
 
 Library: `sidwave/play` exports `readPlaySource`, `buildPlayTune`, `openPlayTarget`, `watchScore`, `selectScore` and the targets.
 

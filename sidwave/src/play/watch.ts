@@ -6,7 +6,7 @@
 // so that an editor which replaces a file by renaming another one over it keeps being followed.
 
 import { createHash } from "node:crypto";
-import { readFileSync, statSync, watch, type FSWatcher } from "node:fs";
+import { readFileSync, realpathSync, statSync, watch, type FSWatcher } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { parse as parseYaml } from "yaml";
@@ -58,7 +58,8 @@ const hashOf = (content: string | Uint8Array): string => createHash("sha256").up
 
 const contentOf = (path: string): string => {
   try {
-    return hashOf(readFileSync(path));
+    // A pipe or a device named as a sample would block the watch or never end.
+    return statSync(path).isFile() ? hashOf(readFileSync(path)) : "not a file";
   } catch {
     return "missing";
   }
@@ -72,6 +73,30 @@ const signatureOf = (path: string): string => {
     return "missing";
   }
 };
+
+/** Differs when a directory was removed and created again; undefined while there is none. */
+const directoryOf = (path: string): string | undefined => {
+  try {
+    const s = statSync(path);
+    return s.isDirectory() ? `${s.dev}:${s.ino}:${s.birthtimeMs}` : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The directories to watch for `file`: its own and, behind a symbolic link, that of the target. While a directory is
+ * missing, the nearest one above it that exists is watched instead, which reports its return.
+ */
+function directoriesOf(file: string): string[] {
+  const files = [file];
+  try { files.push(realpathSync(file)); } catch { /* missing */ }
+  return files.map((f) => {
+    let dir = dirname(f);
+    while (directoryOf(dir) === undefined && dirname(dir) !== dir) dir = dirname(dir);
+    return dir;
+  });
+}
 
 /** The files named by the `imports` of a score, directly and through other libraries, as far as they can be read. */
 function libraryFiles(text: string, scorePath: string, allowDirs: readonly string[]): string[] {
@@ -99,7 +124,7 @@ export async function watchScore(options: WatchOptions): Promise<WatchSummary> {
   const summary: WatchSummary = { builds: 0, errors: 0, ok: false };
 
   const signatures = new Map<string, string>();
-  const watchers = new Map<string, FSWatcher>();
+  const watchers = new Map<string, { watcher: FSWatcher; identity: string | undefined }>();
   /** The content of every file the last build read, as it was before the build read it. */
   let built = new Map<string, string>();
   let current: Playback | undefined;
@@ -135,28 +160,47 @@ export async function watchScore(options: WatchOptions): Promise<WatchSummary> {
     timer = setTimeout(run, debounce);
   };
 
-  const check = () => { if (changed()) schedule(); };
+  const unwatch = (dir: string) => {
+    watchers.get(dir)?.watcher.close();
+    watchers.delete(dir);
+  };
 
-  const follow = (files: string[]) => {
-    for (const watched of files) if (!signatures.has(watched)) signatures.set(watched, signatureOf(watched));
-    for (const dir of new Set(files.map((f) => dirname(f)))) {
+  /** Watches the directories of the followed files, also after one was removed and created again. */
+  const refresh = () => {
+    // The watcher of a removed directory reports nothing about its successor.
+    for (const [dir, { identity }] of watchers) if (directoryOf(dir) !== identity) unwatch(dir);
+    for (const dir of new Set([...signatures.keys()].flatMap(directoriesOf))) {
       if (watchers.has(dir)) continue;
+      const identity = directoryOf(dir);
       try {
         // Every event of the directory leads to a look at the watched files only; other files are ignored that way.
         const watcher = watch(dir, check);
         watcher.on("error", (error) => {
           if (dir === dirname(path)) fail(new SidwaveOperationError("input", `cannot watch ${dir}: ${error.message}`, { file: dir }));
-          else {
-            // The directory of a sample or library went away; it is watched again when a build reads from it.
-            watcher.close();
-            watchers.delete(dir);
-          }
+          // The directory of a sample or library went away; the next look at the files watches it again.
+          else unwatch(dir);
         });
-        watchers.set(dir, watcher);
+        watchers.set(dir, { watcher, identity });
       } catch (error) {
         if (dir === dirname(path)) throw new SidwaveOperationError("input", `cannot watch ${dir}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: dir });
       }
     }
+  };
+
+  const check = () => {
+    if (ended) return;
+    try {
+      refresh();
+    } catch (error) {
+      fail(error);
+      return;
+    }
+    if (changed()) schedule();
+  };
+
+  const follow = (files: string[]) => {
+    for (const watched of files) if (!signatures.has(watched)) signatures.set(watched, signatureOf(watched));
+    refresh();
   };
 
   /** Starts `tune` in place of what plays and returns the event that says so. */
@@ -292,7 +336,7 @@ export async function watchScore(options: WatchOptions): Promise<WatchSummary> {
   } finally {
     ended = true;
     clearTimeout(timer);
-    for (const watcher of watchers.values()) watcher.close();
+    for (const { watcher } of watchers.values()) watcher.close();
     // Stopping first releases a rebuild that waits for the player to start.
     const report = (error: unknown) => options.onEvent({ type: "playback-error", message: classifyError(error).message });
     const stopped = current;

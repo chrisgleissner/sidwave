@@ -12,7 +12,7 @@ import { findVice, startVicePlayback, viceArguments } from "../src/play/vice.ts"
 import { startUltimatePlayback, ultimateBaseUrl, ultimatePlay } from "../src/play/ultimate.ts";
 import { openPlayTarget } from "../src/play/session.ts";
 import { liveChildCount } from "../src/play/children.ts";
-import { fakePrograms, fakeUltimate, sandbox, within } from "./helpers/playKit.mjs";
+import { fakePrograms, fakeUltimate, sandbox, sleep, within } from "./helpers/playKit.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const score = () => parseSidwave(readExampleScore("chiptune_drive"), confinedReadOptions(root));
@@ -266,6 +266,66 @@ test("stopping during an upload that does not answer cancels it and resets", asy
     assert.equal(server.requests.all.at(-1).url, "/v1/machine:reset");
     await assert.rejects(ultimatePlay({ host: server.host, timeoutMs: 50 }, { kind: "sid", bytes: sid }), /no answer within 0\.05 s/);
   } finally { await server.close(); }
+});
+
+test("a password that cannot be a header value is refused without being quoted", async () => {
+  const server = await fakeUltimate();
+  try {
+    for (const password of ["secret\npw", "secret\u20acpw"]) {
+      const error = await ultimatePlay({ host: server.host, password }, { kind: "sid", bytes: sid }).then(() => assert.fail("should fail"), (e) => e);
+      assert.match(error.message, /SIDWAVE_U64_PASSWORD\) holds a line break or another character/);
+      assert.doesNotMatch(error.message, /secret|pw|8364|index/);
+    }
+    assert.equal(server.requests.all.length, 0);
+    await ultimatePlay({ host: server.host, password: " secret-pw\r\n" }, { kind: "sid", bytes: sid });
+    assert.equal((await server.requests.next()).headers["x-password"], "secret-pw");
+  } finally { await server.close(); }
+});
+
+test("a proxy in the environment never receives the request", async () => {
+  const server = await fakeUltimate();
+  const names = ["http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY", "no_proxy", "NO_PROXY"];
+  const saved = names.map((name) => [name, process.env[name]]);
+  try {
+    for (const name of names) delete process.env[name];
+    process.env.HTTP_PROXY = "http://127.0.0.1:1";
+    const upload = () => ultimatePlay({ host: server.host, password: "secret-pw" }, { kind: "sid", bytes: sid });
+    if (process.versions.bun) {
+      // Bun would use the proxy, so nothing is sent unless every NO_PROXY spelling excludes the device.
+      await assert.rejects(upload(), /through the proxy in HTTP_PROXY; unset it or add 127\.0\.0\.1 to NO_PROXY/);
+      process.env.NO_PROXY = "other, 127.0.0.1";
+      process.env.no_proxy = "other";
+      await assert.rejects(upload(), /through the proxy/);
+      assert.equal(server.requests.all.length, 0);
+    } else {
+      // Node connects to the device itself: the proxy address of this test accepts nothing.
+      await upload();
+      assert.equal(server.requests.all.length, 1);
+    }
+  } finally {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+    await server.close();
+  }
+});
+
+test("replacing a tune waits for a reset that is under way", async () => {
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const server = await fakeUltimate((request) => ({ status: 200, body: { errors: [] }, ...(request.url === "/v1/machine:reset" ? { after: held } : {}) }));
+  try {
+    const playback = startUltimatePlayback({ device: { host: server.host }, tune: { kind: "sid", bytes: sid } });
+    await playback.started;
+    const ending = playback.stop("end");
+    await server.requests.next((r) => r.url === "/v1/machine:reset");
+    let replaced = false;
+    const replacing = playback.stop("replace").then(() => { replaced = true; });
+    await sleep(50);
+    assert.equal(replaced, false, "the next tune is not sent before the reset has arrived");
+    release();
+    await within(Promise.all([ending, replacing]), "the end of the reset");
+  } finally { release(); await server.close(); }
 });
 
 test("only a plain host name or address is accepted for the Ultimate", () => {

@@ -46,14 +46,16 @@ export function exitOf(child: ChildProcess): Promise<ChildExit> {
 
 /** Sends SIGTERM, then SIGKILL after `graceMs`, and waits until the process has ended. */
 export async function stopChild(child: ChildProcess, graceMs = 500): Promise<void> {
-  if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
-  const exited = exitOf(child);
-  child.kill("SIGTERM");
-  const force = setTimeout(() => child.kill("SIGKILL"), graceMs);
+  let force: NodeJS.Timeout | undefined;
   try {
+    if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
+    const exited = exitOf(child);
+    child.kill("SIGTERM");
+    force = setTimeout(() => child.kill("SIGKILL"), graceMs);
     await exited;
   } finally {
     clearTimeout(force);
+    // A process that the program started may still hold the pipes, which would keep this process alive.
     child.stdin?.destroy();
     child.stdout?.destroy();
     child.stderr?.destroy();

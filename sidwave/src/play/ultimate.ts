@@ -25,11 +25,41 @@ export function ultimateBaseUrl(host: string): string {
   return `http://${host}`;
 }
 
+/**
+ * The password as fetch sends it. A password that cannot be a header value is refused here, because the error of the
+ * runtime would quote it.
+ */
+function headerPassword(password: string | undefined): string | undefined {
+  const value = password?.replace(/^[\t\n\r ]+|[\t\n\r ]+$/g, "");
+  if (value && /[^\t\x20-\x7e\x80-\xff]/.test(value)) {
+    throw new SidwaveOperationError("engine_unavailable", `the network password (${ULTIMATE_PASSWORD_VARIABLE}) holds a line break or another character that cannot be sent in an HTTP header`);
+  }
+  return value || undefined;
+}
+
+/**
+ * Bun sends requests through the proxy of the environment and has no per-request way to prevent it. The proxy would
+ * receive the tune and the password, so the request is not sent unless NO_PROXY excludes the device.
+ */
+function refuseBunProxy(base: string, host: string): void {
+  if (!process.versions.bun) return;
+  const { env } = process;
+  const variable = ["http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY"].find((name) => env[name]);
+  if (!variable) return;
+  const name = new URL(base).hostname;
+  // Bun versions differ in which spelling wins, so every one that is set has to exclude the host.
+  const excluded = [env.no_proxy, env.NO_PROXY].filter((value) => value !== undefined);
+  if (excluded.length && excluded.every((value) => value.split(",").some((entry) => entry.trim() === "*" || entry.trim() === name))) return;
+  throw new SidwaveOperationError("engine_unavailable", `${host}: Bun would send the request through the proxy in ${variable}; unset it or add ${name} to NO_PROXY, or run sidwave with Node`, { host });
+}
+
 async function request(device: UltimateDevice, method: "POST" | "PUT", path: string, body: FormData | Uint8Array<ArrayBuffer> | undefined, signal?: AbortSignal): Promise<void> {
   const base = ultimateBaseUrl(device.host);
-  const hide = (text: string) => (device.password ? text.split(device.password).join("<password>") : text);
+  refuseBunProxy(base, device.host);
+  const password = headerPassword(device.password);
+  const hide = (text: string) => (password ? text.split(password).join("<password>") : text);
   const headers: Record<string, string> = {};
-  if (device.password) headers["X-Password"] = device.password;
+  if (password) headers["X-Password"] = password;
   if (body instanceof Uint8Array) headers["Content-Type"] = "application/octet-stream";
   const timeout = AbortSignal.timeout(device.timeoutMs ?? 10_000);
   const fail = (message: string) => new SidwaveOperationError("engine_unavailable", hide(`${device.host}: ${message}`), { host: device.host });
@@ -126,6 +156,8 @@ export function startUltimatePlayback(options: UltimatePlaybackOptions): Playbac
       // An upload that was cut off may still have started the tune, so the reset is sent in that case too.
       const failedBeforeStop = await started.promise.then(() => false, () => true);
       if (reason === "replace" || options.detach || failedBeforeStop) {
+        // A reset that is under way must not arrive after the tune that follows.
+        await ending?.catch(() => {});
         done.resolve();
         return;
       }

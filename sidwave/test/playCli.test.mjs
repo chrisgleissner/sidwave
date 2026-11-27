@@ -20,11 +20,18 @@ async function world(body) {
   // Whatever a test leaves running when it fails is ended here, so that a failure never hangs the run.
   const stop = new AbortController();
   const children = [];
+  // A command that wrongly gets as far as playing finds these instead of the player and VICE of the system.
+  const saved = { SIDWAVE_PLAYER: process.env.SIDWAVE_PLAYER, SIDWAVE_VICE: process.env.SIDWAVE_VICE };
+  process.env.SIDWAVE_PLAYER = programs.program("unwanted/player", "fail");
+  process.env.SIDWAVE_VICE = programs.program("unwanted/vsid", "vice-fail");
   try {
     box.write("song.yaml", SCORE);
     box.write("tune.sid", SID);
     await body({ box, programs, stop, children, player: programs.program("player", "player"), listener: programs.program("listener", "slow") });
   } finally {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
     stop.abort();
     for (const child of children) child.kill("SIGKILL");
     await programs.close();
@@ -54,7 +61,7 @@ test("play and watch are listed and explain themselves with examples", async () 
 });
 
 test("wrong options are usage errors that name the fix", async () => {
-  await world(async ({ box, player }) => {
+  await world(async ({ box, programs, player }) => {
     const cases = [
       [["play"], /play needs exactly one file/],
       [["play", "a", "b"], /exactly one file/],
@@ -77,6 +84,9 @@ test("wrong options are usage errors that name the fix", async () => {
       [["play", "song.yaml", "--bogus"], /unknown option --bogus/],
       [["watch"], /watch needs exactly one score file/],
       [["watch", "song.yaml", "--seconds", "1"], /unknown option --seconds/],
+      [["watch", "song.yaml", "--allow-dir", "--no-play"], /--allow-dir needs a value, not the option --no-play/],
+      [["watch", "song.yaml", "--vice-arg", "--no-play", "--target", "vice"], /--vice-arg needs a value/],
+      [["play", "song.yaml", "--solo", "--help-me"], /--solo needs a value/],
     ];
     for (const [args, message] of cases) {
       const result = await cli(box.dir, args).done;
@@ -84,6 +94,7 @@ test("wrong options are usage errors that name the fix", async () => {
       assert.match(result.err, message);
       assert.match(result.err, new RegExp(`sidwave ${args[0]} --help`));
     }
+    assert.equal(programs.starts().length, 0, "nothing was started");
   });
 });
 

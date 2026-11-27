@@ -117,17 +117,18 @@ export async function fakePrograms(dir) {
   };
 }
 
-/** A fake Ultimate REST server. `behaviour(request)` returns { status, body, headers } or "hang". */
+/** A fake Ultimate REST server. `behaviour(request)` returns { status, body, headers, after } or "hang"; the reply waits for `after`. */
 export async function fakeUltimate(behaviour = () => ({ status: 200, body: { errors: [] } })) {
   const requests = eventQueue();
   const server = http.createServer((request, response) => {
     const chunks = [];
     request.on("data", (chunk) => chunks.push(chunk));
-    request.on("end", () => {
+    request.on("end", async () => {
       const record = { method: request.method, url: request.url, headers: request.headers, body: Buffer.concat(chunks) };
       requests.push(record);
       const reply = behaviour(record);
       if (reply === "hang") return;
+      await reply.after;
       response.writeHead(reply.status, { "content-type": "application/json", ...(reply.headers ?? {}) });
       response.end(typeof reply.body === "string" ? reply.body : JSON.stringify(reply.body ?? {}));
     });

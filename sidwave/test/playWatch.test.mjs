@@ -224,6 +224,57 @@ test("a failed replacement leaves the earlier playback to be stopped at the end"
   });
 });
 
+// Bun before 1.4 loses events after a directory was removed or a file replaced.
+const oldBun = process.versions.bun && /^1\.[0-3]\./.test(process.versions.bun) && "fs.watch of this Bun version loses events";
+
+test("watch keeps following a score whose directory is removed and created again", { skip: oldBun }, async () => {
+  const box = sandbox("sidwave-watch-dir-");
+  const dir = path.join(box.dir, "project", "music");
+  const file = path.join(dir, "song.yaml");
+  const events = eventQueue();
+  const stop = new AbortController();
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(file, SCORE);
+  const summary = watchScore({ file, cwd: box.dir, target: "local", debounceMs: 30, signal: stop.signal, onEvent: (e) => events.push(e) });
+  summary.catch(() => {});
+  const bpm = async (tempo) => {
+    fs.writeFileSync(file, SCORE.replace("title: Watched", `title: T${tempo}`));
+    await events.next((e) => e.type === "ok" && e.title === `T${tempo}`, `the build of T${tempo}`);
+  };
+  try {
+    await events.next((e) => e.type === "ok", "the first build");
+    // Removed and back at once.
+    fs.rmSync(dir, { recursive: true });
+    fs.mkdirSync(dir);
+    await bpm(1);
+    await bpm(2);
+    // Removed with its parent, and back later.
+    fs.rmSync(path.join(box.dir, "project"), { recursive: true });
+    await events.next((e) => e.type === "missing", "the missing file");
+    fs.mkdirSync(dir, { recursive: true });
+    await bpm(3);
+    await bpm(4);
+  } finally {
+    stop.abort();
+    await within(summary.catch(() => {}), "the end of the watch");
+    box.done();
+  }
+});
+
+test("watch follows the target of a symbolic link", { skip: oldBun || (process.platform === "win32" && "needs symbolic links") }, async () => {
+  await watching({ player: undefined }, async ({ box, file, next }) => {
+    await next("ok");
+    const other = path.join(box.dir, "other");
+    fs.mkdirSync(other);
+    fs.writeFileSync(path.join(other, "real.yaml"), SCORE.replace("title: Watched", "title: Linked"));
+    fs.symlinkSync(path.join(other, "real.yaml"), `${file}.link`);
+    fs.renameSync(`${file}.link`, file);
+    assert.equal((await next("ok")).title, "Linked");
+    fs.writeFileSync(path.join(other, "real.yaml"), SCORE.replace("title: Watched", "title: Edited"));
+    assert.equal((await next("ok")).title, "Edited");
+  });
+});
+
 test("a watch on a missing file fails; an already aborted watch ends at once", async () => {
   const box = sandbox("sidwave-watch-none-");
   try {

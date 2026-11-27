@@ -110,8 +110,17 @@ function oneOf<T extends string>(flag: string, text: string, values: readonly T[
 
 interface Selected { tune: Omit<TuneOptions, "file">; target: () => TargetOptions; allowDirs: string[] }
 
+/**
+ * An option written where a value belongs would be taken as that value: after "--allow-dir --no-play" the watch would
+ * play. Only VICE arguments start with "-", and none with "--".
+ */
+function checkValues(p: ParsedFlags): void {
+  for (const [flag, value] of p.order) if (value.startsWith("--")) throw new UsageError(`${flag} needs a value, not the option ${value}`);
+}
+
 /** The options both commands share. */
 function sharedOptions(io: CliIo, p: ParsedFlags): Selected {
+  checkValues(p);
   const kind: PlayTarget = oneOf("--target", last(p, "--target") ?? "local", ["local", "vice", "u64"] as const);
   const only = (target: PlayTarget, flags: string[]) => {
     for (const flag of flags) {
