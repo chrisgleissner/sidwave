@@ -11,7 +11,7 @@ import { compileSidwaveBytes } from "../sidwaveOps.js";
 import { psidClock, type SidEngine } from "../engine/libsidplayfp.js";
 import { fdiff, REGISTER_CLASSES, type FDiffResult, type RegisterClass } from "./fdiff.js";
 import { buildIr, type FrameIr, type IrClock } from "./ir.js";
-import { isInitCall, recoverScore, type LanguageExtension, type RecoveredScore, type UnsupportedFeature } from "./recover.js";
+import { leadingCalls, recoverScore, type LanguageExtension, type RecoveredScore, type UnsupportedFeature } from "./recover.js";
 
 /** The longest horizon when the caller gives none: the design's 180 s cap. */
 export const DEFAULT_HORIZON_SECONDS = 180;
@@ -112,7 +112,7 @@ export function summariseFdiff(result: FDiffResult, alignment: { expectedCall: n
 /** F-diff of two IRs at the alignment (of three candidates) with the fewest differing calls. */
 export function bestFdiff(expected: FrameIr, observed: FrameIr, firstExpected = 0): FDiffSummary {
   let best: FDiffSummary | undefined;
-  const firstObserved = isInitCall(observed, 0) ? 1 : 0;
+  const firstObserved = leadingCalls(observed);
   // The first candidate skips the init call of each trace; the others cover tunes whose first call is not an init.
   const candidates: Array<readonly [number, number]> = [[firstExpected, firstObserved], [0, 0], [0, 1], [1, 0], [1, 1]];
   for (const [e, o] of candidates) {

@@ -82,6 +82,10 @@ export const MAX_TABLE_STEPS_TOTAL = 255;
 export const HARD_RESTART_MAX_FRAMES = 8;
 /** The 1.4 player ramps the volume over its first 15 frames; a tune whose volume is 15 for this many frames has no ramp. */
 export const SOFT_START_FRAMES = 20;
+/** The most leading calls skipped as start-up when the init does not write every register. */
+export const INIT_MAX_LEADING = 6;
+/** A spacing within this share of the call period counts as regular when the start-up calls are told apart (a first note call can delay the next call by a few percent). */
+export const INIT_SPACING_TOLERANCE = 0.1;
 /** Spacing deviation (relative) up to which the call rate counts as an integer multiple of the frame rate. */
 export const CALL_RATE_TOLERANCE = 0.02;
 
@@ -308,6 +312,25 @@ export function isInitCall(ir: FrameIr, index: number): boolean {
   const sid = call.sids[0];
   if (!sid || (sid.written & 0x1ffffff) !== 0x1ffffff) return false;
   return true;
+}
+
+/**
+ * Number of calls at the start of the IR that are the player's start-up and not rows of the score: one init call that writes
+ * every register, or, when the init does not (it can write only the master volume), the leading calls whose spacing to
+ * the next call is irregular. At several calls per frame the first play call can follow the init by a fraction of a period,
+ * and the call after it by more than a period. At most INIT_MAX_LEADING calls are skipped.
+ */
+export function leadingCalls(ir: FrameIr): number {
+  // A call that writes every register within the first calls is the init; the calls before it are start-up too.
+  for (let i = 0; i < Math.min(INIT_MAX_LEADING, ir.calls.length); i++) if (isInitCall(ir, i)) return i + 1;
+  let skipped = 0;
+  while (skipped < INIT_MAX_LEADING && skipped + 1 < ir.calls.length) {
+    const spacing = ir.calls[skipped + 1]!.startCycle - ir.calls[skipped]!.startCycle;
+    if (Math.abs(spacing - ir.periodCycles) <= INIT_SPACING_TOLERANCE * ir.periodCycles) break;
+    if (skipped === 0 && ir.calls[0]!.sids[0]!.written !== 1 << 24) break;
+    skipped++;
+  }
+  return skipped;
 }
 
 function reproducer(ir: FrameIr, sid: number, voice: number, call: number): Reproducer {
@@ -1050,7 +1073,7 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   };
 
   if (ir.calls.length < 2) throw new Error("the trace holds fewer than two player calls");
-  const firstCall = isInitCall(ir, 0) ? 1 : 0;
+  const firstCall = leadingCalls(ir);
   const rows = ir.calls.length - firstCall;
   const exact = ir.callsPerFrameExact;
   const speed = Math.max(1, ir.callsPerFrame);

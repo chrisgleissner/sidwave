@@ -79,10 +79,7 @@ test("a score with speed 5 recovers to a compilable 1.5 score and keeps the call
   assert.equal(r.report.callRate.callsPerFrame, 5);
 });
 
-test("a score with speed 5 round trips with the register state exact", {
-  timeout: 120_000,
-  todo: "open: the soft-start misdetection is fixed (the volume ramp is now kept), but the first difference is volume at call 0: the original IR starts at call 0 as its own init call while the recompiled IR skips one, so the alignment is off by one call; not isolated yet",
-}, async () => {
+test("a score with speed 5 round trips with the register state exact", { timeout: 120_000 }, async () => {
   const unit = 1 / 80;
   const score = {
     sidwave: "1.5", title: "five", tempo: 60 * 50.1245 / 16, mode: "PAL", speed: 5,
@@ -219,3 +216,19 @@ test("1.5 constructs in a 1.4 document name the version: pulse width 0, wavetabl
   assert.throws(() => parseSidwave(songs("1.4", 6)), /speed/);
   assert.equal(parseSidwave(songs("1.5", 6)).songs[0].speed, 6);
 });
+
+for (const speed of [2, 4, 8]) {
+  test(`a score with speed ${speed} round trips with the register state exact`, {
+    timeout: 120_000,
+    ...(speed === 8 ? { todo: "open: at speed 8 the first note is one call shorter in the recompiled trace (gate off at call 29 instead of 30): the start-up of the player shifts the first note against the row grid" } : {}),
+  }, async () => {
+    const score = {
+      sidwave: "1.5", title: "multi", tempo: 60 * 50.1245 / 16, mode: "PAL", speed,
+      instruments: { lead: { waveform: "pulse", adsr: [0, 4, 12, 3], hard_restart: { frames: 0 } } },
+      voices: [{ id: 1, instrument: "lead", patterns: { a: { length: 1 / (16 * speed), bars: 1, groove: Array.from({ length: 16 }, (_, i) => ({ note: i % 2 ? "C5" : "A4", len: 0.25 })) } } }],
+      timeline: [{ section: "Main", bars: 2, layers: { v1: "a" } }],
+    };
+    const r = await roundTrip(score, 3);
+    assert.equal(r.report.registerStateExact, true, JSON.stringify(r.report.fdiffState.first));
+  });
+}
