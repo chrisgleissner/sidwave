@@ -209,6 +209,7 @@ export function exportEvents(doc: ParsedSidwave, options: EventExportOptions = {
   const tempoMap: ExportedTempo[] = [];
   const timeSignatures: ExportedTimeSignature[] = [];
   const sections: ExportedSection[] = [];
+  const ramps: Array<{ start: number; end: number; tempo: number; slope: number }> = [];
   const pushTempo = (beat: number, seconds: number, bpm: number) => {
     const value = round6(bpm);
     const last = tempoMap[tempoMap.length - 1];
@@ -224,7 +225,8 @@ export function exportEvents(doc: ParsedSidwave, options: EventExportOptions = {
       if (typeof item.section.tempo === "object") {
         const slope = (item.section.tempo.to - tempo) / length;
         for (let beat = item.startBeat; beat < item.endBeat - 1e-9; beat += 1) pushTempo(beat, item.at(beat), tempo + slope * (beat - item.startBeat));
-        losses.push("Tempo ramps are exported as one tempo change per beat.");
+        ramps.push({ start: item.startBeat, end: item.endBeat, tempo, slope });
+        losses.push("Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant.");
       } else pushTempo(item.startBeat, item.startTime, tempo);
       const meter = item.section.meter ?? legacyMeter;
       const beatsPerBar = meter?.beats ?? doc.song.meter;
@@ -308,6 +310,28 @@ export function exportEvents(doc: ParsedSidwave, options: EventExportOptions = {
   }
   if ([...used].some((i) => arr.instruments[i]!.pulsetable || arr.instruments[i]!.pwStep)) losses.push("Pulse width modulation is described per instrument but not exported as events.");
   losses.push("Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument.");
+
+  // A ramp is linear in beats, a stepped tempo map is constant between entries: add an entry at every note start inside
+  // a ramp, so a note's tick and its time agree to within the tempo change between two neighbouring notes.
+  if (ramps.length) {
+    const have = new Set(tempoMap.map((t) => t.tick));
+    for (const note of notesOut) {
+      const beat = note.on.tick / ppq;
+      const ramp = ramps.find((r) => beat >= r.start && beat < r.end);
+      if (!ramp || have.has(note.on.tick)) continue;
+      have.add(note.on.tick);
+      tempoMap.push({ tick: note.on.tick, time: note.on.time, bpm: round6(ramp.tempo + ramp.slope * (beat - ramp.start)) });
+    }
+    tempoMap.sort((a, b) => a.tick - b.tick);
+    // Inside a ramp, set each entry's tempo to the mean tempo up to the next entry, so the stepped map reproduces the
+    // exact time of every entry (the error between entries is the deviation of the ramp from its mean, not accumulated).
+    for (let i = 0; i + 1 < tempoMap.length; i++) {
+      const here = tempoMap[i]!, next = tempoMap[i + 1]!;
+      if (!ramps.some((r) => here.tick / ppq >= r.start && here.tick / ppq < r.end) || next.time <= here.time) continue;
+      here.bpm = round6((next.tick - here.tick) / ppq * 60 / (next.time - here.time));
+    }
+    for (let i = tempoMap.length - 1; i > 0; i--) if (tempoMap[i]!.bpm === tempoMap[i - 1]!.bpm) tempoMap.splice(i, 1);
+  }
 
   const instruments = [...used].sort((a, b) => a - b).map((index) => describeInstrument(arr.instruments[index]!, index, fps, instrumentNames.get(index)));
 

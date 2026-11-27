@@ -47,6 +47,14 @@ export async function runRender(args: string[], io: CliIo): Promise<number> {
       if (error instanceof RangeError || (error instanceof Error && /^stems? /.test(error.message))) throw new InterchangeUsageError(error.message);
       throw error;
     }
+    // Check every target first so that a refusal leaves no partial output.
+    const targets = a.flags.has("--stems")
+      ? [join(output ?? `${stem}-stems`, `${stem}.mix.wav`), ...result.stems.map((s) => join(output ?? `${stem}-stems`, `${stem}.v${s.voices.join("+v")}.wav`)), join(output ?? `${stem}-stems`, `${stem}.stems.json`)]
+      : [output ?? `${stem}.wav`];
+    if (!a.flags.has("--force")) {
+      const taken = targets.map((t) => resolve(io.cwd, t)).find((t) => existsSync(t));
+      if (taken) throw new InterchangeUsageError(`${taken} exists; use --force to overwrite it`);
+    }
     const files: Array<{ kind: string; path: string; bytes: number; voices?: number[] }> = [];
     const put = (path: string, data: Uint8Array | string, kind: string, voices?: number[]) => {
       const target = resolve(io.cwd, path);
@@ -63,10 +71,12 @@ export async function runRender(args: string[], io: CliIo): Promise<number> {
       for (const s of result.stems) put(join(dir, `${stem}.v${s.voices.join("+v")}.wav`), writeWav(s.samples, result.sampleRate), "stem", s.voices);
       const manifest = {
         score: file, sampleRate: result.sampleRate, seconds: result.seconds, engine: result.engine,
-        additive: result.additive,
+        additive: result.additive, energyRatio: result.sumError.energyRatio, energyWithinTolerance: result.energyWithinTolerance,
         note: result.additive
-          ? `The stems add up to the mix in energy within ${STEM_ENERGY_TOLERANCE * 100}% (not sample by sample); each stem has the idle SID baseline removed.`
-          : "NON-ADDITIVE: the voices influence each other (see coupling), so the stems do not add up to the mix.",
+          ? `Measured energy ratio ${result.sumError.energyRatio.toFixed(3)}: the stems add up to the mix in energy within ${STEM_ENERGY_TOLERANCE * 100}% (not sample by sample); each stem has the idle SID baseline removed.`
+          : result.coupling.length
+            ? `NON-ADDITIVE: the voices influence each other (see coupling), so the stems do not add up to the mix. Measured energy ratio ${result.sumError.energyRatio.toFixed(3)}.`
+            : `NON-ADDITIVE: the measured energy ratio ${result.sumError.energyRatio.toFixed(3)} is outside the tolerance of ${STEM_ENERGY_TOLERANCE * 100}%.`,
         coupling: result.coupling, sumError: result.sumError, files,
       };
       put(join(dir, `${stem}.stems.json`), `${JSON.stringify(manifest, null, 2)}\n`, "manifest");

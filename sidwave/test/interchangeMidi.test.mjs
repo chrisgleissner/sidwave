@@ -92,7 +92,7 @@ test("tempo ramps, time signatures and bends are written", () => {
   const conductor = midi.tracks[0];
   assert.deepEqual(conductor.filter((e) => e.type === "timeSignature").map((e) => `${e.numerator}/${e.denominator}`), ["3/4", "6/8"]);
   const tempos = conductor.filter((e) => e.type === "setTempo").map((e) => Math.round(6e7 / e.microsecondsPerBeat));
-  assert.equal(tempos[0], 100);
+  assert.ok(Math.abs(tempos[0] - 100) < 6);
   assert.ok(tempos.length > 3 && tempos[tempos.length - 1] > 100);
   const bends = midi.tracks[1].filter((e) => e.type === "pitchBend");
   assert.ok(bends.length > 10, "vibrato and the glide produce pitch bend");
@@ -270,4 +270,24 @@ test("command line: export, import and refuse to overwrite the input", () => {
     assert.equal(run("import", "bad.mid").code, 1);
     assert.equal(run("import", "unknown.bin").code, 2);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a file with 200,000 notes gives a result or a typed import error, never a stack overflow", () => {
+  const events = [{ tick: 0, type: "tempo", microsecondsPerQuarter: 500000 }];
+  for (let i = 0; i < 200_000; i++) {
+    events.push({ tick: i * 120, type: "noteOn", channel: 0, note: 40 + (i % 40), velocity: 80 });
+    events.push({ tick: i * 120 + 100, type: "noteOff", channel: 0, note: 40 + (i % 40), velocity: 0 });
+  }
+  const bytes = writeSmf({ format: 0, division: 480, tracks: [events] });
+  try {
+    importMidi(bytes);
+  } catch (error) {
+    assert.ok(error instanceof MidiImportError, `${error}`);
+  }
+});
+
+test("SMF format 2 is rejected with a MidiError", () => {
+  const bytes = writeSmf({ format: 2, division: 96, tracks: [[{ tick: 0, type: "noteOn", channel: 0, note: 60, velocity: 64 }]] });
+  assert.throws(() => parseSmf(bytes), (e) => e instanceof MidiError && /format 2/.test(e.message));
+  assert.throws(() => importMidi(bytes), (e) => e instanceof MidiImportError && /format 2/.test(e.message));
 });

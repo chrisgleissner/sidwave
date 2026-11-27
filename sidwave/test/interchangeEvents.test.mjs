@@ -79,9 +79,8 @@ test("section metre and tempo ramps appear in the maps", () => {
   const exported = exportEvents(doc);
   assert.deepEqual(exported.timeSignatures.map((s) => `${s.numerator}/${s.denominator}@${s.bar}`), ["3/4@1", "6/8@3"]);
   assert.ok(exported.tempoMap.length > 2, "a ramp becomes one tempo per beat");
-  assert.equal(exported.tempoMap[0].bpm, 100);
-  const bpms = exported.tempoMap.map((t) => t.bpm);
-  assert.ok(bpms[bpms.length - 1] > 100 && bpms.every((b, i) => i === 0 || b >= bpms[i - 1]));
+  assert.ok(Math.abs(exported.tempoMap[0].bpm - 100) < 6, "the first entry is the mean tempo of its interval");
+  assert.ok(exported.tempoMap[exported.tempoMap.length - 1].bpm > 100);
   assert.deepEqual(exported.sections.map((s) => [s.name, s.bar, s.bars]), [["waltz", 1, 2], ["six", 3, 2]]);
   assert.ok(exported.losses.some((l) => /ramp/i.test(l)));
 });
@@ -97,4 +96,27 @@ test("bends, legato and accents are exported as note effects", () => {
   assert.equal(notes[0].effects.bend.to, 62);
   assert.ok(notes[0].effects.bend.seconds > 0);
   assert.equal(notes[1].effects.accented, true);
+});
+
+test("a tempo ramp has a tempo entry at every note start, so note ticks and times agree", () => {
+  const doc = parse({
+    sidwave: 1.3, tempo: 60,
+    voices: [{ id: 1, waveform: "pulse", patterns: { a: { length: 0.5, bars: 1, groove: "C4 D4 E4 F4 G4 A4 B4 C5" } } }],
+    timeline: [{ section: "r", bars: 4, tempo: { to: 200 }, layers: { v1: "a" } }],
+  });
+  const exported = exportEvents(doc);
+  const ticks = new Set(exported.tempoMap.map((t) => t.tick));
+  for (const note of exported.voices[0].notes) assert.ok(ticks.has(note.on.tick), `tempo entry at ${note.on.tick}`);
+  // Integrate the stepped map and compare with the exported times.
+  const at = (tick) => {
+    let seconds = 0;
+    const map = exported.tempoMap;
+    for (let i = 0; i < map.length; i++) {
+      const next = i + 1 < map.length ? Math.min(tick, map[i + 1].tick) : tick;
+      if (next > map[i].tick) seconds += (next - map[i].tick) / exported.ppq * 60 / map[i].bpm;
+      if (map[i + 1] && map[i + 1].tick >= tick) break;
+    }
+    return seconds;
+  };
+  for (const note of exported.voices[0].notes) assert.ok(Math.abs(at(note.on.tick) - note.on.time) < 0.03, `${at(note.on.tick)} vs ${note.on.time}`);
 });

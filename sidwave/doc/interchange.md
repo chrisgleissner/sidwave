@@ -2,7 +2,7 @@
 
 SIDWave scores can be exported to and imported from other formats. Every mapping below lists what maps exactly, what maps approximately and what is lost. No import embeds the source file in the score to fake a lossless round trip: an imported score contains only notes, tempos and metres that SIDWave plays.
 
-All commands read at most 16 MiB, never modify their input, never overwrite the input file, never use the network, and refuse to overwrite an existing output without `--force` (imports and `render`). Parsers bound their work (see each section).
+All commands read at most 16 MiB, never modify their input, never overwrite the input file, never use the network, and refuse to overwrite an existing output without `--force` (imports and `render`; `render` checks every target before it writes any). Parsers bound their work (see each section).
 
 ```
 sidwave export <file> [--format events|midi|musicxml] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--json]
@@ -21,7 +21,7 @@ Library entry point: `sidwave/export` (`exportEvents`, `exportMidi`, `importMidi
 | --- | --- |
 | `ppq` | Ticks per quarter note (default 480, `--ppq`). |
 | `callRate` | Player calls per second. All times are exact multiples of one call. |
-| `tempoMap[]` | `{ tick, time, bpm }`. A tempo ramp (`tempo: { to: n }`) is one entry per beat. |
+| `tempoMap[]` | `{ tick, time, bpm }`. A tempo ramp (`tempo: { to: n }`) has one entry per beat and one at each note start inside the ramp; each entry inside a ramp holds the mean tempo up to the next entry, so the stepped map reproduces the exact time of every entry. Between entries the real tempo deviates from that mean, so a position that is not an entry (a note end) can differ by a small fraction of the interval (below 30 ms for a 60 to 200 BPM ramp over 4 bars in the tests). |
 | `timeSignatures[]` | `{ tick, time, bar, numerator, denominator }`, one per change of section metre. |
 | `sections[]` | `{ index, name, bar, bars, tick, time }`. |
 | `instruments[]` | The compiled instruments the notes use: waveform, ADSR, pulse width, vibrato (`depthSemitones`, `rateHz`, `delayCalls`), arpeggio, slide, ring, sync, filter routing and whether wave, pulse or filter tables are present. `name` is the score name when a note names one. |
@@ -36,7 +36,7 @@ Exact: note pitch, order, voice assignment, section structure, tempo and metre. 
 
 ## Standard MIDI File
 
-I/O is a Standard MIDI File of format 1 (export) and type 0 or 1 (import). SIDWave contains its own reader and writer (`parseSmf`, `writeSmf`, no dependency). The tests verify the output with the independent `midi-file` parser (MIT, dev dependency only).
+Export writes format 1. Import reads format 0 and 1; format 2 (independent sequences) is rejected with an error. SIDWave contains its own reader and writer (`parseSmf`, `writeSmf`, no dependency). The tests verify the output with the independent `midi-file` parser (MIT, dev dependency only).
 
 ### Export
 
@@ -45,7 +45,7 @@ I/O is a Standard MIDI File of format 1 (export) and type 0 or 1 (import). SIDWa
 | SIDWave | MIDI |
 | --- | --- |
 | Title, author | Conductor track name (`FF 03`), copyright (`FF 02`). |
-| Tempo (and tempo per section, ramps) | Tempo events in the conductor track (`FF 51`). A ramp is one tempo per beat. |
+| Tempo (and tempo per section, ramps) | Tempo events in the conductor track (`FF 51`). A ramp is stepped as described for the event export. |
 | Section metre | Time signature (`FF 58`) at the section start. |
 | Section names | Marker events (`FF 06`). |
 | One voice | One track (named `v<id> <name>`) and one channel. Pitched voices take the channels 1-9, 11-16 in order; drum voices use channel 10. With more than 15 pitched voices, voices share channels and the export says so. |
@@ -82,6 +82,6 @@ The result is a SIDWave 1.3 score for one SID (at most 3 voices), validated by c
 
 `sidwave render score.yaml --stems -o dir` writes `<name>.mix.wav`, one `<name>.v<id>.wav` per voice and `<name>.stems.json`. Each stem is a compile of the score in which the layers of all other voices are rests, rendered through the same player. The idle SID is not silent in the emulation (a constant offset for each voice and the master volume), so a score with every voice muted is rendered as well and subtracted from the stems; a stem holds only what its voice adds. A voice that echoes, follows or doubles another voice cannot be separated from its source and is rendered together with it (`voices` in the manifest lists both).
 
-The manifest labels the stems `additive: true` or `false`. Stems are non-additive when voices influence each other, which the tool detects from the score: the SID filter in use (a filter table, a filter owner, `filter_env` or `filter_mod`; the routed voices share one filter), ring modulation, hard sync, and copies of other voices. For a score without coupling the stems add up to the mix only in energy: the stated tolerance is that the summed energy of the stems is within 15 % of the energy of the mix after removing the baseline (`sumError.energyRatio`, measured on SIDLite: 0.97 for a three-voice test score). They do not add up sample by sample. A muted voice makes the play call shorter, so the register writes of the voices after it land a few hundred cycles earlier in the call, which shifts oscillator phases (relative RMS difference 0.3 to 0.4, reported as `sumError.relativeRms`). Scores with digi samples (the PSID player omits them) and scores with more than three SIDs are refused.
+The manifest labels the stems `additive: true` or `false`. Stems are non-additive when voices influence each other, which the tool detects from the score: the SID filter in use (a filter table, a filter owner, `filter_env` or `filter_mod`; the routed voices share one filter), ring modulation, hard sync, and copies of other voices. `additive` is true only when nothing couples the voices and the measured energy ratio is within the tolerance: the summed energy of the stems must be within 15 % of the energy of the mix after removing the baseline. The manifest records `energyRatio` and `energyWithinTolerance` (measured on SIDLite: 0.97 for a three-voice test score); a score without coupling whose ratio is outside the tolerance is labelled non-additive. They do not add up sample by sample. A muted voice makes the play call shorter, so the register writes of the voices after it land a few hundred cycles earlier in the call, which shifts oscillator phases (relative RMS difference 0.3 to 0.4, reported as `sumError.relativeRms`). Scores with digi samples (the PSID player omits them) and scores with more than three SIDs are refused.
 
 The tests check the WAV header and samples with the independent `wavefile` parser (MIT, dev dependency only).

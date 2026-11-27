@@ -61,6 +61,7 @@ test("stems of a score without coupling add up to the mix in energy", async () =
     assert.ok(energy(stem.samples) > 1000, "every stem sounds");
   }
   assert.ok(Math.abs(result.sumError.energyRatio - 1) <= STEM_ENERGY_TOLERANCE, `energy ratio ${result.sumError.energyRatio}`);
+  assert.equal(result.energyWithinTolerance, true);
   // Each stem differs from the others: the muting really isolates voices.
   assert.notEqual(result.stems[0].samples[10000], result.stems[1].samples[10000]);
 });
@@ -118,8 +119,16 @@ test("sidwave render --stems writes mix, stems and a manifest; refuses to overwr
     assert.equal(wav.getSamples(false, Int16Array).length, 88200);
     const manifest = JSON.parse(fs.readFileSync(path.join(dir, "out", "plain.stems.json"), "utf8"));
     assert.equal(manifest.additive, true);
+    assert.equal(manifest.energyWithinTolerance, true);
+    assert.equal(typeof manifest.energyRatio, "number");
+    assert.match(manifest.note, new RegExp(manifest.energyRatio.toFixed(3)));
     assert.equal(manifest.files.length, 5 - 1);
     assert.equal((await run("plain.yaml", "--stems", "-o", "out", "--seconds", "2", "--emulation", "sidlite")).code, 2);
+    // A refusal because one target exists writes nothing at all.
+    fs.mkdirSync(path.join(dir, "partial"));
+    fs.writeFileSync(path.join(dir, "partial", "plain.v3.wav"), "x");
+    assert.equal((await run("plain.yaml", "--stems", "-o", "partial", "--seconds", "1", "--emulation", "sidlite")).code, 2);
+    assert.deepEqual(fs.readdirSync(path.join(dir, "partial")), ["plain.v3.wav"]);
     const mix = await run("plain.yaml", "-o", "mix.wav", "--seconds", "1", "--emulation", "sidlite");
     assert.equal(mix.code, 0, mix.err);
     assert.equal(new WaveFile(fs.readFileSync(path.join(dir, "mix.wav"))).getSamples(false, Int16Array).length, 44100);

@@ -42,7 +42,9 @@ export interface StemResult {
   stems: StemInfo[];
   /** Facts that make the voices influence each other. Empty when the stems add up to the mix. */
   coupling: CouplingFinding[];
+  /** True when nothing couples the voices and the measured energy ratio is within STEM_ENERGY_TOLERANCE. */
   additive: boolean;
+  energyWithinTolerance: boolean;
   /** Difference between the sum of the stems and the mix without its idle baseline. A pass/fail check only when `additive`. */
   sumError: {
     /** Energy of the stems added up, divided by the energy of the mix without its baseline. 1 when the stems add up exactly. */
@@ -148,7 +150,8 @@ export async function renderStems(input: ParsedSidwave, options: StemOptions = {
   const mixRms = Math.sqrt(mixSq / Math.max(1, n));
   return {
     sampleRate, seconds: n / sampleRate, mix: mix.samples, stems, coupling,
-    additive: coupling.length === 0,
+    additive: coupling.length === 0 && Math.abs((mixSq > 0 ? stemSq / mixSq : 1) - 1) <= STEM_ENERGY_TOLERANCE,
+    energyWithinTolerance: Math.abs((mixSq > 0 ? stemSq / mixSq : 1) - 1) <= STEM_ENERGY_TOLERANCE,
     sumError: { energyRatio: mixSq > 0 ? stemSq / mixSq : 1, maxAbs, rms, mixRms, relativeRms: mixRms > 0 ? rms / mixRms : 0 },
     engine: mix.engine,
   };

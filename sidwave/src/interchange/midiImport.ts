@@ -172,7 +172,8 @@ export function importMidi(bytes: Uint8Array, options: MidiImportOptions = {}): 
     p.notes.sort((a, b) => a.startTick - b.startTick || a.pitch - b.pitch);
     p.bends.sort((a, b) => a.tick - b.tick);
   }
-  const endTick = Math.max(...withNotes.flatMap((p) => p.notes.map((n) => n.endTick)));
+  let endTick = 0;
+  for (const p of withNotes) for (const n of p.notes) if (n.endTick > endTick) endTick = n.endTick;
 
   // Bars from the time signature map. A signature that does not start on a bar line takes effect at the next bar line.
   interface Bar { start: number; ticks: number; sig: ReturnType<typeof normaliseSignature>; cells: number; cellStart: number }
@@ -233,8 +234,9 @@ export function importMidi(bytes: Uint8Array, options: MidiImportOptions = {}): 
 
   // Voice allocation.
   const rank = (p: Part): number => {
-    const pitches = p.notes.map((n) => n.pitch);
-    return p.notes.length * (1 + (Math.max(...pitches) - Math.min(...pitches)) / 12);
+    let low = 127, high = 0;
+    for (const n of p.notes) { if (n.pitch < low) low = n.pitch; if (n.pitch > high) high = n.pitch; }
+    return p.notes.length * (1 + (high - low) / 12);
   };
   const droppedParts: ImportReport["droppedParts"] = [];
   const drumParts = withNotes.filter((p) => p.drum);

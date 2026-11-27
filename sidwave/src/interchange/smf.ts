@@ -54,6 +54,7 @@ export function parseSmf(bytes: Uint8Array, limits: SmfLimits = {}): Smf {
   const trackCount = view.getUint16(10);
   const division = view.getUint16(12);
   if (format > 2) throw new MidiError(`unsupported SMF format ${format}`);
+  if (format === 2) throw new MidiError("SMF format 2 (independent sequences) is not supported; use format 0 or 1");
   if (division & 0x8000) throw new MidiError("SMPTE time division is not supported; use ticks per quarter note");
   if (division === 0) throw new MidiError("time division is zero");
   if (trackCount > maxTracks) throw new MidiError(`the MIDI file declares ${trackCount} tracks; the limit is ${maxTracks}`);
@@ -95,6 +96,8 @@ export function parseSmf(bytes: Uint8Array, limits: SmfLimits = {}): Smf {
         status = running;
       }
       if (status === 0xff) {
+        // Lenient: a meta event does not cancel running status here (the specification cancels it), so a data byte
+        // after a meta event continues the previous channel message instead of failing; real files rely on this.
         const kind = byte();
         const size = vlq();
         if (pos + size > end) throw new MidiError("meta event runs past the end of its track");
@@ -152,7 +155,8 @@ export function writeSmf(smf: Smf): Uint8Array {
   for (const track of smf.tracks) {
     const sorted: MidiEvent[] = track.filter((e) => e.type !== "endOfTrack").map((e, i) => ({ e, i }))
       .sort((a, b) => a.e.tick - b.e.tick || typeRank(a.e) - typeRank(b.e) || a.i - b.i).map(({ e }) => e);
-    const end = Math.max(0, ...track.map((e) => e.tick));
+    let end = 0;
+    for (const e of track) if (e.tick > end) end = e.tick;
     sorted.push({ tick: end, type: "endOfTrack" });
     const data: number[] = [];
     let last = 0;
