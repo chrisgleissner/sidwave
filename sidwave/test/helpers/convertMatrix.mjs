@@ -34,6 +34,7 @@ const FIXTURES = {
   ],
   midi: ["fuer-elise", "chiptune-drive", "chamber-waltz", "title-fanfare"].map((n) => [n, () => generated(`${n}.mid`)]),
   musicxml: ["fuer-elise", "chiptune-drive", "title-fanfare"].map((n) => [n, () => generated(`${n}.musicxml`)]),
+  abc: [["two-part-air", () => read("test/fixtures/abc/two-part-air.abc")]],
   goattracker: [...["fuer-elise", "chiptune-drive"].map((n) => [n, () => generated(`${n}.sng`)]), ["hand-authored", () => Buffer.from(gts())]],
   furnace: [...["fuer-elise", "chiptune-drive"].map((n) => [n, () => generated(`${n}.fur`)]), ["hand-authored", () => Buffer.from(fur228())]],
   sidwizard: [["fuer-elise", () => generated("fuer-elise.swm")], ["hand-built", () => read("test/fixtures/sidwizard/hand-built.swm")]],
@@ -43,7 +44,7 @@ const FIXTURES = {
   "vice-dump": [["fur-elise", () => read("test/fixtures/traces/fur-elise.vice-dump.txt")]],
   siddump: [["fur-elise", () => read("test/fixtures/traces/fur-elise.siddump.txt")]],
 };
-const EXTENSION = { sidwave: ".yaml", midi: ".mid", musicxml: ".musicxml", goattracker: ".sng", furnace: ".fur", sidwizard: ".swm", mod: ".mod", jch: ".bin", sid: ".sid", "vice-dump": ".dump", siddump: ".siddump" };
+const EXTENSION = { sidwave: ".yaml", midi: ".mid", musicxml: ".musicxml", abc: ".abc", goattracker: ".sng", furnace: ".fur", sidwizard: ".swm", mod: ".mod", jch: ".bin", sid: ".sid", "vice-dump": ".dump", siddump: ".siddump" };
 
 export const FORMATS = listFormats();
 /** Formats with a reader. Their fixtures are the inputs of the matrix. */

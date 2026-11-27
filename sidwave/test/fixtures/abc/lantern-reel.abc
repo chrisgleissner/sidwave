@@ -1,0 +1,13 @@
+%abc-2.1
+% Original test tune written for SIDWave.
+X:1
+T:The Lantern Reel
+C:SIDWave test data
+R:reel
+M:C|
+L:1/8
+Q:1/2=96
+K:Dmix
+A2|:"D"d2fd Adfd|"C"=c2ec Gcec|"D"d2fd Adfa|1 "C"gece "D"d2A2:|2 "C"gece "D"d4||
+|:~f3d (3efg fd|e2=ce GcEG|!segno!F2AF DFAd|
+[M:3/2] {f}g>e c<e d4 d2z2 :|

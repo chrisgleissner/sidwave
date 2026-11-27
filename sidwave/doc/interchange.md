@@ -80,6 +80,53 @@ The result is a SIDWave 1.3 score for one SID (at most 3 voices), validated by c
 * **Pitch bend.** With the bend range of RPN 0 (default 2 semitones), a bend at the start of a note shifts its written pitch to the nearest semitone. A bend inside a note that ends at least one semitone away from the start becomes a SIDWave `bend` (`to` in semitones, `frames` from the last bend event). Bend that returns to its start pitch (vibrato) and other bends are not imported (`bendsLost`).
 * **Not imported:** controllers other than the bend range, aftertouch, SysEx, text other than track names, the note release velocity, drum velocity, polyphony, more than three voices, SMPTE time division. File size (8 MiB), tracks (256), events (2,000,000), ticks (2^31), bars (2048) and grid cells (400,000) are bounded, and the parser reports malformed files as errors.
 
+## ABC notation
+
+Read-only subset of ABC 2.1 (`.abc`), through `sidwave convert` and the library function `importAbc`. A file is
+detected by an `X:` tune line followed by a `K:` line.
+
+`sidwave convert book.abc tune.mid [--song <X number>] [--grid <beats>] [--voices 1-3]`
+
+`--song n` selects the tune with `X:n`; the default is the first tune of the file. `sidwave info book.abc` lists the
+tunes. A tune ends at an empty line, the next `X:` line or the end of the file, and the file header applies to every
+tune. The text is UTF-8; any other file is read as Latin-1 (`abc.charset`).
+
+Supported:
+
+| ABC | Handling |
+|---|---|
+| `T:`, `C:` | first title and first composer |
+| `M:` | `n/d`, `(2+3+2)/8`, `C`, `C\|`, `none`; a metre without a SIDWave metre of the same bar length is written as two bars (`3/8` as `6/8`) or as `4/4` (`meter.approximated`) |
+| `L:` | and the default from the metre (below `0.75`: `1/16`, else `1/8`) |
+| `Q:` | `1/4=120`, several note lengths, text with or without a number, the old forms `120` and `C3=40`; default 120 BPM; SIDWave limits the tempo to 30 to 220 BPM (`abc.tempo.clamped`) |
+| `K:` | all keys with up to seven sharps or flats, all modes (three letters count), `none`, `HP`, `Hp`, `exp`, added accidentals, `octave=`, `transpose=`, clefs with `+8` or `-8` |
+| `V:` | header and body, `[V:id]`; `octave=`, `transpose=` and `+8`/`-8` clefs |
+| Fields in the body | `K:`, `L:`, `M:`, `Q:`, `V:` on their own line or inline. A field line before the first note and the first `V:` applies to every voice, otherwise to the current voice |
+| Notes | accidentals, octave marks, lengths such as `2`, `/`, `//`, `3/2`; an accidental lasts to the bar line for all octaves, or as set by `propagate-accidentals` |
+| Rests | `z`, `x`, and `Z`, `X` for whole bars |
+| Broken rhythm, tuplets | `>` to `>>>`, `(p`, `(p:q:r`; the default `q` follows the metre |
+| Ties | within and across bars, in chords and into repeated sections; a tie to another pitch is counted |
+| Repeats | `\|:`, `:\|`, `::`, three or more passes (`\|::`), `[1`, `\|1`, `:\|2`, lists and ranges such as `[1,3` and `[1-3`; without `\|:` the repeat starts after the previous repeat or double bar |
+| Chords `[CEG]` | the highest note stays in the voice, the others get further voices when there are free ones (`abc.chords`); the length is that of the first note |
+| Line ends | `\` continuation, comments, CR, LF and CRLF |
+
+A first bar that is shorter than the metre is a pickup: rest is added before it so that the bar lines of the score
+match (`abc.pickup.padded`). Voices keep their own time; a voice with a bar too long or too short drifts against the
+others. The metre of the score changes only at a bar line.
+
+Not imported, each with a counted loss: grace notes, decorations, slurs, chord symbols and annotations, lyrics
+(`abc.notation.dropped`), unsupported fields, `I:` instructions and `%%` directives (including macros and MIDI
+directives, also `abc.notation.dropped`), voice overlays after `&` (`abc.overlay.dropped`) and the part order of `P:`
+(`abc.parts.ignored`; the tune plays as written). Voices and chord notes beyond the voice limit are dropped
+(`voices.dropped`, `abc.chord-tones.dropped`); the first line of every voice is allocated before any further chord
+note. Also counted: grid quantisation (`abc.timing.quantized`; use `--grid` for triplets), notes outside the SID range
+moved by octaves, tempo or metre changes inside a bar, titles longer than 80 characters.
+
+Limits (untrusted input): 8 MiB and 500,000 lines per file, 100,000 lines per tune, 4096 characters per field, 64
+voices, 32 notes per chord, 200,000 written and 400,000 played notes and rests, 8192 written and played bars per voice,
+4096 score bars and 400,000 grid cells, nine passes of a repeat. Parsing time is linear in the input size. Malformed
+input raises `AbcImportError` with the line number where one applies.
+
 ## MusicXML
 
 Uncompressed partwise MusicXML (`.musicxml`, `.xml`). SIDWave reads and writes it with its own bounded XML reader (`parseXml`, no dependency). The tests verify the output with the independent `fast-xml-parser` (MIT, dev dependency only).
@@ -291,6 +338,7 @@ sidwave info unknown.bin                   # detect and describe any supported f
 | `sid` | approximate (reconstruct) | yes | `.sid` | magic `PSID` or `RSID` |
 | `midi` | yes | yes | `.mid` `.midi` `.smf` | header chunk `MThd` |
 | `musicxml` | yes (uncompressed) | yes | `.musicxml` `.xml` (`.mxl` input only) | root element `score-partwise` or `score-timewise` |
+| `abc` | yes | no | `.abc` | an `X:` tune line followed by a `K:` line |
 | `goattracker` | yes | yes | `.sng` | magic `GTS!`, `GTS2` to `GTS5` |
 | `sidwizard` | yes | yes | `.swm` `.sws` | identifier `SWM1` or `SWMS` at offset 2 (`.swi` instruments are not handled by convert) |
 | `vice-dump` | approximate (reconstruct) | yes | `.dump` | lines of three decimal numbers |
@@ -356,7 +404,7 @@ reference is the score after the import, with all voices and before any reductio
 import that drops notes is already in the reference, and only `sourceVsOutput` (below) sees it. A note matches when
 its pitch (for a drum hit: its drum name) is equal and the onsets differ by at most the tolerance. The tolerance is one
 video frame (20 ms) for a format without a grid. For a target with a row grid (GoatTracker, Furnace, SID-Wizard) it is half
-a row, and for an importer that quantises to a grid (MIDI, MusicXML: 0.25 beat by default) half a grid cell, each plus 10 ms
+a row, and for an importer that quantises to a grid (MIDI, MusicXML, ABC: 0.25 beat by default) half a grid cell, each plus 10 ms
 for rounding, at most 100 ms, because rounding a note start to the nearest row moves it by up to half a row (a sawtooth: the error of each note
 is bounded and does not accumulate). It is printed with the result (`onsetToleranceMs`). There is no wildcard for drums.
 
@@ -425,6 +473,17 @@ and `siddump` source is read by reconstruct with a 4 s horizon. The tables are p
 | musicxml | furnace | 0.64 | 0.64 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
 | musicxml | sidwizard | 0.78 | 0.78 | 0.89 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells |
 <!-- quality:musicxml:end -->
+
+<!-- quality:abc:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| abc | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| abc | midi | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| abc | musicxml | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| abc | goattracker | 1.00 | 1.00 | 0.97 | 1.00 | the tracker's row grid shortens some note ends |
+| abc | furnace | 1.00 | 1.00 | 0.97 | 1.00 | the tracker's row grid shortens some note ends |
+| abc | sidwizard | 1.00 | 1.00 | 0.97 | 1.00 | the tracker's row grid shortens some note ends |
+<!-- quality:abc:end -->
 
 <!-- quality:goattracker:start -->
 | Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |

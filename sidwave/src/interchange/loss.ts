@@ -22,6 +22,21 @@ const SEVERITY_ORDER: Record<LossSeverity, number> = { info: 0, approx: 1, lost:
 
 /** Ordered rules: the first matching pattern gives the code and severity of a sentence. */
 const RULES: Array<[RegExp, string, LossSeverity]> = [
+  [/^\d+ ABC chord\(s\)/i, "abc.chords", "approx"],
+  [/^\d+ ABC chord tone\(s\) are dropped/i, "abc.chord-tones.dropped", "lost"],
+  [/^\d+ ABC note\(s\) are moved or resized/i, "abc.timing.quantized", "approx"],
+  [/^\d+ ABC tempo value\(s\) are limited/i, "abc.tempo.clamped", "approx"],
+  [/^\d+ ABC (tempo|metre) change\(s\) fall inside/i, "abc.change.moved", "approx"],
+  [/^A pickup bar of .+ is preceded by/i, "abc.pickup.padded", "info"],
+  [/^The file is not UTF-8 and is read as Latin-1/i, "abc.charset", "info"],
+  [/^\d+ ABC voice overlay/i, "abc.overlay.dropped", "lost"],
+  [/^\d+ ABC part field/i, "abc.parts.ignored", "lost"],
+  [/^\d+ ABC title or composer field\(s\) are truncated/i, "abc.metadata.truncated", "approx"],
+  [/^\d+\/\d+ time signature is approximated/i, "meter.approximated", "approx"],
+  [/^\d+ ABC (?:decoration|directive|grace note|lyric|slur|chord symbol)/i, "abc.notation.dropped", "lost"],
+  [/^\d+ ABC tie\(s\) could not be connected/i, "abc.ties.dropped", "lost"],
+  [/^\d+ ABC voice\(s\)/i, "voices.dropped", "lost"],
+  [/^\d+ ABC notes are outside the SIDWave pitch range/i, "pitch.octave", "approx"],
   [/^The voices have [\d, ]+ rows; each voice loops/i, "jch.voices.length", "approx"],
   [/^A groove \(alternating row lengths\)/i, "jch.groove", "approx"],
   [/^Command ".+" \(\d+ uses\) is imported approximately/i, "jch.command.approx", "approx"],

@@ -1,0 +1,372 @@
+{
+ "abc:two-part-air -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   }
+  ]
+ },
+ "abc:two-part-air -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "write",
+    "code": "compile.advisory",
+    "severity": "info",
+    "count": 3,
+    "message": "FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | NO-BASS: Add a voice below C3 or transpose the bass down (at bar 1) | TEMPO-GRID: A sixteenth lasts 8.95 calls; use tempo 93.98 or 83.54 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "abc:two-part-air -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "abc:two-part-air -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "abc:two-part-air -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "abc:two-part-air -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "abc:two-part-air -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ },
+ "abc:two-part-air -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "compile.advisory",
+    "severity": "info",
+    "count": 3,
+    "message": "FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | NO-BASS: Add a voice below C3 or transpose the bass down (at bar 1) | TEMPO-GRID: A sixteenth lasts 8.95 calls; use tempo 93.98 or 83.54 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "abc:two-part-air -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "abc:two-part-air -> sidwizard": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "write",
+    "code": "rows.one-call",
+    "severity": "info",
+    "count": 1,
+    "message": "Rows are one player call long (note starts and ends fall on odd calls): the module is correct but large and uses the fastest tempo."
+   }
+  ]
+ },
+ "abc:two-part-air -> vice-dump": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "trace.cycles",
+    "severity": "info",
+    "count": 1,
+    "message": "Cycle numbers are those of SIDWave's engine; a real VICE run of the same SID file starts with its own power-on delay."
+   }
+  ]
+ }
+}
