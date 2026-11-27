@@ -328,7 +328,7 @@
  },
  "sidwave:chamber-waltz -> sidwizard": {
   "ok": false,
-  "category": "input",
+  "category": "limit_exceeded",
   "message": "the song needs 212 patterns per track; an SWM orderlist holds 124. Use patternRows 64 or a shorter score"
  }
 }
