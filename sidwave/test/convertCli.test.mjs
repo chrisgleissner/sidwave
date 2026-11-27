@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "../src/cli.ts";
 import { convert, detectFormat, listFormats } from "../src/index.ts";
+import { InterchangeLimitError } from "../src/interchange/errors.ts";
 import { ambiguityMessage } from "../src/interchange/convert.ts";
 import { classifyLossText, groupLosses } from "../src/interchange/loss.ts";
 import { planScore } from "../src/interchange/scorePlan.ts";
@@ -33,6 +34,20 @@ test("convert detects the input by content and takes the target from the output 
   assert.equal(fs.readFileSync(path.join(dir, "out.mid")).subarray(0, 4).toString("latin1"), "MThd");
   assert.match(result.out, /goattracker \(detected by magic, confidence 1\) -> midi/);
   assert.match(result.out, /chain: read:goattracker > normalise > plan:midi > write:midi/);
+});
+
+test("SID-Wizard orderlist capacity exits 5 and writes no output", async () => {
+  const dir = tmp();
+  copy(dir, path.join(fixtures, "convert", "chamber-waltz.mid"));
+  const result = await run(["convert", "chamber-waltz.mid", "out.swm"], dir);
+  assert.equal(result.code, 5);
+  assert.match(result.err, /orderlist holds 124/);
+  assert.equal(fs.existsSync(path.join(dir, "out.swm")), false);
+});
+
+test("convert() rejects with InterchangeLimitError for the SID-Wizard orderlist capacity", async () => {
+  const bytes = fs.readFileSync(path.join(fixtures, "convert", "chamber-waltz.mid"));
+  await assert.rejects(() => convert(bytes, { to: "swm" }), (error) => error instanceof InterchangeLimitError && /orderlist holds 124/.test(error.message));
 });
 
 test("the default output is <stem>.<ext>; an existing file is never overwritten without --force", async () => {

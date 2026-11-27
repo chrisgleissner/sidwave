@@ -4,6 +4,8 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 
 ## Unreleased
 
+- `convert` and `export` exit 5 (limit) instead of 3 when a score exceeds a fixed capacity of the target format, such as the 124 orderlist entries of SID-Wizard.
+
 ### Added
 
 - `sidwave sid info|edit|player`, `sidwave songlengths lookup|verify|write` and `sidwave stil parse|query` for HVSC work, and the library entry point `sidwave/hvsc` (`editSidHeader`, `writeSonglengthsEntry`, `verifySonglengths`, `lookupSonglengthEntries`, `parseStil`, `queryStil`, `identifySidPlayer`). `sid edit` patches only the bytes of the named header fields (title, author, released, songs, start song, speed, clock, SID models, second and third SID, flags, version, addresses, relocation range), validates the result against the PSID specification, raises the header version with a warning when a field needs it, and prints the old and new Songlengths MD5 keys; `--dry-run` shows the field changes. `songlengths write` adds or updates an entry in Songlengths.md5 or Songlengths.txt and changes only the lines it touches, including `--from-md5` to carry the times of an edited file over. `songlengths verify` checks every entry against the files of an HVSC tree. `sid player` reads a SIDId signature file from a path the user gives (none is shipped). `--hvsc` defaults to `HVSC_ROOT`. See `doc/hvsc.md`.
