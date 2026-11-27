@@ -61,6 +61,11 @@ average of 20 to 30 on 8 cores, so it is closer to a worst case than to a best c
 | Fidelity analysis, 20 s | 1 s | 0.64 s | |
 | Similarity, 20 s | 2.5 s | 1.7 s | zero-padded FFT per chroma frame |
 | Engine render or trace, 30 s | 1.7 s | 1.45 s | the libsidplayfp WebAssembly module (about 20 times real time) |
+| `sidwave format --check` (in the process) | 80 ms | 28-70 ms | the `yaml` package |
+| `sidwave diff` (in the process) | 600 ms | 225-560 ms | the compile of both texts |
+| `sidwave merge` (in the process) | 400 ms | 90-310 ms | the `yaml` package, then parse of the result |
+| `sidwave transform` (in the process) | 400 ms; `--validate parse` 200 ms | 170-330 ms; 40-190 ms | the compile check of the result |
+| `sidwave generate` (composer 2) | 100 ms; with `--prg` and `--sid` 300 ms | 38 ms; 170 ms | the composer; then two compiles |
 | CLI cold start: `--help` | 200 ms wall | 120-175 ms | Node start-up and module loading |
 | CLI cold start: `validate` | 400 ms wall | 300-370 ms | module loading, then a cold parse |
 | CLI cold start: `compile` | 1 s wall | 0.7-0.85 s | cold code paths of the compiler |

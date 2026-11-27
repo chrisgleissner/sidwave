@@ -39,6 +39,8 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 - `sidwave preserve` and `createPreservation`/`verifyPreservation`: a preservation bundle (score, checksums, configuration, tool identities, horizon, verdict, ambiguities, rights) with a manifest `preservation.json` that verifies offline. The original SID is stored only with `--include-original --rights-permitted`.
 - `sidwave extract-instruments` and `extractInstruments`: the instruments of a score or of a reconstruction as a SIDWave 1.4 library with provenance; `checkInstrumentReuse` compares an extracted instrument in a new score with the source.
 - Documentation: `doc/analysis.md`, `doc/preservation.md`.
+- `sidwave transform`, `format`, `diff`, `merge` and `generate`: the transformation library (transpose by voice or section, tempo, instrument swap, quantise, humanise, section order), canonical formatting with `--check` and `--write` for CI and pre-commit hooks, a semantic diff (exit 1 when the scores differ, `--json`), a three-way merge (exit 1 on conflicts, lists each conflict), and generation from a style, profile and seed with `--prg` and `--sid`. `sidwave diff --git` is a git external diff driver and `sidwave merge` works as a git merge driver; both are documented in `doc/authoring.md` and the merge driver is tested in a temporary repository.
+- CPU budgets for the authoring commands in `test/performanceBudgets.test.mjs`, and entries in `scripts/bench-perf.mjs`.
 
 ### Changed
 

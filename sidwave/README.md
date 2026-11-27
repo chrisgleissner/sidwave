@@ -258,7 +258,7 @@ Planned and not yet available: reconstruction of SID tunes into scores, MIDI/Mus
 
 `generateSidwave({ composer: 2, profile: "chip-aaba-minor", seed: 1, root: "C3", style: "chiptune", system: "PAL" })`
 generates a form-structured piece from one of 33 profiles (see `data/compose/profiles.md`); the default generator is unchanged.
-`sidwave complete song.yaml --op continue --bars 8` appends a section, and `--op harmonise`, `--op accompany` and
+`sidwave generate --seed 7 -o song.yaml --prg song.prg` does the same from the command line. `sidwave complete song.yaml --op continue --bars 8` appends a section, and `--op harmonise`, `--op accompany` and
 `--op fill-section` add a harmony voice, a bass and percussion, or a missing section. Voices and sections that the
 operation does not target keep their register output; the command verifies that by tracing both scores. Not compared, and named in the
 result: the ring-out tail of a score with `end` when new entries follow the original ones (continue, fill-section at the end), and the
@@ -267,7 +267,7 @@ and the "Composer 2 and completion" section of `data/sound/sidwave.md`.
 
 ## Formatting, diff and merge
 
-`sidwave/format` rewrites a score in a canonical layout, compares two scores by meaning, and merges two edits of one base score. These are library functions only; there is no command line for them yet.
+`sidwave/format` rewrites a score in a canonical layout, compares two scores by meaning, and merges two edits of one base score. The command line has `sidwave format`, `diff` and `merge`, with `transform` and `generate` for the other authoring operations, and git diff and merge drivers; see [`doc/authoring.md`](doc/authoring.md).
 
 - `formatSidwave(text)` sorts the keys of the document, voices, patterns, instruments, sections and notes into the order of the language specification, writes strings with double quotes, writes short lists of scalars (at most 6 items and 72 characters) on one line, and keeps comments. A comment block that is followed by a blank line before the first key stays at the top of the file. Formatting a formatted score returns it unchanged. It throws the YAML error for text that is not YAML.
 - `diffSidwave(a, b)` returns `{ changes, compiledEqual }`. Each change has a JSON-pointer-like `path`, the `before` and `after` values, and a class: `musical` (notes, tempo, timeline, sections), `synthesis` (instruments, waveforms, ADSR, filters, effects), `hardware` (SIDs, chip model, clock mode) or `structural` (everything else). Text that differs only in layout gives one `formatting` change. `compiledEqual` is true when both scores compile to the same PRG.
