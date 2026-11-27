@@ -515,7 +515,7 @@ test("merge reports whether comments and aliases were preserved", async () => {
   assert.equal(count(outside.merged, "#"), count(base, "#"));
   assert.equal(count(outside.merged, "&"), count(base, "&"));
   // An edit to a value that ours reaches through an alias cannot be applied in place: the result comes from plain data.
-  const inside = mergeSidwave(base, base, base.replace("vibrato: &voicevib { depth: 0.32", "vibrato: &voicevib { depth: 0.4"));
+  const inside = mergeSidwave(base, base, base.replace("vibrato: &voicevib {depth: 0.32", "vibrato: &voicevib {depth: 0.4"));
   assert.deepEqual(inside.conflicts, []);
   assert.equal(inside.preserved, false);
   assert.deepEqual(inside.warnings, ["Comments and aliases of the ours side were not kept: Expected YAML collection at vibrato. Remaining path: depth"]);

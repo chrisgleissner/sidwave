@@ -206,7 +206,11 @@ function distance(a: string, b: string): number {
 
 /** The message for an unknown command, with the closest known command when one is near enough ("did you mean transform?"). */
 export function unknownCommandMessage(word: string, known: readonly string[]): string {
-  const ranked = known.map((name) => ({ name, d: distance(word.toLowerCase(), name) })).sort((x, y) => x.d - y.d)[0];
+  const lower = word.toLowerCase();
+  const prefixMatches = lower.length >= 2 ? known.filter((name) => name.startsWith(lower)).sort() : [];
+  if (prefixMatches.length === 1) return `unknown command "${word}"; did you mean ${prefixMatches[0]}?`;
+  if (prefixMatches.length > 1) return `unknown command "${word}"; did you mean one of: ${prefixMatches.join(", ")}?`;
+  const ranked = known.map((name) => ({ name, d: distance(lower, name) })).sort((x, y) => x.d - y.d)[0];
   const near = ranked !== undefined && ranked.d <= Math.max(2, Math.floor(ranked.name.length / 3));
   return `unknown command "${word}"${near ? `; did you mean ${ranked.name}?` : ""}`;
 }

@@ -2,10 +2,11 @@
 // Copyright (C) 2025-2026 Christian Gleissner
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
-import { resolve } from "node:path";
+import { accessSync, constants, existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import YAML from "yaml";
-import { EXIT_OK, UsageError, envelope, type CliIo } from "./cliCore.js";
-import { checkOutput, emit, last, parseInteger, parseNumber, runAuthoring, writeOutput } from "./cliAuthoring.js";
+import { EXIT_OK, SidwaveOperationError, UsageError, envelope, type CliIo } from "./cliCore.js";
+import { checkOutput, emit, isCharacterDevice, last, parseInteger, parseNumber, runAuthoring, writeOutput } from "./cliAuthoring.js";
 import { DEFAULT_COMPOSER2_PROFILES, DEFAULT_MUSIC_SEED, MUSIC_STYLES, generateSidwave, type GenerateOptions, type MusicStyle } from "./audio/generateSidwave.js";
 import { PROFILES } from "./compose/profiles.js";
 import { formatSidwave } from "./format/sidwaveFormat.js";
@@ -122,6 +123,16 @@ export function runGenerateCli(args: string[], io: CliIo): number {
     const targets = [scoreToStdout ? undefined : scoreFile, prgFile, sidFile].filter((f): f is string => f !== undefined && f !== "-");
     for (const target of targets) checkOutput(io, target, { force });
     if (new Set(targets.map((t) => resolve(io.cwd, t))).size !== targets.length) throw new UsageError("two outputs name the same file");
+    for (const target of targets) {
+      const path = resolve(io.cwd, target);
+      if (target === "-" || isCharacterDevice(path)) continue;
+      // The directory is created when it is missing, so the nearest existing parent must be writable.
+      let dir = dirname(path);
+      while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir);
+      try { accessSync(dir, constants.W_OK); } catch {
+        throw new SidwaveOperationError("input", `cannot write ${target}: the directory ${dir} is not writable`, { file: path });
+      }
+    }
     // Compile before anything is written, so that a failure leaves no partial output.
     const doc = prgFile !== undefined || sidFile !== undefined ? parseSidwave(text) : undefined;
     const compiled: Array<{ kind: "prg" | "sid"; file: string; bytes: Uint8Array; seconds: number }> = [];

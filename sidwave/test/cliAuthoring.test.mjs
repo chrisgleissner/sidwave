@@ -12,6 +12,8 @@ import { parseSidwave } from "../src/sidwave.js";
 import { formatSidwave, diffSidwave, mergeSidwave } from "../src/format/sidwaveFormat.js";
 import { transpose, setTempo, scaleTempo, substituteInstrument, quantise, humanise, restructure } from "../src/transform/index.js";
 import { describeChange } from "../src/cliDiff.js";
+import { unknownCommandMessage } from "../src/cliAuthoring.js";
+import { checkSidwaveCompiles, compileSidwaveToPrg } from "../src/sidwaveCompiler.js";
 import { generateSidwave } from "../src/audio/generateSidwave.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -30,6 +32,9 @@ function run(cwd, ...args) {
 }
 
 const SCORE = readExampleScore("chiptune_drive");
+// The bundled examples are formatted; RAW is the same score with one non-canonical line.
+const RAW = SCORE.replace(/^tempo: */m, "tempo:   ");
+assert.ok(RAW !== SCORE && formatSidwave(RAW) === SCORE, "the examples are in canonical format and RAW is not");
 const EXAMPLES = listSidwaveExamples().map((e) => e.name);
 const write = (dir, name, text) => { fs.writeFileSync(path.join(dir, name), text); return path.join(dir, name); };
 
@@ -54,20 +59,20 @@ test("format prints exactly what formatSidwave returns, for every bundled exampl
 test("format --check exits 1 for a file that is not formatted and lists it; --write fixes it", () => {
   const { dir, done } = sandbox();
   try {
-    write(dir, "raw.yaml", SCORE);
-    write(dir, "good.yaml", formatSidwave(SCORE));
+    write(dir, "raw.yaml", RAW);
+    write(dir, "good.yaml", SCORE);
     const bad = run(dir, "format", "raw.yaml", "good.yaml", "--check");
     assert.equal(bad.code, EXIT_FAILED);
     assert.match(bad.out, /raw\.yaml: not formatted/);
     assert.doesNotMatch(bad.out, /good\.yaml/);
-    assert.equal(fs.readFileSync(path.join(dir, "raw.yaml"), "utf8"), SCORE, "--check changes nothing");
+    assert.equal(fs.readFileSync(path.join(dir, "raw.yaml"), "utf8"), RAW, "--check changes nothing");
     const json = JSON.parse(run(dir, "format", "raw.yaml", "--check", "--json").out);
     assert.equal(json.ok, false);
     assert.equal(json.result.formatted, false);
     const fixed = run(dir, "format", "raw.yaml", "good.yaml", "--write");
     assert.equal(fixed.code, EXIT_OK);
     assert.match(fixed.out, /formatted raw\.yaml/);
-    assert.equal(fs.readFileSync(path.join(dir, "raw.yaml"), "utf8"), formatSidwave(SCORE));
+    assert.equal(fs.readFileSync(path.join(dir, "raw.yaml"), "utf8"), SCORE);
     assert.equal(run(dir, "format", "raw.yaml", "good.yaml", "--check").code, EXIT_OK);
     assert.match(run(dir, "format", "raw.yaml", "--write").out, /already formatted/);
   } finally { done(); }
@@ -145,8 +150,8 @@ test("diff exits 0 for equal scores and 1 for different ones, and --json matches
 test("diff treats a formatting-only difference as a difference unless --ignore-formatting is given", () => {
   const { dir, done } = sandbox();
   try {
-    write(dir, "a.yaml", SCORE);
-    write(dir, "b.yaml", formatSidwave(SCORE));
+    write(dir, "a.yaml", RAW);
+    write(dir, "b.yaml", SCORE);
     const plain = run(dir, "diff", "a.yaml", "b.yaml");
     assert.equal(plain.code, EXIT_FAILED);
     assert.match(plain.out, /formatting only \(no musical change\)/);
@@ -217,6 +222,36 @@ test("transform validation levels: arrange finds a result the compiler rejects, 
     assert.equal(run(dir, "transform", "s.yaml", "--tempo-factor", "1.25", "--validate", "parse").code, EXIT_OK);
     assert.equal(run(dir, "transform", "s.yaml", "--tempo-factor", "1.25", "--validate", "compile").code, EXIT_INPUT);
     assert.equal(run(dir, "transform", "s.yaml", "--tempo", "99", "--validate", "none").code, EXIT_USAGE);
+  } finally { done(); }
+});
+
+test("the default transform check finds the cycle budget and the memory size, like the compiler", () => {
+  const message = (fn) => { try { fn(); } catch (e) { return e.message; } return undefined; };
+  // checkSidwaveCompiles throws what compileSidwaveToPrg throws for the cycle budget, and finds nothing in the examples.
+  for (const name of EXAMPLES) {
+    const doc = parseSidwave(readExampleScore(name));
+    assert.equal(message(() => checkSidwaveCompiles(doc, { loop: false })), undefined, name);
+  }
+  const noTurbo = readExampleScore("ultisid_orchestra").replace(/^cpu:.*$/m, "");
+  assert.ok(!/^cpu:/m.test(noTurbo));
+  const cycles = message(() => compileSidwaveToPrg(parseSidwave(noTurbo), { loop: false }));
+  assert.match(cycles, /use cpu: turbo/);
+  assert.equal(message(() => checkSidwaveCompiles(parseSidwave(noTurbo), { loop: false })), cycles, "the same message as the compiler");
+  // A song that does not fit below $D000.
+  const long = formatSidwave(YAML.stringify(generateSidwave({ composer: 1, root: "C3", preset: "classic", style: "funk", seed: 1, system: "PAL", steps: 260 * 8 }).score));
+  const size = message(() => compileSidwaveToPrg(parseSidwave(long), { loop: false }));
+  assert.match(size, /the compiled song needs/);
+  assert.equal(message(() => checkSidwaveCompiles(parseSidwave(long), { loop: false })), size);
+  const { dir, done } = sandbox();
+  try {
+    write(dir, "u.yaml", noTurbo);
+    write(dir, "ok.yaml", readExampleScore("ultisid_orchestra"));
+    const result = run(dir, "transform", "u.yaml", "--tempo", "100");
+    assert.equal(result.code, EXIT_INPUT, "the default check rejects what the compiler rejects");
+    assert.match(result.err, /cpu: turbo/);
+    assert.equal(run(dir, "transform", "u.yaml", "--tempo", "100", "--validate", "compile").code, EXIT_INPUT);
+    assert.equal(run(dir, "transform", "u.yaml", "--tempo", "100", "--validate", "parse").code, EXIT_OK, "parse checks neither");
+    assert.equal(run(dir, "transform", "ok.yaml", "--tempo", "100").code, EXIT_OK);
   } finally { done(); }
 });
 
@@ -553,6 +588,33 @@ test("generate checks every output before it writes the first one", () => {
   } finally { done(); }
 });
 
+test("generate checks output directories before writing any output", { skip: process.getuid?.() === 0 }, () => {
+  const { dir, done } = sandbox();
+  const ro = path.join(dir, "ro");
+  fs.mkdirSync(ro);
+  fs.chmodSync(ro, 0o555);
+  try {
+    const result = run(dir, "generate", "--seed", "2", "-o", "g1.yaml", "--prg", "ro/x.prg");
+    assert.equal(result.code, EXIT_INPUT);
+    assert.equal(fs.existsSync(path.join(dir, "g1.yaml")), false, "score was not written");
+    assert.match(result.err, /ro is not writable/);
+    // A missing directory is created, as writeOutput does.
+    assert.equal(run(dir, "generate", "--seed", "2", "-o", "newdir/sub/g.yaml").code, EXIT_OK);
+    assert.equal(fs.existsSync(path.join(dir, "newdir", "sub", "g.yaml")), true);
+    assert.equal(run(dir, "generate", "--seed", "2", "-o", "ro/deeper/g.yaml").code, EXIT_INPUT, "below a read-only directory");
+  } finally {
+    fs.chmodSync(ro, 0o755);
+    done();
+  }
+});
+
+test("unknown command suggestions prefer prefixes and list ambiguous matches", () => {
+  assert.equal(unknownCommandMessage("gen", ["generate", "format"]), 'unknown command "gen"; did you mean generate?');
+  assert.equal(unknownCommandMessage("tranform", ["transform", "format"]), 'unknown command "tranform"; did you mean transform?');
+  assert.equal(unknownCommandMessage("co", ["compile", "compare", "complete", "convert"]), 'unknown command "co"; did you mean one of: compare, compile, complete, convert?');
+  assert.equal(unknownCommandMessage("zzz", ["generate", "format"]), 'unknown command "zzz"');
+});
+
 test("generate --prg and --sid write the bytes that sidwave compile produces for the score", () => {
   const { dir, done } = sandbox();
   try {
@@ -617,7 +679,7 @@ test("the built command line runs the authoring commands", () => {
   assert.ok(fs.existsSync(binJs), `${binJs} is missing: run "npm run build" before the tests`);
   const { dir, done } = sandbox();
   try {
-    write(dir, "s.yaml", SCORE);
+    write(dir, "s.yaml", RAW);
     const result = spawnSync(process.execPath, [binJs, "diff", "s.yaml", "s.yaml"], { cwd: dir, encoding: "utf8" });
     assert.equal(result.status, 0);
     assert.match(result.stdout, /semantically identical/);
@@ -644,9 +706,10 @@ test("the authoring commands start fast in a new process", { skip: process.platf
       assert.ok(result.status === 0 || result.status === 1, `${args.join(" ")}: ${result.stderr}`);
       return childCpuMs() - before;
     };
+    // Limits are about 2.2 times the CPU measured on a loaded 8-core machine (load average 14, 2026-11-27: 50, 140, 510, 680, 990, 990 and 320 ms); a regression to the old eager loading exceeds them.
     const cases = [
-      [["--version"], 400], [["format", "--help"], 600], [["format", "s.yaml", "--check"], 1200], [["diff", "s.yaml", "t.yaml"], 1500],
-      [["merge", "s.yaml", "t.yaml", "s.yaml"], 2200], [["transform", "s.yaml", "--tempo", "99"], 2500], [["generate", "--seed", "3"], 1200],
+      [["--version"], 110], [["format", "--help"], 300], [["format", "s.yaml", "--check"], 1100], [["diff", "s.yaml", "t.yaml"], 1500],
+      [["merge", "s.yaml", "t.yaml", "s.yaml"], 2200], [["transform", "s.yaml", "--tempo", "99"], 2200], [["generate", "--seed", "3"], 700],
     ];
     for (const [args, limit] of cases) {
       const used = Math.min(cold(...args), cold(...args));
