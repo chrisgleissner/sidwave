@@ -2214,7 +2214,7 @@ const MODERN_LIBRARY = {
 } as Record<string, Record<string, any>>;
 
 /** Represents 0 < k < 1 as mant / 2^(8 + shift) with the largest shift that keeps mant <= 255 (at least 7 bits of precision). */
-function mantissaShift(k: number): [number, number] {
+export function mantissaShift(k: number): [number, number] {
   let shift = 0;
   while (shift < 15 && Math.round(k * 2 ** (9 + shift)) <= 255) shift += 1;
   return [Math.max(1, Math.round(k * 2 ** (8 + shift))), shift];

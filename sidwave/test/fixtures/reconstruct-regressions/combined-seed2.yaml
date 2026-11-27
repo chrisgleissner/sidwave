@@ -1,0 +1,219 @@
+# Combined-feature score at speed 2 (shrunk, 150 evaluations): the vibrato fit fails for one note of lead3 (pulse table, vibrato depth 0.15 delay 4, hard restart with test bit).
+# Register-state differing calls by class: pitch:24; first: {"class":"pitch","call":275,"timeSeconds":2.7426120124070286,"voice":3,"register":14,"expected":14,"observed":10}; call count mismatch: undefined
+# Unsupported: pitch: instrument i3: the frequency registers of 1 notes are not equal-temperament pitches and no vibrato reproduces them
+sidwave: "1.4"
+title: combined 2
+tempo: 130
+mode: PAL
+speed: 2
+sids:
+  - id: sid1
+    address: $D400
+    model: "6581"
+instruments:
+  lead1:
+    waveform: pulse
+    adsr:
+      - 1
+      - 3
+      - 10
+      - 3
+    pulse_width: 1296
+    pulsetable:
+      steps:
+        - set: 1345
+          calls: 1
+        - add: 37
+          calls: 20
+        - add: -21
+          calls: 20
+      loop: 1
+    hard_restart:
+      frames: 0
+    filtertable:
+      steps:
+        - cutoff: 548
+          resonance: 10
+          type: lowpass
+          frames: 1
+        - add: 10
+          frames: 20
+  lead2:
+    waveform: pulse
+    adsr:
+      - 0
+      - 7
+      - 6
+      - 6
+    wavetable:
+      - note: "+0"
+        calls: 2
+      - note: "+7"
+        calls: 3
+    loop: 0
+    hard_restart:
+      frames: 2
+      adsr:
+        - 0
+        - 0
+        - 0
+        - 0
+      test: true
+    vibrato:
+      depth: 0.25
+      rate: 4.5
+      delay: 0
+  lead3:
+    waveform: pulse
+    adsr:
+      - 3
+      - 6
+      - 11
+      - 6
+    pulse_width: 1097
+    pulsetable:
+      steps:
+        - set: 550
+          calls: 1
+        - add: 30
+          calls: 20
+        - add: -36
+          calls: 20
+      loop: 1
+    hard_restart:
+      frames: 1
+      test: true
+    vibrato:
+      depth: 0.15
+      rate: 3
+      delay: 4
+voices:
+  - id: 1
+    instrument: lead1
+    patterns:
+      A:
+        length: 0.5
+        groove:
+          - note: E4
+            len: 1
+          - note: A3
+            len: 0.75
+          - note: D5
+            len: 0.25
+          - note: C5
+            len: 0.25
+          - note: D3
+            len: 1
+          - note: D3
+            len: 1.5
+          - note: D3
+            len: 0.75
+          - "-"
+          - note: G3
+            len: 1.5
+          - note: C5
+            len: 1.5
+          - note: G3
+            len: 1.5
+          - "-"
+      B:
+        length: 0.5
+        groove:
+          - note: D3
+            len: 1
+          - note: G4
+            len: 1.5
+          - note: G4
+            len: 1
+          - note: A3
+            len: 0.5
+          - note: D4
+            len: 0.25
+          - note: G3
+            len: 1
+          - note: G5
+            len: 0.25
+          - note: A3
+            len: 0.25
+          - "-"
+          - "-"
+          - note: A4
+            len: 1
+          - note: D5
+            len: 0.25
+  - id: 2
+    instrument: lead2
+    patterns:
+      A:
+        length: 0.5
+        groove:
+          - note: E4
+            len: 0.75
+          - note: D3
+            len: 0.5
+          - note: C5
+            len: 0.5
+          - note: C3
+            len: 0.5
+          - note: C3
+            len: 0.25
+          - note: F4
+            len: 0.5
+          - note: C5
+            len: 0.25
+          - note: G3
+            len: 1
+          - note: G4
+            len: 0.5
+          - "-"
+          - note: C3
+            len: 0.25
+          - note: C3
+            len: 0.25
+      B:
+        length: 0.5
+        groove:
+          - note: E5
+            len: 0.25
+          - note: C5
+            len: 1.5
+          - note: C3
+            len: 0.5
+          - "-"
+          - note: C3
+            len: 0.75
+          - note: C4
+            len: 1.5
+          - note: D3
+            len: 1.5
+          - note: E3
+            len: 0.5
+          - note: E4
+            len: 0.75
+          - note: C4
+            len: 0.75
+          - "-"
+          - note: D5
+            len: 1.5
+  - id: 3
+    instrument: lead3
+    patterns:
+      A:
+        length: 0.5
+        groove:
+          - note: E3
+            len: 0.75
+          - note: G3
+            len: 0.75
+          - note: G5
+            len: 0.25
+          - note: F4
+            len: 0.25
+      B:
+        groove:
+          - note: A4
+timeline:
+  - bars: 4
+    layers:
+      v1: A A B
+      v3: A A B

@@ -4,3 +4,5 @@
 export * from "./ir.js";
 export * from "./fdiff.js";
 export * from "./features.js";
+export * from "./recover.js";
+export * from "./reconstruct.js";
