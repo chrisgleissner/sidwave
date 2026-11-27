@@ -6,6 +6,8 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 
 ### Added
 
+- Added `sidwave/retarget` and `sidwave retarget`: convert a score between PAL and NTSC, 6581 and 8580, and SID counts. Every change is reported as exact, approximate or dropped with measured numbers (timing per event kind, filter cutoff deviation, voices kept and dropped).
+- `sidwave retarget` accepts `--budget-bytes`, `--budget-cycles` and `--allow-changes`: music-preserving steps run first and are checked on the register trace, lossy steps only on request, and a budget that cannot be met gives exit 1 with the best numbers reached.
 - npm package `sidwave`: language, parser, lint, compiler to PRG and PSID, generator, examples and the `sidwave` command. It is extracted from c64bridge with the history of the moved files. It is not published yet.
 - Added `sidwave/sid-file` and `sidwave/songlengths`: PSID/RSID v1-v4 reader and writer, HVSC Songlengths.md5 parser.
 - Added `sidwave/engine` (libsidplayfp-wasm render and cycle-exact trace, optional peer dependency) and `sidwave/verify` (T0, T1 and A0 comparison).

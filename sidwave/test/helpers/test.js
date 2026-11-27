@@ -27,8 +27,10 @@ if (typeof globalThis.Bun !== "undefined") {
         teardown(callback) {
           teardowns.push(callback);
         },
-        async test(_childName, childFn) {
-          await childFn();
+        async test(_childName, optionsOrChildFn, maybeChildFn) {
+          // node:test accepts t.test(name, fn) and t.test(name, options, fn).
+          const childFn = typeof optionsOrChildFn === "function" ? optionsOrChildFn : maybeChildFn;
+          if (typeof childFn === "function") await childFn(context);
         },
         skip(reason) {
           const err = new Error(reason ?? "skipped");
