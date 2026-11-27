@@ -22,6 +22,8 @@ test("sidwave reconstruct writes a score, prints a summary and exits 0 when the 
   const result = await run(["reconstruct", "tune.sid", "--seconds", "2", "-o", "score.yaml"], dir);
   assert.equal(result.exit, 0, result.err);
   assert.match(result.err, /0 differing calls in register-state classes/);
+  assert.match(result.err, /^Recovered \d+ notes in \d+ instruments/);
+  assert.match(result.err, /a strict match/);
   const score = readFileSync(join(dir, "score.yaml"), "utf8");
   parseSidwave(score);
   const json = await run(["reconstruct", "tune.sid", "--seconds", "2", "--json"], dir);
