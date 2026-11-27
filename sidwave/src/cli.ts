@@ -35,7 +35,6 @@ Usage:
   sidwave examples [<name>] [-o <dir>] [--force] [--json]
   sidwave retarget <file> [--clock pal|ntsc] [--model 6581|8580] [--sids <n>] [--budget-cycles <n>] [--budget-bytes <n>]
                           [--allow-changes] [-o <out>] [--force] [--json]   (see "sidwave retarget --help")
-${RUN_HELP.usage}${RECONSTRUCT_USAGE}  sidwave --help | --version
 ${INTERCHANGE_HELP}${RUN_HELP.usage}${RECONSTRUCT_USAGE}  sidwave --help | --version
 
 Commands:
@@ -396,9 +395,8 @@ function fail(io: CliIo, json: boolean, command: string, error: unknown): number
 export function runCli(args: string[], io: CliIo): number | Promise<number> {
   const json = args.includes("--json");
   const [first, ...rest] = args;
-  const name = first !== undefined && (first === "retarget" || Object.prototype.hasOwnProperty.call(COMMANDS, first)) ? first : "sidwave";
   const interchange = first !== undefined && Object.prototype.hasOwnProperty.call(INTERCHANGE_COMMANDS, first) ? INTERCHANGE_COMMANDS[first] : undefined;
-  const name = first !== undefined && (interchange || Object.prototype.hasOwnProperty.call(COMMANDS, first)) ? first : "sidwave";
+  const name = first !== undefined && (first === "retarget" || interchange || Object.prototype.hasOwnProperty.call(COMMANDS, first)) ? first : "sidwave";
   try {
     if (first === undefined) { io.err(HELP); return EXIT_USAGE; }
     if (first === "-h" || first === "--help" || first === "help") { io.out(HELP); return EXIT_OK; }
