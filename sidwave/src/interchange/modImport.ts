@@ -193,45 +193,159 @@ export function importMod(bytes: Uint8Array, options: ModImportOptions = {}): Mo
     while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (rowStarts[mid]! <= time + 1e-9) lo = mid; else hi = mid - 1; }
     return lo;
   };
-  const used = new Map<string, { def: Record<string, unknown>; sample: number; base: string; arp?: [number, number, number] }>();
-  const effectUse = { noteDelayRounded: 0, cutInsideRow: 0, bendNegligible: 0, bendClamped: 0, vibratoDropped: 0, arpOverBudget: 0 };
+  const effectUse = { noteDelayRounded: 0, cutInsideRow: 0, bendNegligible: 0, bendClamped: 0, vibratoDropped: 0, budgetVariants: 0, mergedSamples: 0 };
+  const used = new Map<string, { def: Record<string, unknown>; sample: number; arp?: boolean }>();
 
   const baseName = (sample: number): string => `s${String(sample).padStart(2, "0")}${slug(song.samples[sample - 1]!.name) ? `_${slug(song.samples[sample - 1]!.name)}` : ""}`;
-  const baseDef = (a: SampleAnalysis): Record<string, unknown> => ({ waveform: a.waveform, adsr: a.adsr, ...(a.waveform === "pulse" && a.pulseWidth ? { pulse_width: a.pulseWidth } : {}) });
-  const instrumentFor = (n: ModNote, arpOk: boolean): string => {
-    const a = analysis.get(n.sample)!;
-    const base = baseName(n.sample);
-    if (!used.has(base)) used.set(base, { def: baseDef(a), sample: n.sample, base });
-    if (arpOk && n.arpeggio) {
-      const frames = Math.max(1, Math.min(255, Math.round(n.tickSec * fps)));
-      const name = `${base}_a${hex(n.arpeggio.x)}${hex(n.arpeggio.y)}_${frames}`;
-      if (!used.has(name)) {
-        const offs = [0, n.arpeggio.x, n.arpeggio.y];
-        used.set(name, { def: { ...baseDef(a), wavetable: offs.map((o) => ({ note: `+${o}`, frames })), loop: 0 }, sample: n.sample, base, arp: [n.arpeggio.x, n.arpeggio.y, frames] });
-      }
-      return name;
-    }
-    return base;
-  };
+  // SIDWave refuses notes shorter than 3 frames with its default two-frame hard restart; a song with such notes uses the plain gate restart.
+  let shortestNote = Infinity;
+  for (const { notes } of perChannel) for (const n of notes) shortestNote = Math.min(shortestNote, (n.endTime - n.startTime) * fps);
+  const shortRows = Math.min(...seq.rows.map((r) => r.seconds)) * fps < 3;
+  const shortNotes = shortestNote < 3.2 || shortRows;
+  const baseDef = (a: SampleAnalysis): Record<string, unknown> => ({ waveform: a.waveform, adsr: a.adsr, ...(a.waveform === "pulse" && a.pulseWidth ? { pulse_width: a.pulseWidth } : {}), ...(shortNotes ? { hard_restart: { frames: 0 } } : {}) });
+  const VIB_DEPTH = [0.1, 0.2, 0.35, 0.5, 0.75, 1, 1.5, 2.5], VIB_RATE = [1, 2, 3, 4, 6, 8, 10, 12], VIB_DELAY = [0, 12, 25, 50];
+  const snap = (v: number, set: number[]): number => set.reduce((b, c) => (Math.abs(Math.log(c + 1) - Math.log(v + 1)) < Math.abs(Math.log(b + 1) - Math.log(v + 1)) ? c : b));
+  const libOf = (a: SampleAnalysis): string => `lib:${GM_NAMES[a.drum!] ?? drumInfo(a.drum!).lib}`;
 
   interface Features { vibrato: boolean; bend: boolean; portamento: boolean; arp: boolean }
-  const buildVoices = (features: Features): { voices: GridVoice[]; stats: ModImportReport["voices"]; usedNotes: Map<string, number> } => {
+  interface Spec { base: string; arp?: { x: number; y: number; frames: number }; vib?: { depth: number; rate: number; delay: number }; drum?: string }
+  const specOf = (n: ModNote, features: Features, endRow: number, startRow: number, tally = false): Spec => {
+    const a = analysis.get(n.sample)!;
+    if (a.drum !== undefined) return { base: libOf(a), drum: libOf(a) };
+    const spec: Spec = { base: baseName(n.sample) };
+    if (features.arp && n.arpeggio) spec.arp = { x: n.arpeggio.x, y: n.arpeggio.y, frames: Math.max(1, Math.min(255, Math.round(n.tickSec * fps))) };
+    else if (features.vibrato && n.vibrato && !n.glide) {
+      if (n.vibrato.rows >= Math.ceil(Math.max(1, endRow - startRow) / 2)) {
+        const rate = n.vibrato.speed / n.tickSec / 64;
+        const d = 255 * n.vibrato.depth / 128, p = n.vibrato.period;
+        const depth = 6 * Math.log2((p + d) / Math.max(1, p - d));
+        const delay = Math.max(0, Math.round((seq.rows[n.vibrato.firstRow]!.start - n.startTime) * fps));
+        spec.vib = { depth: snap(Math.max(0.1, depth), VIB_DEPTH), rate: snap(rate, VIB_RATE), delay: snap(delay, VIB_DELAY) };
+      } else if (tally) effectUse.vibratoDropped++;
+    }
+    return spec;
+  };
+  const specKey = (s: Spec): string => JSON.stringify([s.base, s.arp, s.vib]);
+
+  // Where a note ends, in cells; shared by the instrument plan and the cell builder.
+  const cellSpan = (n: ModNote, next: ModNote | undefined): { start: number; end: number; gateOff?: number } => {
+    const pr = seq.rows[n.row]!;
+    let start = n.row;
+    if (n.delayTicks > 0 && n.delayTicks * 2 >= pr.speed && start + 1 < totalRows) start++;
+    let end: number;
+    let gateOff: number | undefined;
+    const endRow = n.endTime >= seq.seconds - 1e-9 ? totalRows : rowIndexAt(n.endTime);
+    if (endRow >= totalRows) end = totalRows;
+    else {
+      const into = (n.endTime - rowStarts[endRow]!) / seq.rows[endRow]!.seconds;
+      if (into < 1e-6) end = endRow;
+      else {
+        end = endRow + 1;
+        const frames = Math.round((rowStarts[endRow]! + seq.rows[endRow]!.seconds - n.endTime) * fps);
+        if (frames >= 1) gateOff = Math.min(255, frames);
+      }
+    }
+    const nextStart = next ? next.row + (next.delayTicks * 2 >= seq.rows[next.row]!.speed ? 1 : 0) : totalRows;
+    if (end > nextStart) { end = nextStart; gateOff = undefined; }
+    if (end <= start) { end = start + 1; gateOff = undefined; }
+    return { start, end, ...(gateOff === undefined ? {} : { gateOff }) };
+  };
+
+  /**
+   * SIDWave holds at most 63 distinct compiled instruments (waveform, ADSR, pulse width, vibrato, arpeggio) per score.
+   * Samples with the same definition share one; if there are still too many the closest ones merge; the vibrato and arpeggio
+   * variants that fit in what is left are used in order of how often they occur.
+   */
+  const planInstruments = (features: Features): { nameOf: (spec: Spec) => { name: string; spec: Spec } } => {
     used.clear();
+    const specs = new Map<string, { spec: Spec; count: number }>();
+    for (const unit of kept) {
+      if (unit.drums) continue;
+      unit.notes.forEach((n, k) => {
+        const { start, end } = cellSpan(n, unit.notes[k + 1]);
+        const spec = specOf(n, features, end, start, true);
+        const key = specKey(spec);
+        const e = specs.get(key);
+        if (e) e.count++; else specs.set(key, { spec, count: 1 });
+      });
+    }
+    const libs = new Set<string>();
+    for (const u of kept) for (const n of u.notes) { const a = analysis.get(n.sample)!; if (a.drum !== undefined) libs.add(libOf(a)); }
+    const budget = 63 - libs.size;
+    // Base instruments by definition.
+    const baseUse = new Map<string, number>();
+    for (const { spec, count } of specs.values()) if (!spec.drum) baseUse.set(spec.base, (baseUse.get(spec.base) ?? 0) + count);
+    const sampleOfBase = new Map<string, number>();
+    for (const s of analysis.keys()) sampleOfBase.set(baseName(s), s);
+    const byDef = new Map<string, string>();
+    const remap = new Map<string, string>();
+    for (const [b] of [...baseUse].sort((x, y) => y[1] - x[1])) {
+      const def = baseDef(analysis.get(sampleOfBase.get(b)!)!);
+      const key = JSON.stringify(def);
+      const hit = byDef.get(key);
+      if (hit) { remap.set(b, hit); effectUse.mergedSamples++; } else { byDef.set(key, b); remap.set(b, b); }
+    }
+    const bases = [...new Set(remap.values())];
+    while (bases.length > budget && bases.length > 1) {
+      const use = (b: string): number => [...remap].filter(([, t]) => t === b).reduce((t, [f]) => t + (baseUse.get(f) ?? 0), 0);
+      const loser = bases.reduce((lo, b) => (use(b) < use(lo) ? b : lo));
+      const da = analysis.get(sampleOfBase.get(loser)!)!;
+      let best = "", bestD = Infinity;
+      for (const b of bases) {
+        if (b === loser) continue;
+        const db = analysis.get(sampleOfBase.get(b)!)!;
+        const dist = (db.waveform === da.waveform ? 0 : 100) + da.adsr.reduce((t, v, i) => t + Math.abs(v - db.adsr[i]!), 0);
+        if (dist < bestD) { bestD = dist; best = b; }
+      }
+      for (const [f, t] of remap) if (t === loser) remap.set(f, best);
+      bases.splice(bases.indexOf(loser), 1);
+      effectUse.mergedSamples++;
+    }
+    for (const b of bases) used.set(b, { def: baseDef(analysis.get(sampleOfBase.get(b)!)!), sample: sampleOfBase.get(b)! });
+    // Variants in order of use, within what is left of the budget.
+    const variants = [...specs.values()].filter((e) => !e.spec.drum && (e.spec.arp || e.spec.vib)).sort((a, b) => b.count - a.count);
+    const allowed = new Set<string>();
+    let room = budget - bases.length;
+    const variantNames = new Map<string, string>();
+    for (const { spec, count } of variants) {
+      const base = remap.get(spec.base)!;
+      const key = specKey({ ...spec, base });
+      if (allowed.has(key)) continue;
+      if (room <= 0) { effectUse.budgetVariants += count; continue; }
+      room--;
+      allowed.add(key);
+      const baseEntry = used.get(base)!;
+      const name = spec.arp ? `${base}_a${hex(spec.arp.x)}${hex(spec.arp.y)}_${spec.arp.frames}` : `${base}_v${variantNames.size + 1}`;
+      variantNames.set(key, name);
+      if (spec.arp) used.set(name, { def: { ...baseEntry.def, wavetable: [0, spec.arp.x, spec.arp.y].map((o) => ({ note: `+${o}`, frames: spec.arp!.frames })), loop: 0 }, sample: baseEntry.sample, arp: true });
+    }
+    return {
+      nameOf: (spec) => {
+        if (spec.drum) return { name: spec.drum, spec };
+        const base = remap.get(spec.base) ?? spec.base;
+        const key = specKey({ ...spec, base });
+        if (allowed.has(key)) return { name: spec.arp ? variantNames.get(key)! : base, spec: { ...spec, base } };
+        return { name: base, spec: { base } };
+      },
+    };
+  };
+
+  const buildVoices = (features: Features): { voices: GridVoice[]; stats: ModImportReport["voices"]; usedNotes: Map<string, number> } => {
+    for (const k of Object.keys(effectUse) as Array<keyof typeof effectUse>) effectUse[k] = 0;
+    const plan = planInstruments(features);
     const usedNotes = new Map<string, number>();
     const voices: GridVoice[] = [];
     const stats: ModImportReport["voices"] = [];
-    const arpCap = 63 - 31;
     for (const [vi, unit] of kept.entries()) {
       const cells: GridCell[] = Array.from({ length: totalCells }, () => ({ kind: "rest" as const }));
       let shifted = 0, collisions = 0, count = 0;
       const sorted = unit.notes;
       for (const [k, n] of sorted.entries()) {
-        const next = sorted[k + 1];
-        const pr = seq.rows[n.row]!;
-        let start = n.row;
-        if (n.delayTicks > 0) { if (n.delayTicks * 2 >= pr.speed && start + 1 < totalRows) start++; effectUse.noteDelayRounded++; }
         const a = analysis.get(n.sample)!;
         const drumNote = a.drum !== undefined;
+        const { start, end, gateOff } = cellSpan(n, sorted[k + 1]);
+        if (n.delayTicks > 0) effectUse.noteDelayRounded++;
+        if (gateOff !== undefined && !unit.drums) effectUse.cutInsideRow++;
         if (unit.drums) {
           const info = drumInfo(drumNote ? a.drum! : 45);
           const existing = cells[start];
@@ -242,63 +356,25 @@ export function importMod(bytes: Uint8Array, options: ModImportOptions = {}): Mo
           } else { cells[start] = { kind: "note", pitch: 48, drum: info.letter }; count++; }
           continue;
         }
-        // End of the note in cells. A note that ends inside a row occupies that row and closes its gate early (gate_off).
-        let end: number;
-        let gateOff: number | undefined;
-        const endRow = n.endTime >= seq.seconds - 1e-9 ? totalRows : rowIndexAt(n.endTime);
-        if (endRow >= totalRows) end = totalRows;
-        else {
-          const into = (n.endTime - rowStarts[endRow]!) / seq.rows[endRow]!.seconds;
-          if (into < 1e-6) end = endRow;
-          else {
-            end = endRow + 1;
-            const frames = Math.round((rowStarts[endRow]! + seq.rows[endRow]!.seconds - n.endTime) * fps);
-            if (frames >= 1) { gateOff = Math.min(255, frames); effectUse.cutInsideRow++; }
-          }
-        }
-        const nextStart = next ? next.row + (next.delayTicks * 2 >= seq.rows[next.row]!.speed ? 1 : 0) : totalRows;
-        if (end > nextStart) { end = nextStart; gateOff = undefined; }
-        if (end <= start) { end = start + 1; gateOff = undefined; }
         let pitch = n.midi + transpose;
         const original = pitch;
         while (pitch < 12) pitch += 12;
         while (pitch > maxMidi) pitch -= 12;
         if (pitch !== original) shifted++;
         const level = Math.max(1, Math.min(15, Math.round(15 * n.meanVolume / 64)));
-        const arpOk = features.arp && !!n.arpeggio;
-        let inst: string;
-        if (drumNote) inst = `lib:${GM_NAMES[a.drum!] ?? drumInfo(a.drum!).lib}`;
-        else {
-          let wantArp = arpOk;
-          if (wantArp) {
-            const key = `${baseName(n.sample)}_a${hex(n.arpeggio!.x)}${hex(n.arpeggio!.y)}_${Math.max(1, Math.min(255, Math.round(n.tickSec * fps)))}`;
-            if (!used.has(key) && [...used.values()].filter((u) => u.arp).length >= arpCap) { wantArp = false; effectUse.arpOverBudget++; }
-          }
-          inst = instrumentFor(n, wantArp);
-        }
+        const { name: inst, spec } = plan.nameOf(specOf(n, features, end, start));
         usedNotes.set(inst, (usedNotes.get(inst) ?? 0) + 1);
         const cell: GridCell = { kind: "note", pitch, level, inst, ...(gateOff === undefined ? {} : { gateOff }) };
         if (n.glide && features.portamento && n.portamento) {
-          const frames = Math.max(1, Math.min(255, Math.round(n.portamento.seconds * fps)));
-          cell.legato = true; cell.portamento = frames;
-        } else if (n.slide && features.bend && !drumNote && !(arpOk)) {
+          cell.legato = true; cell.portamento = Math.max(1, Math.min(255, Math.round(n.portamento.seconds * fps)));
+        } else if (n.slide && features.bend && !drumNote && !spec.arp) {
           const room = Math.max(12 - pitch, Math.min(maxMidi - pitch, n.slide.semitones));
           if (room !== n.slide.semitones) effectUse.bendClamped++;
           const durFrames = Math.max(1, Math.floor((n.endTime - n.startTime) * fps));
           if (room !== 0) cell.bend = { to: room, frames: Math.max(1, Math.min(255, durFrames, Math.round(n.slide.seconds * fps))) };
           else effectUse.bendNegligible++;
         }
-        if (n.vibrato && features.vibrato && !drumNote && !arpOk && !n.glide) {
-          const noteRows = Math.max(1, end - start);
-          if (n.vibrato.rows >= Math.ceil(noteRows / 2)) {
-            const rate = Math.max(0.2, Math.min(12, n.vibrato.speed / n.tickSec / 64));
-            const d = 255 * n.vibrato.depth / 128;
-            const p = n.vibrato.period;
-            const depth = Math.round(Math.max(0.03, Math.min(6, 6 * Math.log2((p + d) / Math.max(1, p - d)))) * 100) / 100;
-            const delay = Math.max(0, Math.min(255, Math.round((seq.rows[n.vibrato.firstRow]!.start - n.startTime) * fps)));
-            cell.vibrato = { depth, rate: Math.round(rate * 100) / 100, ...(delay > 0 ? { delay } : {}) };
-          } else effectUse.vibratoDropped++;
-        }
+        if (spec.vib) cell.vibrato = { depth: spec.vib.depth, rate: spec.vib.rate, ...(spec.vib.delay > 0 ? { delay: spec.vib.delay } : {}) };
         cells[start] = cell;
         count++;
         for (let r = start + 1; r < end && r < totalCells; r++) cells[r] = { kind: "tie" };
@@ -350,7 +426,8 @@ export function importMod(bytes: Uint8Array, options: ModImportOptions = {}): Mo
   if (effectUse.noteDelayRounded) losses.push(`${effectUse.noteDelayRounded} delayed note(s) (EDx) start on the nearest row.`);
   if (effectUse.bendClamped) losses.push(`${effectUse.bendClamped} slide(s) would leave the playable range and are limited to it.`);
   if (effectUse.vibratoDropped) losses.push(`${effectUse.vibratoDropped} vibrato(s) cover less than half of their note and are not imported.`);
-  if (effectUse.arpOverBudget) losses.push(`${effectUse.arpOverBudget} arpeggio note(s) use the plain instrument because SIDWave allows 63 instruments.`);
+  if (effectUse.budgetVariants) losses.push(`${effectUse.budgetVariants} note(s) lose their vibrato or arpeggio because SIDWave holds 63 distinct instruments per score and the more frequent variants used them up.`);
+  if (effectUse.mergedSamples) losses.push(`${effectUse.mergedSamples} sample(s) share the SIDWave instrument of another sample with the same or the closest waveform and ADSR.`);
   const shiftedTotal = built.stats.reduce((t, v) => t + v.octaveShifted, 0);
   if (shiftedTotal) losses.push(`${shiftedTotal} notes are outside the SIDWave range and were moved by octaves.`);
   const collisionTotal = built.stats.reduce((t, v) => t + v.drumCollisions, 0);

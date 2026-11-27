@@ -108,19 +108,22 @@ export function analyzeSample(s: ModSample): SampleAnalysis {
   let zc = 0;
   for (let i = 0; i < N; i++) { x[i] = x[i]! - mean; if (i > 0 && (x[i]! > 0) !== (x[i - 1]! > 0)) zc++; }
   const zeroCrossings = zc / N;
-  // Periodicity: normalised autocorrelation, shortest lag within 90 % of the best.
+  // Periodicity: normalised autocorrelation. The period is the shortest lag after the first negative value (so a slowly varying
+  // signal does not count its own smoothness as a period) whose correlation is within 90 % of the best.
   const maxLag = Math.min(600, Math.floor(N / 3));
   const r: number[] = new Array(maxLag + 1).fill(0);
-  let best = 0;
-  for (let lag = 6; lag <= maxLag; lag++) {
+  for (let lag = 2; lag <= maxLag; lag++) {
     let num = 0, e1 = 0, e2 = 0;
     for (let i = 0; i + lag < N; i++) { num += x[i]! * x[i + lag]!; e1 += x[i]! * x[i]!; e2 += x[i + lag]! * x[i + lag]!; }
-    const v = e1 > 0 && e2 > 0 ? num / Math.sqrt(e1 * e2) : 0;
-    r[lag] = v;
-    if (v > best) best = v;
+    r[lag] = e1 > 0 && e2 > 0 ? num / Math.sqrt(e1 * e2) : 0;
   }
-  let lagBest = 0;
-  for (let lag = 6; lag <= maxLag; lag++) if (r[lag]! >= 0.9 * best && r[lag]! > 0.3) { lagBest = lag; break; }
+  let firstNegative = 0;
+  for (let lag = 2; lag <= maxLag; lag++) if (r[lag]! < 0) { firstNegative = lag; break; }
+  let best = 0, lagBest = 0;
+  if (firstNegative > 0) {
+    for (let lag = firstNegative; lag <= maxLag; lag++) if (r[lag]! > best) best = r[lag]!;
+    for (let lag = firstNegative; lag <= maxLag; lag++) if (r[lag]! >= 0.9 * best && best > 0.3) { lagBest = lag; break; }
+  }
   const periodic = best >= 0.55 && lagBest > 0;
   const harmonics: number[] = [];
   let waveform: SampleWaveform = "noise";
@@ -173,7 +176,7 @@ export function analyzeSample(s: ModSample): SampleAnalysis {
   const decays = peak > 0 && tail <= 0.25 * peak;
   if (named !== undefined) { result.drum = named; result.drumReason = "name"; }
   else if (!s.looped && decays && seconds <= 1.2 && !periodic) {
-    result.drum = zeroCrossings > 0.35 ? (seconds < 0.12 ? 42 : seconds > 0.4 ? 49 : 46) : 38;
+    result.drum = zeroCrossings > 0.35 ? (seconds < 0.12 ? 42 : seconds > 0.4 ? 49 : 46) : zeroCrossings < 0.15 ? (seconds < 0.4 ? 36 : 45) : 38;
     result.drumReason = "short noise-like one-shot";
   } else if (!s.looped && decays && seconds <= 0.35 && periodic && lagBest >= 55) {
     result.drum = seconds < 0.2 ? 36 : 45;

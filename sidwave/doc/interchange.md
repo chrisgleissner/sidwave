@@ -7,7 +7,8 @@ All commands read at most 16 MiB, never modify their input, never overwrite the 
 ```
 sidwave export <file> [--format events|midi|musicxml|goattracker|furnace|vice-dump|swm|swi] [--instrument <name|n>] [--pattern-rows 16|32|64] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--seconds <s>] [--json]
 sidwave reconstruct <trace> [--from vice-dump|siddump] [--clock PAL|NTSC] [--seconds <s>] [--title <text>] [-o <score.yaml>] [--json]
-sidwave import <file> [--format midi|musicxml|goattracker|furnace|swm|swi] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>] [--subtune <n>]
+sidwave import <file> [--format midi|musicxml|goattracker|furnace|mod|swm|swi] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>] [--subtune <n>]
+                      [--sids 1-10] [--transpose <n>] [--quality]
                       [--no-drums] [--no-bend] [--title <text>] [--mode PAL|NTSC] [--no-validate] [--force] [--json]
 sidwave render <score> --stems [-o <dir>] [--force] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite] [--model 6581|8580] [--song <n>]
 ```
@@ -491,3 +492,85 @@ whose writer renders audio or traces sets `writeNeedsEngine`; a reader that reco
 `readIsApproximate`. Detection, `convert`, `formats`, `info` and the conversion test matrix pick the format up: add
 fixtures for it to `test/helpers/convertMatrix.mjs` (the matrix test fails on a readable format without a fixture), a
 block for it to the threshold tables below, and run `scripts/regenerate-convert-golden.mjs`.
+
+## ProTracker MOD (`.mod`)
+
+`sidwave import tune.mod -o tune.yaml [--sids n] [--transpose n] [--quality] [--mode PAL|NTSC]`. The format is detected from the signature at offset 1080 (or the extension `.mod`). The mapping is written from the published ProTracker module format description. SID Factory II ships a MOD converter (`converter_mod`, GPL-2.0); it was read to find out which behaviour users expect, nothing was copied, and the importer differs from it on purpose (see the table at the end of this section).
+
+Variants: 31-sample files with the signatures `M.K.`, `M!K!`, `M&K!`, `N.T.`, `FLT4`, `4CHN`, `6CHN`, `8CHN`, `CD81`, `OCTA`, `nCHN` (1 to 9), `nnCH` (10 to 32), `TDZ1` to `TDZ3`; `FLT8` (every pattern is two stored 4-channel patterns and the order list holds even numbers, which are halved); and the 15-sample Soundtracker layout, which has no signature and is accepted only when every pattern cell is plausible (no sample number above 15, periods 0 or 28 to 1712). Not supported: Oktalyzer, other 8-channel formats, and files above 8 MiB.
+
+Input bounds: 8 MiB, 32 channels, 128 patterns (pattern number at most 127), 64 rows per pattern, at most 100,000 played rows before the song repeats. A file that ends inside the pattern data, has a song length of 0, names more than 128 patterns or has no recognisable layout is a `ModError` (exit 3). A file that is short inside the sample data is read as far as it goes (warning). A song length above 128 is clamped (warning). A fuzz test (1500 cases for the parser, 400 for the importer) checks that every mutation gives a result or a typed error.
+
+### What is played
+
+The importer follows the order list through position jumps (`Bxx`), pattern breaks (`Dxx`), pattern loops (`E6x`, per channel), pattern delays (`EEx`), speed (`F01` to `F1F`) and tempo (`F20` to `FFF`). A tick lasts 2.5 / BPM seconds (125 BPM is 50 ticks per second), a row lasts speed x ticks (times one plus the pattern delay). `F00` ends the song. The song ends when a jump or the order list reaches a position that was already played (the loop target is reported; a loop to a position other than the first row is reported as a loss because SIDWave loops the whole timeline) or when the order list ends.
+
+### Timing
+
+Every played row is one grid cell. The rows per beat are 4 unless the row length would put the tempo outside 30 to 220 BPM, in which case 8, 2, 16 or 1 is used (the first with no bar outside the range). The score is divided into bars of 4 beats. When the row length changes at a row that is a whole number of beats (2 to 5) before the end of a bar, the bar ends there (meter 2/4, 3/4 or 5/4), so the change is exact. Every bar gets the tempo `60 x beats / seconds`, where seconds is the real duration of its rows. A bar therefore always has the exact length, and a row length change or pattern delay that is not on a beat only moves notes within its bar (reported as `mistimedRows`). SIDWave counts whole player calls per cell, so a row of 6 frames at 125 BPM is 119.8 ms in the player and 120 ms in the MOD; the score runs 0.2 % fast on PAL (measured: 0.958 s against 0.960 s for the first eight rows).
+
+### Voice reduction (4 or more channels to 3 voices per SID)
+
+The policy is deterministic:
+
+1. A channel is a drum channel when at least 60 % of its notes use a percussion sample (see below). The other channels are melodic.
+2. Each channel gets a score: for a melodic channel the number of notes times (1 + pitch range in semitones / 24); for a drum channel the number of hits times 1.25.
+3. With `--sids n` the score has `3 n` voices. When there are more channels, the drum channels are merged into one drum voice (when there is more than one), a drum voice with at least 4 hits keeps a place, and the remaining places go to the highest scores (ties: the lower channel number). A kept channel is never mixed into another.
+4. Every other channel is dropped and reported with its note count (`droppedNotes`, `losses`, `voicePolicy.ranking`).
+5. Voices are ordered by channel number, the drum voice last. Voice `i` is on SID `ceil(i / 3)`, at `$D400`, `$D420`, `$D440` and so on.
+
+`--sids 2` keeps four to six channels, `--sids 3` up to nine. Drum hits that fall on the same row in a merged drum voice keep the hit with the higher priority (kick, snare, clap, tom, crash, open hat, hat) and count the other as dropped.
+
+### Samples to instruments (approximate)
+
+The Amiga sample is not reproduced. Each sample that a note uses is measured once (at most 2048 points for the periodicity and the harmonics, one pass for the envelope) and becomes a SIDWave instrument:
+
+| Measurement | SIDWave |
+| --- | --- |
+| Periodic (normalised autocorrelation of at least 0.55): harmonics 2 and 3 weak | `triangle` |
+| Periodic: harmonic 2 weak, harmonic 3 present (a square wave) | `pulse`, width 0.5 |
+| Periodic: harmonics 2 and 3 strong (a ramp) | `sawtooth` |
+| Periodic with other spectra | `pulse`, width 0.25 |
+| Not periodic | `noise` |
+| Looped sample | ADSR with a sustain from the loop level relative to the peak (4 to 15), decay from the length of the part before the loop, attack from the time to the peak, release 4 |
+| One-shot sample | Sustain 0, decay from twice the time the envelope needs to fall to 10 %, attack from the time to the peak, release 3 |
+| Percussion (below) | the SIDWave library drum `lib:kick`, `lib:snare`, `lib:hat`, `lib:open_hat`, `lib:tom`, `lib:clap` or `lib:crash` |
+
+Percussion is recognised by the sample name (`bd`, `kick`, `bassdrum`, `sn`, `snare`, `sd`, `clap`, `hh`, `hat`, `oh`, `open hat`, `tom`, `crash`, `cymbal`, `ride`) or, without a name, by a one-shot sample of at most 1.2 s that decays to a quarter of its peak and is either not periodic (zero-crossing rate above 0.35: hat, open hat or crash by length; below 0.15: kick or tom; between: snare) or short and low (at most 0.35 s, period of 55 points or more: kick or tom). White-noise snares and open hats cannot be told apart by the measurements, so an unnamed noise burst of 0.12 to 0.4 s is an open hat. In a drum voice the hit is a letter of a `drums:` pattern; in a pitched voice it is a note with the library instrument.
+
+Samples with identical SIDWave definitions share one instrument. SIDWave holds at most 63 distinct compiled instruments (waveform, ADSR, pulse width, vibrato and arpeggio together), so when a song needs more, the least used instruments merge into the nearest (same waveform first, then the ADSR distance) and only the most frequent vibrato and arpeggio variants are kept; the report lists what was merged or lost. Digi playback of the samples (CIA2 volume digis, `samples:` in SIDWave) is not used: it needs a dedicated SID, a base rate of at most 8 kHz and 2,000 to 4,000 bytes per second of sound, and it plays 4-bit samples that sound unlike the MOD samples on a 6581.
+
+### Notes, levels and effects
+
+Notes: the period is converted to the nearest semitone (`MIDI = 48 + 12 log2(428 / period x 2^(finetune / 96))`, period 428 is MIDI 48, `C3`); `--transpose` adds semitones, and notes outside C0 to A#7 move by octaves (counted). A note without a sample number uses the last sample of the channel; a sample number without a note only resets the volume. A note stays until the next note on the channel, a cut or the end of the song (a looped sample sounds until then, a one-shot sample fades by the ADSR decay).
+
+Level: `level = round(15 x volume / 64)`, at least 1, from the time-weighted mean volume over the note, so `Cxx` at the start sets it exactly and slides and later changes average. A note whose volume reaches 0 (`C00`, a slide to 0, `EC0`) ends there.
+
+| Effect | SIDWave | Status |
+| --- | --- | --- |
+| `0xy` arpeggio | instrument variant with a wavetable `+0, +x, +y` that loops, one step per tick (`frames`) | approximate: the table runs from the note start, not restarted at each row; exact when the row has a multiple of three ticks |
+| `1xx`, `2xx`, `E1x`, `E2x` slides | `bend: { to, frames }` with the total movement rounded to whole semitones over the time the slide ran | approximate; slides below half a semitone and slides on an arpeggio note are dropped |
+| `3xx`, `5xy` tone portamento | note with `legato: true, portamento: frames`, the time `ceil(distance / speed)` ticks | approximate: the glide is linear in SID frequency, the MOD glide is linear in period |
+| `4xy`, `6xy` vibrato | per-note `vibrato` with rate `x x tick rate / 64` Hz (at most 12), depth from `y x 255 / 128` period units at the note period (at least 0.03 semitones), the delay from the first vibrato row; parameters snap to 8 depths, 8 rates and 4 delays | approximate: only when the vibrato covers half of the note |
+| `Axy`, `5xy`, `6xy`, `EAx`, `EBx`, `Cxx` volume | note level (mean) and the end of the note at volume 0 | approximate |
+| `ECx` note cut | `gate_off` in frames before the end of the row | exact to one frame |
+| `EDx` note delay | the note starts on the nearest row | approximate (error up to half a row) |
+| `Bxx`, `Dxx`, `E6x`, `EEx`, `Fxx` | the sequence of rows and the bar tempo (see above) | exact in length, within the bar for changes not on a beat |
+| `7xy` tremolo, `8xx` and `E8x` panning, `9xx` sample offset, `E3x`, `E4x`, `E5x`, `E7x`, `E9x`, `EFx` | not imported | counted by effect in `effects` and listed in `losses` |
+
+If SIDWave does not accept the score with all features, the importer drops vibrato, then slides, then tone portamento, then arpeggios one after the other and says so in `losses`. For notes shorter than 3 frames the instruments use the plain gate restart.
+
+### Quality measure
+
+`--quality` (or `quality: true`, or `measureModQuality`) adds `report.quality`. The reference note list is built from the MOD itself: for each kept channel, each trigger or tone portamento target with its onset and end in seconds, after the speed, tempo, jump, loop and delay effects (so a note ends at the next note, a cut or the end of the song). The imported score is read back through the structured event export, which gives the notes as SIDWave schedules them. A reference note matches an imported note of the same voice with the same pitch (a slide matches at its start or end pitch; drum hits match regardless of pitch) whose onset is within 60 ms. The report gives precision, recall, F1, the absolute onset error (mean, 95th percentile, maximum), the mean intersection over union of the sounding intervals of matched pitched notes (the gate-off time is subtracted), the figures per voice and the recall over the notes of all channels, which includes the notes the voice reduction dropped.
+
+Measured on the committed fixtures (`test/fixtures/mod`, hand-built, written by `test/helpers/modKit.mjs`; every figure is printed by the test): `four-channel.mod` (bass, lead, harmony and drums, 160 kept notes of 192, 3 voices): F1 1.00, onset error 5.1 ms (95th percentile 9.5 ms), duration overlap 0.98, recall over all channels 0.83 (the dropped channel is 32 notes); with `--sids 2` all four channels are kept and F1 is 1.00. `effects.mod` (every mapped effect, speed and tempo changes, a jump loop, 24 notes): F1 0.96 (the delayed note, 68 ms from its row, is the one miss), onset error 4.7 ms, duration overlap 0.97. The onset error is the frame rounding of SIDWave (at most one frame, 20 ms), not an error of the mapping.
+
+### CPU time
+
+Measured with `process.cpuUsage` on Node 24 on a loaded machine (`test/interchangeMod.test.mjs`): a 230 KB module with 100 patterns (6400 played rows, 31 samples of 4 KB, effects on a third of the notes) imports in 0.58 s without SIDWave validation and 2.8 s with it (compiling the score is the largest part); a 100 KB module with 30 patterns (1920 rows) takes 0.26 s without validation; the four-channel fixture takes 0.03 to 0.1 s. Sample analysis is 0.13 s for 31 samples of 4 KB. `--no-validate` skips the compile; the score is checked again when it is compiled.
+
+### Where this differs from the SID Factory II converter
+
+SID Factory II (`converter_mod`) converts only `M.K.` and `FLT` modules, asks the user to name the one channel to ignore, gives every instrument a triangle with a fixed envelope, tunes slides by a fixed factor, turns `Cxx` into a sustain/release command, and reports `5xy`, `6xy`, `7xy`, `8xx`, `9xx`, `Axx`, `E#x` and BPM tempo as unsupported. Matched here: the 4-channel to 3-voice reduction (the channel to drop is chosen by the score above instead of by the user), the nearest-note rule for periods, the arpeggio, slide, portamento, vibrato, set-volume and speed commands, the cut of a pattern at `Bxx` and `Dxx`, and a report of the commands that were used and not converted. Added: all 31-sample variants with 6 or 8 channels and the 15-sample layout, samples chosen by their waveform, drums, ADSR from the sample envelope, volume slides, fine slides, note cut and delay, tempo in BPM, the loop, the quality measure, and two SIDs.
+

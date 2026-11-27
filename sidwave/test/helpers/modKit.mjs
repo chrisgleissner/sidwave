@@ -165,3 +165,34 @@ export function songVariant(variant, channels, melodicSample = SAMPLES.sine) {
   }
   return buildMod({ title: `VARIANT ${variant}`, variant, channels, samples: [melodicSample], orders: [0], patterns: [rows] });
 }
+
+/** A large 4-channel song: `patternCount` distinct patterns of 64 rows (a note every second row), 31 samples of 4 KB, a pseudo-random score. */
+export function songLarge(patternCount = 64) {
+  let seed = 7;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed >> 8) % n; };
+  const kinds = ["sine", "square", "saw", "triangle", "noise", "kick", "snare", "hat"];
+  const samples = Array.from({ length: 31 }, (_, i) => {
+    const kind = kinds[i % kinds.length];
+    const data = kind === "sine" || kind === "square" || kind === "saw" || kind === "triangle" ? wave(kind, 4096, 32 + (i % 5) * 8) : wave(kind, 4096);
+    return { name: `s${i}`, data, volume: 40 + (i % 25), ...(["sine", "square", "saw", "triangle"].includes(kind) ? { loop: [0, 4096] } : {}) };
+  });
+  const patterns = [];
+  for (let p = 0; p < patternCount; p++) {
+    const rows = Array.from({ length: 64 }, () => [{}, {}, {}, {}]);
+    for (let r = 0; r < 64; r += 2) for (let c = 0; c < 4; c++) {
+      if (rnd(3) === 0) continue;
+      const fx = rnd(6);
+      rows[r][c] = { note: 36 + rnd(30), sample: 1 + rnd(31), ...(fx === 0 ? { fx: 0, param: 0x37 } : fx === 1 ? { fx: 4, param: 0x34 } : fx === 2 ? { fx: 0xa, param: 0x02 } : {}) };
+    }
+    patterns.push(rows);
+  }
+  return buildMod({ title: "LARGE", samples, orders: Array.from({ length: Math.min(128, patternCount) }, (_, i) => i), patterns });
+}
+
+/** The committed fixtures: file name to bytes. `test/interchangeMod.test.mjs` checks the files against these. */
+export const MOD_FIXTURES = () => ({
+  "four-channel.mod": songFourChannel(),
+  "effects.mod": songEffects(),
+  "fifteen-sample.mod": songVariant(null, 4),
+  "flt8.mod": songVariant("FLT8", 8),
+});
