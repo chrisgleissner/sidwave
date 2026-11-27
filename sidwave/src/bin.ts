@@ -4,11 +4,7 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 import { readFileSync } from "node:fs";
-import { enableCompileCache } from "node:module";
 import type { CliIo } from "./cliCore.js";
-
-// The compiled code of the modules is cached on disk by Node (22.1 and later; earlier versions have no such function).
-try { enableCompileCache?.(); } catch { /* the cache is an optimisation only */ }
 
 process.stdout.on("error", (error: NodeJS.ErrnoException) => { if (error.code === "EPIPE") process.exit(0); throw error; });
 
