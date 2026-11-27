@@ -101,6 +101,10 @@
       "types": "./dist/reconstruct/index.d.ts",
       "default": "./dist/reconstruct/index.js"
     },
+    "./export": {
+      "types": "./dist/interchange/index.d.ts",
+      "default": "./dist/interchange/index.js"
+    },
     "./data/*": "./data/*",
     "./package.json": "./package.json"
   },
@@ -115,6 +119,7 @@
     "data/**",
     "doc/licensing.md",
     "doc/tutorial.md",
+    "doc/interchange.md",
     "CHANGELOG.md",
     "LICENSE",
     "LICENSE-EXCEPTION.md",
@@ -162,6 +167,8 @@
     }
   },
   "devDependencies": {
-    "libsidplayfp-wasm": "1.1.1"
+    "libsidplayfp-wasm": "1.1.1",
+    "midi-file": "^1.2.4",
+    "wavefile": "^11.0.0"
   }
 }
