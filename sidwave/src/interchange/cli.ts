@@ -18,6 +18,8 @@ import { importGoatTracker } from "./goattrackerImport.js";
 import { importMidi } from "./midiImport.js";
 import { exportMusicXml } from "./musicxmlExport.js";
 import { importMusicXml } from "./musicxmlImport.js";
+import { importSwi, importSwm } from "./swmImport.js";
+import { exportSwi, exportSwm } from "./swmExport.js";
 
 export { InterchangeUsageError };
 /** Largest score or interchange file the command line reads. */
@@ -88,14 +90,56 @@ export function writeOutput(io: CliIo, input: string, target: string, bytes: Uin
 
 const stem = (file: string): string => basename(file, extname(file)).replace(/\.sidwave$/i, "");
 
-function exportCommand(args: string[], io: CliIo): number {
-  const a = parseFlags(args, ["-o", "--output", "--format", "--song", "--ppq", "--allow-dir"], ["--bend", "--json"]);
+function swmExportCommand(format: "swm" | "swi", file: string, a: InterchangeArgs, io: CliIo): number {
+  const { bytes, path } = readBounded(io, file);
+  const song = numberFlag(a, "--song");
+  const json = a.flags.has("--json");
+  const output = (a.flags.get("-o") ?? a.flags.get("--output")) as string | undefined ?? `${stem(file)}.${format}`;
+  try {
+    const doc = withFile(file, () => parseSidwave(bytes.toString("utf8"), confinedReadOptions(io.cwd, a.allowDirs)));
+    const common = song === undefined ? {} : { song };
+    let out: Uint8Array;
+    let result: Record<string, unknown>;
+    if (format === "swi") {
+      const which = a.flags.get("--instrument");
+      if (typeof which !== "string") throw new UsageError("--format swi needs --instrument <name or index>");
+      const r = exportSwi(doc, /^\d+$/.test(which) ? Number(which) : which, common);
+      out = r.bytes; result = { losses: r.losses };
+    } else {
+      const patternRows = numberFlag(a, "--pattern-rows");
+      const r = exportSwm(doc, { ...common, ...(patternRows === undefined ? {} : { patternRows }) });
+      for (const loss of r.report.losses) io.err(`note: ${loss}\n`);
+      out = r.bytes; result = { ...r.report };
+    }
+    if (output === "-") { io.outBytes(out); return 0; }
+    const written = writeOutput(io, path, output, out);
+    const full = { file, format, output: written, bytes: out.length, ...result };
+    io.out(json ? `${JSON.stringify(envelope("export", true, { result: full }), null, 2)}\n` : `${written}: SID-Wizard ${format === "swi" ? "instrument" : "module"}, ${out.length} bytes\n`);
+    return 0;
+  } catch (error) {
+    if (error instanceof RangeError) throw new UsageError(error.message);
+    throw error;
+  }
+}
+
+/** Exporters that need the engine and are therefore asynchronous (see traceCli.ts). */
+export type AsyncExporter = (file: string, args: InterchangeArgs, io: CliIo, json: boolean) => Promise<number>;
+const asyncExporters = new Map<string, AsyncExporter>();
+export function registerAsyncExporter(format: string, handler: AsyncExporter): void { asyncExporters.set(format, handler); }
+
+function exportCommand(args: string[], io: CliIo): number | Promise<number> {
+  const a = parseFlags(args, ["-o", "--output", "--format", "--song", "--ppq", "--seconds", "--instrument", "--pattern-rows", "--allow-dir"], ["--bend", "--json"]);
   if (a.positional.length !== 1) throw new UsageError("export needs exactly one score file");
   const file = a.positional[0]!;
   const output = (a.flags.get("-o") ?? a.flags.get("--output")) as string | undefined;
   const ext = output === undefined ? "" : extname(output).toLowerCase();
-  const format = (a.flags.get("--format") as string | undefined) ?? (ext === ".mid" || ext === ".midi" ? "midi" : ext === ".musicxml" || ext === ".xml" ? "musicxml" : ext === ".sng" ? "goattracker" : ext === ".fur" ? "furnace" : "events");
-  if (!["events", "midi", "musicxml", "goattracker", "furnace"].includes(format)) throw new UsageError(`--format must be events, midi, musicxml, goattracker or furnace, not ${format}`);
+  const format = (a.flags.get("--format") as string | undefined) ?? (ext === ".dump" ? "vice-dump" : ext === ".swm" ? "swm" : ext === ".swi" ? "swi" : ext === ".mid" || ext === ".midi" ? "midi" : ext === ".musicxml" || ext === ".xml" ? "musicxml" : ext === ".sng" ? "goattracker" : ext === ".fur" ? "furnace" : "events");
+  if (format === "swm" || format === "swi") return swmExportCommand(format, file, a, io);
+  const asyncExporter = asyncExporters.get(format);
+  if (asyncExporter) return asyncExporter(file, a, io, a.flags.has("--json"));
+  if (!["events", "midi", "musicxml", "goattracker", "furnace"].includes(format)) throw new UsageError(`--format must be events, midi, musicxml, goattracker, furnace${[...asyncExporters.keys()].map((k) => `, ${k}`).join("")}, not ${format}`);
+  if (a.flags.has("--seconds")) throw new UsageError("--seconds applies to --format vice-dump only");
+  if (a.flags.has("--instrument") || a.flags.has("--pattern-rows")) throw new UsageError("--instrument and --pattern-rows apply to --format swi and swm only");
   if (format !== "midi" && a.flags.has("--bend")) throw new UsageError("--bend applies to --format midi only");
   const { bytes, path } = readBounded(io, file);
   const song = numberFlag(a, "--song");
@@ -165,7 +209,7 @@ export type ImportHandler = (bytes: Buffer, args: InterchangeArgs) => ImportResu
 const importers = new Map<string, ImportHandler>();
 export function registerImporter(format: string, handler: ImportHandler): void { importers.set(format, handler); }
 /** Importer flags registered by other modules (valued, bare). */
-export const IMPORT_VALUED = ["-o", "--output", "--format", "--grid", "--voices", "--title", "--mode", "--song", "--allow-dir"];
+export const IMPORT_VALUED = ["-o", "--output", "--format", "--grid", "--voices", "--title", "--mode", "--song", "--subtune", "--allow-dir"];
 export const IMPORT_BARE = ["--no-drums", "--no-bend", "--no-validate", "--json", "--force"];
 
 importers.set("musicxml", (bytes, a) => {
@@ -209,6 +253,9 @@ importers.set("furnace", (bytes, a) => {
 const detect = (file: string, bytes: Buffer): string | undefined => {
   if (bytes.subarray(0, 4).toString("latin1") === "MThd") return "midi";
   const ext = extname(file).toLowerCase();
+  const id = bytes.subarray(2, 6).toString("latin1");
+  if (ext === ".swi") return "swi";
+  if (id === "SWM1" || id === "SWMS" || ext === ".swm" || ext === ".sws") return "swm";
   if (ext === ".musicxml" || ext === ".xml") return "musicxml";
   if (ext === ".mxl") return "musicxml";
   if (bytes.subarray(0, 4).toString("latin1") === "GTS5" || bytes.subarray(0, 4).toString("latin1") === "GTS4" || bytes.subarray(0, 4).toString("latin1") === "GTS3" || bytes.subarray(0, 4).toString("latin1") === "GTS2" || ext === ".sng") return "goattracker";
@@ -233,13 +280,30 @@ importers.set("midi", (bytes, a) => {
   }
 });
 
+for (const format of ["swm", "swi"]) {
+  importers.set(format, (bytes, a) => {
+    const subtune = numberFlag(a, "--subtune");
+    const mode = a.flags.get("--mode") as string | undefined;
+    if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
+    try {
+      return (format === "swi" ? importSwi : importSwm)(bytes, {
+        ...(subtune === undefined ? {} : { subtune }), ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}),
+        ...(mode ? { mode } : {}), validate: !a.flags.has("--no-validate"),
+      });
+    } catch (error) {
+      if (error instanceof RangeError) throw new UsageError(error.message);
+      throw error;
+    }
+  });
+}
+
 function importCommand(args: string[], io: CliIo): number {
   const a = parseFlags(args, IMPORT_VALUED, IMPORT_BARE);
   if (a.positional.length !== 1) throw new UsageError("import needs exactly one input file");
   const file = a.positional[0]!;
   const { bytes, path } = readBounded(io, file);
   const format = (a.flags.get("--format") as string | undefined) ?? detect(file, bytes);
-  if (format === undefined) throw new UsageError(`cannot tell the format of ${file}; pass --format midi, musicxml, goattracker or furnace`);
+  if (format === undefined) throw new UsageError(`cannot tell the format of ${file}; pass --format midi, musicxml, goattracker, furnace, swm or swi`);
   if (a.flags.get("-o") === "-" || a.flags.get("--output") === "-") {
     if (a.flags.has("--json")) throw new UsageError("import -o - writes the YAML to stdout; --json cannot be combined with it");
   }
@@ -261,13 +325,19 @@ function importCommand(args: string[], io: CliIo): number {
   return 0;
 }
 
-export const INTERCHANGE_HELP = `  sidwave export <file> [--format events|midi|musicxml|goattracker|furnace] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--json]
-  sidwave import <file> [--format midi|musicxml|goattracker|furnace] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>]
+export const INTERCHANGE_HELP = `  Examples (the format is detected from the file; --format / --from override):
+    sidwave import tune.swm -o tune.yaml           SID-Wizard module (.swm .sws; --subtune n) or instrument (.swi)
+    sidwave export score.yaml -o score.swm         SID-Wizard module for the expressible subset (losses are printed)
+    sidwave export score.yaml -o run.dump          VICE -sounddev dump text of the compiled score
+    sidwave reconstruct run.dump                   score from a VICE dump or a siddump table (SID files work as before)
+  sidwave export <file> [--format events|midi|musicxml|goattracker|furnace|vice-dump|swm|swi] [--instrument <name|n>] [--pattern-rows 16|32|64] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--seconds <s>] [--json]
+  sidwave reconstruct <trace> [--from vice-dump|siddump] [--clock PAL|NTSC] [--seconds <s>] [--title <text>] [-o <score.yaml>] [--json]
+  sidwave import <file> [--format midi|musicxml|goattracker|furnace|swm|swi] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>] [--subtune <n>]
                         [--no-drums] [--no-bend] [--title <text>] [--mode PAL|NTSC] [--no-validate] [--force] [--json]
 `;
 
 /** Commands handled here; `cli.ts` hands the arguments after the command name to the matching function. */
-export const INTERCHANGE_COMMANDS: Record<string, (args: string[], io: CliIo) => number> = {
+export const INTERCHANGE_COMMANDS: Record<string, (args: string[], io: CliIo) => number | Promise<number>> = {
   export: exportCommand,
   import: importCommand,
 };
