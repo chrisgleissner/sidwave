@@ -159,6 +159,8 @@ interface ProgramCall {
   wave: number;
   gate: number;
   offset: number;
+  /** The exact frequency register when the call is not an equal-temperament pitch under the tuning (written as a wavetable `reg` step). */
+  reg?: number;
   pw: number;
   /** The filter state while this voice is routed through the filter; absent when it is not. */
   filt?: { cutoff: number; res: number; type: number };
@@ -493,7 +495,7 @@ function segmentTrack(track: Track, tune: TuningSpec, clockHz: number, speed: nu
       }
       seg.program.push({
         wave: track.ctl[k]! & 0xfe, gate: track.ctl[k]! & 1,
-        offset: m === undefined ? 0 : m - seg.midi, pw: track.pw[k]!,
+        offset: m === undefined ? 0 : m - seg.midi, ...(m === undefined && track.freq[k]! > 0 ? { reg: track.freq[k]! } : {}), pw: track.pw[k]!,
         ...(track.route[k]! & (1 << track.voice) ? { filt: { cutoff: track.cutoff[k]!, res: track.route[k]! >> 4, type: track.mode[k]! & 0x70 } } : {}),
       });
     }
@@ -681,7 +683,7 @@ function isPrefix(shorter: ProgramCall[], longer: ProgramCall[]): boolean {
 }
 
 /** Run-length encodes the per-call wave, gate and offset into wavetable steps. */
-function wavetableSteps(program: ProgramCall[]): Array<Record<string, unknown>> | undefined {
+function wavetableSteps(program: ProgramCall[], regSteps: boolean): Array<Record<string, unknown>> | undefined {
   const steps: Array<Record<string, unknown>> = [];
   let i = 0;
   while (i < program.length) {
@@ -702,7 +704,8 @@ function wavetableSteps(program: ProgramCall[]): Array<Record<string, unknown>> 
       continue;
     }
     let j = i + 1;
-    while (j < program.length && !program[j]!.slide && program[j]!.wave === c.wave && program[j]!.gate === c.gate && program[j]!.offset === c.offset) j++;
+    const regOf = (x: ProgramCall): number | undefined => (regSteps ? x.reg : undefined);
+    while (j < program.length && !program[j]!.slide && program[j]!.wave === c.wave && program[j]!.gate === c.gate && program[j]!.offset === c.offset && regOf(program[j]!) === regOf(c)) j++;
     const name = waveName(c.wave);
     if (!name) return undefined;
     const step: Record<string, unknown> = { wave: name };
@@ -710,7 +713,8 @@ function wavetableSteps(program: ProgramCall[]): Array<Record<string, unknown>> 
     if (c.wave & 0x04) step.ring = true;
     if (c.wave & 0x02) step.sync = true;
     if (!c.gate) step.gate = false;
-    if (c.offset !== 0) step.note = c.offset > 0 ? `+${c.offset}` : String(c.offset);
+    if (regSteps && c.reg !== undefined) step.reg = c.reg;
+    else if (c.offset !== 0) step.note = c.offset > 0 ? `+${c.offset}` : String(c.offset);
     step.calls = Math.min(255, j - i);
     steps.push(step);
     // A run longer than 255 calls continues in a further step.
@@ -816,7 +820,7 @@ export function foldLoop(steps: Array<Record<string, unknown>>): { steps: Array<
 }
 
 function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, restart: RestartInfo, speed: number,
-  gap: { unsupported: Array<{ kind: string; detail: string }>; filterRecovered?: boolean }, vibrato?: VibratoFit): Record<string, unknown> {
+  gap: { unsupported: Array<{ kind: string; detail: string }>; filterRecovered?: boolean }, vibrato?: VibratoFit, regSteps = false): Record<string, unknown> {
   const first = program[0]!;
   const inst: Record<string, unknown> = {};
   const name = waveName(first.wave);
@@ -849,9 +853,9 @@ function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, res
   } else if (program.some((c) => c.filt)) {
     gap.unsupported.push({ kind: "filtertable", detail: "the filter state of a routed note cannot be written as a filter table" });
   }
-  const needsWavetable = program.some((c) => c.wave !== first.wave || !c.gate || c.offset !== 0 || !!c.slide);
+  const needsWavetable = program.some((c) => c.wave !== first.wave || !c.gate || c.offset !== 0 || !!c.slide || (regSteps && c.reg !== undefined));
   if (needsWavetable) {
-    const steps = wavetableSteps(program);
+    const steps = wavetableSteps(program, regSteps);
     if (steps) {
       const folded = foldLoop(steps);
       if (folded.steps.length > MAX_TABLE_STEPS) gap.unsupported.push({ kind: "wavetable", detail: `${folded.steps.length} steps exceed ${MAX_TABLE_STEPS}` });
@@ -989,6 +993,19 @@ function simplifyInstrument(y: Record<string, unknown>, level: number): Record<s
     for (const k of ["ring", "sync", "pulse_width", "hard_restart"]) if (y[k] !== undefined) out[k] = y[k];
   } else if (level === 2 && y.hard_restart !== undefined) out.hard_restart = y.hard_restart;
   return out;
+}
+
+/**
+ * True when an instrument needs exact `reg` pitch steps: some note is not an equal-temperament pitch, and every note of
+ * the instrument has the same frequency registers at each call (a pitch table of the player, not a vibrato whose phase
+ * differs from note to note).
+ */
+function usesRegSteps(def: InstrumentDef, members: NoteSegment[]): boolean {
+  if (!members.some((m) => m.modulated)) return false;
+  for (const m of members) {
+    for (let k = 0; k < m.program.length; k++) if (m.program[k]!.reg !== def.program[k]?.reg) return false;
+  }
+  return def.program.some((c) => c.reg !== undefined);
 }
 
 // ---- the recovery --------------------------------------------------------------------------------------------------
@@ -1184,7 +1201,8 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   // and vibrato, and the simplified shapes that become equal share one instrument. Search space: the number of fully kept
   // instruments and the simplification level (3 levels); objective: most notes fully kept; deterministic, no work budget needed (linear in the instruments).
   const budgetGap = { unsupported: [] as Array<{ kind: string; detail: string }>, filterRecovered: false };
-  const fullYaml = renamed.map((def) => buildInstrumentYaml(def.program, def.ad, def.sr, def.restart, speed, budgetGap));
+  // An instrument with notes whose pitch no equal-temperament note explains gets exact `reg` pitch steps; a vibrato fit that succeeds later replaces them.
+  const fullYaml = renamed.map((def, i) => buildInstrumentYaml(def.program, def.ad, def.sr, def.restart, speed, budgetGap, undefined, usesRegSteps(def, membersOf[i]!)));
   const sizes = fullYaml.map((y) => ({
     wave: Array.isArray(y.wavetable) ? (y.wavetable as unknown[]).length : 0,
     pulse: y.pulsetable ? ((y.pulsetable as { steps: unknown[] }).steps.length) : 0,
@@ -1254,7 +1272,8 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     fitted.add(fi);
     const vibrato = fitVibrato(members, tune, ir.clockHz, speed, frameRate * speed);
     if (vibrato) {
-      finalYaml[fi] = { ...finalYaml[fi]!, vibrato: { depth: vibrato.depth, rate: vibrato.rate, ...(vibrato.delayCalls ? { delay: vibrato.delayCalls / speed } : {}) } };
+      const def = renamed[i]!;
+      finalYaml[fi] = buildInstrumentYaml(def.program, def.ad, def.sr, def.restart, speed, budgetGap, vibrato, false);
       finalDefs[fi]!.yaml = finalYaml[fi]!;
     } else {
       const track = used[segsByTrack.findIndex((list) => list.includes(modulated))]!;
@@ -1309,7 +1328,8 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   });
   // SIDWave 1.5 is declared only when the score needs it: a speed above 4, or a player without the soft-start volume ramp.
   const useTable = tune.override.size > 0;
-  const v15 = speed > 4 || softStartOff || useTable;
+  const usesReg = Object.values(instruments).some((y) => ((y as { wavetable?: Array<Record<string, unknown>> }).wavetable ?? []).some((step) => step.reg !== undefined));
+  const v15 = speed > 4 || softStartOff || useTable || usesReg;
   const build = (layout: Layout): Record<string, unknown> => ({
     sidwave: v15 ? "1.5" : "1.4",
     ...(softStartOff ? { player: { soft_start: false } } : {}),

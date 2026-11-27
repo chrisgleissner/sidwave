@@ -1,0 +1,34 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
+import { homedir } from "node:os";
+import path from "node:path";
+import { createLibsidplayfpEngine, psidClock } from "./dist/engine/libsidplayfp.js";
+import { irOfTrace } from "./dist/reconstruct/reconstruct.js";
+import { recoverScore } from "./dist/reconstruct/recover.js";
+import { parseSidwave } from "./dist/sidwave.js";
+import { compileSidwaveBytes } from "./dist/sidwaveOps.js";
+const sha = (d) => createHash("sha256").update(d).digest("hex");
+const [file, song, seconds, from = "0", count = "40"] = process.argv.slice(2);
+const sid = new Uint8Array(readFileSync(path.join("/home/chris/dev/c64/C64Music", file)));
+const clock = psidClock(sid) ?? "PAL";
+const key = sha(JSON.stringify({ sid: sha(sid), song: Number(song), seconds: Number(seconds), clock, engineVersion: "1.1.1", t: 1 })).slice(0, 32);
+const dir = path.join(homedir(), ".c64bridge/sidwave-standalone/recon-cache/traces");
+const meta = JSON.parse(readFileSync(path.join(dir, key + ".json"), "utf8"));
+const buf = gunzipSync(readFileSync(path.join(dir, key + ".f64.gz")));
+const records = new Float64Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+const orig = irOfTrace({ ...meta, records });
+const rec = recoverScore(orig, {});
+const compiled = compileSidwaveBytes(parseSidwave(rec.text), { format: "sid", loop: true });
+const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+const t2 = await engine.trace({ sid: new Uint8Array(compiled.bytes), seconds: Number(seconds), clock });
+const re = irOfTrace(t2);
+const o0 = 1, r0 = 1;
+console.log("calls", orig.calls.length, re.calls.length, "firstCall", rec.firstCall);
+const hx = (r, v) => Array.from(r.subarray(v * 7, v * 7 + 7), (b) => b.toString(16).padStart(2, "0")).join(" ");
+for (let i = Number(from); i < Number(from) + Number(count); i++) {
+  const a = orig.calls[rec.firstCall + i]?.sids[0].regs, b = re.calls[(re.calls[0].sids[0].written & 0x1ffffff) === 0x1ffffff ? 1 + i : i]?.sids[0].regs;
+  if (!a || !b) break;
+  const diff = [0, 1, 2].some((v) => hx(a, v) !== hx(b, v));
+  console.log(String(i).padStart(4), diff ? "DIFF" : "same", "v1", hx(a, 0), "|", hx(b, 0), "   v2", hx(a, 1), "|", hx(b, 1));
+}
