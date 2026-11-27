@@ -1,0 +1,44 @@
+# Lesson 6: filter sweep and pulse width modulation
+#
+# Concepts: the SID has one filter that can darken a sound; moving its cutoff makes the sound open and close.
+# Pulse width modulation (PWM) moves the width of a pulse wave, which makes a thin sound move and shimmer.
+#
+# The lead uses `pwm_sweep`: the width moves between 0.5 - depth and 0.5 + depth, `speed` times a second. The bass uses
+# `filter_mod`: "+900 over 8 steps" opens the filter by 900 units while the pattern plays its first eight entries, and
+# starts again at every repeat. A filter belongs to one SID chip and is declared with it: here voice 2 owns the filter
+# and routes its own channel through it (`filter` in `sids`). A filter needs the chip `model` (6581 and 8580 differ).
+#
+# Try this: set the sweep to "-900 over 8 steps", or raise `speed` of pwm_sweep to 2.
+sidwave: 1.4
+title: Lesson 6 - Movement
+tempo: 107.41
+mode: PAL
+sids:
+  - { id: sid1, address: "$D400", model: "8580", filter: { owner: v2, route: [2] } }
+instruments:
+  lead: { waveform: pulse, pulse_width: 0.5, adsr: [2, 6, 11, 6] }
+  bass: { waveform: sawtooth, adsr: [0, 7, 9, 4] }
+voices:
+  - id: 1
+    name: Lead
+    instrument: lead
+    patterns:
+      long:
+        length: 4
+        bars: 2
+        groove: "E4 | G4"
+        fx:
+          pwm_sweep: { depth: 0.3, speed: 0.5 }
+  - id: 2
+    name: Bass
+    instrument: bass
+    patterns:
+      pulse:
+        length: 0.5
+        bars: 1
+        groove: "E2 E2 E3 E2 E2 E3 G2 A2"
+        fx:
+          filter_mod: { sweep: "+900 over 8 steps" }
+sections:
+  open: { bars: 2, layers: { v1: long, v2: pulse } }
+timeline: [open]

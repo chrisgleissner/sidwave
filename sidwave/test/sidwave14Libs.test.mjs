@@ -16,7 +16,7 @@ import { compileSidwaveBytes, confinedReadOptions } from "../src/sidwaveOps.js";
 import { SIDWAVE_LIBRARY_LIMITS, bundleScore, canonicalLibraryHash, libraryClosure, lockScore, readImportEntries, satisfiesVersion } from "../src/sidwaveLibs.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const fixture = path.join(here, "fixtures", "sidwave-libs");
+const fixture = path.join(here, "projects", "sidwave-libs");
 const sha = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 
 /** A fresh copy of the fixture project (its `pkgs` directory becomes `node_modules`, which git ignores). */

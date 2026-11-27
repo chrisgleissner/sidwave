@@ -1,0 +1,47 @@
+# Lesson 2: two voices and named instruments
+#
+# Concepts: an instrument is a named sound (waveform, envelope, pulse width) that voices and notes can share;
+# two voices play at once, a bass below and a melody above.
+#
+# `instruments` defines "lead" and "bass" once. A voice picks its default with `instrument:`. A single note may pick
+# another one with "@name", as the last note of the bass does. The melody is the first line of Beethoven's Ode to Joy,
+# which is in the public domain.
+#
+# A section `level` sets how loud the section is (here mf, then ff), so the second half is stronger.
+#
+# Try this: give "lead" the waveform triangle, or write C2@lead in the bass to hear that note with the lead sound.
+sidwave: 1.4
+title: Lesson 2 - Ode to Joy
+tempo: 107.41
+mode: PAL
+sids:
+  - { id: sid1, address: "$D400", model: "8580" }
+instruments:
+  lead: { waveform: pulse, pulse_width: 0.35, adsr: [1, 6, 10, 5] }
+  bass: { waveform: sawtooth, adsr: [0, 6, 8, 4] }
+  pluck: { waveform: triangle, adsr: [0, 7, 4, 4] }   # a softer, shorter note
+voices:
+  - id: 1
+    name: Melody
+    instrument: lead
+    patterns:
+      first:
+        length: 1
+        bars: 4
+        groove: "E4 E4 F4 G4 | G4 F4 E4 D4 | C4 C4 D4 E4 | E4 ~ D4 ~"
+      second:
+        length: 1
+        bars: 4
+        groove: "E4 E4 F4 G4 | G4 F4 E4 D4 | C4 C4 D4 E4 | D4 ~ C4 ~"
+  - id: 2
+    name: Bass
+    instrument: bass
+    patterns:
+      roots:
+        length: 1
+        bars: 4
+        groove: "C2 ~ C2 ~ | G2 ~ G2 ~ | C2 ~ C2 ~ | G2 ~ C2@pluck ~"
+sections:
+  A: { bars: 4, level: mf, layers: { v1: first, v2: roots } }
+  B: { bars: 4, level: ff, layers: { v1: second, v2: roots } }
+timeline: [A, B]

@@ -1,0 +1,41 @@
+# Lesson 3: drums from a library
+#
+# Concepts: `imports` brings instruments and patterns from a library file, under a name you choose. The library has a
+# version, a licence and a content hash, so a score always plays the same drums.
+#
+# The import below names the library file (libs/chip_kit.yaml), the namespace "kit" and the versions that are
+# acceptable. After it, "kit.beat" and "kit.fill" are drum patterns that can be used as layers, and "kit.kick" is an
+# instrument. Only what the score uses is copied into the compiled music. `sidwave lock` adds a `sha256` to the import
+# line, `sidwave bundle` collects the score and its libraries into one folder, and compiling the score prints the
+# licence of each library it used. The library must lie inside this score's folder (or in a folder given with
+# `--allow-dir`); the sidwave command never reads libraries from the network.
+#
+# Try this: play the "fill" section first in `timeline`, or write your own kit pattern in libs/chip_kit.yaml.
+sidwave: 1.4
+title: Lesson 3 - Drums
+tempo: 107.41
+mode: PAL
+imports:
+  - { as: kit, from: ./libs/chip_kit.yaml, version: "^1.0.0" }
+sids:
+  - { id: sid1, address: "$D400", model: "8580" }
+instruments:
+  lead: { waveform: pulse, pulse_width: 0.4, adsr: [1, 6, 10, 5] }
+  bass: { waveform: sawtooth, adsr: [0, 6, 8, 4] }
+voices:
+  - id: 1
+    name: Melody
+    instrument: lead
+    patterns:
+      riff: { length: 0.5, bars: 1, groove: "A4 - C5 - E5 - C5 - " }
+  - id: 2
+    name: Bass
+    instrument: bass
+    patterns:
+      root: { length: 0.5, bars: 1, groove: "A2 A2 - A2 A2 - A3 A2" }
+  - id: 3
+    name: Drums                     # voice 3 has no pattern of its own: it plays the kit's patterns
+sections:
+  groove: { bars: 2, level: mf, layers: { v1: riff, v2: root, v3: kit.beat } }
+  fill: { bars: 1, level: ff, layers: { v1: riff, v2: root, v3: kit.fill } }
+timeline: [groove, groove, fill]

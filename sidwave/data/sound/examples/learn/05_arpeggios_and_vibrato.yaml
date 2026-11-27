@@ -1,0 +1,42 @@
+# Lesson 5: arpeggios and vibrato
+#
+# Concepts: an arpeggio plays the notes of a chord one after another, so quickly that one voice sounds like a chord.
+# Vibrato bends a held note up and down a little, the way a singer or a violinist does.
+#
+# The first voice has one arpeggio pattern per chord (Am, F, C and G). With `frame_rate: 2` it changes note every two
+# video frames, about 25 times a second, and `length: 4` makes one chord last a whole bar. The second voice plays a
+# slow melody with `fx.vibrato`: `depth` is the width in semitones, `rate` is the speed in Hz and `delay` waits that
+# many frames after the note starts, so short notes stay steady and long notes come alive.
+#
+# Try this: make `frame_rate` 1 or 4, or raise the vibrato `depth` to 0.6.
+sidwave: 1.4
+title: Lesson 5 - Chords and Vibrato
+tempo: 93.98
+mode: PAL
+sids:
+  - { id: sid1, address: "$D400", model: "8580" }
+instruments:
+  arp: { waveform: pulse, pulse_width: 0.25, adsr: [0, 4, 9, 4] }
+  solo: { waveform: triangle, adsr: [3, 6, 11, 6] }
+voices:
+  - id: 1
+    name: Chords
+    instrument: arp
+    patterns:
+      am: { type: arpeggio, notes: [A3, C4, E4], frame_rate: 2, length: 4, bars: 1 }
+      f: { type: arpeggio, notes: [F3, A3, C4], frame_rate: 2, length: 4, bars: 1 }
+      c: { type: arpeggio, notes: [C4, E4, G4], frame_rate: 2, length: 4, bars: 1 }
+      g: { type: arpeggio, notes: [G3, B3, D4], frame_rate: 2, length: 4, bars: 1 }
+  - id: 2
+    name: Solo
+    instrument: solo
+    patterns:
+      line:
+        length: 1
+        bars: 4
+        groove: "E5 ~ ~ ~ | C5 ~ ~ ~ | E5 ~ D5 ~ | B4 ~ ~ ~"
+        fx:
+          vibrato: { depth: 0.35, rate: 5.5, delay: 12 }
+sections:
+  progression: { bars: 4, layers: { v1: "am f c g", v2: line } }
+timeline: [progression]

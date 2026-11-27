@@ -1,0 +1,29 @@
+# Lesson 1: one voice, one melody
+#
+# Concepts: a score is a few top-level settings plus voices (the instruments that play) and a timeline (when they play).
+# A pattern is a short list of notes; one entry in the list lasts `length` beats.
+#
+# Read it from the top: tempo and the system clock (PAL), one SID chip, one voice with one pattern called "tune".
+# Inside the pattern, "|" ends a bar (it takes no time), "~" holds the note before it and "-" is a rest. The timeline
+# plays "tune" for four bars, and the score then starts again from the top.
+#
+# Try this: change `tempo` to 120, change C4 to C5, or replace the last bar's "~" with "-" to hear a rest.
+sidwave: 1.4
+title: Lesson 1 - Twinkle
+tempo: 93.98
+mode: PAL
+sids:
+  - { id: sid1, address: "$D400", model: "8580" }
+voices:
+  - id: 1
+    name: Melody
+    waveform: pulse        # the sound of the voice: pulse, sawtooth, triangle or noise
+    pulse_width: 0.4       # how narrow the pulse is; 0.5 is a square wave
+    adsr: [1, 5, 10, 5]    # attack, decay, sustain, release (0-15): a soft start and a short fade
+    patterns:
+      tune:
+        length: 1          # every entry lasts one beat
+        bars: 4            # the pattern has four bars of four beats (the compiler checks this)
+        groove: "C4 C4 G4 G4 | A4 A4 G4 ~ | F4 F4 E4 E4 | D4 D4 C4 ~"
+timeline:
+  - { section: Tune, bars: 4, layers: { v1: tune } }

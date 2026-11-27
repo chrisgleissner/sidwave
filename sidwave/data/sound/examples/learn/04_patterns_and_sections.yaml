@@ -1,0 +1,40 @@
+# Lesson 4: patterns, sections and a loop
+#
+# Concepts: a few patterns, arranged into named sections, make a whole song. `loop_to` says where the song starts again
+# after the last section, so the intro plays only once.
+#
+# Each voice owns the patterns it plays. `sections` gives names to combinations: in "intro" only the bass plays (the
+# melody layer is "-", silence). The `timeline` lists the sections in order, and "verse*2" repeats one. A layer such as
+# "tune+5" plays the same pattern five semitones higher, so one pattern serves two chords. A "~" inside "high" holds a
+# note across a beat, so the two voices do not restart on every beat at the same moment.
+#
+# Try this: change `loop_to` to chorus, or add a section "outro" with only the bass and put it last.
+sidwave: 1.4
+title: Lesson 4 - Form
+tempo: 125.31
+mode: PAL
+sids:
+  - { id: sid1, address: "$D400", model: "8580" }
+instruments:
+  lead: { waveform: pulse, pulse_width: 0.3, adsr: [1, 5, 10, 4] }
+  bass: { waveform: sawtooth, adsr: [0, 6, 8, 4] }
+voices:
+  - id: 1
+    name: Melody
+    instrument: lead
+    patterns:
+      tune: { length: 1, bars: 2, groove: "A4 C5 E5 C5 | D5 C5 B4 ~" }
+      high: { length: 0.5, bars: 2, groove: "E5 D5 ~ B4 A4 B4 C5 E5 | D5 C5 ~ A4 G4 A4 B4 ~" }
+  - id: 2
+    name: Bass
+    instrument: bass
+    patterns:
+      walk: { length: 1, bars: 2, groove: "A2 ~ E2 ~ | D2 ~ E2 ~" }
+      drive: { length: 0.5, bars: 2, groove: "A2 A2 A3 A2 A2 A3 A2 A3 | D2 D2 D3 D2 E2 E2 E3 E2" }
+sections:
+  intro: { bars: 2, layers: { v1: "-", v2: walk } }
+  verse: { bars: 2, layers: { v1: tune, v2: walk } }
+  chorus: { bars: 2, layers: { v1: high, v2: drive } }
+  lift: { bars: 2, layers: { v1: "tune+5", v2: "walk+5" } }
+timeline: [intro, "verse*2", chorus, lift, chorus]
+loop_to: verse
