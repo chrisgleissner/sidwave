@@ -1,0 +1,96 @@
+// SIDWave 1.5 `global_table` (per-call filter and volume registers) and the wavetable waveform `none`, and their recovery.
+import test from "#test/runner";
+import assert from "#test/assert";
+import { readFileSync } from "node:fs";
+import { parseSidwave } from "../src/sidwave.ts";
+import { compileSidwaveBytes } from "../src/sidwaveOps.ts";
+import { irOfTrace } from "../src/reconstruct/reconstruct.ts";
+import { globalTableSteps } from "../src/reconstruct/recover.ts";
+import { sharedEngine, roundTrip } from "./helpers/reconstructRoundTrip.mjs";
+
+const doc = (version, extra, instrument = "{ waveform: pulse, adsr: [0, 4, 12, 3] }") => `sidwave: "${version}"
+title: T
+tempo: 120
+${extra}
+voices:
+  - { id: 1, instrument: lead, patterns: { a: { length: 1, bars: 1, groove: "A4 - C5 -" } } }
+instruments:
+  lead: ${instrument}
+timeline:
+  - { section: Main, bars: 1, layers: { v1: a } }
+`;
+const TABLE = `player: { soft_start: false }
+global_table:
+  loop: 2
+  steps:
+    - { d415: 3, d416: 16, d417: 0xF1, d418: 0x1F, calls: 2 }
+    - { d416_add: -4, calls: 3 }
+    - { d415: 1, d416: 100, d417: 0x21, d418: 0x3A }
+    - { d416_add: 7, d418: 9, calls: 2 }`;
+
+const compile = (text) => new Uint8Array(compileSidwaveBytes(parseSidwave(text), { format: "sid", loop: true }).bytes);
+const trace = async (text) => irOfTrace(await sharedEngine().trace({ sid: compile(text), seconds: 1, clock: "PAL" }));
+const globals = (call) => Array.from(call.sids[0].regs.subarray(0x15, 0x19));
+
+test("global_table and the waveform none are 1.5 constructs: an older document names the version", () => {
+  assert.throws(() => parseSidwave(doc("1.4", TABLE.replace("player: { soft_start: false }\n", ""))), /global_table requires sidwave: 1\.5/);
+  assert.throws(() => parseSidwave(doc("1.4", "", "{ waveform: pulse, wavetable: [{ wave: none, test: true }] }")), /waveform none requires sidwave: 1\.5/);
+});
+
+test("global_table is validated", () => {
+  const bad = (extra, pattern) => assert.throws(() => parseSidwave(doc("1.5", extra)), pattern);
+  bad("global_table: { steps: [] }", /steps/);
+  bad("global_table: { steps: [{ calls: 1 }] }", /no step sets a register/);
+  bad("global_table: { steps: [{ d417: 1 }, { d416: 2 }] }", /first step sets every register/);
+  bad("global_table: { steps: [{ d416: 1, d416_add: 1 }] }", /choose d416 or d416_add/);
+  bad("global_table: { steps: [{ d417: 256 }] }", /d417/);
+  bad("global_table: { steps: [{ d417: 1, calls: 256 }] }", /calls/);
+  bad("global_table: { loop: 1, steps: [{ d417: 1 }] }", /loop/);
+  bad("global_table: { steps: [{ d418: 15 }] }", /soft_start: false/);
+});
+
+test("the player writes the table values call by call, continues at the loop step and writes the register order unchanged", async () => {
+  const ir = await trace(doc("1.5", TABLE));
+  const expected = [
+    [3, 16, 0xf1, 0x1f], [3, 16, 0xf1, 0x1f], [3, 12, 0xf1, 0x1f], [3, 8, 0xf1, 0x1f], [3, 4, 0xf1, 0x1f],
+    [1, 100, 0x21, 0x3a], [1, 107, 0x21, 9], [1, 114, 0x21, 9], [1, 100, 0x21, 0x3a], [1, 107, 0x21, 9],
+  ];
+  assert.deepEqual(ir.calls.slice(1, 11).map(globals), expected);
+});
+
+test("without a loop the last values are held; registers the table does not set stay with the player", async () => {
+  const ir = await trace(doc("1.5", "global_table: { steps: [{ d417: 4 }, { d417: 9 }] }"));
+  assert.deepEqual(ir.calls.slice(1, 5).map((c) => c.sids[0].regs[0x17]), [4, 9, 9, 9]);
+  const plain = await trace(doc("1.5", "player: { soft_start: true }"));
+  assert.equal(ir.calls[30].sids[0].regs[0x18], plain.calls[30].sids[0].regs[0x18]);
+});
+
+test("the waveform none writes the control register without waveform bits", async () => {
+  const ir = await trace(doc("1.5", "", "{ waveform: pulse, wavetable: [{ wave: none, test: true, calls: 1 }, { wave: pulse }] }"));
+  assert.deepEqual(ir.calls[1].sids[0].control[0], [0x09]);
+  assert.deepEqual(ir.calls[2].sids[0].control[0], [0x41]);
+});
+
+test("globalTableSteps encodes runs and linear cutoff sweeps", () => {
+  const values = [[16, 0xf1], [16, 0xf1], [20, 0xf1], [24, 0xf1], [24, 0x21]];
+  const ir = { calls: values.map(([cut, res]) => { const regs = new Uint8Array(25); regs[0x16] = cut; regs[0x17] = res; return { sids: [{ regs }] }; }) };
+  assert.deepEqual(globalTableSteps(ir, 0, [0x16, 0x17]), [
+    { d416: 16, d417: 0xf1, calls: 2 }, { d416_add: 4, calls: 2 }, { d417: 0x21, calls: 1 },
+  ]);
+});
+
+test("recovery writes a global_table for a changing filter and volume, and the round trip is strict exact", { timeout: 60_000 }, async () => {
+  const r = await roundTrip(doc("1.5", TABLE));
+  assert.equal(r.report.fdiff.classes.filter.differingCalls, 0, JSON.stringify(r.report.fdiff.first));
+  assert.equal(r.report.fdiff.classes.volume.differingCalls, 0);
+  assert.match(r.score, /global_table:/);
+  assert.equal(r.report.strictExact, true, JSON.stringify(r.report.fdiff.first));
+});
+
+test("global_table and none are documented in the schema, the spec chapter and the changelog", () => {
+  const read = (name) => readFileSync(new URL(`../${name}`, import.meta.url), "utf8");
+  const schema = JSON.parse(read("data/sound/sidwave.schema.json"));
+  assert.ok(schema.properties.global_table.properties.steps);
+  assert.match(read("data/sound/sidwave.md"), /#### Global registers: `global_table`/);
+  assert.match(read("CHANGELOG.md"), /`global_table`/);
+});

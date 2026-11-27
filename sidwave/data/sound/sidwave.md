@@ -96,6 +96,7 @@ timeline:
 | `instruments` | Optional named instrument map. Voices may select an instrument; `lib:name` selects a built-in recipe. |
 | `speed` | Player calls per frame, from 1 to 4 (to 8 in 1.5; see "Speed up to 8"). |
 | `player` | 1.5: player options `soft_start`, `idle_writes` and `start` (see "Player options"). |
+| `global_table` | 1.5: per-call values of the filter and volume registers (see "Global registers"). |
 | `tuning` | 1.5: `cents` shift and exact `registers` per note (see "Tuning"). |
 | `title`, `author` | Written to the PSID header (Latin-1, 32 characters). |
 | `meter` | Quarter notes per bar. Defaults to 4. In 1.2 use `meter: 3` for 3/4. 1.3 also accepts time signatures (see SIDWave 1.3). |
@@ -1373,6 +1374,52 @@ therefore has a first note one call shorter than the tune; later notes are exact
 SID addresses in a multi-SID score exist already (`sids[].address`), so recovery of tunes with several SIDs is a recovery
 change (the recovery emits only SID 1 today), not a language change. A table of global volume, filter and routing steps
 (`global_table`) is not implemented: 10 of 24 tunes change the filter or volume registers outside any note, and the S5d work did not reach it.
+
+#### Global registers: `global_table`
+
+**Reproducer.** A tune whose player writes `$D417` or `$D418` with values that change independently of the notes: a
+routing bit set in the middle of a note, a volume that is rewritten per call, or a cutoff sweep that runs while no voice
+uses the filter.
+
+**Why 1.4 cannot express it.** The player computes `$D415` to `$D418` from the SID's filter settings and from the filter
+table of the sounding note. Nothing sets them on a timeline of their own.
+
+**Evidence.** Filter and volume were among the most frequent differing classes of the 24 development tunes.
+
+**Design.**
+
+```yaml
+sidwave: "1.5"
+player: { soft_start: false }
+global_table:
+  loop: 1
+  steps:
+    - { d415: 0, d416: 32, d417: 0xF1, d418: 0x1F, calls: 4 }
+    - { d416_add: 8, calls: 16 }
+    - { d416_add: -8, calls: 16 }
+```
+
+Each step lasts `calls` player calls (1 to 255). `d415` to `d418` set a register at the start of the step; a register
+that a step does not name keeps its value. `d416_add` adds a signed value to `$D416`, modulo 256, in every call of the
+step. The first step sets every register that any step names. After the last step the table continues at `loop`, with the
+values the registers then hold, or keeps the last values when there is no `loop`. A table has at most 2048 steps.
+
+The table owns the registers that it names: the player no longer writes them, so filter tables and filter settings have no
+effect on those registers. The other registers of the four stay with the player. The table runs once per call from the
+first call after `player.start`, `init` restarts it, and a song loop does not. A table that names `d418` needs
+`player.soft_start: false`. The construct supports one SID and cannot be combined with `songs` or `effects`.
+
+Recovery emits the table only when a score without it differs from the tune in the filter or volume class, and keeps it
+only when it brings the two traces closer; the instruments of such a score have no filter tables.
+
+**Rejected alternative.** A filter table that belongs to a voice cannot describe a register that changes while that voice
+plays no note, and it cannot describe `$D418` at all.
+
+#### Wavetable waveform `none`
+
+A wavetable step with `wave: none` writes a control register without waveform bits, with the `test`, `gate`, `ring` and
+`sync` flags of the step. Many players start a note with the test bit alone (`$09`); earlier versions require a waveform
+(`$41`). The construct requires `sidwave: 1.5`.
 
 ## Playable examples
 

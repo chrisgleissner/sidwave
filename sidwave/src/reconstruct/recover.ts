@@ -19,7 +19,7 @@
 
 import YAML from "yaml";
 import { formatSidwave } from "../format/sidwaveFormat.js";
-import { midiToHz, midiToNoteName, parseSidwave } from "../sidwave.js";
+import { GLOBAL_TABLE_MAX_STEPS, midiToHz, midiToNoteName, parseSidwave } from "../sidwave.js";
 import { compileSidwaveBytes } from "../sidwaveOps.js";
 import { mantissaShift, maxSidwaveMidi, sidwaveFrameRate } from "../sidwaveCompiler.js";
 import { controlRegister, type FrameIr } from "./ir.js";
@@ -698,6 +698,18 @@ function waveName(wave: number): string | undefined {
   return WAVE_NAMES[wave & 0xf0];
 }
 
+/** The name of a wavetable step's waveform; `none` (SIDWave 1.5) when no waveform bit is set. */
+function stepWaveName(wave: number): string | undefined {
+  return wave & 0xf0 ? waveName(wave) : "none";
+}
+
+/** The waveform that sounds in most gate-on calls of a program: the instrument's own waveform, which a first call without a usable waveform (a test bit start) does not name. */
+function dominantWave(program: ProgramCall[]): number | undefined {
+  const counts = new Map<number, number>();
+  for (const c of program) if (waveName(c.wave)) counts.set(c.wave & 0xf0, (counts.get(c.wave & 0xf0) ?? 0) + (c.gate ? 2 : 1));
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0];
+}
+
 function sameCall(a: ProgramCall, b: ProgramCall): boolean {
   return a.wave === b.wave && a.gate === b.gate && a.offset === b.offset && a.pw === b.pw
     && a.slide?.from === b.slide?.from && a.slide?.to === b.slide?.to && a.slide?.count === b.slide?.count
@@ -717,7 +729,7 @@ function wavetableSteps(program: ProgramCall[], regSteps: boolean): Array<Record
   while (i < program.length) {
     const c = program[i]!;
     if (c.slide) {
-      const name = waveName(c.wave);
+      const name = stepWaveName(c.wave);
       if (!name) return undefined;
       const step: Record<string, unknown> = { wave: name };
       if (c.wave & 0x08) step.test = true;
@@ -734,7 +746,7 @@ function wavetableSteps(program: ProgramCall[], regSteps: boolean): Array<Record
     let j = i + 1;
     const regOf = (x: ProgramCall): number | undefined => (regSteps ? x.reg : undefined);
     while (j < program.length && !program[j]!.slide && program[j]!.wave === c.wave && program[j]!.gate === c.gate && program[j]!.offset === c.offset && regOf(program[j]!) === regOf(c)) j++;
-    const name = waveName(c.wave);
+    const name = stepWaveName(c.wave);
     if (!name) return undefined;
     const step: Record<string, unknown> = { wave: name };
     if (c.wave & 0x08) step.test = true;
@@ -878,8 +890,9 @@ function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, res
   const first = program[0]!;
   const inst: Record<string, unknown> = {};
   const name = waveName(first.wave);
-  inst.waveform = name ?? "pulse";
-  if (!name) gap.unsupported.push({ kind: "waveform", detail: `control value $${first.wave.toString(16)} has no waveform bits` });
+  inst.waveform = name ?? WAVE_NAMES[dominantWave(program) ?? 0x40]!;
+  const unnamed = program.find((c) => !stepWaveName(c.wave));
+  if (unnamed) gap.unsupported.push({ kind: "waveform", detail: `control value $${unnamed.wave.toString(16)} combines noise with another waveform` });
   if (first.wave & 0x04) inst.ring = true;
   if (first.wave & 0x02) inst.sync = true;
   inst.adsr = [ad >> 4, ad & 15, sr >> 4, sr & 15];
@@ -909,7 +922,7 @@ function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, res
   } else if (program.some((c) => c.filt)) {
     gap.unsupported.push({ kind: "filtertable", detail: "the filter state of a routed note cannot be written as a filter table" });
   }
-  const needsWavetable = program.some((c) => c.wave !== first.wave || !c.gate || c.offset !== 0 || !!c.slide || (regSteps && c.reg !== undefined));
+  const needsWavetable = !name || program.some((c) => c.wave !== first.wave || !c.gate || c.offset !== 0 || !!c.slide || (regSteps && c.reg !== undefined));
   if (needsWavetable) {
     const steps = wavetableSteps(program, regSteps);
     if (steps) {
@@ -917,6 +930,8 @@ function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, res
       if (folded.steps.length > MAX_TABLE_STEPS) gap.unsupported.push({ kind: "wavetable", detail: `${folded.steps.length} steps exceed ${MAX_TABLE_STEPS}` });
       inst.wavetable = folded.steps;
       if (folded.loop !== undefined) inst.loop = folded.loop;
+      // Every step names its waveform; the instrument's own one is what remains when the tables are dropped to fit the budget.
+      inst.waveform = WAVE_NAMES[dominantWave(program) ?? 0x40]!;
     }
   }
   if (vibrato) inst.vibrato = { depth: vibrato.depth, rate: vibrato.rate, ...(vibrato.delayCalls ? { delay: vibrato.delayCalls / speed } : {}) };
@@ -1192,6 +1207,65 @@ function writesControlWhileIdle(ir: FrameIr, from: number, t: Track, until: numb
     for (const i of [0, 1, 2, 3, 5, 6]) if (sid.regs[base + i] !== 0) return false;
   }
   return true;
+}
+
+// ---- global registers ----------------------------------------------------------------------------------------------
+
+/** The `global_table` steps of the registers `regs` ($15 to $18) of SID 1 over the IR calls from `from` on. */
+export function globalTableSteps(ir: FrameIr, from: number, regs: number[]): Array<Record<string, number>> {
+  const steps: Array<Record<string, number>> = [];
+  const at = (k: number, r: number): number => ir.calls[k]!.sids[0]!.regs[r]!;
+  const others = regs.filter((r) => r !== 0x16);
+  const delta = (k: number): number => (regs.includes(0x16) && k > from ? ((at(k, 0x16) - at(k - 1, 0x16) + 384) % 256) - 128 : 0);
+  for (let k = from; k < ir.calls.length;) {
+    const first = k === from;
+    const d = delta(k);
+    const step: Record<string, number> = {};
+    for (const r of regs) {
+      if (r === 0x16 && d !== 0) continue;
+      if (first || at(k, r) !== at(k - 1, r)) step[`d4${r.toString(16)}`] = at(k, r);
+    }
+    if (d !== 0) step.d416_add = d;
+    let n = 1;
+    while (n < 255 && k + n < ir.calls.length && delta(k + n) === d && others.every((r) => at(k + n, r) === at(k, r))) n++;
+    step.calls = n;
+    steps.push(step);
+    k += n;
+  }
+  return steps;
+}
+
+/**
+ * The recovered score with the filter and volume registers of SID 1 written from a `global_table` (SIDWave 1.5) instead of
+ * the instruments' filter tables and the player's volume. Returns undefined when those registers never differ from what a
+ * player without filter writes (0, 0, 0 and volume 15), so a table would add nothing. The caller compares both scores with
+ * the tune and keeps the closer one.
+ */
+export function withGlobalTable(ir: FrameIr, recovered: RecoveredScore): RecoveredScore | undefined {
+  const from = ir.calls.length - recovered.rows;
+  const regs = [0x15, 0x16, 0x17, 0x18].filter((r) => {
+    for (let k = from; k < ir.calls.length; k++) if (ir.calls[k]!.sids[0]!.regs[r] !== (r === 0x18 ? 15 : 0)) return true;
+    return false;
+  });
+  if (!regs.length || from >= ir.calls.length) return undefined;
+  const folded = foldLoop(globalTableSteps(ir, from, regs));
+  const truncated = folded.steps.length > GLOBAL_TABLE_MAX_STEPS;
+  const table = truncated ? { steps: folded.steps.slice(0, GLOBAL_TABLE_MAX_STEPS) } : folded;
+  const document = JSON.parse(JSON.stringify(recovered.document)) as Record<string, unknown>;
+  for (const instrument of Object.values((document.instruments ?? {}) as Record<string, Record<string, unknown>>)) delete instrument.filtertable;
+  const volume = regs.includes(0x18);
+  const player = { ...(document.player as Record<string, unknown> | undefined), ...(volume ? { soft_start: false } : {}) };
+  const { sidwave: _version, player: _player, ...rest } = document;
+  const next: Record<string, unknown> = { sidwave: "1.5", ...(Object.keys(player).length ? { player } : {}), global_table: table, ...rest };
+  const unsupported = recovered.unsupported.filter((u) => u.kind !== "global_state" && u.kind !== "filtertable");
+  if (truncated) {
+    unsupported.push({ kind: "global_table", detail: `the filter and volume registers change more often than ${GLOBAL_TABLE_MAX_STEPS} table steps can hold; the table ends early`, evidence: { steps: folded.steps.length } });
+  }
+  return {
+    ...recovered, document: next, text: formatSidwave(YAML.stringify(next)), unsupported,
+    extensions: recovered.extensions.filter((e) => e.id !== "global-register-sequence" && e.id !== "table-filtertable"),
+    languageVersion: "1.5", softStartOff: recovered.softStartOff || volume,
+  };
 }
 
 // ---- the recovery --------------------------------------------------------------------------------------------------
@@ -1535,7 +1609,8 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     return !!t && (t.wrap === true || t.steps.some((st) => st.set === 0));
   });
   const usesReg = Object.values(instruments).some((y) => ((y as { wavetable?: Array<Record<string, unknown>> }).wavetable ?? []).some((step) => step.reg !== undefined));
-  const v15 = speed > 4 || softStartOff || idleOff || idleControl || startSteps.length > 0 || useTable || usesReg || usesWide;
+  const usesNoWave = Object.values(instruments).some((y) => ((y as { wavetable?: Array<Record<string, unknown>> }).wavetable ?? []).some((step) => step.wave === "none"));
+  const v15 = speed > 4 || softStartOff || idleOff || idleControl || startSteps.length > 0 || useTable || usesReg || usesWide || usesNoWave;
   const playerOptions = {
     ...(softStartOff ? { soft_start: false } : {}),
     ...(idleOff ? { idle_writes: false } : {}),

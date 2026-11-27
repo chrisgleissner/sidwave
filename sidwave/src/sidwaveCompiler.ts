@@ -10,7 +10,7 @@ import { digiTriggers, makeTimelineClock, rampValue, timelinePatternPasses, type
 import type { SampleStats } from "./sidwavePcm.js";
 import { addDigiPlayer, digiCyclesPerCall, digiDataAsm, digiPeakCycles, digiPeriod, validateDigiRate } from "./sidwaveDigi.js";
 import { AssemblyError, assemblyToPrgDetailed } from "6502-toolkit/assembler";
-import { isModern, isV13, patternBeats, sectionBarBeats } from "./sidwave.js";
+import { isModern, isV13, patternBeats, sectionBarBeats, type GlobalTable } from "./sidwave.js";
 import { SIDWAVE_EFFECT_STEP_BYTES, effectCode, effectCyclesBound, effectFrames, effectRam, effectTables } from "./sidwaveEffects.js";
 import { SongSelect, hasSongSelect, lintSongs, mergeSampleCommands, psidSpeedBits, songDoc } from "./sidwaveSongs.js";
 import type { ParsedEffect, ParsedSidwave, SystemMode, SidwaveVoice, SidwavePattern, SidwavePatternGroove, MotifEntry, SidwaveRegisterTable, FilterModSpec, SidwaveSamples, SidwaveGrooveNote } from "./sidwave.js";
@@ -1006,6 +1006,8 @@ export function maxSidwaveMidi(system: SystemMode): number {
 
 function waveformToCtrl(w: string): number {
   const wf = (w || "pulse").toLowerCase();
+  // SIDWave 1.5 wavetable steps: no waveform bits (test, gate, ring and sync alone).
+  if (wf === "none") return 0;
   if (wf.includes("tri") && wf.includes("saw") && wf.includes("pulse")) return 0x70;
   if (wf.includes("tri") && wf.includes("pulse")) return 0x50;
   if (wf.includes("saw") && wf.includes("pulse")) return 0x60;
@@ -1120,6 +1122,8 @@ export interface Arrangement {
   idleControl?: boolean;
   /** SIDWave 1.5 `player.start`: the register writes of the first player calls. */
   startSteps?: Array<Array<{ reg: number; value: number }>>;
+  /** SIDWave 1.5 `global_table`: per-call values of the filter and volume registers. */
+  globalTable?: GlobalTable;
   /** SIDWave 1.5 `tuning`: the 96 register values C0..B7 of the document's clock; absent without a tuning. */
   noteTable?: number[];
   clock?: TimelineClock;
@@ -1332,6 +1336,7 @@ function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrange
     ...(doc.player?.idleWrites === false ? { idleSilent: true } : {}),
     ...(doc.player?.idleWrites === "control" ? { idleControl: true } : {}),
     ...(doc.player?.start ? { startSteps: doc.player.start } : {}),
+    ...(doc.globalTable ? { globalTable: doc.globalTable } : {}),
     ...(doc.tuning && (doc.tuning.cents || doc.tuning.registers.length) ? { noteTable: noteTableOf(doc) } : {}),
   };
 }
@@ -2592,7 +2597,8 @@ function estimatePlayerCycles(arr: Arrangement, loop: boolean): number {
   const hasFade = arr.instruments.some((inst) => inst.vibFade);
   const bursts = new Map<number, number>();
   const add = (frame: number, cycles: number) => bursts.set(frame, (bursts.get(frame) ?? 0) + cycles);
-  let regular = (arr.startSteps ? 6 : 0) + 180 + (arr.softVolume ? 35 + 135 * (arr.chips?.length ?? 1) : 0) + (arr.samples ? 48 * (arr.chips?.length ?? 1) : 0); // entry, pointer/banking saves, play-once wrapper and return
+  // global_table: the step load and the four writes of gt_tick, at most 170 cycles (a loop back adds the reload).
+  let regular = (arr.globalTable ? 200 : 0) + (arr.startSteps ? 6 : 0) + 180 + (arr.softVolume ? 35 + 135 * (arr.chips?.length ?? 1) : 0) + (arr.samples ? 48 * (arr.chips?.length ?? 1) : 0); // entry, pointer/banking saves, play-once wrapper and return
   for (const chip of arr.chips ?? [{ filter: arr.filter, hasFilterTable: hasFilter }]) {
     regular += arr.chips ? 155 : 0; // base table lookup, 3-channel dispatch and unfiltered volume
     if (chip.filter.used || chip.hasFilterTable || !arr.chips) {
@@ -3621,6 +3627,134 @@ ${banks.join("\n")}
 `;
 }
 
+/** Bytes of one `global_table` step in the player: calls, mode, $D415, $D416 or its increment, $D417, $D418. A zero call count ends the table. */
+const GLOBAL_STEP_BYTES = 6;
+
+function globalTableBytes(table: GlobalTable): number[] {
+  const carried: [number, number, number, number] = [0, 0, 0, 0];
+  const bytes: number[] = [];
+  for (const step of table.steps) {
+    const values = [step.d415, step.d416, step.d417, step.d418];
+    // Mode bit 0: add the third byte to $D416 in every call. Bits 4 to 7: the step sets $D415 to $D418; the others keep their value.
+    let mode = step.d416Add === undefined ? 0 : 1;
+    values.forEach((value, r) => {
+      if (value === undefined) return;
+      carried[r] = value;
+      mode |= 16 << r;
+    });
+    bytes.push(step.calls, mode, carried[0], step.d416Add === undefined ? carried[1] : step.d416Add & 255, carried[2], carried[3]);
+  }
+  bytes.push(0);
+  return bytes;
+}
+
+/**
+ * SIDWave 1.5 `global_table`: the player's own writes of the registers that the table sets are removed from the play routine,
+ * and `gt_tick` writes the table's values once per call after the voices. init restarts the table; a song loop does not.
+ */
+function addGlobalTable(code: string, table: GlobalTable, address: number): string {
+  const play = code.indexOf("\nplay:\n");
+  const init = "\nini_voice:\n";
+  const done = "play_chips_done:\n";
+  if (play < 0 || !code.includes(init) || !code.includes(done)) throw new Error("SIDWAVE player code changed: the global table patch points were not found");
+  const head = code.slice(0, play);
+  let body = code.slice(play);
+  for (const reg of table.registers) {
+    const offset = reg.toString(16);
+    body = body.split(`  ldy #$${offset}\n  sta (sid_io),y\n`).join("");
+  }
+  code = (head + body).replace(init, `\n  jsr gt_reset${init}`).replace(done, `${done}  jsr gt_tick\n`);
+  const writes = table.registers.map((reg) => `  lda gt_v${reg.toString(16)}\n  sta $${(address + reg).toString(16).toUpperCase()}`).join("\n");
+  const loop = table.loop === undefined ? `  rts` : `  lda #<(gt_data+${table.loop * GLOBAL_STEP_BYTES})
+  sta ptr
+  lda #>(gt_data+${table.loop * GLOBAL_STEP_BYTES})
+  sta ptr+1
+  jmp gt_load`;
+  // The caller saves and restores ptr around the whole play call.
+  return `${code}
+gt_reset:
+  lda #<gt_data
+  sta gt_posl
+  lda #>gt_data
+  sta gt_posh
+  lda #0
+  sta gt_left
+  sta gt_mode
+  rts
+gt_tick:
+  lda gt_left
+  bne gt_run
+  lda gt_posl
+  sta ptr
+  lda gt_posh
+  sta ptr+1
+gt_load:
+  ldy #0
+  lda (ptr),y
+  bne gt_step
+  jmp gt_end
+gt_step:
+  sta gt_left
+  iny
+  lda (ptr),y
+  sta gt_mode
+  asl
+  bcc gt_keep18
+  pha
+  ldy #5
+  lda (ptr),y
+  sta gt_v18
+  pla
+gt_keep18:
+  asl
+  bcc gt_keep17
+  pha
+  ldy #4
+  lda (ptr),y
+  sta gt_v17
+  pla
+gt_keep17:
+  asl
+  bcc gt_keep16
+  pha
+  ldy #3
+  lda (ptr),y
+  sta gt_v16
+  pla
+gt_keep16:
+  asl
+  bcc gt_keep15
+  ldy #2
+  lda (ptr),y
+  sta gt_v15
+gt_keep15:
+  ldy #3
+  lda (ptr),y
+  sta gt_add
+  clc
+  lda ptr
+  adc #${GLOBAL_STEP_BYTES}
+  sta gt_posl
+  lda ptr+1
+  adc #0
+  sta gt_posh
+gt_run:
+  dec gt_left
+  lda gt_mode
+  lsr
+  bcc gt_write
+  clc
+  lda gt_v16
+  adc gt_add
+  sta gt_v16
+gt_write:
+${writes}
+  rts
+gt_end:
+${table.loop === undefined ? "  sta gt_mode\n  jmp gt_write" : loop}
+`;
+}
+
 /** ANDs the value written to $D417 (route bits and resonance) with the first SID's effect mask, at every write. */
 function maskFilterRoute(code: string): string {
   const site = "  ldy #$17\n  sta (sid_io),y\n";
@@ -3978,6 +4112,7 @@ c_ret:
     if (arr.tuning) playerCode = addTunedLookup(playerCode, arr.tuning);
     if (arr.samples) playerCode = addDigiPlayer(playerCode, arr.samples, arr.chips, [CLOCK_HZ.PAL, CLOCK_HZ.NTSC]);
   }
+  if (arr.globalTable) playerCode = addGlobalTable(playerCode, arr.globalTable, arr.chips![0]!.address);
   if (arr.idleControl) playerCode = playerCode.replace("  sta $D400,y ; idle control", arr.chips ? "  sta (sid_io),y" : "  sta $D400,y");
   if (songs) {
     // The song selector copies each song's loop targets into loop_lo and loop_hi.
@@ -4201,6 +4336,7 @@ c_ret:
   }
   if (arr.chips?.some((chip) => chip.hasOffset)) for (const name of ["g_so0", "g_so1", "g_so2", "g_sres"]) R.push(`${name}: .res 1`);
   if (arr.startSteps) R.push("st_i: .res 1");
+  if (arr.globalTable) R.push("gt_left: .res 1", "gt_posl: .res 1", "gt_posh: .res 1", "gt_mode: .res 1", "gt_add: .res 1", "gt_v15: .res 1", "gt_v16: .res 1", "gt_v17: .res 1", "gt_v18: .res 1");
   R.push(`vars_end:`);
   if (arr.effects) R.push(...effectRam(channels, arr.chips!.length, arr.effects.some((effect) => effect.steps.some((step) => step.filter === "off"))));
 
@@ -4208,6 +4344,7 @@ c_ret:
     effectTables({ effects: arr.effects, filterOff: arr.effects.some((effect) => effect.steps.some((step) => step.filter === "off")), hzToRegister: hzToSidFrequency, midiToHz },
       (label, items) => pushByteRows(T, label, items, SIDWAVE_EFFECT_STEP_BYTES), (text) => T.push(text));
   }
+  if (arr.globalTable) pushByteRows(T, "gt_data", globalTableBytes(arr.globalTable).map((v) => `$${hex2(v)}`));
   streams.forEach((s, i) => pushByteRows(T, `stream${i}`, s.map((b) => typeof b === "string" ? b : `$${hex2(b)}`)));
   if (arr.samples) L.push(includeSamples ? digiDataAsm(arr.samples) :
     [...arr.samples.defs.keys()].map((_, i) => `digi_data${i}:`).join("\n"));
