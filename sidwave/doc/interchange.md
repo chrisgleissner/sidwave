@@ -76,6 +76,43 @@ The result is a SIDWave 1.3 score for one SID (at most 3 voices), validated by c
 * **Pitch bend.** With the bend range of RPN 0 (default 2 semitones), a bend at the start of a note shifts its written pitch to the nearest semitone. A bend inside a note that ends at least one semitone away from the start becomes a SIDWave `bend` (`to` in semitones, `frames` from the last bend event). Bend that returns to its start pitch (vibrato) and other bends are not imported (`bendsLost`).
 * **Not imported:** controllers other than the bend range, aftertouch, SysEx, text other than track names, the note release velocity, drum velocity, polyphony, more than three voices, SMPTE time division. File size (8 MiB), tracks (256), events (2,000,000), ticks (2^31), bars (2048) and grid cells (400,000) are bounded, and the parser reports malformed files as errors.
 
+## MusicXML
+
+Uncompressed partwise MusicXML (`.musicxml`, `.xml`). SIDWave reads and writes it with its own bounded XML reader (`parseXml`, no dependency). The tests verify the output with the independent `fast-xml-parser` (MIT, dev dependency only).
+
+Reader limits (untrusted input): at most 16 MiB; elements nested at most 64 deep; at most 1,000,000 elements and 64 attributes per element; at most 2,000,000 notes, 2048 bars and 400,000 grid cells. Only the five predefined XML entities and numeric character references are decoded. A `DOCTYPE` with an internal subset (where entities are declared) and any other entity reference are rejected; the external DTD named by a `DOCTYPE` is never fetched. Compressed `.mxl` (zip) files are rejected with a message that asks for an uncompressed export (no zip reader without a new dependency). `score-timewise` is rejected.
+
+### Export
+
+`sidwave export score.yaml -o score.musicxml [--song n] [--ppq n]`
+
+| SIDWave | MusicXML |
+| --- | --- |
+| Title, author | `work-title`, `creator type="composer"`. |
+| One voice | One `part` (named `v<id> <name>`), one `voice` 1 inside it. |
+| Section metre | `time` (beats, beat-type) at the first measure of each section with a new signature; measures are one bar of the section metre. |
+| Tempo (sections, ramps) | `direction` with `metronome` and `sound tempo` in the first part, at the tick of each tempo-map entry; a note that spans a tempo change is split into tied notes. |
+| Section names | `rehearsal` directions in the first part. |
+| Note | `note` with `pitch` (sharps), `duration` in divisions (`divisions` = ticks per quarter note, default 480; there is no `type`), `tie`/`tied` where a note crosses a bar line or a tempo change. Rests fill the gaps. |
+| Velocity | `dynamics` attribute of the note, `velocity / 90 x 100` (MusicXML defines 100 as MIDI velocity 90). |
+| Instrument | One `score-instrument`/`midi-instrument` per distinct GM program in the part (program table as for MIDI), referenced by each note. |
+| Drum hit | `unpitched` note with a `midi-unpitched` key (GM percussion key + 1) per drum name; the part uses the percussion clef. |
+
+Exact: pitch, order, voice assignment, bar structure, tempo and metre at bar lines. Approximate: velocity. Lost: ADSR, waveform, pulse width, ring, sync, filter, wavetables, bend, glide, slide, vibrato, the note type (the duration is exact in ticks but is not engraved as quarter or eighth note), key signature (always C major).
+
+### Import
+
+`sidwave import tune.musicxml -o tune.yaml [--grid 0.25] [--voices 3] [--no-drums]`
+
+Voice allocation, monophony (skyline: highest note wins, lowest in a part with a median below C3), range, quantisation, tempo-per-bar and time-signature rules are those of the MIDI import. Differences:
+
+* Parts are the unit of allocation (instead of MIDI track and channel). A part with more unpitched than pitched notes is a drum part; its hits map through the `midi-unpitched` key of the note's `instrument` in the part list (hits without a key are counted in `droppedHits`).
+* Instruments: the `midi-program` of the note's `instrument`, else of the part's first `midi-instrument`, by the GM family table; a bass part without program uses `bass`. A note carries `inst` only when its program differs from the voice's most common one.
+* Positions come from `duration`, `backup`, `forward` and `chord`; `divisions` can change per measure. Ties merge notes of equal pitch. Transposition (`transpose`: `chromatic` and `octave-change`) is applied, so notes are imported at sounding pitch.
+* A first measure marked `implicit="yes"` that is shorter than its bar (a pickup) is padded with a rest at its start, with a warning. A measure whose content differs from its time signature produces a warning.
+* Tempo comes from `sound tempo` or `metronome` (beat-unit and dots); a tempo inside a bar takes effect at the next bar line. Level comes from the `dynamics` attribute (`velocity = 0.9 x dynamics`; 127 without it).
+* Not imported (always in the report): grace notes, cue notes, unpitched notes in pitched parts, repeat signs and endings (measures play once as written), dynamics marks, articulations, slurs, ornaments, lyrics, key signatures, clefs, additive or free time signatures (an error), polyphony, more than three voices.
+
 ## WAV and stems
 
 `sidwave render` renders the mix through the libsidplayfp engine (the optional `libsidplayfp-wasm` package) as a 16-bit mono WAV. `--engine sidlite` selects the fast SIDLite model (default `residfp`; `--emulation` is an alias), `--model` forces the SID model, `--seconds` and `--rate` set the length and rate (default 48000 Hz; `--sample-rate` is an alias). `--song` is 1-based like the other run commands.

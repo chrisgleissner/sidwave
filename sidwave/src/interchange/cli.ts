@@ -12,6 +12,8 @@ import { InterchangeUsageError } from "./errors.js";
 import { exportEvents } from "./events.js";
 import { exportMidi } from "./midiExport.js";
 import { importMidi } from "./midiImport.js";
+import { exportMusicXml } from "./musicxmlExport.js";
+import { importMusicXml } from "./musicxmlImport.js";
 
 export { InterchangeUsageError };
 /** Largest score or interchange file the command line reads. */
@@ -125,11 +127,16 @@ function exportCommand(args: string[], io: CliIo): number {
   }
 }
 
-/** Replaced once the MusicXML exporter is registered (see musicxmlCli.ts). */
-let musicXmlExport: (doc: ReturnType<typeof parseSidwave>, common: { song?: number; ppq?: number }, output: string | undefined, input: string, io: CliIo, json: boolean) => number = () => {
-  throw new UsageError("MusicXML export is not available in this build");
-};
-export function registerMusicXmlExport(fn: typeof musicXmlExport): void { musicXmlExport = fn; }
+function musicXmlExport(doc: ReturnType<typeof parseSidwave>, common: { song?: number; ppq?: number }, output: string | undefined, input: string, io: CliIo, json: boolean): number {
+  const result = exportMusicXml(doc, common);
+  const target = output ?? `${stem(input)}.musicxml`;
+  for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
+  if (target === "-") { io.out(result.xml); return 0; }
+  const written = writeOutput(io, input, target, result.xml);
+  const summary = { file: input, format: "musicxml", output: written, bytes: Buffer.byteLength(result.xml), divisions: result.divisions, bars: result.bars, parts: result.parts, losses: result.losses, warnings: result.warnings };
+  io.out(json ? `${JSON.stringify(envelope("export", true, { result: summary }), null, 2)}\n` : `${written}: MusicXML, ${result.parts.length} parts, ${result.bars} bars\n`);
+  return 0;
+}
 
 export interface ImportResultLike { yaml: string; report: unknown }
 export type ImportHandler = (bytes: Buffer, args: InterchangeArgs) => ImportResultLike;
@@ -138,6 +145,23 @@ export function registerImporter(format: string, handler: ImportHandler): void {
 /** Importer flags registered by other modules (valued, bare). */
 export const IMPORT_VALUED = ["-o", "--output", "--format", "--grid", "--voices", "--title", "--mode", "--allow-dir"];
 export const IMPORT_BARE = ["--no-drums", "--no-bend", "--no-validate", "--json", "--force"];
+
+importers.set("musicxml", (bytes, a) => {
+  const grid = numberFlag(a, "--grid");
+  const voices = numberFlag(a, "--voices");
+  const mode = a.flags.get("--mode") as string | undefined;
+  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
+  try {
+    return importMusicXml(bytes, {
+      ...(grid === undefined ? {} : { grid }), ...(voices === undefined ? {} : { voices }),
+      ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}),
+      ...(mode ? { mode } : {}), drums: !a.flags.has("--no-drums"), validate: !a.flags.has("--no-validate"),
+    });
+  } catch (error) {
+    if (error instanceof RangeError) throw new UsageError(error.message);
+    throw error;
+  }
+});
 
 const detect = (file: string, bytes: Buffer): string | undefined => {
   if (bytes.subarray(0, 4).toString("latin1") === "MThd") return "midi";

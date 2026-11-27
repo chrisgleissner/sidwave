@@ -167,6 +167,7 @@
     }
   },
   "devDependencies": {
+    "fast-xml-parser": "^5.2.5",
     "libsidplayfp-wasm": "1.1.1",
     "midi-file": "^1.2.4",
     "wavefile": "^11.0.0"

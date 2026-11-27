@@ -11,3 +11,6 @@ export * from "./smf.js";
 export * from "./stems.js";
 export * from "./wav.js";
 export * from "./errors.js";
+export * from "./musicxmlExport.js";
+export * from "./musicxmlImport.js";
+export { parseXml, XmlError, type XmlNode } from "./xml.js";
