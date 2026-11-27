@@ -11,6 +11,13 @@ import type { EngineIdentity } from "../engine/types.js";
  * calibration protocol: doc/plans/sidwave-standalone/research/a1-calibration-design.md.
  */
 
+/**
+ * Status of A1 from the held-out evaluation of the frozen rule file (data/verify/a1-heldout-report.json): "verified
+ * within declared bounds" only when held-out false accepts and false rejects are both at most 5 %. Measured: 15.3 %
+ * and 22.2 %, so A1 is "approximate".
+ */
+export const A1_STATUS: "approximate" | "verified within declared bounds" = "approximate";
+
 export const A1_SAMPLE_RATE = 48_000;
 export const A1_WINDOW = 1024;
 export const A1_HOP = 512;

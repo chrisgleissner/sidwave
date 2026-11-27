@@ -205,9 +205,9 @@ export function formatVerify(report: VerifyReport): string {
   ];
   if (report.a1) {
     const a = report.a1;
-    if (a.reason) lines.push(`A1: not evaluated (${a.reason})`);
+    if (a.reason) lines.push(`A1 (${a.status}): not evaluated (${a.reason})`);
     else {
-      lines.push(`A1: ${a.badWindows} of ${a.windows} windows differ, lag ${a.lagMs} ms${a.truncated ? ", a render ended before the horizon" : ""}` +
+      lines.push(`A1 (${a.status}): ${a.badWindows} of ${a.windows} windows differ, lag ${a.lagMs} ms${a.truncated ? ", a render ended before the horizon" : ""}` +
         (a.firstBad ? `; first bad window ${a.firstBad.timeSeconds.toFixed(3)} s (${a.firstBad.class})` : ""));
     }
   }

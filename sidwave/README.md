@@ -377,6 +377,8 @@ const result = await verifySid(reference, candidate, { engine, seconds: 60, a1: 
 // result.levels.A1 is "pass", "fail" or "not evaluated"; result.a1.reason says why it was not evaluated.
 ```
 
+**Status: approximate.** On the held-out tunes the frozen rules accepted 15 of 98 material defects (false accepts 15.3 %, 95 % interval 9.5-23.7 %) and rejected 4 of 18 benign changes (false rejects 22.2 %, 9.0-45.2 %; all four are 3-cent detunes). The bound for "verified within declared bounds" is 5 % for both, so A1 stays "approximate": a pass means the audio is plausibly the same, not that it is proven. Pitch-only changes (waveform swaps, small timing shifts, pulse width, filter cutoff) are the weakest area. `result.a1.status` carries the status, the CLI prints it, and [`data/verify/a1-heldout-report.json`](data/verify/a1-heldout-report.json) lists the per-class rates and every misclassified case.
+
 The thresholds come from `data/verify/a1-rules.json`, which `scripts/calibrate-a1.mjs` writes after a grid search over score-level mutations (wrong, missing and extra notes, octave errors, detuning, timing, envelope, waveform, pulse width, filter, sync and ring, percussion, sections) and benign refactors. See the rule file for the corpus, the split between development and held-out tunes, and the measured error rates.
 
 ## Versioning and support

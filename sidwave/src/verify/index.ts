@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { psidClock } from "../engine/libsidplayfp.js";
 import type { EngineIdentity, SidClock, SidEngine, SidEmulation, SystemRoms } from "../engine/types.js";
-import { A1_SAMPLE_RATE, compareAudioA1, type A1Result, type A1Rules } from "./a1.js";
+import { A1_SAMPLE_RATE, A1_STATUS, compareAudioA1, type A1Result, type A1Rules } from "./a1.js";
 
 export * from "./a1.js";
 
@@ -57,6 +57,8 @@ export type CompareOptions = {
 };
 
 export type A1Details = Partial<Omit<A1Result, "verdict">> & {
+  /** Calibration status of A1: "approximate" unless the held-out error rates were both at most 5 %. */
+  status: typeof A1_STATUS;
   /** Why A1 was not evaluated: the engine, sample rate or ROMs differ from the conditions of the rule file. */
   reason?: string;
 };
@@ -420,7 +422,7 @@ async function evaluateA1(
     ? (["kernal", "basic", "chargen"] as const).find((name) => a1.romHashes![name] !== undefined && a1.romHashes![name] !== conditions.roms[name])
     : undefined;
   if (mismatchedRom) {
-    return { level: "not evaluated", details: { reason: `The ${mismatchedRom} ROM differs from the ROM pinned in the A1 rule file` } };
+    return { level: "not evaluated", details: { status: A1_STATUS, reason: `The ${mismatchedRom} ROM differs from the ROM pinned in the A1 rule file` } };
   }
   const request = {
     seconds, song: context.song, clock: context.clock, sampleRate: A1_SAMPLE_RATE, channels: 1 as const,
@@ -439,9 +441,10 @@ async function evaluateA1(
       : pinned && (identity.id !== pinned.id || identity.version !== pinned.version)
         ? `The engine ${identity.id} ${identity.version} differs from the pinned ${pinned.id} ${pinned.version}`
         : undefined;
-  if (reason) return { level: "not evaluated", details: { reason }, identity };
+  if (reason) return { level: "not evaluated", details: { status: A1_STATUS, reason }, identity };
   const result = compareAudioA1(x.samples, y.samples, a1.rules, { horizonSeconds: seconds });
-  const { verdict, ...details } = result;
+  const { verdict, ...rest } = result;
+  const details: A1Details = { status: A1_STATUS, ...rest };
   let difference: Difference | undefined;
   if (verdict === "fail" && result.firstBad) {
     const cycle = context.originCycle + Math.floor(result.firstBad.timeSeconds * context.clockHz);
