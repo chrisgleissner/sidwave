@@ -107,13 +107,15 @@ Prompt section 6 requires that a reconstructed score can be edited. The test `an
 - change the tempo: `setTempo` to 80 %; the tempo field changed, the length in calls scales, and each voice plays the same pitches in the same order.
 - reuse an extracted instrument: the reuse test above.
 
-Results: pass on every cell. No cell is n/a at this commit. The edits apply to any layout: the note to change is any plain sounding note of any voice and pattern occurrence (the occurrence gets a private copy of its pattern and the changed note is found by comparing the note lists read from the text), the instrument swap uses another instrument of the score or, when there is none that the compiler accepts, a copy of the voice's instrument with another envelope, and the tempo edit applies to any score. The test asserts that every cell of each input class (seeded, reconstructed, reconstructed fixtures) passes, and allows n/a only where no bar line splits the score into two sections that compile (transpose a section); that has not occurred. The transposition check asserts that every pitched note of section 2 moved by exactly the interval and every note of section 1 did not move.
+Results: pass on every cell; no cell is n/a. The edits apply to any layout: the note to change is any plain sounding note of any voice and pattern occurrence (the occurrence gets a private copy of its pattern and the changed note is found by comparing the note lists read from the text), the instrument swap uses another instrument of the score or a copy of the voice's instrument with another envelope, and the tempo edit applies to any score. The transposition check asserts that every pitched note of section 2 moved by exactly the interval and every note of section 1 did not. The test allows no n/a.
+
+**Weak rows.** On the three reconstructed fixtures the tune is one voice with one note in the horizon. There, "change one note" has no successor note and no other voice, and "swap an instrument" has no other voice, so the check that unrelated parts keep their registers is vacuous; the intended change is still checked. These six cells are reported as `pass (weak)` and the test allows weak passes on the fixtures only.
 
 | Input class | change one note | swap an instrument | transpose a section | change the tempo | reuse an instrument |
 | --- | --- | --- | --- | --- | --- |
 | seeded basic/1, arpeggio/3, hard_restart/4, vibrato/5, combined/1 | pass | pass | pass | pass | pass |
 | reconstructed (the same five tunes) | pass | pass | pass | pass | pass |
-| reconstructed fixtures arpeggio, vibrato, pulseSweep | pass | pass | pass | pass | pass |
+| reconstructed fixtures arpeggio, vibrato, pulseSweep | pass (weak) | pass (weak) | pass | pass | pass |
 
 ## Performance
 

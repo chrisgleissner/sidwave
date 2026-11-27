@@ -2,8 +2,9 @@
 // Copyright (C) 2025-2026 Christian Gleissner
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
-// Technique detection. From a register trace (frame-state IR) every fact is observed: the detectors read register
-// values and the order of control writes and apply fixed thresholds, which are listed in the evidence. From a score,
+// Technique detection. From a register trace (frame-state IR) the control-bit and rate facts (sync, ring, test bit,
+// noise, combined waveforms, multispeed, sample playback) are observed. Classifications that apply thresholds (hard
+// restart, arpeggio, vibrato, slide, pulse and filter sweeps) are inferred, with the detector named (DETECTORS). From a score,
 // techniques are read from the instrument definitions and are observed in the score. Each pass is linear in the
 // number of calls (trace) or notes (score).
 
@@ -121,7 +122,7 @@ const mode = (values: number[]): number | undefined => {
   return best;
 };
 
-/** Techniques of a register trace. All facts are observed. */
+/** Techniques of a register trace: bit and rate facts are observed, threshold classifications are inferred (see DETECTORS). */
 export function techniquesFromIr(ir: FrameIr): Technique[] {
   const out: Technique[] = [];
   const from = isInitCall(ir, 0) ? 1 : 0;

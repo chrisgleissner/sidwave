@@ -4,7 +4,7 @@ import assert from "#test/assert";
 import { appendFileSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPreservation, lookupStil, MANIFEST_FILE, ORIGINAL_FILE, verifyPreservation, writePreservation } from "../src/analyze/preserve.ts";
+import { createPreservation, lookupStil, MANIFEST_FILE, MANIFEST_MAX_BYTES, ORIGINAL_FILE, verifyPreservation, writePreservation } from "../src/analyze/preserve.ts";
 import { sha256 } from "../src/analyze/common.ts";
 import { buildFixture } from "./helpers/reconstructFixtures.mjs";
 import { sharedEngine } from "./helpers/reconstructRoundTrip.mjs";
@@ -81,7 +81,7 @@ test("verify: an untouched bundle verifies offline and reproduces the verdict", 
   const result = await verifyPreservation(dir, { engine: sharedEngine() });
   assert.equal(result.ok, true, JSON.stringify(result.checks.filter((c) => !c.ok)));
   assert.equal(result.verdict.reproduced, "recompiled trace matches the stored fingerprint");
-  assert.deepEqual(result.checks.map((c) => c.name), ["file score.yaml", "file reconstruction-report.json", "no unlisted files", "original", "subtune consistent", "verdict flags consistent", "recompile", "trace fingerprint", "clock consistent", "SID count consistent", "strict verdict consistent"]);
+  assert.deepEqual(result.checks.map((c) => c.name), ["file score.yaml", "file reconstruction-report.json", "no unlisted files", "original", "subtune consistent", "verdict flags consistent", "recompile", "trace fingerprint", "horizon calls", "horizon cycles", "strict verdict details", "clock consistent", "SID count consistent", "strict verdict consistent"]);
   assert.ok(result.unauthenticated.includes("rights") && result.unauthenticated.includes("verdict.a1"));
 });
 
@@ -181,6 +181,48 @@ test("verify cross-checks what it can recompute: original, rights, header, subtu
   const result = await verifyPreservation(dir, { engine: sharedEngine() });
   assert.equal(result.ok, true, "a different tool version is a warning");
   assert.ok(result.identityNotes.length >= 2, result.identityNotes.join("; "));
+});
+
+test("verify checks the horizon, the differing-call counts and the header field by field, and reads the manifest safely", { timeout: 240_000 }, async () => {
+  const base = temp();
+  const withOriginal = await make(seededSid("combined", 1), { includeOriginal: true, rightsPermitted: true });
+  const plain = await make(seededSid("combined", 1));
+  const fresh = (bundle, name) => { const dir = join(base, name); writePreservation(bundle, dir); return dir; };
+  const result = (dir) => verifyPreservation(dir, { engine: sharedEngine() });
+  const failing = async (dir) => (await result(dir)).checks.filter((c) => !c.ok).map((c) => c.name);
+  const manifest = (dir, fn) => writeFileSync(join(dir, MANIFEST_FILE), JSON.stringify((() => { const m = JSON.parse(readFileSync(join(dir, MANIFEST_FILE), "utf8")); fn(m); return m; })(), null, 2));
+  let dir = fresh(plain, "calls");
+  manifest(dir, (m) => { m.horizon.calls += 5; });
+  assert.deepEqual(await failing(dir), ["horizon calls"]);
+  dir = fresh(plain, "cycles");
+  manifest(dir, (m) => { m.horizon.cycles = 5; });
+  assert.deepEqual(await failing(dir), ["horizon cycles"]);
+  dir = fresh(plain, "strict-details");
+  manifest(dir, (m) => { m.verdict.differingCalls = 3; });
+  assert.deepEqual(await failing(dir), ["strict verdict details"]);
+  dir = fresh(withOriginal, "differing");
+  manifest(dir, (m) => { m.verdict.strict = false; m.verdict.differingCalls = 4; });
+  const names = await failing(dir);
+  assert.ok(names.includes("differing calls re-derived") && names.includes("verdict re-derived"), String(names));
+  dir = fresh(withOriginal, "header");
+  manifest(dir, (m) => { m.referenceConfiguration.playAddress += 1; m.source.songs = 3; });
+  const header = (await result(dir)).checks.find((c) => c.name === "header consistent");
+  assert.equal(header.ok, false);
+  assert.match(header.detail, /songs is 1 in original\.sid and 3 in the manifest/);
+  assert.match(header.detail, /playAddress is \d+ in original\.sid and \d+ in the manifest/);
+  const un = (await result(fresh(plain, "un"))).unauthenticated;
+  assert.ok(un.includes("verdict.differingCalls") && un.includes("ambiguities") && un.includes("rights"));
+  assert.ok(!(await result(fresh(withOriginal, "un2"))).unauthenticated.includes("verdict.differingCalls"), "re-derived with the original");
+  // The manifest itself: a link and an oversized file are refused.
+  dir = fresh(plain, "mlink");
+  const real = join(base, "m.json");
+  writeFileSync(real, readFileSync(join(dir, MANIFEST_FILE)));
+  rmSync(join(dir, MANIFEST_FILE));
+  symlinkSync(real, join(dir, MANIFEST_FILE));
+  await assert.rejects(() => result(dir), /not a regular file/);
+  dir = fresh(plain, "mbig");
+  appendFileSync(join(dir, MANIFEST_FILE), " ".repeat(MANIFEST_MAX_BYTES + 1));
+  await assert.rejects(() => result(dir), /the limit is/);
 });
 
 test("verify reads regular files only, and not more bytes than the manifest lists", { timeout: 120_000 }, async () => {

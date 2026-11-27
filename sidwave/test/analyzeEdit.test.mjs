@@ -104,7 +104,9 @@ const EDITS = {
       assert.ok(diff[diff.length - 1] <= next + 4, `no difference after the edited note: last at ${diff[diff.length - 1]}, next note at ${next}`);
       assert.ok(fdiff(restrictIrToVoice(before, v), restrictIrToVoice(after_ir, v), { alignExpected: 1, alignObserved: 1 }).classes.pitch.differingCalls > 0, "the pitch changed");
       for (let other = 1; other <= 3; other++) if (other !== v) assert.deepEqual(voiceDiff(before, after_ir, other), [], `voice ${other} keeps its register output`);
-      return { detail: `voice ${v}: ${diff.length} calls differ, from ${diff[0]} to ${diff[diff.length - 1]} (note ${note.start}..${next})` };
+      const others = new Set(after.notes.filter((n) => n.voice !== v).map((n) => n.voice));
+      const weak = later.length === 0 && others.size === 0;
+      return { weak, detail: `voice ${v}: ${diff.length} calls differ, from ${diff[0]} to ${diff[diff.length - 1]} (note ${note.start}..${next})` };
     }
     return { skip: "no sounding note inside the horizon that can be edited alone" };
   },
@@ -136,7 +138,7 @@ const EDITS = {
       const diff = voiceDiff(before, after, v);
       if (!diff.length) continue;
       for (let o = 1; o <= 3; o++) if (o !== v) assert.deepEqual(voiceDiff(before, after, o), [], `voice ${o} keeps its register output`);
-      return { detail: `${own} to ${other}: ${diff.length} calls of voice ${v} differ` };
+      return { weak: doc.voices.length === 1, detail: `${own} to ${other}: ${diff.length} calls of voice ${v} differ${doc.voices.length === 1 ? " (one voice: no unrelated voice to compare)" : ""}` };
     }
     return { skip: "every candidate instrument is rejected by the compiler for the notes of the voice or leaves its registers unchanged" };
   },
@@ -241,7 +243,7 @@ test("edits keep unrelated voices and sections unchanged on seeded scores and on
     for (const [edit, run] of Object.entries(EDITS)) {
       try {
         const r = await run(input.text);
-        row[edit] = r.skip ? `n/a: ${r.skip}` : "pass";
+        row[edit] = r.skip ? `n/a: ${r.skip}` : r.weak ? "pass (weak)" : "pass";
         if (r.detail) row[`${edit} detail`] = r.detail;
       } catch (error) {
         row[edit] = "FAIL";
@@ -258,14 +260,18 @@ test("edits keep unrelated voices and sections unchanged on seeded scores and on
   assert.deepEqual(failures, []);
   // Per edit and input class: every input passes, except the listed impossibilities.
   const classOf = (name) => (name.startsWith("reconstructed fixture") ? "fixtures" : name.startsWith("reconstructed") ? "reconstructed" : "seeded");
-  const ALLOWED_NA = { "transpose a section": /no bar line splits/ };
+  const ALLOWED_NA = {};
+  const passed = (r, n) => r[n] === "pass" || r[n] === "pass (weak)";
   for (const n of names) {
     for (const cls of ["seeded", "reconstructed", "fixtures"]) {
       const rows = table.filter((r) => classOf(r.input) === cls);
       const na = rows.filter((r) => r[n].startsWith("n/a"));
       for (const r of na) assert.match(r[n], ALLOWED_NA[n] ?? /^$/, `${r.input} / ${n} is n/a without a listed reason`);
-      assert.equal(rows.filter((r) => r[n] === "pass").length + na.length, rows.length, `${n} on ${cls}`);
-      assert.ok(rows.filter((r) => r[n] === "pass").length >= Math.ceil(rows.length * 0.6), `${n} passes on most ${cls} inputs`);
+      assert.equal(rows.filter((r) => passed(r, n)).length + na.length, rows.length, `${n} on ${cls}`);
+      assert.ok(rows.filter((r) => passed(r, n)).length >= Math.ceil(rows.length * 0.6), `${n} passes on most ${cls} inputs`);
+      // A weak pass (nothing unrelated to compare) is allowed only on the single-voice, single-note fixtures.
+      for (const r of rows.filter((x) => x[n] === "pass (weak)")) assert.equal(cls, "fixtures", `${r.input} / ${n} is weak`);
+      if (cls !== "fixtures") assert.equal(rows.filter((x) => x[n] === "pass (weak)").length, 0);
     }
   }
 });

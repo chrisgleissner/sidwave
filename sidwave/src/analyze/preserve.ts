@@ -25,6 +25,8 @@ export const PRESERVATION_SCHEMA = "sidwave-preservation/1";
 export const MANIFEST_FILE = "preservation.json";
 export const SCORE_FILE = "score.yaml";
 export const REPORT_FILE = "reconstruction-report.json";
+/** Largest manifest that verify reads. */
+export const MANIFEST_MAX_BYTES = 4 * 1024 * 1024;
 export const ORIGINAL_FILE = "original.sid";
 
 export type Redistribution = "unknown" | "permitted";
@@ -305,8 +307,12 @@ function readManifest(dir: string): PreservationManifest {
   const path = join(dir, MANIFEST_FILE);
   let text: string;
   try {
+    const info = lstatSync(path);
+    if (!info.isFile()) throw new SidwaveOperationError("input", `${path} is not a regular file`, { file: path });
+    if (info.size > MANIFEST_MAX_BYTES) throw new SidwaveOperationError("input", `${path} is ${info.size} bytes; the limit is ${MANIFEST_MAX_BYTES}`, { file: path });
     text = readFileSync(path, "utf8");
   } catch (error) {
+    if (error instanceof SidwaveOperationError) throw error;
     throw new SidwaveOperationError("input", `cannot read ${path}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: path });
   }
   let m: PreservationManifest;
@@ -368,7 +374,13 @@ export async function verifyPreservation(dir: string, options: VerifyPreservatio
     try {
       const header = parseSidFile(original);
       const headerClock = psidClock(original) ?? "PAL";
-      add("header consistent", header.songs === manifest.source.songs && header.magic === manifest.source.magic && header.version === manifest.source.version && header.clock === cfg.headerClock && headerClock === cfg.clock && header.loadAddress === cfg.loadAddress && songSpeed(header, manifest.source.subtune) === cfg.speed, `songs, magic, version, clock, addresses and speed of original.sid against the manifest`);
+      const mismatches = [
+        ["songs", header.songs, manifest.source.songs], ["magic", header.magic, manifest.source.magic], ["version", header.version, manifest.source.version],
+        ["headerClock", header.clock, cfg.headerClock], ["clock", headerClock, cfg.clock], ["loadAddress", header.loadAddress, cfg.loadAddress],
+        ["initAddress", header.initAddress === 0 ? header.loadAddress : header.initAddress, cfg.initAddress], ["playAddress", header.playAddress, cfg.playAddress],
+        ["speed", songSpeed(header, manifest.source.subtune), cfg.speed],
+      ].filter(([, a, b]) => a !== b).map(([name, a, b]) => `${name} is ${String(a)} in original.sid and ${String(b)} in the manifest`);
+      add("header consistent", mismatches.length === 0, mismatches.length ? mismatches.join("; ") : "songs, magic, version, clock, addresses and speed of original.sid match the manifest");
     } catch (error) {
       add("header consistent", false, `original.sid does not parse: ${(error as Error).message}`);
     }
@@ -401,6 +413,12 @@ export async function verifyPreservation(dir: string, options: VerifyPreservatio
       const traceOk = fp === f.recompiled && ir.calls.length - f.recompiledFirstCall >= f.calls;
       add("trace fingerprint", traceOk, traceOk ? `the recompiled score gives the recorded register trace (${f.calls} calls)` : "the register trace of the recompiled score differs from the recorded fingerprint");
       if (traceOk) reproduced = "recompiled trace matches the stored fingerprint";
+      const calls = manifest.horizon.calls;
+      const noMismatch = !manifest.verdict.callCountMismatch;
+      add("horizon calls", noMismatch ? calls === f.referenceFirstCall + f.calls : calls >= f.referenceFirstCall + f.calls, `horizon.calls ${calls}, fingerprints.calls ${f.calls} from call ${f.referenceFirstCall}${noMismatch ? "" : " (call count mismatch recorded)"}`);
+      const hz = clock === "NTSC" ? 1_022_727 : 985_248;
+      add("horizon cycles", manifest.horizon.seconds > 0 && manifest.horizon.seconds <= 180 && manifest.horizon.cycles >= manifest.horizon.seconds * hz && manifest.horizon.cycles <= manifest.horizon.seconds * hz + 1_000_000, `horizon.cycles ${manifest.horizon.cycles} for ${manifest.horizon.seconds} s at ${hz} Hz`);
+      if (manifest.verdict.strict) add("strict verdict details", manifest.verdict.differingCalls === 0 && !manifest.verdict.callCountMismatch && !manifest.verdict.firstDifference, "a strict verdict has no differing call, no call-count mismatch and no first difference");
       add("clock consistent", scoreMode === manifest.referenceConfiguration.clock, `the score's mode ${scoreMode} against the recorded clock ${manifest.referenceConfiguration.clock}`);
       if (manifest.verdict.strict) add("SID count consistent", ir.sidCount === cfg.sidCount, `the recompiled trace has ${ir.sidCount} SID(s), the manifest ${cfg.sidCount}`);
       if (manifest.verdict.strict) add("strict verdict consistent", f.reference === f.recompiled, "a strict verdict needs equal reference and recompiled fingerprints");
@@ -411,13 +429,16 @@ export async function verifyPreservation(dir: string, options: VerifyPreservatio
         add("verdict re-derived", strict === manifest.verdict.strict, `strict ${strict} from the original and the recompiled score, manifest ${manifest.verdict.strict}`);
         const state = bestFdiff(stateOnlyIr(refIr), stateOnlyIr(ir), f.referenceFirstCall);
         const registerState = state.standardAlignment && !state.callCountMismatch && state.differingCalls - state.classes.timing.differingCalls === 0;
+        add("differing calls re-derived", summary.differingCalls === manifest.verdict.differingCalls && JSON.stringify(summary.callCountMismatch ?? null) === JSON.stringify(manifest.verdict.callCountMismatch ?? null), `${summary.differingCalls} differing calls and call-count mismatch ${JSON.stringify(summary.callCountMismatch ?? null)} from the original, manifest ${manifest.verdict.differingCalls} and ${JSON.stringify(manifest.verdict.callCountMismatch ?? null)}`);
         add("registerStateExact re-derived", registerState === manifest.verdict.registerStateExact, `register state exact ${registerState} from the original, manifest ${manifest.verdict.registerStateExact}`);
         add("original SID count", refIr.sidCount === cfg.sidCount, `the original trace has ${refIr.sidCount} SID(s), the manifest ${cfg.sidCount}`);
         reproduced = "re-derived from the original";
       }
     }
   }
-  return { ok: checks.every((c) => c.ok), checks, identityNotes, unauthenticated: ["rights", "verdict.a1", "verdict.t0", "verdict.t1", "ambiguities", "referenceConfiguration.roms"], verdict: { stored: { strict: manifest.verdict.strict, registerStateExact: manifest.verdict.registerStateExact }, reproduced } };
+  const unauthenticated = ["rights", "verdict.a1", "verdict.t0", "verdict.t1", "verdict.firstDifference", "ambiguities", "referenceConfiguration.roms", "referenceConfiguration.sidAddresses", "identities"];
+  if (!original) unauthenticated.push("source (md5, sha256, bytes, songs, magic, version)", "referenceConfiguration (clock, headerClock, sidModels, addresses, speed)", "verdict.differingCalls", "verdict.callCountMismatch", ...(manifest.verdict.strict ? [] : ["verdict.strict", "verdict.registerStateExact"]), "fingerprints.reference");
+  return { ok: checks.every((c) => c.ok), checks, identityNotes, unauthenticated, verdict: { stored: { strict: manifest.verdict.strict, registerStateExact: manifest.verdict.registerStateExact }, reproduced } };
 }
 
 /** The bundle as text for a terminal. */

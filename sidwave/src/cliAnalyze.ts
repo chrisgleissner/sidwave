@@ -6,7 +6,7 @@
 // cliCore.ts. Each command is a thin wrapper of a function of src/analyze; this file holds the argument handling and
 // the output only, and cli.ts holds one line of dispatch.
 
-import { existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
 import { EXIT_FAILED, EXIT_OK, SidwaveOperationError, UsageError, envelope, type CliIo } from "./cliCore.js";
 import { analyzeScore, analyzeSid, formatAnalysis } from "./analyze/analysis.js";
@@ -127,9 +127,14 @@ function sameFile(a: string, b: string): boolean {
   return real(a) === real(b);
 }
 
+/** True for any directory entry, including a dangling symbolic link. */
+function pathExists(path: string): boolean {
+  try { lstatSync(path); return true; } catch { return false; }
+}
+
 function writeFile(io: CliIo, path: string, bytes: Uint8Array | string, inputs: string[], force = false): void {
   if (inputs.some((input) => sameFile(path, resolve(io.cwd, input)))) throw new UsageError("the output file is an input file; refusing to overwrite it");
-  if (existsSync(path) && !force) throw new UsageError(`${path} exists; use --force to overwrite it`);
+  if (pathExists(path) && !force) throw new UsageError(`${path} exists; use --force to overwrite it`);
   try {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, bytes);

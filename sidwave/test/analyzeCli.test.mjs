@@ -1,7 +1,7 @@
 // The command line of analyze, compare, isolate, preserve and extract-instruments.
 import test from "#test/runner";
 import assert from "#test/assert";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import YAML from "yaml";
@@ -126,6 +126,8 @@ test("isolate and extract-instruments do not overwrite an existing output withou
   assert.equal(readFileSync(join(dir, "out.wav"), "utf8"), "keep");
   assert.equal((await run(["isolate", "tune.sid", "--voice", "1", "--seconds", "1", "-o", "out.wav", "--force"], dir)).exit, 0);
   assert.equal(readFileSync(join(dir, "out.wav")).subarray(0, 4).toString(), "RIFF");
+  symlinkSync(join(dir, "nowhere.wav"), join(dir, "dangling.wav"));
+  assert.equal((await run(["isolate", "tune.sid", "--voice", "1", "--seconds", "1", "-o", "dangling.wav"], dir)).exit, 2, "a dangling link counts as existing");
   writeFileSync(join(dir, "lib.yaml"), "keep");
   assert.equal((await run(["extract-instruments", "a.yaml", "-o", "lib.yaml"], dir)).exit, 2);
   assert.equal(readFileSync(join(dir, "lib.yaml"), "utf8"), "keep");
