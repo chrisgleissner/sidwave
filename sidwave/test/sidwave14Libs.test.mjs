@@ -13,6 +13,7 @@ import { parseSidwave } from "../src/sidwave.js";
 import { compileSidwaveToPrg } from "../src/sidwaveCompiler.js";
 import { SIDWAVE_SCORE_RESOURCES, readSidwaveExample } from "../src/sidwaveExamples.js";
 import { compileSidwaveBytes, confinedReadOptions } from "../src/sidwaveOps.js";
+import { readExampleScore } from "../src/sidwaveOps.js";
 import { SIDWAVE_LIBRARY_LIMITS, bundleScore, canonicalLibraryHash, libraryClosure, lockScore, readImportEntries, satisfiesVersion } from "../src/sidwaveLibs.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -751,4 +752,71 @@ test("a nested import selects effects of its library, which get a valid dot-free
     fs.writeFileSync(drums, original.replace('version: "^1.0.0" }', 'version: "^1.0.0", effects: [nope] }'));
     expectError(() => parseFile(score), /no effect nope/);
   });
+});
+
+function sampleProject() {
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-samples-")));
+  fs.mkdirSync(path.join(dir, "sub"));
+  fs.writeFileSync(path.join(dir, "sub", "kick.u8"), Buffer.from(Array.from({ length: 300 }, (_, i) => 128 + Math.round(100 * Math.sin(i / 7)))));
+  const score = readExampleScore("digi_groove").replace(/^ {4}kick: .*$/m, "    kick: { file: sub/kick.u8, file_rate: 4000 }");
+  fs.writeFileSync(path.join(dir, "d.yaml"), score);
+  return { dir, score: path.join(dir, "d.yaml"), done: () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+test("a bundle copies file: samples, rewrites their paths, lists them with sha256 and compiles to the same bytes", () => {
+  const p = sampleProject();
+  try {
+    const out = path.join(p.dir, "bundle");
+    const manifest = bundleScore(fs.readFileSync(p.score, "utf8"), p.score, out, [], false, p.dir);
+    assert.deepEqual(manifest.samples.map((x) => x.file), ["samples/kick.u8"]);
+    const bytes = fs.readFileSync(path.join(p.dir, "sub", "kick.u8"));
+    assert.deepEqual(manifest.samples[0], { file: "samples/kick.u8", sha256: sha(bytes), bytes: 300 });
+    assert.ok(fs.readFileSync(path.join(out, "samples", "kick.u8")).equals(bytes));
+    assert.match(fs.readFileSync(path.join(out, "d.yaml"), "utf8"), /kick: \{ file: samples\/kick\.u8, file_rate: 4000 \}/);
+    const original = compileSidwaveBytes(parseSidwave(fs.readFileSync(p.score, "utf8"), confinedReadOptions(p.dir, [], p.score)), { format: "prg" });
+    const copy = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-samples-copy-")));
+    try {
+      fs.cpSync(out, copy, { recursive: true });
+      const bundled = compileSidwaveBytes(parseSidwave(fs.readFileSync(path.join(copy, "d.yaml"), "utf8"), confinedReadOptions(copy, [], path.join(copy, "d.yaml"))), { format: "prg" });
+      assert.ok(original.bytes.equals(bundled.bytes));
+    } finally {
+      fs.rmSync(copy, { recursive: true, force: true });
+    }
+    // Through the command line, compiled from inside the bundle.
+    const cli = run(p.dir, "bundle", "d.yaml", "-o", "viacli");
+    assert.equal(cli.code, 0, cli.err);
+    assert.ok(fs.existsSync(path.join(p.dir, "viacli", "samples", "kick.u8")));
+    const inside = run(path.join(p.dir, "viacli"), "compile", "d.yaml", "-o", "-");
+    assert.equal(inside.code, 0, inside.err);
+    assert.ok(inside.bytes.equals(original.bytes));
+  } finally {
+    p.done();
+  }
+});
+
+test("bundle refuses samples outside the confinement and larger than the sample limit, and keeps same-named files apart", () => {
+  const p = sampleProject();
+  try {
+    const outside = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-samples-out-")));
+    try {
+      fs.writeFileSync(path.join(outside, "kick.u8"), Buffer.alloc(100, 128));
+      fs.symlinkSync(path.join(outside, "kick.u8"), path.join(p.dir, "sub", "link.u8"));
+      const text = fs.readFileSync(p.score, "utf8");
+      const attempt = (replacement) => () => bundleScore(text.replace("sub/kick.u8", replacement), p.score, path.join(p.dir, `o${Math.random()}`), [], false, p.dir);
+      expectError(attempt("sub/link.u8"), /outside the allowed directories/);
+      expectError(attempt("../escape.u8"), /outside the allowed directories|ENOENT/);
+      assert.ok(bundleScore(text.replace("sub/kick.u8", "sub/link.u8"), p.score, path.join(p.dir, "allowed"), [outside], false, p.dir).samples.length === 1);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+    fs.writeFileSync(path.join(p.dir, "sub", "big.u8"), Buffer.alloc(16 * 1024 * 1024 + 1, 128));
+    expectError(() => bundleScore(fs.readFileSync(p.score, "utf8").replace("sub/kick.u8", "sub/big.u8"), p.score, path.join(p.dir, "big"), [], false, p.dir), /exceeds the sample size limit/);
+    fs.mkdirSync(path.join(p.dir, "other"));
+    fs.writeFileSync(path.join(p.dir, "other", "kick.u8"), Buffer.alloc(100, 90));
+    const two = fs.readFileSync(p.score, "utf8").replace(/^ {4}snare: .*$/m, "    snare: { file: other/kick.u8, file_rate: 4000 }");
+    const manifest = bundleScore(two, p.score, path.join(p.dir, "two"), [], false, p.dir);
+    assert.equal(new Set(manifest.samples.map((x) => x.file)).size, 2);
+  } finally {
+    p.done();
+  }
 });

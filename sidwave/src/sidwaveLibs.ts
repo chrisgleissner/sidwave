@@ -15,7 +15,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import YAML from "yaml";
 import { formatSidwave } from "./format/sidwaveFormat.js";
 import { SidwaveValidationError } from "./sidwave.js";
-import type { SidwaveUsedLibrary } from "./sidwavePcm.js";
+import { DEFAULT_MAX_PCM_FILE_BYTES, type SidwaveUsedLibrary } from "./sidwavePcm.js";
 
 export const SIDWAVE_LIBRARY_LIMITS = {
   /** Deepest chain of libraries that import libraries, counted from the score. */
@@ -604,6 +604,8 @@ export interface BundleManifest {
   format: "sidwave-bundle";
   version: 1;
   score: { file: string; sha256: string };
+  /** The `file:` samples of the score, copied to samples/ with the paths in the score rewritten to match. */
+  samples: Array<{ file: string; sha256: string; bytes: number }>;
   libraries: Array<{
     file: string; name: string; version: string; sha256: string; licence: string;
     provenance: SidwaveLibraryMeta["provenance"]; imports: Array<{ as: string; file: string }>;
@@ -618,8 +620,11 @@ function safeStem(text: string): string {
  * Writes the score and every library it depends on into `outDir`: the score as `<name>`, the libraries in `libs/`,
  * the `from` of each import rewritten to a relative path inside the bundle, and `bundle.json`. The imports that
  * used `pkg:` become local paths, so the bundle compiles without node_modules or any other directory.
+ * `file:` samples are copied to `samples/` (read like the compiler reads them: relative to `sampleRoot`, inside it or
+ * `allowedDirs`, at most 16 MiB each and 64 MiB together) and their paths rewritten, so the bundle is compiled with
+ * its own directory as the working directory.
  */
-export function bundleScore(text: string, file: string, outDir: string, allowedDirs: readonly string[] = [], force = false): BundleManifest {
+export function bundleScore(text: string, file: string, outDir: string, allowedDirs: readonly string[] = [], force = false, sampleRoot: string = dirname(resolve(file))): BundleManifest {
   const doc = YAML.parseDocument(text);
   if (doc.errors.length) throw new SidwaveValidationError("$", `YAML could not be parsed: ${doc.errors[0]!.message.split("\n")[0]}`);
   const seq = doc.get("imports");
@@ -660,9 +665,11 @@ export function bundleScore(text: string, file: string, outDir: string, allowedD
   };
 
   const scoreName = basename(file);
-  const scoreText = rewrite(text, "./libs/", scoreImports);
+  const withLibs = rewrite(text, "./libs/", scoreImports);
+  const copied = copySamples(withLibs, target, sampleRoot, allowedDirs);
+  const scoreText = copied.text;
   writeFileSync(join(target, scoreName), scoreText);
-  const manifest: BundleManifest = { format: "sidwave-bundle", version: 1, score: { file: scoreName, sha256: sha256Hex(scoreText) }, libraries: [] };
+  const manifest: BundleManifest = { format: "sidwave-bundle", version: 1, score: { file: scoreName, sha256: sha256Hex(scoreText) }, samples: copied.samples, libraries: [] };
   for (const lib of order) {
     const source = readFileSync(lib.file, "utf8");
     const out = rewrite(source, "./", lib.imports);
@@ -678,4 +685,60 @@ export function bundleScore(text: string, file: string, outDir: string, allowedD
   manifest.libraries.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
   writeFileSync(join(target, "bundle.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
+}
+
+const MAX_BUNDLE_SAMPLE_BYTES = 64 * 1024 * 1024;
+
+/** Copies the `file:` samples of a score text into `<target>/samples` and returns the text with the new paths. */
+function copySamples(text: string, target: string, sampleRoot: string, allowedDirs: readonly string[]): { text: string; samples: BundleManifest["samples"] } {
+  const doc = YAML.parseDocument(text);
+  const node = doc.get("samples", true);
+  const scalars: YAML.Scalar[] = [];
+  if (node && typeof node === "object") {
+    YAML.visit(node as YAML.Node, {
+      Pair(_key, pair) {
+        if (YAML.isScalar(pair.key) && pair.key.value === "file" && YAML.isScalar(pair.value) && typeof pair.value.value === "string") scalars.push(pair.value);
+      },
+    });
+  }
+  if (!scalars.length) return { text, samples: [] };
+  const root = realpathSync(resolve(sampleRoot));
+  const roots = [root, ...allowedDirs.map((dir) => realpathSync(resolve(dir)))];
+  const inside = (p: string) => roots.some((r) => { const rel = relative(r, p); return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel)); });
+  const byReal = new Map<string, string>();
+  const names = new Set<string>();
+  const out: BundleManifest["samples"] = [];
+  let total = 0;
+  mkdirSync(join(target, "samples"), { recursive: true });
+  for (const scalar of scalars) {
+    const name = scalar.value as string;
+    const lexical = resolve(root, name);
+    let real: string;
+    try {
+      real = realpathSync(lexical);
+    } catch (error) {
+      if (!inside(lexical)) throw new Error(`sample ${name} is outside the allowed directories; pass --allow-dir to permit it`);
+      throw new Error(`sample ${name} cannot be read (${(error as NodeJS.ErrnoException).code ?? "error"})`);
+    }
+    if (!inside(real)) throw new Error(`sample ${name} is outside the allowed directories; pass --allow-dir to permit it`);
+    let rel = byReal.get(real);
+    if (rel === undefined) {
+      const size = statSync(real).size;
+      if (size > DEFAULT_MAX_PCM_FILE_BYTES) throw new Error(`sample ${name} is ${size} bytes, which exceeds the sample size limit of ${DEFAULT_MAX_PCM_FILE_BYTES}`);
+      total += size;
+      if (total > MAX_BUNDLE_SAMPLE_BYTES) throw new Error(`the samples add up to more than ${MAX_BUNDLE_SAMPLE_BYTES} bytes`);
+      const bytes = readFileSync(real);
+      const digest = sha256Hex(bytes);
+      let base = safeStem(basename(real));
+      if (names.has(base)) base = `${digest.slice(0, 8)}-${base}`;
+      names.add(base);
+      rel = `samples/${base}`;
+      writeFileSync(join(target, rel), bytes);
+      byReal.set(real, rel);
+      out.push({ file: rel, sha256: digest, bytes: bytes.length });
+    }
+    scalar.value = rel;
+  }
+  out.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+  return { text: doc.toString({ lineWidth: 0 }), samples: out };
 }

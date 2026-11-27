@@ -1287,8 +1287,11 @@ imports:
 - **Pins.** `version` is a range: `1.2.3`, `^1.2.0`, `~1.2.0`, `1`, `1.x`, `>=1.0.0 <2.0.0`, alternatives with `||`
   (no pre-release tags). `sha256` is the SHA-256 of the canonical library text: the file as written by `sidwave format`
   (comments included, so a comment change changes the hash) without the `from` of its own imports. Leaving out `from`
-  lets a bundle move a library without changing its identity. A mismatch is an error that names both hashes. The
-  pins of a library's own imports are checked in the same way.
+  lets a bundle move a library without changing its identity. The pin covers the dependency closure: for a library
+  with imports it is the SHA-256 of that text hash followed by the sorted pins of the libraries it imports (one per
+  line), so swapping a nested library changes the pin of every library above it. A library without imports has the
+  hash of its own text. A mismatch is an error that names both hashes. The pins written in a library's own imports are
+  checked in the same way.
 - **Reporting.** The parsed document has `libraries` and the compile summary (`sidwave compile --json`, or the
   `libraries` of `compileSidwaveBytes`) lists each library that contributed an item: namespace, name, version,
   `sha256` and licence. The command prints one line per library to standard error.
@@ -1298,8 +1301,10 @@ imports:
   own name, the libraries as `libs/<name>-<version>.yaml`, every `from` rewritten to a relative path (a `pkg:` import
   becomes a local one), and `bundle.json` with `format`, the score's file and hash, and for each library its file, name,
   version, `sha256`, licence, provenance and imports. The bundle compiles with no `node_modules` and no other directory
-  to the same bytes. The target directory must be empty unless `--force` is given. `file:` samples of a score are not
-  part of a bundle.
+  to the same bytes. The target directory must be empty unless `--force` is given. `file:` samples of the score are
+  copied to `samples/` (confined like the compiler's reads, at most 16 MiB each and 64 MiB together), their paths in
+  the score are rewritten, and `bundle.json` lists each with its `sha256` and size. Sample paths are relative to the
+  working directory, so compile the bundle from inside its directory.
 
 **Rejected alternative.** Letting a score name any URL and fetching it was rejected: the compiler would make network
 requests while reading a document, a score would change its meaning when the remote file changes, and a bundle could not
