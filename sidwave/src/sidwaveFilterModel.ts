@@ -30,14 +30,35 @@ const POINTS: Record<SidModel, ReadonlyArray<readonly [number, number]>> = {
 /** Marks the tables as approximate in compile output and documentation. */
 export const FILTER_CURVE_NOTE = "nominal reSID 0.16 f0_points tables, linearly interpolated; real chips vary";
 
-export function cutoffHz(units: number, model: SidModel = "8580"): number {
-  const points = POINTS[model];
-  const code = Math.max(0, Math.min(2047, units));
-  const next = points.findIndex(([reg]) => reg >= code);
+function interpolate(points: ReadonlyArray<readonly [number, number]>, code: number): number {
+  // Binary search for the first point whose register is at least `code`.
+  let lo = 0, hi = points.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid]![0] >= code) hi = mid; else lo = mid + 1;
+  }
+  const next = points[lo]![0] >= code ? lo : -1;
   if (next <= 0) return points[0]![1];
   const [left, low] = points[next - 1]!;
   const [right, high] = points[next]!;
   return low + (high - low) * (code - left) / (right - left);
+}
+
+const TABLES: Partial<Record<SidModel, Float64Array>> = {};
+/** Cutoff in Hz for every register code 0-2047 of a model, computed once. */
+function table(model: SidModel): Float64Array {
+  let t = TABLES[model];
+  if (!t) {
+    t = new Float64Array(2048);
+    for (let code = 0; code < 2048; code++) t[code] = interpolate(POINTS[model], code);
+    TABLES[model] = t;
+  }
+  return t;
+}
+
+export function cutoffHz(units: number, model: SidModel = "8580"): number {
+  const code = Math.max(0, Math.min(2047, units));
+  return Number.isInteger(code) ? table(model)[code]! : interpolate(POINTS[model], code);
 }
 
 /** Parses `900Hz` or `1.2kHz`; undefined when the text is not a frequency. */
@@ -52,11 +73,18 @@ export function resolveCutoff(raw: number | string, model: SidModel | undefined,
   const target = parseHz(raw);
   if (target === undefined) throw new SidwaveValidationError(path, "expected a number or a frequency such as 900Hz");
   const chip = model ?? "8580";
+  const key = `${chip}:${target}`;
+  const cached = RESOLVED.get(key);
+  if (cached !== undefined) return cached;
+  const hz = table(chip);
   let nearest = 0;
   let error = Infinity;
   for (let code = 0; code <= 2047; code++) {
-    const delta = Math.abs(cutoffHz(code, chip) - target);
+    const delta = Math.abs(hz[code]! - target);
     if (delta < error - 1e-9) { nearest = code; error = delta; }
   }
+  if (RESOLVED.size > 4096) RESOLVED.clear();
+  RESOLVED.set(key, nearest);
   return nearest;
 }
+const RESOLVED = new Map<string, number>();

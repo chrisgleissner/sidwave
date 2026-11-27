@@ -4,7 +4,7 @@
 
 import type { ParsedSidwave } from "../sidwave.js";
 import { expectedSchedule, fft, type ExpectedSchedule } from "./sidwaveFidelity.js";
-import { chromaSequence, type Stereo } from "./sidwaveSimilarity.js";
+import { chromaSequence, mixMono, type Stereo } from "./sidwaveSimilarity.js";
 
 /**
  * Objective quality gate for a rendering or a capture of a SIDWave song. Every check returns PASS, WARN or FAIL
@@ -305,8 +305,9 @@ export function analyseQuality(input: QualityInput): QualityReport {
   else {
     const durations = boundaries.slice(1).map((end, i) => Math.max(0, end - boundaries[i]! - 0.3));
     const per = Math.floor(Math.min(...durations) / 0.2);
+    const mixed = mixMono(signal);
     const seq = durations.map((duration, i) => chromaSequence(signal,
-      Array.from({ length: per }, (_, k) => offset + boundaries[i]! + k * duration / per)));
+      Array.from({ length: per }, (_, k) => offset + boundaries[i]! + k * duration / per), mixed));
     const sim = (x: number, y: number) => { let s = 0, n = 0; for (let k = 0; k < per; k += 1) { const p = seq[x]![k], q = seq[y]![k]; if (!p || !q) continue; let d = 0; for (let j = 0; j < 12; j += 1) d += p[j]! * q[j]!; s += d; n += 1; } return n ? s / n : 0; };
     let repeated = 0;
     const firsts: number[] = [];

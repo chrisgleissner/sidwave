@@ -1139,7 +1139,23 @@ export function createInstrumentPool() {
     return idx;
   };
 
-  return { instruments, instIndex };
+  // The pool index of an instrument with its envelope, sustain/release or filter routing replaced. The result depends
+  // only on the base instrument and the replaced values, so it is memoised per base object instead of being rebuilt
+  // and serialised for every note.
+  const variants = new WeakMap<Instrument, Map<string, number>>();
+  const instVariant = (inst: Instrument, ad: number | undefined, sr: number, filter: number): number => {
+    let byKey = variants.get(inst);
+    if (!byKey) { byKey = new Map(); variants.set(inst, byKey); }
+    const key = `${ad}|${sr}|${filter}`;
+    let idx = byKey.get(key);
+    if (idx === undefined) {
+      idx = instIndex({ ...inst, ...(ad === undefined ? {} : { ad }), sr, filter });
+      byKey.set(key, idx);
+    }
+    return idx;
+  };
+
+  return { instruments, instIndex, instVariant };
 }
 
 /** Maps every `center` voice to the channel of its paired SID on the other pan side. */
@@ -1393,8 +1409,8 @@ function arrangeDoubles(
       const fade = note.fade ? { start: note.fade.start + shift, end: note.fade.end + shift } : undefined;
       return [{ ...note, start, end, fade, sustain,
         beat: note.beat === undefined ? undefined : note.beat + (voice.echo?.delay_beats ?? 0),
-        inst: pool.instIndex({ ...inst, ...(envelope ? { ad: envelope[0] << 4 | envelope[1] } : {}),
-          sr: (sustain << 4) | (envelope?.[3] ?? (inst.sr & 15)), filter }) }];
+        inst: pool.instVariant(inst, envelope ? envelope[0] << 4 | envelope[1] : undefined,
+          (sustain << 4) | (envelope?.[3] ?? (inst.sr & 15)), filter) }];
     });
     target.events.push(...buildVoiceEvents(target.notes, pool.instruments, timing.totalFrames, timing.framesPerBeat, [], cents, timing.clock?.loopFrame, doc.end ? timing.totalFrames : undefined));
     visiting.delete(voice.id);
@@ -1496,7 +1512,7 @@ function followNotes(
       path: beat === undefined ? note.path : `bar ${clock.barOf(beat)} v${voice.id}`,
       volume: sameChip ? note.volume : undefined,
       inst: legato ? previous!.inst : named ? index
-        : pool.instIndex({ ...inst, sr: ((sustain ?? sustainNibble) << 4) | (inst.sr & 15), filter: filter(inst) }) };
+        : pool.instVariant(inst, undefined, ((sustain ?? sustainNibble) << 4) | (inst.sr & 15), filter(inst)) };
     out.push(copy);
   }
   // A longer hard restart in the follower's instrument must still fit between its notes.
@@ -1740,7 +1756,15 @@ function arrangeChip(
             if (modern && !sid?.model && !isLibrary && JSON.stringify(fx.filtertable ?? "").includes('"hz"')) {
               throw new SidwaveValidationError(`${patPath}.instrument`, "declare sids[].model before using a cutoff in Hz");
             }
-            inst = buildInstrument(instVoice, fx, entry.arp ? offsets : [], entry.arp ? entry.arpSpeed : 0, routed, fps, modern, doc.speed, base, sid?.model);
+            // The pitch only reaches the instrument through a wavetable of a modern score. Without one, every pitch of the
+            // entry yields an equal instrument, so it is built, serialised and pooled once.
+            const pitchFreeKey = `${id}:${routed}`;
+            const pitchFree = !modern || !fx.wavetable;
+            inst = pitchFree ? shapes.get(pitchFreeKey) : undefined;
+            if (!inst) {
+              inst = buildInstrument(instVoice, fx, entry.arp ? offsets : [], entry.arp ? entry.arpSpeed : 0, routed, fps, modern, doc.speed, base, sid?.model);
+              if (pitchFree) shapes.set(pitchFreeKey, inst);
+            }
             shapes.set(shapeKey, inst);
           }
           const previous = out[out.length - 1];
@@ -2388,6 +2412,15 @@ export type StreamByte = number | string;
  */
 export function compressVoiceTokens(tokens: number[][], voice: number, setLoopOffset: (offset: number) => void): { bytes: StreamByte[]; calls: number } {
   const key = tokens.map((t) => t.join(","));
+  // Equal tokens share one integer id, so the repeated comparisons below compare numbers instead of strings.
+  const keyIds = new Map<string, number>();
+  const id = Int32Array.from(key, (k) => {
+    let v = keyIds.get(k);
+    if (v === undefined) { v = keyIds.size; keyIds.set(k, v); }
+    return v;
+  });
+  const radix = keyIds.size + 1;
+  const numericSignature = radix ** 3 <= Number.MAX_SAFE_INTEGER;
   const barrier = tokens.map((t) => !t.length || t[0] === OP.LOOP);
   const prefix = [0];
   for (const token of tokens) prefix.push(prefix[prefix.length - 1]! + token.length);
@@ -2395,11 +2428,13 @@ export function compressVoiceTokens(tokens: number[][], voice: number, setLoopOf
   const subs: Array<{ start: number; length: number; uses: number }> = [];
   const matchAt = (i: number, sub: { start: number; length: number }) => {
     if (i + sub.length > tokens.length) return false;
-    for (let k = 0; k < sub.length; k++) if (barrier[i + k] || key[i + k] !== key[sub.start + k]) return false;
+    for (let k = 0; k < sub.length; k++) if (barrier[i + k] || id[i + k] !== id[sub.start + k]) return false;
     return true;
   };
-  const signature = (i: number) => key[i] + "|" + key[i + 1] + "|" + key[i + 2];
-  const later = new Map<string, number[]>();
+  const signature = (i: number): number | string => numericSignature
+    ? (id[i]! * radix + id[i + 1]!) * radix + id[i + 2]!
+    : key[i] + "|" + key[i + 1] + "|" + key[i + 2];
+  const later = new Map<number | string, number[]>();
   for (let i = 0; i + 2 < tokens.length; i++) {
     if (barrier[i] || barrier[i + 1] || barrier[i + 2]) continue;
     const sig = signature(i);
@@ -2407,11 +2442,21 @@ export function compressVoiceTokens(tokens: number[][], voice: number, setLoopOf
     later.get(sig)!.push(i);
   }
   const plan = (discover: boolean, allowed: typeof subs) => {
-    const cursors = new Map<string, number>();
+    const cursors = new Map<number | string, number>();
     const steps: Array<{ token?: number; sub?: number }> = [];
+    // Subroutines indexed by the key of their first token, in `allowed` order, so only candidates that can match are tried.
+    const byFirst = new Map<number, number[]>();
+    let indexed = 0;
     for (let i = 0; i < tokens.length;) {
       if (barrier[i]) { steps.push({ token: i++ }); continue; }
-      const hit = allowed.findIndex((sub) => matchAt(i, sub));
+      for (; indexed < allowed.length; indexed++) {
+        const first = id[allowed[indexed]!.start]!;
+        const list = byFirst.get(first);
+        if (list) list.push(indexed); else byFirst.set(first, [indexed]);
+      }
+      let hit = -1;
+      const candidates = byFirst.get(id[i]!);
+      if (candidates) for (const c of candidates) if (matchAt(i, allowed[c]!)) { hit = c; break; }
       if (hit >= 0) { allowed[hit]!.uses++; steps.push({ sub: hit }); i += allowed[hit]!.length; continue; }
       if (discover && i + 2 < tokens.length) {
         const sig = signature(i);
@@ -2422,7 +2467,7 @@ export function compressVoiceTokens(tokens: number[][], voice: number, setLoopOf
         const next = positions?.[cursor];
         if (next !== undefined) {
           let run = 0;
-          while (run < next - i && !barrier[i + run] && !barrier[next + run] && key[i + run] === key[next + run]) run++;
+          while (run < next - i && !barrier[i + run] && !barrier[next + run] && id[i + run] === id[next + run]) run++;
           if (size(i, i + run) >= 12) {
             allowed.push({ start: i, length: run, uses: 1 });
             steps.push({ sub: allowed.length - 1 });

@@ -39,6 +39,11 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 - `engines.node` is `>=20.19` (was `>=24`).
 - Published files include `CHANGELOG.md` and `bin`.
 
+### Performance
+
+- Compiling a score is about three times faster: the filter cutoff in Hz no longer scans all 2048 register codes on every lookup (now a precomputed table and a cache), stream compression compares integers instead of strings, and instrument variants are memoised. `lint`, `transpose`, `diff` and `merge` are faster by the same factor because they compile. `diff` also compiles only one side when both texts hold equal data. A1 comparison is 2.3 times faster (one half-size FFT per real window, no `Math.hypot`); the band energies are bit-identical to the previous ones. Similarity and quality analysis are 2 to 3 times faster (cached chroma tables and mono mix, a half-size FFT per frame). Compiler output, PSID, game build and fixtures are byte-identical.
+- Added `scripts/bench-perf.mjs` (CPU and wall time per operation, JSON report), `doc/performance.md` (budgets) and `test/performanceBudgets.test.mjs` (CPU-time regression tests).
+
 ### Documentation
 
 - Name written as SIDWave in prose (README files, the language specification, the licence texts, the JSON Schema title, package descriptions, `--help` text and code comments). The npm package name, the `sidwave` command, file names, code identifiers, schema `$id` URLs, YAML keys, and error, lint and output messages (including `Invalid SIDWAVE at ...`) keep their spelling.
