@@ -830,7 +830,14 @@ function normalizeInstruments(raw: unknown, path: string, modern: boolean, v13 =
       inst.wavetable = inst.wavetable.map((step: any, i: number) => {
         const sp = `${path}.${name}.wavetable[${i}]`;
         if (!isPlainObject(step)) throw new SidwaveValidationError(sp, "expected a step mapping");
-        checkKeys(step, new Set(["wave", "test", "gate", "ring", "sync", "note", "frames", ...(modern ? ["calls", "slide_to"] : [])]), sp);
+        checkKeys(step, new Set(["wave", "test", "gate", "ring", "sync", "note", "frames", ...(modern ? ["calls", "slide_to"] : []), ...(v15 ? ["reg"] : [])]), sp);
+        if (step.reg !== undefined) {
+          const text = typeof step.reg === "string" ? step.reg.trim() : step.reg;
+          const reg = typeof text === "string" ? (/^\$[0-9a-fA-F]{1,4}$/.test(text) ? Number.parseInt(text.slice(1), 16) : Number.NaN) : text;
+          if (typeof reg !== "number" || !Number.isInteger(reg) || reg < 0 || reg > 0xffff) throw new SidwaveValidationError(sp + ".reg", "expected a 16-bit frequency register value such as $1CD6");
+          if (step.note !== undefined || step.slide_to !== undefined) throw new SidwaveValidationError(sp, "reg cannot be combined with note or slide_to");
+          step = { ...step, reg };
+        }
         if (modern && step.wave !== undefined && /noise\+|\+noise/.test(requireText(step.wave, sp + ".wave"))) {
           throw new SidwaveValidationError(`${sp}.wave`, "noise combined with another waveform can lock the noise register; use noise alone");
         }

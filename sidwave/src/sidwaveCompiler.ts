@@ -2590,7 +2590,7 @@ function estimatePlayerCycles(arr: Arrangement, loop: boolean): number {
     const used = [...new Set(notes.map(({ inst }) => arr.instruments[inst]!))];
     if (arr.tuning) regular += 135;
     if (arr.mirrors?.some(([source]) => source === slot)) regular += 150;
-    if (used.some((inst) => inst.wavetable?.some((step) => step.hz !== undefined))) regular += 32;
+    if (used.some((inst) => inst.wavetable?.some((step) => step.hz !== undefined || step.reg !== undefined))) regular += 32;
     if (used.some((inst) => inst.pulsetable?.steps.some((step) => step.cadence))) regular += 25;
     if (used.some((inst) => inst.filtertable?.steps.some((step) => step.cadence))) regular += 25;
     if (arr.samples) regular += 16;
@@ -3637,7 +3637,7 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
   const hasRestart = arr.voices.some(({ events }) => events.some(({ bytes }) => bytes[0] === OP.RESTART));
   const hasLegato = arr.voices.some(({ events }) => events.some((event) => event.order === ORDER.note && event.bytes[0] === OP.LEGATO));
   const hasPortamento = arr.voices.some(({ events }) => events.some((event) => event.order === ORDER.note && event.bytes.length > 2));
-  const hasRawWavePitch = insts.some((i) => i.wavetable?.some((step) => step.hz !== undefined));
+  const hasRawWavePitch = insts.some((i) => i.wavetable?.some((step) => step.hz !== undefined || step.reg !== undefined));
   const hasWavetable = insts.some((i) => i.wavetable?.length);
   const hasPulseTable = insts.some((i) => i.pulsetable?.steps?.length);
   const hasFilterTable = insts.some((i) => i.filtertable?.steps?.length);
@@ -4050,7 +4050,7 @@ c_ret:
   col("i_slreclo", insts.map((i) => i.slideRecip & 0xff));
   col("i_slrechi", insts.map((i) => i.slideRecip >> 8));
   col("i_filt", insts.map((i) => i.filter));
-  const wt: Array<{ ctrl: number; note: number; mode: number; frames: number; hz?: number }> = [];
+  const wt: Array<{ ctrl: number; note: number; mode: number; frames: number; hz?: number; reg?: number }> = [];
   const wtStart = insts.map((inst) => {
     if (!inst.wavetable?.length) return 0;
     const start = wt.length;
@@ -4062,7 +4062,7 @@ c_ret:
       const n = s.note === undefined ? "" : String(s.note);
       const mode = !n ? 0 : /^[+-]/.test(n) ? 1 : 2;
       const note = mode === 0 ? 0 : mode === 1 ? (Number(n) & 255) : (noteNameToMidi(n)! - 12);
-      wt.push({ ctrl, note, mode: s.hz === undefined ? mode : 3, frames: Number(s.frames ?? 1), hz: s.hz });
+      wt.push({ ctrl, note, mode: s.hz === undefined && s.reg === undefined ? mode : 3, frames: Number(s.frames ?? 1), hz: s.hz, reg: s.reg });
     }
     return start;
   });
@@ -4076,7 +4076,7 @@ c_ret:
     col("wt_mode", wt.length ? wt.map((s) => s.mode) : [0]);
     col("wt_frames", wt.length ? wt.map((s) => s.frames) : [1]);
     if (hasRawWavePitch) for (const system of ["PAL", "NTSC"] as const) {
-      const freq = wt.map(({ hz }) => hz === undefined ? 0 : hzToSidFrequency(hz, system));
+      const freq = wt.map(({ hz, reg }) => reg !== undefined ? reg : hz === undefined ? 0 : hzToSidFrequency(hz, system));
       col(`wt_raw_${system.toLowerCase()}_lo`, freq.map((v) => v & 255));
       col(`wt_raw_${system.toLowerCase()}_hi`, freq.map((v) => v >> 8));
     }

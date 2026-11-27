@@ -85,3 +85,19 @@ test("wrap: true wraps a pulse width modulo 4096; without it the width clamps to
   assert.ok(wrapped.slice(0, 6).join() === "3900,4050,104,254,404" || wrapped.slice(0, 8).some((v) => v === 104), `wrapped: ${wrapped.slice(0, 8)}`);
   assert.ok(clamped.every((v) => v <= 4094) && clamped.some((v) => v === 4094), `clamped: ${clamped.slice(0, 8)}`);
 });
+
+test("a wavetable step with reg writes the exact frequency register value", async () => {
+  const text = score("1.5", "", "{ waveform: pulse, adsr: [0, 4, 12, 3], wavetable: [{ reg: '$1CD6', calls: 3 }, { reg: 0x2001 }] }");
+  const w = await writes(text);
+  const freqs = [];
+  let lo = 0;
+  for (const x of w) {
+    if (x.reg === 0) lo = x.value;
+    else if (x.reg === 1) freqs.push(lo | (x.value << 8));
+  }
+  assert.ok(freqs.includes(0x1cd6), `0x1CD6 is written: ${freqs.slice(0, 8).map((f) => f.toString(16))}`);
+  assert.ok(freqs.includes(0x2001), "0x2001 is written after the first step");
+  assert.throws(() => parseSidwave(score("1.4", "", "{ waveform: pulse, wavetable: [{ reg: '$1CD6' }] }")), /wavetable\[0\]/);
+  assert.throws(() => parseSidwave(score("1.5", "", "{ waveform: pulse, wavetable: [{ reg: 70000 }] }")), /reg/);
+  assert.throws(() => parseSidwave(score("1.5", "", "{ waveform: pulse, wavetable: [{ reg: '$1CD6', note: C5 }] }")), /reg cannot be combined/);
+});
