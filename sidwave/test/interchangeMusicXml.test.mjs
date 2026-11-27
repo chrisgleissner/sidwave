@@ -220,6 +220,9 @@ test("XML text size, input size and character references are bounded", () => {
   assert.throws(() => parseXml("<a>&#xD800;</a>"), /valid XML 1.0/);
   assert.throws(() => parseXml("<a>&#xFFFF;</a>"), /valid XML 1.0/);
   assert.throws(() => parseXml("<a>a & b</a>"), XmlError);
+  assert.throws(() => parseXml("<a>x\u0001y</a>"), /control character/);
+  assert.throws(() => parseXml('<a b="x\u0008"/>'), /control character/);
+  assert.equal(parseXml("<a>&#0000000065;&#x000041;</a>").text, "AA");
   assert.equal(parseXml("<a>&#x1F600;&#9;&lt;&amp;x</a>").text, "\u{1F600}\t<&x");
   // Many entities decode in linear time.
   const before = process.cpuUsage();

@@ -16,19 +16,22 @@ export interface XmlLimits { maxDepth?: number; maxNodes?: number; maxAttributes
 
 const PREDEFINED: Record<string, string> = { lt: "<", gt: ">", amp: "&", apos: "'", quot: '"' };
 
+const RAW_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/;
+
 function validXmlChar(code: number): boolean {
   return code === 9 || code === 10 || code === 13 || (code >= 0x20 && code <= 0xd7ff) || (code >= 0xe000 && code <= 0xfffd) || (code >= 0x10000 && code <= 0x10ffff);
 }
 
 /** Decodes the predefined entities and character references in one pass over the text. */
 function decode(text: string): string {
+  if (RAW_CONTROL.test(text)) throw new XmlError("a control character that XML 1.0 does not allow");
   let amp = text.indexOf("&");
   if (amp < 0) return text;
   let out = "";
   let last = 0;
   while (amp >= 0) {
     const semi = text.indexOf(";", amp + 1);
-    if (semi < 0 || semi - amp > 12) throw new XmlError("an & that does not start an entity or character reference");
+    if (semi < 0 || semi - amp > 40) throw new XmlError("an & that does not start an entity or character reference");
     const name = text.slice(amp + 1, semi);
     let value: string | undefined;
     if (name.charCodeAt(0) === 35) {

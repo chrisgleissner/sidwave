@@ -31,14 +31,15 @@ export function compileScoreToSid(yamlText) {
 const semitone = (reg) => (reg > 0 ? 12 * Math.log2(reg * 985248 / 16777216 / 440) + 69 : -1);
 
 /**
- * Startup offset, in player calls, between the two players. The GoatTracker player starts a song with its call counter at
- * 5, so the first row is read on call 3 and its note starts on call 5 (tick 0); the wavetable sets the frequency on the
- * next call, so the first audible note with its pitch is on call 6 to 7. The SIDWave player plays the first note on
- * call 0. A reference made by gt2reloc therefore lags the SIDWave PSID by 7 calls (143 ms at 50 Hz); on the example songs
- * the best alignment is 7 or 8 calls (hard restart and the first row differ per song). Agreement is
- * computed at this pinned shift; a search over -12..12 is only used to check that the pinned value is the best one.
+ * Startup offset, in player calls, between the GoatTracker player and the SIDWave player. GoatTracker starts every
+ * channel with a call counter of one row (mt_initchn sets mt_chncounter to 1; the default tempo value is 5, so a row is
+ * tempo + 1 = 6 calls), so the first row is processed one row late, and the wavetable sets the pitch one call after the
+ * note starts. The SIDWave player plays its first note on call 0. A reference made by gt2reloc therefore lags the SIDWave
+ * PSID by `ticksPerRow + 1` calls (7 calls, 143 ms, for the default tempo 6). The expected shift is derived from the
+ * song's initial ticks per row; a search over -12..12 is only used to check it.
  */
-export const GT_STARTUP_CALLS = 7;
+export const gtStartupCalls = (ticksPerRow) => ticksPerRow + 1;
+export const GT_STARTUP_CALLS = gtStartupCalls(6);
 
 function agreementAt(ref, cand, shift) {
   const gate = [0, 0, 0], both = [0, 0, 0], same = [0, 0, 0];

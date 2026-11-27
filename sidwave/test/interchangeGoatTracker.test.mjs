@@ -12,7 +12,7 @@ import { importGoatTracker } from "../src/interchange/goattrackerImport.js";
 import { exportGoatTracker } from "../src/interchange/goattrackerExport.js";
 import { runCli } from "../src/cli.js";
 import { VERSIONS, gts } from "./helpers/gtFixtures.mjs";
-import { haveGt2reloc, haveEngine, differential, differentialExport, GT2RELOC, GT_STARTUP_CALLS } from "./helpers/trackerDifferential.mjs";
+import { haveGt2reloc, haveEngine, differential, differentialExport, GT2RELOC, GT_STARTUP_CALLS, gtStartupCalls } from "./helpers/trackerDifferential.mjs";
 
 const pitches = (text) => exportEvents(parseSidwave(text)).voices.map((v) => v.notes.map((n) => n.pitch));
 const expected = [[60, 64, 67, 72], [36, 36, 41, 36], []];
@@ -144,6 +144,7 @@ for (const [magic, make] of Object.entries(VERSIONS)) {
   test(`differential: gt2reloc of a ${magic} file against the imported score`, { skip: reason }, async () => {
     const result = importGoatTracker(make());
     const diff = await differential({ sng: make(), yamlText: result.yaml, seconds: 6 });
+    assert.equal(-diff.agree.bestShift, gtStartupCalls(result.report.tempo.initialTicksPerRow));
     // gt2reloc converts older formats on load as the importer does; the sequences agree call by call after the
     // startup offset of the SIDWave player. The register levels of the ladder are reported, not required.
     assert.equal(diff.agree.bestShift, -GT_STARTUP_CALLS, "the startup offset is the best alignment");
@@ -172,11 +173,11 @@ test("differential: the exported GTS5 file in gt2reloc against the compiled scor
 const EXAMPLES = path.join(os.homedir(), ".c64bridge/sidwave-standalone/tools/goattracker2-upstream-2.77/examples");
 test("the 14 example songs of GoatTracker 2.77 import when they are available locally", { skip: fs.existsSync(EXAMPLES) ? undefined : "examples not installed" }, () => {
   const files = fs.readdirSync(EXAMPLES).filter((f) => f.endsWith(".sng"));
-  assert.ok(files.length >= 10);
-  for (const file of files) {
+    for (const file of files) {
     const result = importGoatTracker(fs.readFileSync(path.join(EXAMPLES, file)));
     assert.ok(result.report.rows > 0, file);
   }
+  assert.equal(files.length, 14);
 });
 
 test("a pattern row with an instrument above 63 is an input error, and mutated songs only raise typed errors", () => {
@@ -208,7 +209,8 @@ test("differential on example songs of GoatTracker 2.77 (local; per-song figures
     const diff = await differential({ sng, yamlText: result.yaml, seconds: 8 });
     const f = (list) => list.map((x) => x.toFixed(2)).join("/");
     console.log(`# ${name}: best shift ${diff.agree.bestShift}, gate ${f(diff.agree.gate)}, note ${f(diff.agree.pitch)}, A1 bad windows ${(diff.ladder.a1.badWindows / diff.ladder.a1.windows).toFixed(2)}`);
-    assert.ok(diff.agree.bestShift >= -9 && diff.agree.bestShift <= -6, `${name}: best shift ${diff.agree.bestShift}`);
+    const expectedShift = -gtStartupCalls(result.report.tempo.initialTicksPerRow);
+    assert.ok(Math.abs(diff.agree.bestShift - expectedShift) <= 1, `${name}: best shift ${diff.agree.bestShift}, expected ${expectedShift}`);
     assert.ok(Math.min(...diff.agree.gate) >= 0.75, `${name}: gate ${f(diff.agree.gate)}`);
   }
 });
