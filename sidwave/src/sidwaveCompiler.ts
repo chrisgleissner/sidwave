@@ -1027,6 +1027,8 @@ export interface ArrangedNote {
   /** SIDWave 1.3: a chord-arp entry and the accent flag, which a follower with its own instrument needs. */
   chord?: { offsets: number[]; speed: number };
   accented?: boolean;
+  /** Name of the instrument as written in the score (`lib:` prefix for the built-in library); used by the exporters. */
+  instrumentName?: string;
 }
 
 type GlobalEvent =
@@ -1802,7 +1804,7 @@ function arrangeChip(
               volume: rampValue(section.volume?.[sid?.id ?? ""], volume, b - sec.startBeat, sec.endBeat - sec.startBeat, sec.meter) } : {}),
             ...(isV13(doc) && entry.chord ? { chord: { offsets, speed: entry.chord.speed } } : {}),
             ...(isV13(doc) && entry.accented ? { accented: true } : {}),
-
+            ...(instrumentName ? { instrumentName } : {}),
           };
           out.push(arranged);
           if (entry.bend) bends.set(arranged, { path: patPath, minFrames });
