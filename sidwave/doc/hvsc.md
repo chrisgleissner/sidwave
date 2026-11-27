@@ -165,7 +165,7 @@ const { text, action } = writeSonglengthsEntry(databaseText, { md5: edited.md5.n
 
 Input from files is not trusted: a SID file larger than 65,662 bytes (`--max-bytes` changes it) and a database larger than 32 MB are refused before they are read; a directory walk stops at 32 levels and does not follow symbolic links; a SIDId signature longer than 4,096 bytes is an error. Errors have a category and an exit code: 2 for a wrong option or value, 3 for a file that is not valid, 5 for a limit, and 1 for a negative result (a key that is not listed, `verify` with problems, a directory run with failed files). With `--json` every command prints `{ "ok", "command", "result" }` or `{ "ok": false, "command", "error": { "category", "message", "details" } }`; a directory run prints one object per line instead.
 
-The code is tested with 1,000 random cases each for the header editor, the Songlengths parser and writer, the STIL parser and the SIDId parser and matcher (`test/hvsc*.test.mjs`). The tests that need HVSC (round trip of all files, timings of the real databases, a run over the whole collection) read `HVSC_ROOT` (default `~/dev/c64/C64Music` on the author's machine) and are skipped when it is not there. They read the collection and write nothing to it.
+The code is tested with 1,000 random cases each for the header editor, the Songlengths parser and writer, the STIL parser and the SIDId parser and matcher (`test/hvsc*.test.mjs`). The tests that need HVSC (round trip of all files, timings of the real databases, a run over the whole collection) read the directory named by `HVSC_ROOT` or `HVSC_DIR` and are skipped when it is not there. They read the collection and write nothing to it.
 
 ## Known limits
 
