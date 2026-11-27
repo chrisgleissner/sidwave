@@ -55,5 +55,5 @@ test("the command line is covered by the import scan and uses no network module"
     }
     assert.ok(!/\bfetch\s*\(|XMLHttpRequest|WebSocket/.test(fs.readFileSync(path.join(srcDir, file), "utf8")), `${file} makes a network call`);
   }
-  assert.equal(manifest.bin.sidwave, "./bin/sidwave.js");
+  assert.equal(manifest.bin.sidwave, "bin/sidwave.js");
 });

@@ -34,8 +34,8 @@ If you modify SIDWave, you may extend the exception to your version, but you are
 | Component | Licence | Use |
 | --- | --- | --- |
 | `6502-toolkit` | MIT (same author) | Required. Assembles the player. |
-| `yaml` 2.9.0 | ISC | Required. Parses YAML scores. |
-| `libsidplayfp-wasm` 1.1.1 | GPL-2.0-or-later | Optional, planned for rendering and tracing. Wraps libsidplayfp 3.1.1 and reSIDfp, both GPL-2.0-or-later. |
+| `yaml` 2.9 | ISC | Required. Parses YAML scores. |
+| `libsidplayfp-wasm` 1.1 | GPL-2.0-or-later | Optional peer dependency, not included in the `sidwave` package. Used for rendering, tracing, verification, reconstruction and local playback. Wraps libsidplayfp 3.1.1 and reSIDfp, both GPL-2.0-or-later. |
 
 `sidplayfp` and VICE are separate programs that you install and run yourself. SIDWave calls them as external processes and does not include or link their code.
 
