@@ -310,6 +310,46 @@
    }
   ]
  },
+ "abc:two-part-air -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "abc.chords",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 ABC chord(s) are reduced to simultaneous SID voice lanes."
+   },
+   {
+    "stage": "read",
+    "code": "abc.notation.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "1 ABC decoration(s) are skipped. | 1 ABC lyric line(s) are skipped. | 1 ABC directive(s) or unsupported field(s) are skipped."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 13,
+    "message": "13 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 19,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 8 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 26 gate-offs shortly before the next note of a voice are written together with that note."
+   }
+  ]
+ },
  "abc:two-part-air -> sidwizard": {
   "ok": true,
   "losses": [

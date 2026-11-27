@@ -28,7 +28,7 @@ test("every format of the registry that can be read has a fixture, and every one
   assert.deepEqual(MISSING_FIXTURES, [], `add fixtures for ${MISSING_FIXTURES.join(", ")} in test/helpers/convertMatrix.mjs`);
   const sources = new Set(inputs().map((i) => i.format));
   for (const id of READABLE_FORMATS) assert.ok(sources.has(id), `${id} has no input`);
-  for (const id of ["sidwave", "sid", "midi", "musicxml", "goattracker", "furnace", "sidwizard", "wav", "prg", "events", "vice-dump", "siddump"]) {
+  for (const id of ["sidwave", "sid", "midi", "musicxml", "goattracker", "furnace", "sidwizard", "basic", "wav", "prg", "events", "vice-dump", "siddump"]) {
     assert.ok(READABLE_FORMATS.includes(id) || WRITABLE_FORMATS.includes(id), `${id} is not in the registry`);
   }
 });

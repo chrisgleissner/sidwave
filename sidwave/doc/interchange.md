@@ -341,6 +341,7 @@ sidwave info unknown.bin                   # detect and describe any supported f
 | `abc` | yes | no | `.abc` | an `X:` tune line followed by a `K:` line |
 | `goattracker` | yes | yes | `.sng` | magic `GTS!`, `GTS2` to `GTS5` |
 | `sidwizard` | yes | yes | `.swm` `.sws` | identifier `SWM1` or `SWMS` at offset 2 (`.swi` instruments are not handled by convert) |
+| `basic` | no | yes | `.bas` | a numbered BASIC listing with the extension `.bas` |
 | `vice-dump` | approximate (reconstruct) | yes | `.dump` | lines of three decimal numbers |
 | `siddump` | approximate (reconstruct) | no | `.siddump` | a table with `|` rows and a Frame column |
 | `furnace` | yes | yes | `.fur` | header `-Furnace module-`, also inside zlib |
@@ -352,6 +353,75 @@ sidwave info unknown.bin                   # detect and describe any supported f
 
 `sidwave formats` prints the same table with a loss summary per format. Reading events JSON, WAV and PRG is not
 supported by design or not yet: events are a lossy view, a PRG has no score, and audio transcription is planned.
+
+## Commodore BASIC V2 (`.bas`)
+
+`sidwave convert score.yaml score.bas` writes a self-contained BASIC V2 program that plays the score on the SID at
+`$D400`. The format is write only. The listing is upper case, numbered in steps of 10, with at most 80 characters per
+line: eight lines of player and the DATA statements.
+
+**Using it.** Type the listing in, paste it into an emulator, or tokenise it with VICE's `petcat`, which reads lower
+case ASCII as the unshifted letters of the C64:
+
+```
+tr A-Z a-z < score.bas > score.txt && petcat -w2 -o score.prg -- score.txt
+```
+
+`RUN` first reads all DATA and compares the number and the sum of the values with the program's checksum; a typing
+error stops it with `DATA ERROR` (a missing or non-numeric value can stop it with a BASIC error instead). The check
+takes about 7.5 ms per value: 4 s for Für Elise and about 50 s for the 20 KB Chamber Waltz program. The report gives
+the estimate as `checkSeconds`. To skip the check once the listing is known to be right, delete lines 20 and 30.
+Stopping the program with RUN/STOP leaves the notes that are sounding; RUN/STOP and RESTORE silences them.
+
+**Data.** Each record is `D,N` followed by `N` pairs of SID register offset (0 to 24) and value. `D` is the delay in
+jiffies since the previous record. The program waits until `TI` reaches the sum of the delays and writes the pairs. A
+record with `N` = 0 ends the program. Only registers that change are written.
+
+**Register values.** BASIC V2 writes about 100 registers per second, while the compiled player writes up to 25 in
+every call. The program therefore holds one value per note: the writer runs the compiled player and takes, for each
+note of the score, the pitch, waveform, pulse width and envelope that the player holds during the note (the waveform
+that sounds longest, at the first call that has the pitch of the score). Wavetable steps, attack transients, vibrato,
+arpeggios, glides and pulse sweeps are not played (`basic.modulation.dropped` counts the notes). Filter and volume
+registers are updated at note starts only (`basic.filter.sampled`), without the lowest three bits of the cutoff.
+Digi samples are not played. One SID plays at most three voices; `voices.dropped` reports the rest, and voices taken
+from other SIDs share one filter and volume (`basic.sid.moved`). The program plays the score once, without its loop.
+One second after the last record it clears the SID and ends, which cuts a longer release.
+
+**Timing.** The clock is `TI`, which runs at 60 Hz on PAL and NTSC machines, so a record starts on a 16.7 ms step. The
+writer predicts the interpreter time of each record (9.7 ms per register, 16 ms per record, measured on a PAL C64 in
+VICE 3.10) and starts the record early so that the last gate it opens is on time. Delays are measured from the start
+of the program, so the error does not accumulate. Errors of the note starts against the score, measured in VICE 3.10
+(PAL) from the SID writes, with the first note 0.5 s after `TI` is reset:
+
+| Score | Note starts | Mean | 95 % | Maximum |
+|---|---|---|---|---|
+| `fuer_elise` (25 s) | 47 | 6 ms | 15 ms | 19 ms |
+| `chamber_waltz` (139 s) | 655 | 11 ms | 24 ms | 34 ms |
+| `chiptune_drive --seconds 60` (too dense) | 796 | 144 ms | 426 ms | 659 ms |
+
+In all three runs the program made exactly the register writes of its DATA, every gate-on of the compiled player
+appeared, and the frequency, waveform and envelope at each of them were values that the compiled player holds during
+that note.
+
+A gate that closes is less exact than a note start: it shares the record with the notes that start around it, and a
+gate-off less than 65 ms before the next note of the same voice is written together with that note. The envelope still
+sees the gate closed while the new values are written. In these runs gate-offs differed from the player's by up to
+105 ms in the first two scores.
+
+In a dense passage a record cannot be finished before the next one is due. The notes are then late until the passage
+ends. `basic.timing.dense` reports how many records are predicted to be more than 25 ms late and the largest delay;
+pulse width and filter writes are left out while the program is more than 50 ms behind (`basic.timing.shed`). The
+program does not play such a score in time. `--voices 2` or `--voices 1` writes fewer registers. The predictions in
+the report (`predictedMeanErrorMs`, `predictedMaxErrorMs`, `maxDelayMs`) do not include the phase of `TI` when the
+program resets it, which shifts all notes together by up to 17 ms, nor the variation of the interpreter.
+
+An NTSC score gets NTSC frequency values, and a PAL score PAL values: run the program on a machine of the same
+standard to keep the pitch.
+
+**Size.** The tokenised program (one byte per keyword and operator, five bytes of overhead per line) and nine numeric
+variables of seven bytes must fit into the 38,911 bytes of BASIC RAM; otherwise the conversion exits 5 and writes no
+file. As a guide, about 1,000 notes fit. The message names the `--seconds` value that fits: `--seconds n` writes the
+notes that start in the first `n` seconds (`basic.truncated`). `--voices` also shortens the program.
 
 ### Detection
 

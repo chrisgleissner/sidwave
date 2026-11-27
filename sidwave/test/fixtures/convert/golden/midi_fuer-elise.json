@@ -176,6 +176,32 @@
    }
   ]
  },
+ "midi:fuer-elise -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 13,
+    "message": "13 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 32,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 8 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 37 gate-offs shortly before the next note of a voice are written together with that note."
+   }
+  ]
+ },
  "midi:fuer-elise -> sidwizard": {
   "ok": true,
   "losses": [
