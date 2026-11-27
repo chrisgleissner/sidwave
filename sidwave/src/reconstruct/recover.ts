@@ -213,9 +213,30 @@ function gcd(a: number, b: number): number {
   return a;
 }
 
-/** Register value of an equal-temperament note with a tuning offset (the formula of the compiler's hzToSidFrequency). */
-function registerOf(midi: number, cents: number, clockHz: number): number {
-  return Math.max(0, Math.min(0xffff, Math.round((midiToHz(midi + cents / 100) * 16_777_216) / clockHz)));
+/** The note-to-register table of a recovered score: equal temperament shifted by `cents`, with exact registers for single notes (`override`, MIDI note to register; `byReg` is the inverse). */
+export interface TuningSpec {
+  cents: number;
+  override: Map<number, number>;
+  byReg: Map<number, number>;
+}
+
+const PLAIN = { cents: 0, override: new Map<number, number>(), byReg: new Map<number, number>() };
+const equalTuning = (cents: number): TuningSpec => ({ cents, override: new Map(), byReg: new Map() });
+
+/** Largest MIDI note whose equal-temperament register fits 16 bits without tuning (the compiler's playable range). */
+function maxMidiOf(clockHz: number): number {
+  let midi = MIDI_MAX;
+  while (Math.round((midiToHz(midi) * 16_777_216) / clockHz) > 0xffff) midi--;
+  return midi;
+}
+
+const etRegister = (midi: number, cents: number, clockHz: number): number => Math.round((midiToHz(midi + cents / 100) * 16_777_216) / clockHz);
+
+/** Register value of a note under the tuning: an exact override, else equal temperament with the cents shift (the formula of the compiler's hzToSidFrequency). */
+function registerOf(midi: number, tune: TuningSpec, clockHz: number): number {
+  const exact = tune.override.get(midi);
+  if (exact !== undefined) return exact;
+  return Math.max(0, Math.min(0xffff, etRegister(midi, tune.cents, clockHz)));
 }
 
 function nearestSemitone(freq: number, cents: number, clockHz: number): number {
@@ -224,14 +245,53 @@ function nearestSemitone(freq: number, cents: number, clockHz: number): number {
 }
 
 /** The semitone whose register equals `freq` exactly under the tuning, or undefined. */
-function exactSemitone(freq: number, cents: number, clockHz: number): number | undefined {
+function exactSemitone(freq: number, tune: TuningSpec, clockHz: number): number | undefined {
   if (freq <= 0) return undefined;
-  const near = nearestSemitone(freq, cents, clockHz);
+  const overridden = tune.byReg.get(freq);
+  if (overridden !== undefined) return overridden;
+  const near = nearestSemitone(freq, tune.cents, clockHz);
+  const top = maxMidiOf(clockHz);
   for (const midi of [near, near - 1, near + 1]) {
-    // The language plays C0 (MIDI 12) to B7 and rejects a pitch whose register would not fit 16 bits under the tuning.
-    if (midi >= MIDI_MIN && midi <= MIDI_MAX && registerOf(midi, cents, clockHz) === freq && Math.round((midiToHz(midi + cents / 100) * 16_777_216) / clockHz) <= 0xffff) return midi;
+    // The language plays C0 (MIDI 12) up to the highest note whose register fits 16 bits, and rejects a pitch whose register under the tuning would not fit.
+    if (midi < MIDI_MIN || midi > top || tune.override.has(midi)) continue;
+    const reg = etRegister(midi, tune.cents, clockHz);
+    if (reg === freq && reg <= 0xffff) return midi;
   }
   return undefined;
+}
+
+/**
+ * Builds the exact-register overrides: every gate-on frequency register that no equal-temperament note matches under the
+ * measured shift is assigned to the nearest semitone slot that is still free (not claimed, and whose equal-temperament
+ * register is not itself played). A register that finds no slot within one semitone stays unmatched. Frequencies are
+ * taken in order of use, most used first, so that the commonest pitches claim the nearest slot; the work is linear in the
+ * number of distinct registers.
+ */
+function buildNoteTable(counts: Map<number, number>, cents: number, clockHz: number): TuningSpec {
+  const tune = equalTuning(cents);
+  const top = maxMidiOf(clockHz);
+  const playedEt = new Set<number>();
+  const unmatched: Array<[number, number]> = [];
+  for (const [freq, n] of counts) {
+    if (exactSemitone(freq, tune, clockHz) !== undefined) playedEt.add(freq);
+    else unmatched.push([freq, n]);
+  }
+  unmatched.sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  for (const [freq] of unmatched) {
+    const hz = (freq * clockHz) / 16_777_216;
+    const exact = 69 + 12 * Math.log2(hz / 440) - cents / 100;
+    const near = Math.round(exact);
+    const order = [near, exact > near ? near + 1 : near - 1, exact > near ? near - 1 : near + 1];
+    for (const midi of order) {
+      if (midi < MIDI_MIN || midi > top || tune.override.has(midi)) continue;
+      const etReg = Math.max(0, Math.min(0xffff, etRegister(midi, cents, clockHz)));
+      if (playedEt.has(etReg)) continue;
+      tune.override.set(midi, freq);
+      tune.byReg.set(freq, midi);
+      break;
+    }
+  }
+  return tune;
 }
 
 /**
@@ -257,7 +317,7 @@ function reproducer(ir: FrameIr, sid: number, voice: number, call: number): Repr
 
 // ---- step 2: tuning ------------------------------------------------------------------------------------------------
 
-function estimateTuning(tracks: Track[], clockHz: number): { cents: number; distinct: number; matched: number; mode: number } {
+function estimateTuning(tracks: Track[], clockHz: number): { cents: number; distinct: number; matched: number; mode: number; counts: Map<number, number> } {
   const counts = new Map<number, number>();
   for (const t of tracks) {
     // Only the frequency at a gate-on edge is a note pitch; later calls of a note may be modulated.
@@ -265,7 +325,7 @@ function estimateTuning(tracks: Track[], clockHz: number): { cents: number; dist
       if (t.ctl[k]! & 1 && (k === 0 || !(t.ctl[k - 1]! & 1)) && t.freq[k]! > 0) counts.set(t.freq[k]!, (counts.get(t.freq[k]!) ?? 0) + 1);
     }
   }
-  if (!counts.size) return { cents: 0, distinct: 0, matched: 0, mode: 0 };
+  if (!counts.size) return { cents: 0, distinct: 0, matched: 0, mode: 0, counts };
   const bins = new Map<number, number>();
   for (const [freq, n] of counts) {
     const hz = (freq * clockHz) / 16_777_216;
@@ -295,7 +355,8 @@ function estimateTuning(tracks: Track[], clockHz: number): { cents: number; dist
   let bestMatched = -1;
   for (const c of candidates) {
     let matched = 0;
-    for (const [freq, n] of counts) if (exactSemitone(freq, c, clockHz) !== undefined) matched += n;
+    const trial = equalTuning(c);
+    for (const [freq, n] of counts) if (exactSemitone(freq, trial, clockHz) !== undefined) matched += n;
     if (matched > bestMatched) {
       bestMatched = matched;
       bestCents = c;
@@ -303,7 +364,7 @@ function estimateTuning(tracks: Track[], clockHz: number): { cents: number; dist
   }
   let total = 0;
   for (const n of counts.values()) total += n;
-  return { cents: bestCents, distinct: counts.size, matched: bestMatched / Math.max(1, total), mode };
+  return { cents: bestCents, distinct: counts.size, matched: bestMatched / Math.max(1, total), mode, counts };
 }
 
 // ---- step 3 and 4: segmentation and programs -----------------------------------------------------------------------
@@ -336,7 +397,7 @@ function extractTracks(ir: FrameIr, first: number): Track[] {
   return tracks;
 }
 
-function segmentTrack(track: Track, cents: number, clockHz: number, speed: number, maxMidi: number, notes: { unsupported: Array<{ call: number; kind: string; detail: string }> }): NoteSegment[] {
+function segmentTrack(track: Track, tune: TuningSpec, clockHz: number, speed: number, maxMidi: number, notes: { unsupported: Array<{ call: number; kind: string; detail: string }> }): NoteSegment[] {
   const n = track.ctl.length;
   const starts: number[] = [];
   for (let k = 0; k < n; k++) if (track.ctl[k]! & 1 && (k === 0 || !(track.ctl[k - 1]! & 1))) starts.push(k);
@@ -418,15 +479,15 @@ function segmentTrack(track: Track, cents: number, clockHz: number, speed: numbe
     const useGateEnd = viaGateOff || (seg.gateOff < end && plainTail && seg.gateOff - seg.start >= minEntry);
     seg.length = useGateEnd && !viaGateOff ? seg.gateOff - seg.start : seg.entryEnd - seg.start;
     const progEnd = useGateEnd ? seg.gateOff : end;
-    const base = exactSemitone(track.freq[seg.start]!, cents, clockHz);
+    const base = exactSemitone(track.freq[seg.start]!, tune, clockHz);
     seg.pitchApprox = base === undefined;
-    seg.midi = base ?? Math.max(MIDI_MIN, Math.min(maxMidi, nearestSemitone(track.freq[seg.start]!, cents, clockHz)));
+    seg.midi = base ?? Math.max(MIDI_MIN, Math.min(maxMidi, nearestSemitone(track.freq[seg.start]!, tune.cents, clockHz)));
     // The vibrato continues through the release and the restart calls, so the whole span up to the next note is checked.
     for (let k = seg.start; k < (next ? next.start : n); k++) seg.freqs.push(track.freq[k]!);
-    seg.modulated = seg.freqs.some((f) => exactSemitone(f, cents, clockHz) === undefined);
+    seg.modulated = seg.freqs.some((f) => exactSemitone(f, tune, clockHz) === undefined);
     if (seg.modulated) notes.unsupported.push({ call: seg.start, kind: "pitch", detail: "frequency register is not an equal-temperament semitone under the measured tuning" });
     for (let k = seg.start; k < progEnd; k++) {
-      const m = exactSemitone(track.freq[k]!, cents, clockHz);
+      const m = exactSemitone(track.freq[k]!, tune, clockHz);
       if (m === undefined) {
         seg.pitchApprox = true;
       }
@@ -492,9 +553,10 @@ export function simulateVibrato(ft: number, up: [number, number], down: [number,
  * every call count up to the first deviation. Returns the first exact fit, preferring a smaller delay and then a
  * depth with fewer decimals.
  */
-export function fitVibrato(members: Array<{ midi: number; freqs: number[] }>, cents: number, clockHz: number, speed: number, fps: number): VibratoFit | undefined {
+export function fitVibrato(members: Array<{ midi: number; freqs: number[] }>, tune: TuningSpec | number, clockHz: number, speed: number, fps: number): VibratoFit | undefined {
   const sample = members.slice(0, VIBRATO_MAX_MEMBERS);
-  const fts = sample.map((m) => registerOf(m.midi, cents, clockHz));
+  const spec = typeof tune === "number" ? equalTuning(tune) : tune;
+  const fts = sample.map((m) => registerOf(m.midi, spec, clockHz));
   let maxDev = 0;
   let firstDeviation = Infinity;
   sample.forEach((m, i) => {
@@ -571,12 +633,12 @@ function markSlides(seg: NoteSegment, track: Track, progEnd: number, clockHz: nu
   const register = (hz: number): number => Math.max(0, Math.min(0xffff, Math.round((hz * 16_777_216) / clockHz)));
   for (let k = seg.start + 1; k < progEnd; k++) {
     const call = seg.program[k - seg.start]!;
-    if (call.slide || exactSemitone(track.freq[k]!, 0, clockHz) !== undefined) continue;
+    if (call.slide || exactSemitone(track.freq[k]!, PLAIN, clockHz) !== undefined) continue;
     const k0 = k - 1;
-    const from = exactSemitone(track.freq[k0]!, 0, clockHz);
+    const from = exactSemitone(track.freq[k0]!, PLAIN, clockHz);
     if (from === undefined || seg.program[k0 - seg.start]!.slide) continue;
     for (let e = k + 1; e < progEnd && e - k0 < 255; e++) {
-      const to = exactSemitone(track.freq[e]!, 0, clockHz);
+      const to = exactSemitone(track.freq[e]!, PLAIN, clockHz);
       if (to === undefined) continue;
       const n = e - k0 + 1;
       let ok = true;
@@ -978,14 +1040,44 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   }
   const used = tracks.filter((t) => t.sid === 0 && t.ctl.some((c) => c & 1));
   const tuning = estimateTuning(used, ir.clockHz);
-  if (tuning.matched < TUNING_MATCH_MIN && tuning.distinct) {
+  // Gate-on registers that equal temperament under the measured shift does not explain get exact note registers (SIDWave 1.5 `tuning.registers`).
+  const tune = buildNoteTable(tuning.counts, tuning.cents, ir.clockHz);
+  let explained = 0;
+  let totalNotes = 0;
+  for (const [freq, n] of tuning.counts) {
+    totalNotes += n;
+    if (exactSemitone(freq, tune, ir.clockHz) !== undefined) explained += n;
+  }
+  const matchedShare = totalNotes ? explained / totalNotes : 1;
+  if (matchedShare < TUNING_MATCH_MIN && tuning.distinct) {
     unsupported.push({
-      kind: "tuning", detail: `only ${(tuning.matched * 100).toFixed(1)} percent of the gate-on frequency values match a tuned equal-temperament note`,
+      kind: "tuning", detail: `only ${(matchedShare * 100).toFixed(1)} percent of the gate-on frequency values match a tuned note, even with exact registers for single notes`,
       evidence: { cents: tuning.cents, mode: tuning.mode },
     });
   }
   const gaps = { unsupported: [] as Array<{ call: number; kind: string; detail: string }> };
-  const segsByTrack = used.map((t) => segmentTrack(t, tuning.cents, ir.clockHz, speed, maxSidwaveMidi(system), gaps));
+  const segsByTrack = used.map((t) => segmentTrack(t, tune, ir.clockHz, speed, maxSidwaveMidi(system), gaps));
+  // A note longer than MAX_NOTE_BEATS is cut, so that every pattern stays within the 64-beat limit of the language.
+  for (const segs of segsByTrack) {
+    for (const seg of segs) {
+      if (seg.length > MAX_NOTE_BEATS * callsPerBeat) {
+        seg.length = MAX_NOTE_BEATS * callsPerBeat;
+        cutNotes++;
+      }
+    }
+  }
+  // The player needs a note to last at least one frame (`speed` calls). A gate that is on for less is dropped, and the span stays a rest.
+  let droppedNotes = 0;
+  for (const segs of segsByTrack) {
+    for (let i = segs.length - 1; i >= 0; i--) {
+      if (!segs[i]!.phantom && segs[i]!.length < speed) {
+        segs.splice(i, 1);
+        droppedNotes++;
+      }
+    }
+  }
+  if (droppedNotes) unsupported.push({ kind: "short_note", detail: `${droppedNotes} notes last less than one frame (${speed} calls) and were dropped`, evidence: {} });
+  if (cutNotes) unsupported.push({ kind: "long_note", detail: `${cutNotes} notes last more than ${MAX_NOTE_BEATS} beats and were cut`, evidence: {} });
   // Global registers: filter cutoff, resonance and routing, mode and volume.
   const globalSeen = new Map<number, Set<number>>();
   for (let k = firstCall; k < ir.calls.length; k++) {
@@ -1160,7 +1252,7 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     const modulated = members.find((x) => x.modulated);
     if (!modulated) continue;
     fitted.add(fi);
-    const vibrato = fitVibrato(members, tuning.cents, ir.clockHz, speed, frameRate * speed);
+    const vibrato = fitVibrato(members, tune, ir.clockHz, speed, frameRate * speed);
     if (vibrato) {
       finalYaml[fi] = { ...finalYaml[fi]!, vibrato: { depth: vibrato.depth, rate: vibrato.rate, ...(vibrato.delayCalls ? { delay: vibrato.delayCalls / speed } : {}) } };
       finalDefs[fi]!.yaml = finalYaml[fi]!;
@@ -1216,17 +1308,19 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     return [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 0;
   });
   // SIDWave 1.5 is declared only when the score needs it: a speed above 4, or a player without the soft-start volume ramp.
-  const v15 = speed > 4 || softStartOff;
+  const useTable = tune.override.size > 0;
+  const v15 = speed > 4 || softStartOff || useTable;
   const build = (layout: Layout): Record<string, unknown> => ({
     sidwave: v15 ? "1.5" : "1.4",
     ...(softStartOff ? { player: { soft_start: false } } : {}),
+    ...(useTable ? { tuning: { ...(tune.cents ? { cents: tune.cents } : {}), registers: Object.fromEntries([...tune.override].sort((a, b) => a[0] - b[0]).map(([midi, reg]) => [midiToNoteName(midi), reg])) } } : {}),
     title: options.title ?? "Reconstructed",
     tempo,
     mode: system,
     speed,
     ...(Object.keys(instruments).length ? { instruments } : {}),
     voices: layout.voices.map((v, i) => ({
-      id: voiceIds[i], ...(tuning.cents ? { detune: tuning.cents } : {}), instrument: instNames[defaults[i]!], patterns: v.patterns,
+      id: voiceIds[i], ...(tuning.cents && !useTable ? { detune: tuning.cents } : {}), instrument: instNames[defaults[i]!], patterns: v.patterns,
     })),
     timeline: [{
       section: "Song", bars,
