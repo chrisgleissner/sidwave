@@ -5,3 +5,6 @@ export * from "./common.js";
 export * from "./music.js";
 export * from "./techniques.js";
 export * from "./analysis.js";
+export * from "./instruments.js";
+export * from "./compare.js";
+export * from "./isolate.js";
