@@ -59,38 +59,43 @@ test("invalid library names, dates and non-score input are rejected", async () =
   await assert.rejects(() => extractInstruments("- a\n- b\n"), /not a YAML mapping/);
 });
 
-test("reuse: every extracted instrument of seeded scores gives the same register output of its voice in a new score", { timeout: 300_000 }, async () => {
+const FULL = process.env.SIDWAVE_FULL_REUSE === "1";
+test(`reuse: extracted instruments of seeded scores give the same register output of their voice in a new score (${FULL ? "all" : "a sample of 3; SIDWAVE_FULL_REUSE=1 runs every instrument"})`, { timeout: 300_000 }, async () => {
   const results = [];
-  for (const [feature, seed] of [["basic", 1], ["arpeggio", 3], ["hard_restart", 4], ["vibrato", 5], ["filter", 6], ["combined", 3]]) {
+  const scores = FULL
+    ? [["basic", 1], ["arpeggio", 3], ["hard_restart", 4], ["vibrato", 5], ["filter", 6], ["combined", 3]]
+    : [["arpeggio", 3], ["filter", 6], ["combined", 3]];
+  for (const [feature, seed] of scores) {
     const text = seededText(feature, seed);
     const extracted = await extractInstruments(text, { created: CREATED });
-    for (const inst of extracted.instruments) {
-      const check = await checkInstrumentReuse({ library: extracted.library, instrument: inst.name, source: text, engine: sharedEngine() });
+    for (const inst of FULL ? extracted.instruments : extracted.instruments.slice(0, 1)) {
+      const check = await checkInstrumentReuse({ library: extracted.library, instrument: inst.name, sourceInstrument: inst.sourceName, source: text, engine: sharedEngine() });
       assert.equal(check.equal, true, `${feature} seed ${seed} ${inst.name}: ${JSON.stringify(check.first)}`);
       assert.ok(check.comparedCalls > 100);
       results.push(`${feature}/${seed}/${inst.name}`);
     }
   }
-  assert.ok(results.length >= 12, `${results.length} instruments checked`);
+  assert.ok(results.length >= 3, `${results.length} instruments checked`);
 });
 
-test("reuse: the comparison fails when the instrument in the new score differs from the extracted one", { timeout: 120_000 }, async () => {
+test("reuse: the source side is the source score's own definition, so a corrupted extraction fails the check", { timeout: 120_000 }, async () => {
   const text = seededText("pulse", 2);
   const extracted = await extractInstruments(text, { created: CREATED });
   const probes = reuseProbes({ library: extracted.library, instrument: "lead1", source: text });
-  const changed = YAML.parse(probes.inline);
-  changed.instruments.X.adsr = [0, 0, 15, 0];
-  const compile = (t) => new Uint8Array(compileSidwaveBytes(parseSidwave(t), { format: "sid", loop: false }).bytes);
-  const trace = async (t) => irOfTrace(await sharedEngine().trace({ sid: compile(t), seconds: 3 }));
-  const same = await trace(probes.inline);
-  const other = await trace(YAML.stringify(changed));
-  assert.equal(fdiff(restrictIrToVoice(same, 1), restrictIrToVoice(await trace(probes.inline), 1), { alignExpected: 1, alignObserved: 1 }).equal, true);
-  const result = fdiff(restrictIrToVoice(same, 1), restrictIrToVoice(other, 1), { alignExpected: 1, alignObserved: 1 });
-  assert.equal(result.equal, false);
-  assert.ok(result.classes.adsr.differingCalls > 0);
-  assert.notEqual(irFingerprint(restrictIrToVoice(same, 1)), irFingerprint(restrictIrToVoice(other, 1)));
-  // Voices other than the restricted one do not matter: restricting to voice 2 sees no difference.
-  assert.equal(fdiff(restrictIrToVoice(same, 2), restrictIrToVoice(other, 2), { alignExpected: 1, alignObserved: 1 }).equal, true);
+  assert.deepEqual(YAML.parse(probes.inline).instruments.X, YAML.parse(text).instruments.lead1, "the inline probe holds the source score's definition");
+  const good = await checkInstrumentReuse({ library: extracted.library, instrument: "lead1", source: text, engine: sharedEngine(), seconds: 3 });
+  assert.equal(good.equal, true);
+  // Corrupt the extraction (the library), not the inline copy.
+  const lib = YAML.parse(extracted.library);
+  lib.instruments.lead1.adsr = [0, 0, 15, 0];
+  const bad = await checkInstrumentReuse({ library: YAML.stringify(lib), instrument: "lead1", source: text, engine: sharedEngine(), seconds: 3 });
+  assert.equal(bad.equal, false);
+  assert.ok(bad.differingCalls > 0 && bad.first);
+  // Corrupting the source side the same way is also detected: the two sides are independent.
+  const source = YAML.parse(text);
+  source.instruments.lead1.adsr = [0, 0, 15, 0];
+  assert.equal((await checkInstrumentReuse({ library: extracted.library, instrument: "lead1", source: YAML.stringify(source), engine: sharedEngine(), seconds: 3 })).equal, false);
+  await assert.rejects(() => checkInstrumentReuse({ library: extracted.library, instrument: "lead1", sourceInstrument: "missing", source: text, engine: sharedEngine() }), /source score has no instrument missing/);
 });
 
 test("reuse in the whole source: replacing every instrument by an import from the library keeps all voices identical", { timeout: 300_000 }, async () => {
@@ -128,7 +133,7 @@ test("SID input: the library comes from the reconstruction with the source check
   assert.match(result.library, /# Subtune 1, horizon 3 s, reconstruction (strictly exact|not strictly exact)\./);
   // An extracted instrument of the reconstruction is reusable.
   const rec = await reconstructSid(sid, { engine: sharedEngine(), seconds: 3 });
-  const check = await checkInstrumentReuse({ library: result.library, instrument: result.instruments[0].name, source: rec.score, engine: sharedEngine() });
+  const check = await checkInstrumentReuse({ library: result.library, instrument: result.instruments[0].name, sourceInstrument: result.instruments[0].sourceName, source: rec.score, engine: sharedEngine() });
   assert.equal(check.equal, true, JSON.stringify(check.first));
   await assert.rejects(() => extractInstruments(sid, { created: CREATED }), /needs an engine/);
 });

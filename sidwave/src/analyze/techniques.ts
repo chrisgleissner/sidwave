@@ -27,6 +27,16 @@ export interface Technique extends Marked {
   evidence: Record<string, number | string | boolean | number[] | string[]>;
 }
 
+/** Names of the threshold detectors. A technique found by one of them is inferred from register values; the register facts in its evidence stay observed. */
+export const DETECTORS = {
+  hardRestart: "threshold detector hard restart: gate-on edges after a 1 to 3 call gate-off gap with the test bit set or the AD/SR registers changed (THRESHOLDS.hardRestart*)",
+  arpeggio: "threshold detector arpeggio: periodic cycle of 2 to 6 distinct frequencies within a gate-on run (THRESHOLDS.arpeggio*)",
+  vibrato: "threshold detector vibrato: regular frequency oscillation under a semitone within a gate-on run (THRESHOLDS.vibrato*)",
+  slide: "threshold detector pitch slide: monotone frequency change over several calls (THRESHOLDS.slideMinChanges)",
+  pulse: "threshold detector pulse width sweep: monotone pulse width while the pulse waveform is selected (THRESHOLDS.sweep*)",
+  filter: "threshold detector filter sweep: monotone cutoff while voices are routed through the filter (THRESHOLDS.sweep*)",
+} as const;
+
 export const THRESHOLDS = {
   /** Calls of one gate-on run needed to look for arpeggio and vibrato. */
   arpeggioMinRun: 8,
@@ -250,7 +260,7 @@ export function techniquesFromIr(ir: FrameIr): Technique[] {
   const hrVoices = [...found.hardRestart].filter(([, h]) => h.edges >= T.hardRestartMinEdges && h.pattern / h.edges >= T.hardRestartShare);
   if (hrVoices.length) {
     out.push({
-      basis: "observed", source: "trace", name: "hard restart", voices: hrVoices.map(([g]) => g).sort((a, b) => a - b),
+      basis: "inferred", method: DETECTORS.hardRestart, source: "trace", name: "hard restart", voices: hrVoices.map(([g]) => g).sort((a, b) => a - b),
       summary: "a short gate-off gap before a note with the test bit set or the envelope registers changed",
       evidence: {
         gateOnEdges: hrVoices.reduce((x, [, h]) => x + h.edges, 0), edgesWithPattern: hrVoices.reduce((x, [, h]) => x + h.pattern, 0),
@@ -263,7 +273,7 @@ export function techniquesFromIr(ir: FrameIr): Technique[] {
     const periods = [...found.arpeggio.values()].flatMap((e) => e.periods);
     const steps = [...found.arpeggio.values()].flatMap((e) => e.steps);
     out.push({
-      basis: "observed", source: "trace", name: "arpeggio", voices: list(found.arpeggio),
+      basis: "inferred", method: DETECTORS.arpeggio, source: "trace", name: "arpeggio", voices: list(found.arpeggio),
       summary: "the frequency cycles through a few values within one gate-on run",
       evidence: { runs: [...found.arpeggio.values()].reduce((x, e) => x + e.runs, 0), cycleSteps: mode(periods) ?? 0, example: mostCommon(steps) ?? "" },
     });
@@ -272,18 +282,18 @@ export function techniquesFromIr(ir: FrameIr): Technique[] {
     const rates = [...found.vibrato.values()].flatMap((e) => e.rates);
     const depths = [...found.vibrato.values()].flatMap((e) => e.depths);
     out.push({
-      basis: "observed", source: "trace", name: "vibrato", voices: list(found.vibrato),
+      basis: "inferred", method: DETECTORS.vibrato, source: "trace", name: "vibrato", voices: list(found.vibrato),
       summary: "the frequency oscillates regularly around the note by less than one semitone",
       evidence: { runs: [...found.vibrato.values()].reduce((x, e) => x + e.runs, 0), medianRateHz: round(median(rates), 2), medianDepthCents: round(median(depths), 1) },
     });
   }
   if (found.slide.size) {
-    out.push({ basis: "observed", source: "trace", name: "pitch slide", voices: list(found.slide), summary: "the frequency moves in one direction over several calls", evidence: { slides: [...found.slide.values()].reduce((x, y) => x + y, 0) } });
+    out.push({ basis: "inferred", method: DETECTORS.slide, source: "trace", name: "pitch slide", voices: list(found.slide), summary: "the frequency moves in one direction over several calls", evidence: { slides: [...found.slide.values()].reduce((x, y) => x + y, 0) } });
   }
   if (found.pulse.size) {
     const steps = [...found.pulse.values()].flatMap((e) => e.step);
     out.push({
-      basis: "observed", source: "trace", name: "pulse width sweep", voices: list(found.pulse), summary: "the pulse width moves monotonically over many calls",
+      basis: "inferred", method: DETECTORS.pulse, source: "trace", name: "pulse width sweep", voices: list(found.pulse), summary: "the pulse width moves monotonically over many calls",
       evidence: { sweeps: [...found.pulse.values()].reduce((x, e) => x + e.sweeps, 0), medianStepPerChange: round(median(steps), 2) },
     });
   }
@@ -315,7 +325,7 @@ export function techniquesFromIr(ir: FrameIr): Technique[] {
   }
   if (routedVoices.size) {
     out.push({
-      basis: "observed", source: "trace", name: "filter sweep", voices: [...routedVoices].sort((a, b) => a - b),
+      basis: "inferred", method: DETECTORS.filter, source: "trace", name: "filter sweep", voices: [...routedVoices].sort((a, b) => a - b),
       summary: filterSweeps ? "the filter cutoff moves monotonically over many calls while voices are routed through the filter" : "voices are routed through the filter; the cutoff does not sweep",
       evidence: { sweeps: filterSweeps, sids: filterSids, modes: [...modes].sort(), maxResonance: resonanceMax, swept: filterSweeps > 0 },
     });

@@ -23,7 +23,7 @@ test("a reconstructed SIDWave tune: observed trace facts, inferred musical facts
   assert.equal(report.metre.declared.basis, "inferred");
   assert.match(report.metre.declared.method, /reconstruction/);
   assert.equal(report.form.declaredSections[0].basis, "inferred");
-  assert.ok(report.techniques.length >= 4 && report.techniques.every((t) => t.basis === "observed"));
+  assert.ok(report.techniques.length >= 4 && report.techniques.every((t) => (t.basis === "observed") === ["oscillator sync", "ring modulation", "test bit", "noise", "combined waveforms", "multispeed", "sample playback"].includes(t.name)));
   const names = report.techniques.map((t) => t.name);
   for (const expected of ["hard restart", "vibrato", "pulse width sweep", "filter sweep", "arpeggio"]) assert.ok(names.includes(expected), `${expected} in ${names}`);
   assert.equal(report.resources.trace.basis, "observed");

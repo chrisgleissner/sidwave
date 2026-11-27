@@ -6,7 +6,7 @@
 // cliCore.ts. Each command is a thin wrapper of a function of src/analyze; this file holds the argument handling and
 // the output only, and cli.ts holds one line of dispatch.
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
 import { EXIT_FAILED, EXIT_OK, SidwaveOperationError, UsageError, envelope, type CliIo } from "./cliCore.js";
 import { analyzeScore, analyzeSid, formatAnalysis } from "./analyze/analysis.js";
@@ -74,10 +74,10 @@ export function takeAnalyzeFlag(command: string, flags: AnalyzeFlags, arg: strin
 
 export const ANALYZE_USAGE = `  sidwave analyze  <file.sid|score> [--song <n>] [--seconds <s>] [--songlengths <file>] [--json]
   sidwave compare  <a> <b> [--song <n>] [--seconds <s>] [--level T0|T1|A0|A1] [--no-ladder] [--json]
-  sidwave isolate  <file.sid> --voice <n> [--mute] [-o <out.wav>] [--song <n>] [--seconds <s>] [--json]
+  sidwave isolate  <file.sid> --voice <n> [--mute] [-o <out.wav> [--force]] [--song <n>] [--seconds <s>] [--json]
   sidwave preserve <file.sid> [--song <n>] [--seconds <s>] [-o <dir>] [--include-original --rights-permitted] [--stil <STIL.txt> --stil-path <path>] [--json]
   sidwave preserve --verify <dir> [--json]
-  sidwave extract-instruments <file.sid|score> [-o <library.yaml>] [--name <n>] [--licence <spdx>] [--author <a>] [--song <n>] [--seconds <s>] [--json]
+  sidwave extract-instruments <file.sid|score> [-o <library.yaml> [--force]] [--name <n>] [--licence <spdx>] [--author <a>] [--song <n>] [--seconds <s>] [--json]
 `;
 
 export const ANALYZE_HELP = `  analyze    Structural analysis: key and mode, metre, form, motifs, voice use, techniques and resources. Every fact is
@@ -113,6 +113,9 @@ interface Options {
   strict: boolean;
 }
 
+/** Largest STIL file read, in bytes (the HVSC STIL.txt is a few megabytes). */
+const STIL_FILE_MAX_BYTES = 32 * 1024 * 1024;
+
 const isPsid = (bytes: Uint8Array) => bytes.length >= 4 && ["PSID", "RSID"].includes(String.fromCharCode(...bytes.subarray(0, 4)));
 
 function engineOf(io: CliIo, emulation: SidEmulation = "sidlite"): SidEngine {
@@ -124,8 +127,9 @@ function sameFile(a: string, b: string): boolean {
   return real(a) === real(b);
 }
 
-function writeFile(io: CliIo, path: string, bytes: Uint8Array | string, inputs: string[]): void {
+function writeFile(io: CliIo, path: string, bytes: Uint8Array | string, inputs: string[], force = false): void {
   if (inputs.some((input) => sameFile(path, resolve(io.cwd, input)))) throw new UsageError("the output file is an input file; refusing to overwrite it");
+  if (existsSync(path) && !force) throw new UsageError(`${path} exists; use --force to overwrite it`);
   try {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, bytes);
@@ -207,7 +211,7 @@ async function compareCommand(io: CliIo, options: Options): Promise<number> {
 }
 
 async function isolateCommand(io: CliIo, options: Options): Promise<number> {
-  reject(options, "isolate", [["force", "--force"], ["format", "--format"]]);
+  reject(options, "isolate", [["format", "--format"]]);
   const file = one(options, "isolate");
   if (options.analyze.voice === undefined) throw new UsageError("isolate needs --voice <n>");
   const input = inputOf(io, options, file);
@@ -221,7 +225,7 @@ async function isolateCommand(io: CliIo, options: Options): Promise<number> {
     ...(options.run.song === undefined ? {} : { song: options.run.song }), seconds: horizon(io, options, file),
     ...(options.run.rate === undefined ? {} : { sampleRate: options.run.rate }), ...(io.signal ? { signal: io.signal } : {}),
   });
-  if (outPath === undefined) io.outBytes(result.wav); else writeFile(io, outPath, result.wav, [file]);
+  if (outPath === undefined) io.outBytes(result.wav); else writeFile(io, outPath, result.wav, [file], options.force);
   const { wav, ...summary } = result;
   const line = `${outPath ?? "standard output"}: voice ${result.voice} ${result.mode === "solo" ? "alone" : "muted"}, ${result.horizon.seconds} s, method ${result.method}, ${result.coupling.nonAdditive ? `non-additive (${result.coupling.reasons.join("; ")})` : "additive"}, reconstruction ${result.reconstructionStrictExact ? "strictly exact" : "not strictly exact"}\n`;
   const text = options.json ? `${JSON.stringify(envelope("isolate", true, { result: { file, output: outPath ?? null, bytes: wav.length, ...summary } }), null, 2)}\n` : line;
@@ -256,11 +260,7 @@ async function preserveCommand(io: CliIo, options: Options): Promise<number> {
   const rules = run.a1Rules ? parseA1Rules(Buffer.from(readInput(run.a1Rules, { cwd: io.cwd })).toString("utf8")) : undefined;
   let stil: { text: string; path: string } | undefined;
   if (flags.stil !== undefined) {
-    try {
-      stil = { text: readFileSync(resolve(io.cwd, flags.stil), "utf8"), path: flags.stilPath! };
-    } catch (error) {
-      throw new SidwaveOperationError("input", `cannot read ${flags.stil}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: flags.stil });
-    }
+    stil = { text: Buffer.from(readInput(flags.stil, { cwd: io.cwd, maxBytes: options.run.maxBytes ?? STIL_FILE_MAX_BYTES })).toString("utf8"), path: flags.stilPath! };
   }
   const dir = resolve(io.cwd, options.output ?? `${basename(target, extname(target))}.preserved`);
   const level = flags.noLadder ? "none" : run.level ?? "A1";
@@ -271,13 +271,14 @@ async function preserveCommand(io: CliIo, options: Options): Promise<number> {
     ...(rom ? { roms: rom.roms } : {}), ...(rules ? { rules } : {}), ...(io.signal ? { signal: io.signal } : {}),
   });
   writePreservation(bundle, dir);
+  for (const warning of bundle.warnings) io.err(`warning: ${warning}\n`);
   const ok = bundle.manifest.verdict.strict;
   emit(io, options, "preserve", ok, { file: target, output: dir, files: Object.keys(bundle.manifest.files), manifest: bundle.manifest }, `${dir}: ${[...bundle.files.keys()].join(", ")}\n${formatPreservation(bundle.manifest)}`);
   return ok ? EXIT_OK : EXIT_FAILED;
 }
 
 async function extractCommand(io: CliIo, options: Options): Promise<number> {
-  reject(options, "extract-instruments", [["force", "--force"], ["format", "--format"]]);
+  reject(options, "extract-instruments", [["format", "--format"]]);
   const file = one(options, "extract-instruments");
   const input = inputOf(io, options, file);
   const flags = options.analyze;
@@ -296,7 +297,7 @@ async function extractCommand(io: CliIo, options: Options): Promise<number> {
   }
   const toStdout = options.output === undefined || options.output === "-";
   const outPath = toStdout ? undefined : resolve(io.cwd, options.output!);
-  if (outPath) writeFile(io, outPath, result.library, [file]);
+  if (outPath) writeFile(io, outPath, result.library, [file], options.force);
   const summary = { file, output: outPath ?? null, libraryName: result.libraryName, instruments: result.instruments.map((i) => ({ name: i.name, usedByVoices: i.usedByVoices, patternEntries: i.patternEntries, programs: i.programs })), external: result.external, provenance: result.provenance };
   const line = `${outPath ?? "standard output"}: ${result.instruments.length} instrument${result.instruments.length === 1 ? "" : "s"} in library ${result.libraryName}${result.external.length ? `; not copied (not defined in the score): ${result.external.join(", ")}` : ""}\n`;
   if (options.json) {

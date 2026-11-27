@@ -315,7 +315,7 @@ export function formatAnalysis(report: AnalysisReport): string {
   }
   L.push(`Techniques: ${report.techniques.length}`);
   for (const t of report.techniques) {
-    L.push(`  ${t.name} [observed, ${t.source}]${t.voices.length ? ` voices ${t.voices.join(",")}` : ""}: ${t.summary} ${JSON.stringify(t.evidence)}`);
+    L.push(`  ${t.name} ${tag(t)} (${t.source})${t.voices.length ? ` voices ${t.voices.join(",")}` : ""}: ${t.summary} ${JSON.stringify(t.evidence)}`);
   }
   L.push("Resources:");
   const r = report.resources;

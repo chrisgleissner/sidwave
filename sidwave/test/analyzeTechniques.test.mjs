@@ -23,7 +23,8 @@ test("arpeggio: a gate-on run that cycles through three frequencies, with one to
   const t = techniquesFromIr(ir).find((x) => x.name === "arpeggio");
   assert.ok(t, "arpeggio found");
   assert.deepEqual(t.voices, [1]);
-  assert.equal(t.basis, "observed");
+  assert.equal(t.basis, "inferred", "a threshold classification is inferred");
+  assert.match(t.method, /threshold detector arpeggio/);
   assert.equal(t.evidence.cycleSteps, 3);
   assert.equal(t.evidence.example, "0,4,7");
 });
@@ -95,7 +96,8 @@ test("independently written player fixtures: the techniques of each tune are fou
   for (const [fixture, technique] of Object.entries(expected)) {
     const report = await analyzeSid(new Uint8Array(buildFixture(fixture).sid), { engine: sharedEngine(), seconds: 3 });
     assert.ok(report.techniques.some((t) => t.name === technique), `${fixture}: ${technique} in ${report.techniques.map((t) => t.name).join(", ")}`);
-    assert.ok(report.techniques.every((t) => t.basis === "observed" && t.source === "trace"));
+    const RAW = ["oscillator sync", "ring modulation", "test bit", "noise", "combined waveforms", "multispeed", "sample playback"];
+    assert.ok(report.techniques.every((t) => t.source === "trace" && (RAW.includes(t.name) ? t.basis === "observed" : t.basis === "inferred" && /^threshold detector/.test(t.method))));
     checkMarks(report);
   }
 });

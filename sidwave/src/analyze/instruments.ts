@@ -39,6 +39,8 @@ export interface ExtractOptions {
 
 export interface ExtractedInstrument {
   name: string;
+  /** Name in the source score (`name` may differ: it is made a valid library identifier). */
+  sourceName: string;
   /** The instrument definition as written in the score. */
   definition: Record<string, unknown>;
   /** Voices (as declared, by id) that use the instrument and the number of pattern entries that name it. */
@@ -116,7 +118,7 @@ export function extractInstrumentsFromScore(text: string, options: ExtractOption
     renamed.set(name, target);
     const u = uses.get(name);
     instruments.push({
-      name: target, definition: JSON.parse(JSON.stringify(def)) as Record<string, unknown>,
+      name: target, sourceName: name, definition: JSON.parse(JSON.stringify(def)) as Record<string, unknown>,
       usedByVoices: [...(u?.voices ?? [])].sort((a, b) => a - b), patternEntries: u?.entries ?? 0,
       programs: ["wavetable", "pulsetable", "filtertable"].filter((k) => def[k] !== undefined),
     });
@@ -171,9 +173,12 @@ export interface ReuseCheck {
 export interface ReuseOptions {
   /** The library text written by extractInstruments. */
   library: string;
+  /** Name of the instrument in the library. */
   instrument: string;
-  /** The score the instrument came from: tempo, mode, speed and SID setup of the probe follow it. */
+  /** The score the instrument came from. Its own definition of the instrument is the reference of the comparison; tempo, mode, speed and SID setup of the probe follow it. */
   source: string;
+  /** Name of the instrument in the source score when it differs from the library name. */
+  sourceInstrument?: string;
   engine: SidEngine;
   /** Notes of the probe, default C3 E4 A4 C5 G3 D5. */
   notes?: string[];
@@ -182,12 +187,15 @@ export interface ReuseOptions {
 
 const PROBE_NOTES = ["C3", "E4", "A4", "C5"];
 
-/** Probe scores: the same notes on one voice, once with the instrument inline and once imported from the library. */
-export function reuseProbes(options: Pick<ReuseOptions, "library" | "instrument" | "source" | "notes">): { inline: string; imported: string } {
+/** Probe scores: the same notes on one voice, once with the source score's own definition inline and once with the instrument imported from the extracted library. */
+export function reuseProbes(options: Pick<ReuseOptions, "library" | "instrument" | "source" | "sourceInstrument" | "notes">): { inline: string; imported: string } {
   const lib = YAML.parse(options.library) as { instruments?: Record<string, unknown> };
   const src = YAML.parse(options.source) as Record<string, unknown>;
-  const definition = lib.instruments?.[options.instrument];
-  if (!definition) throw new Error(`the library has no instrument ${options.instrument}`);
+  if (!lib.instruments?.[options.instrument]) throw new Error(`the library has no instrument ${options.instrument}`);
+  // The reference is the source score's own definition, not a copy taken from the library.
+  const sourceName = options.sourceInstrument ?? options.instrument;
+  const definition = (src.instruments as Record<string, unknown> | undefined)?.[sourceName];
+  if (!definition) throw new Error(`the source score has no instrument ${sourceName}`);
   const notes = options.notes ?? PROBE_NOTES;
   const base = {
     sidwave: "1.4", title: "Instrument reuse probe", tempo: 100, mode: src.mode ?? "PAL", ...(src.speed === undefined ? {} : { speed: src.speed }),

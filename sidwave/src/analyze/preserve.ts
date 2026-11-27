@@ -8,12 +8,12 @@
 // SHA-256 of every file. The original SID is stored only when the caller asserts that redistribution is permitted.
 // `verifyPreservation` recompiles the score offline and checks every hash, the trace fingerprint and the verdict.
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { SidwaveOperationError } from "../cliCore.js";
 import { psidClock, type SidEngine, type SystemRoms } from "../engine/libsidplayfp.js";
 import { IR_CODE_VERSION, type FrameIr } from "../reconstruct/ir.js";
-import { DEFAULT_HORIZON_SECONDS, bestFdiff, irOfTrace, reconstructSid, type ReconstructReport } from "../reconstruct/reconstruct.js";
+import { DEFAULT_HORIZON_SECONDS, bestFdiff, irOfTrace, stateOnlyIr, reconstructSid, type ReconstructReport } from "../reconstruct/reconstruct.js";
 import { parseSidFile, songSpeed } from "../sidFile.js";
 import { parseSidwave } from "../sidwave.js";
 import { compileSidwaveBytes } from "../sidwaveOps.js";
@@ -94,6 +94,8 @@ export interface PreservationBundle {
   /** File name to content. Contains the manifest as preservation.json. */
   files: Map<string, Uint8Array>;
   report: ReconstructReport;
+  /** Things the caller should know that are not errors, for example a STIL entry that was not found. */
+  warnings: string[];
 }
 
 export interface PreserveOptions {
@@ -120,6 +122,9 @@ function packageIdentity(): { name: string; version: string } {
   return { name: manifest.name, version: manifest.version };
 }
 
+/** Longest STIL entry copied into a manifest, in characters. */
+export const STIL_MAX_CHARS = 16_384;
+
 /** The STIL block of an HVSC path: the lines from the path line to the next path line. */
 export function lookupStil(stilText: string, hvscPath: string): { path: string; text: string } | undefined {
   const wanted = hvscPath.startsWith("/") ? hvscPath : `/${hvscPath}`;
@@ -128,7 +133,8 @@ export function lookupStil(stilText: string, hvscPath: string): { path: string; 
   if (start < 0) return undefined;
   let end = start + 1;
   while (end < lines.length && !lines[end]!.startsWith("/") ) end++;
-  return { path: wanted, text: lines.slice(start + 1, end).join("\n").trim() };
+  const text = lines.slice(start + 1, end).join("\n").trim();
+  return { path: wanted, text: text.length > STIL_MAX_CHARS ? `${text.slice(0, STIL_MAX_CHARS)}\n[truncated at ${STIL_MAX_CHARS} characters]` : text };
 }
 
 function ambiguitiesOf(report: ReconstructReport): PreservationManifest["ambiguities"] {
@@ -252,8 +258,13 @@ export async function createPreservation(sidBytes: Uint8Array, options: Preserve
         : "Redistribution rights are unknown. The original SID is not part of this bundle; the score is a reconstruction of a copyrighted work and may need the rights holder's permission to publish.",
     },
   };
+  const warnings: string[] = [];
+  if (options.stil && !manifest.rights.stil) {
+    warnings.push(`no STIL entry for ${options.stil.path} in the STIL file; the manifest has no stil field`);
+    manifest.ambiguities.push({ kind: "STIL", detail: `no entry for ${options.stil.path} was found in the supplied STIL file` });
+  }
   put(MANIFEST_FILE, json(manifest));
-  return { manifest, files, report };
+  return { manifest, files, report, warnings };
 }
 
 export function writePreservation(bundle: PreservationBundle, dir: string): void {
@@ -280,6 +291,8 @@ export interface VerificationResult {
   checks: VerificationCheck[];
   /** Differences between the tools that made the bundle and the tools verifying it. They do not fail the verification on their own. */
   identityNotes: string[];
+  /** Fields that verification cannot authenticate: they are the maker's statements. */
+  unauthenticated: string[];
   verdict: { stored: { strict: boolean; registerStateExact: boolean }; reproduced: "recompiled trace matches the stored fingerprint" | "not reproduced" | "re-derived from the original" };
 }
 
@@ -322,7 +335,10 @@ export async function verifyPreservation(dir: string, options: VerifyPreservatio
       continue;
     }
     const path = join(root, name);
-    if (!existsSync(path)) { add(`file ${name}`, false, "missing"); continue; }
+    let info;
+    try { info = lstatSync(path); } catch { add(`file ${name}`, false, "missing"); continue; }
+    if (!info.isFile()) { add(`file ${name}`, false, "not a regular file (a link or a directory is not accepted)"); continue; }
+    if (info.size > entry.bytes) { add(`file ${name}`, false, `${info.size} bytes on disk, the manifest says ${entry.bytes}; not read`); continue; }
     const bytes = new Uint8Array(readFileSync(path));
     contents.set(name, bytes);
     const actual = sha256(bytes);
@@ -336,12 +352,27 @@ export async function verifyPreservation(dir: string, options: VerifyPreservatio
   if (original) {
     add("original checksums", sha256(original) === manifest.source.sha256 && md5(original) === manifest.source.md5, "sha256 and md5 of original.sid against the manifest");
   } else if (ORIGINAL_FILE in manifest.files) add("original", false, "original.sid is listed but could not be read");
-  else add("original", manifest.rights.redistribution === "unknown" || manifest.rights.redistribution === "permitted", `original SID not included (redistribution ${manifest.rights.redistribution})`);
+  else add("original", true, `original SID not included (redistribution ${manifest.rights.redistribution})`);
+  if (original) add("redistribution", manifest.rights.redistribution === "permitted", manifest.rights.redistribution === "permitted" ? "the caller asserted that redistribution is permitted" : "original.sid is present but rights.redistribution is not \"permitted\"");
   const identityNotes: string[] = [];
   const here = packageIdentity();
   if (here.version !== manifest.identities.sidwavePackage.version) identityNotes.push(`sidwave ${manifest.identities.sidwavePackage.version} made the bundle, ${here.version} verifies it`);
   if (options.engine.version !== "unknown" && options.engine.version !== manifest.identities.engine.version) identityNotes.push(`engine ${manifest.identities.engine.version} made the bundle, ${options.engine.version} verifies it`);
   if (IR_CODE_VERSION !== manifest.identities.irCodeVersion) identityNotes.push(`IR version ${manifest.identities.irCodeVersion} made the bundle, ${IR_CODE_VERSION} verifies it`);
+  if (manifest.identities.engine.id !== options.engine.id) identityNotes.push(`engine ${manifest.identities.engine.id} made the bundle, ${options.engine.id} verifies it`);
+  if (manifest.identities.compiler.version !== here.version) identityNotes.push(`compiler ${manifest.identities.compiler.version} made the bundle, ${here.version} verifies it`);
+  const cfg = manifest.referenceConfiguration;
+  add("subtune consistent", manifest.horizon.song === manifest.source.subtune && manifest.source.subtune >= 1 && manifest.source.subtune <= manifest.source.songs, `horizon.song ${manifest.horizon.song}, source.subtune ${manifest.source.subtune} of ${manifest.source.songs}`);
+  add("verdict flags consistent", !manifest.verdict.strict || manifest.verdict.registerStateExact, "a strict verdict implies registerStateExact");
+  if (original) {
+    try {
+      const header = parseSidFile(original);
+      const headerClock = psidClock(original) ?? "PAL";
+      add("header consistent", header.songs === manifest.source.songs && header.magic === manifest.source.magic && header.version === manifest.source.version && header.clock === cfg.headerClock && headerClock === cfg.clock && header.loadAddress === cfg.loadAddress && songSpeed(header, manifest.source.subtune) === cfg.speed, `songs, magic, version, clock, addresses and speed of original.sid against the manifest`);
+    } catch (error) {
+      add("header consistent", false, `original.sid does not parse: ${(error as Error).message}`);
+    }
+  }
   let reproduced: VerificationResult["verdict"]["reproduced"] = "not reproduced";
   const scoreBytes = contents.get(SCORE_FILE);
   if (!scoreBytes) {
@@ -350,8 +381,11 @@ export async function verifyPreservation(dir: string, options: VerifyPreservatio
     add("recompile", !manifest.verdict.strict, "the bundle records that the score did not compile");
   } else {
     let compiled: Uint8Array | undefined;
+    let scoreMode = "";
     try {
-      compiled = new Uint8Array(compileSidwaveBytes(parseSidwave(Buffer.from(scoreBytes).toString("utf8")), { format: "sid", loop: manifest.identities.compileOptions.loop }).bytes);
+      const doc = parseSidwave(Buffer.from(scoreBytes).toString("utf8"));
+      scoreMode = doc.song.mode;
+      compiled = new Uint8Array(compileSidwaveBytes(doc, { format: "sid", loop: manifest.identities.compileOptions.loop }).bytes);
     } catch (error) {
       add("recompile", false, `the score does not compile: ${(error as Error).message}`);
     }
@@ -367,17 +401,23 @@ export async function verifyPreservation(dir: string, options: VerifyPreservatio
       const traceOk = fp === f.recompiled && ir.calls.length - f.recompiledFirstCall >= f.calls;
       add("trace fingerprint", traceOk, traceOk ? `the recompiled score gives the recorded register trace (${f.calls} calls)` : "the register trace of the recompiled score differs from the recorded fingerprint");
       if (traceOk) reproduced = "recompiled trace matches the stored fingerprint";
+      add("clock consistent", scoreMode === manifest.referenceConfiguration.clock, `the score's mode ${scoreMode} against the recorded clock ${manifest.referenceConfiguration.clock}`);
+      if (manifest.verdict.strict) add("SID count consistent", ir.sidCount === cfg.sidCount, `the recompiled trace has ${ir.sidCount} SID(s), the manifest ${cfg.sidCount}`);
       if (manifest.verdict.strict) add("strict verdict consistent", f.reference === f.recompiled, "a strict verdict needs equal reference and recompiled fingerprints");
       if (original) {
         const refIr = irOfTrace(await engine.trace({ sid: original, song: manifest.horizon.song, seconds: manifest.horizon.seconds, clock }));
         const summary = bestFdiff(refIr, ir, f.referenceFirstCall);
         const strict = summary.equal && summary.standardAlignment && !summary.callCountMismatch;
         add("verdict re-derived", strict === manifest.verdict.strict, `strict ${strict} from the original and the recompiled score, manifest ${manifest.verdict.strict}`);
+        const state = bestFdiff(stateOnlyIr(refIr), stateOnlyIr(ir), f.referenceFirstCall);
+        const registerState = state.standardAlignment && !state.callCountMismatch && state.differingCalls - state.classes.timing.differingCalls === 0;
+        add("registerStateExact re-derived", registerState === manifest.verdict.registerStateExact, `register state exact ${registerState} from the original, manifest ${manifest.verdict.registerStateExact}`);
+        add("original SID count", refIr.sidCount === cfg.sidCount, `the original trace has ${refIr.sidCount} SID(s), the manifest ${cfg.sidCount}`);
         reproduced = "re-derived from the original";
       }
     }
   }
-  return { ok: checks.every((c) => c.ok), checks, identityNotes, verdict: { stored: { strict: manifest.verdict.strict, registerStateExact: manifest.verdict.registerStateExact }, reproduced } };
+  return { ok: checks.every((c) => c.ok), checks, identityNotes, unauthenticated: ["rights", "verdict.a1", "verdict.t0", "verdict.t1", "ambiguities", "referenceConfiguration.roms"], verdict: { stored: { strict: manifest.verdict.strict, registerStateExact: manifest.verdict.registerStateExact }, reproduced } };
 }
 
 /** The bundle as text for a terminal. */

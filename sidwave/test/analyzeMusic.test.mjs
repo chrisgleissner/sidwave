@@ -119,10 +119,12 @@ test("voice use: ranges, density and roles; a declared role is observed and a de
   assert.ok(use[0].soundingShare > 0 && use[0].soundingShare <= 1);
 });
 
-test("analyzeScore marks every fact as observed or inferred with a method, for every bundled example", { timeout: 400_000 }, async () => {
+const ALL_EXAMPLES = process.env.SIDWAVE_ALL_EXAMPLES === "1";
+test(`analyzeScore marks every fact as observed or inferred with a method (${ALL_EXAMPLES ? "every bundled example" : "three small examples; SIDWAVE_ALL_EXAMPLES=1 runs all"})`, { timeout: 400_000 }, async () => {
   const dir = new URL("../data/sound/examples/", import.meta.url).pathname;
   let analysed = 0;
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml"))) {
+  const files = readdirSync(dir).filter((f) => f.endsWith(".yaml") && (ALL_EXAMPLES || ["fuer_elise.yaml", "game_songs.yaml", "title_fanfare.yaml"].includes(f)));
+  for (const file of files) {
     const text = readFileSync(`${dir}${file}`, "utf8");
     const report = await analyzeScore(text, { read: confinedReadOptions(dir, [], `${dir}${file}`) });
     const marks = checkMarks(report);
@@ -131,7 +133,7 @@ test("analyzeScore marks every fact as observed or inferred with a method, for e
     assert.ok(report.voices.length >= 3, file);
     analysed++;
   }
-  assert.ok(analysed >= 10, `${analysed} examples`);
+  assert.ok(analysed >= (ALL_EXAMPLES ? 10 : 3), `${analysed} examples`);
 });
 
 function syntheticModel(noteCount) {

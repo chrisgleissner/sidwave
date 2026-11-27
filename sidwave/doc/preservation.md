@@ -17,7 +17,7 @@ The output directory must not exist or must be empty.
 
 ## Rights
 
-The original SID is never stored unless the caller asserts that redistribution is permitted: `--include-original` is refused (exit 2) without `--rights-permitted`, and `--rights-permitted` alone changes the `redistribution` field but adds no file. SIDWave does not check the assertion. The manifest holds the author, name and released (copyright) fields of the PSID header, and with `--stil STIL.txt --stil-path /MUSICIANS/...` the STIL entry for the tune from a local STIL file. The `redistribution` field is `unknown` unless the caller asserted `permitted`. The score and the manifest hold no SID bytes; the tests check this. The score of a copyrighted tune is a reconstruction of that work and may need the rights holder's permission to publish.
+The original SID is never stored unless the caller asserts that redistribution is permitted: `--include-original` is refused (exit 2) without `--rights-permitted`, and `--rights-permitted` alone changes the `redistribution` field but adds no file. SIDWave does not check the assertion. The manifest holds the author, name and released (copyright) fields of the PSID header, and with `--stil STIL.txt --stil-path /MUSICIANS/...` the STIL entry for the tune from a local STIL file (read with a size limit of 32 MiB or `--max-bytes`; an entry is cut at 16,384 characters; an entry that is not found gives a warning and an `ambiguities` entry). The `redistribution` field is `unknown` unless the caller asserted `permitted`. The score and the manifest hold no SID bytes; the tests check this. The score of a copyrighted tune is a reconstruction of that work and may need the rights holder's permission to publish.
 
 ## Manifest `preservation.json`, schema `sidwave-preservation/1`
 
@@ -41,13 +41,16 @@ The file is JSON with two-space indentation. It holds no time stamp, so the same
 
 `sidwave preserve --verify dir` runs these checks and exits 0 only when all of them pass.
 
-1. For each file of the manifest: the file exists and its SHA-256 and size match. A file with a name that is not plain, or that is missing, fails.
+1. For each file of the manifest: the path is a regular file (a link or directory fails, it is checked with `lstat`), its size on disk is not larger than the size in the manifest (a larger file is not read), and its SHA-256 and size match.
 2. No file in the directory is missing from the manifest.
-3. `original.sid`, when present, matches the MD5 and SHA-256 of `source`; `source.originalIncluded` agrees with the file list.
-4. `score.yaml` is compiled with the recorded options. The compiled bytes must have the recorded SHA-256 and size. When the SIDWave version differs from the recorded one, the check can fail for that reason, and the report says so in `identityNotes`.
-5. The compiled SID is traced for the recorded horizon on SIDLite. The fingerprint of the compared calls must equal `fingerprints.recompiled`.
-6. A strict verdict needs equal `reference` and `recompiled` fingerprints.
-7. With `original.sid`: the F-diff of the original and the recompiled trace is computed again and its strict result must equal `verdict.strict`.
+3. `original.sid`, when present, matches the MD5 and SHA-256 of `source`, `source.originalIncluded` agrees with the file list, and `rights.redistribution` is `permitted`. A bundle that holds the original without that assertion fails. Its header (songs, magic, version, clock, load address, speed of the subtune) is compared with the manifest.
+4. The subtune of `horizon.song` equals `source.subtune`, which lies within `source.songs`. A strict verdict implies `registerStateExact`.
+5. `score.yaml` is compiled with the recorded options. The compiled bytes must have the recorded SHA-256 and size. When the SIDWave version differs from the recorded one, the check can fail for that reason, and the report says so in `identityNotes`. Differences of the package, compiler, engine or engine id are warnings in `identityNotes`; they do not fail the verification by themselves.
+6. The compiled SID is traced for the recorded horizon on SIDLite. The fingerprint of the compared calls must equal `fingerprints.recompiled`. The mode of the score must equal the recorded clock, and for a strict verdict the SID count of the trace must equal `sidCount`.
+7. A strict verdict needs equal `reference` and `recompiled` fingerprints.
+8. With `original.sid`: the F-diff of the original and the recompiled trace is computed again; its strict result must equal `verdict.strict`, its register-state result `registerStateExact`, and the SID count of the original trace `sidCount`.
+
+**Not authenticated.** Verification does not authenticate `rights` (title, author, released, STIL, `redistribution`), `verdict.a1`, `verdict.t0`, `verdict.t1`, `ambiguities` and `referenceConfiguration.roms`. They are statements of whoever made the bundle; anyone who can edit the manifest can change them together with nothing else failing. `verifyPreservation` lists these fields in `unauthenticated`. A bundle is not signed.
 
 What the verification proves: the files are the ones the manifest lists, the score recompiles offline to the recorded program, that program produces the recorded register trace, and (with the original) the recorded verdict. Without the original it cannot recompute `strict` for a bundle that says `strict: false`; it checks that the recompiled trace matches its fingerprint. The audio level A1 is not recomputed offline: it needs the original SID and the pinned ROM images, so only the recorded status is kept.
 

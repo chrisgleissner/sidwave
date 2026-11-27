@@ -7,7 +7,7 @@ import assert from "#test/assert";
 import YAML from "yaml";
 import { differingCalls, restrictIrToVoice } from "../src/analyze/common.ts";
 import { checkInstrumentReuse, extractInstruments } from "../src/analyze/instruments.ts";
-import { modelOfScore } from "../src/analyze/music.ts";
+import { modelOfScore, modelOfScoreText } from "../src/analyze/music.ts";
 import { fdiff } from "../src/reconstruct/fdiff.ts";
 import { reconstructSid } from "../src/reconstruct/reconstruct.ts";
 import { midiToNoteName, noteNameToMidi, parseSidwave } from "../src/sidwave.ts";
@@ -39,72 +39,106 @@ function twoSections(text, first) {
   return dump(doc);
 }
 
-/** Gives the first pattern occurrence of voice 1 a private copy of its pattern and returns the copy's name. */
-function unshareFirst(doc) {
-  const voice = doc.voices[0];
-  const layer = doc.timeline[0].layers[`v${voice.id}`];
-  const tokens = layer.trim().split(/\s+/);
-  const m = /^([A-Za-z_]\w*)(?:\*(\d+))?$/.exec(tokens[0]);
-  if (!m || !voice.patterns?.[m[1]]) return undefined;
-  const copy = `${m[1]}__e`;
-  voice.patterns[copy] = JSON.parse(JSON.stringify(voice.patterns[m[1]]));
-  doc.timeline[0].layers[`v${voice.id}`] = [copy, ...(Number(m[2] ?? 1) > 1 ? [`${m[1]}*${Number(m[2]) - 1}`] : []), ...tokens.slice(1)].join(" ");
-  return copy;
+/**
+ * Gives one pattern occurrence a private copy of its pattern. Any voice, section and layer token is tried; the occurrence
+ * is the one whose pattern has a plain sounding note, so every pattern layout of a reconstruction is covered.
+ * Returns { doc, voice, copy } for the candidate at `skip`, or undefined.
+ */
+function unshare(text, skip) {
+  let n = 0;
+  const doc = parse(text);
+  for (const [vi, voice] of doc.voices.entries()) {
+    for (const [si, section] of doc.timeline.entries()) {
+      const key = `v${voice.id ?? vi + 1}`;
+      if (typeof section.layers?.[key] !== "string") continue;
+      const tokens = section.layers[key].trim().split(/\s+/);
+      for (const [ti, token] of tokens.entries()) {
+        const m = /^([A-Za-z_]\w*)(?:\*(\d+))?$/.exec(token);
+        const pattern = m && voice.patterns?.[m[1]];
+        if (!pattern || !Array.isArray(pattern.groove)) continue;
+        const plain = pattern.groove.map((e, i) => [e, i]).filter(([e]) => noteOf(e) !== undefined && !(typeof e === "object" && (e.legato || e.portamento || e.slide_from || e.bend)));
+        if (!plain.length || n++ < skip) continue;
+        const copy = `${m[1]}__e${ti}`;
+        voice.patterns[copy] = JSON.parse(JSON.stringify(pattern));
+        const count = Number(m[2] ?? 1);
+        tokens.splice(ti, 1, copy, ...(count > 1 ? [`${m[1]}*${count - 1}`] : []));
+        section.layers[key] = tokens.join(" ");
+        return { doc, voice: vi + 1, copy, plain: plain.map(([, i]) => i), pattern: voice.patterns[copy] };
+      }
+    }
+  }
+  return undefined;
 }
 
-const noteOf = (entry) => (typeof entry === "string" ? (entry === "-" || entry === "~" ? undefined : entry) : entry?.note);
+const noteOf = (entry) => (typeof entry === "string" ? (entry === "-" || entry === "~" || entry.includes(" ") || entry.includes("|") ? undefined : entry) : entry?.note);
 function setNote(entry, note) { return typeof entry === "string" ? note : { ...entry, note }; }
 
 const EDITS = {
   async "change one note"(text) {
-    const doc = parse(text);
-    const copy = unshareFirst(doc);
-    if (!copy) return { skip: "the first layer of voice 1 is not a plain pattern reference" };
-    const pattern = doc.voices[0].patterns[copy];
-    const sounding = pattern.groove.map((e, i) => [e, i]).filter(([e]) => noteOf(e) !== undefined && !(typeof e === "object" && (e.legato || e.portamento)));
-    const J = 2;
-    if (sounding.length <= J + 1) return { skip: "fewer than four sounding notes in the first pattern" };
-    const [entry, index] = sounding[J];
-    const midi = noteNameToMidi(noteOf(entry));
-    const edited = midiToNoteName(midi + 7 <= 84 ? midi + 7 : midi - 7);
-    pattern.groove[index] = setNote(entry, edited);
-    const model = modelOfScore(parseSidwave(text));
-    const notes = model.notes.filter((n) => n.voice === 1 && !n.percussion);
-    const start = notes[J].start;
-    const next = notes[J + 1].start;
-    const [before, after] = [await irOfText(text), await irOfText(dump(doc))];
-    const v1 = voiceDiff(before, after, 1);
-    assert.ok(v1.length > 0, "the edited voice changed");
-    assert.ok(v1[0] >= start - 4, `no difference before the edited note: first at ${v1[0]}, note at ${start}`);
-    assert.ok(v1[v1.length - 1] <= next + 4, `no difference after the edited note: last at ${v1[v1.length - 1]}, next note at ${next}`);
-    assert.ok(fdiff(restrictIrToVoice(before, 1), restrictIrToVoice(after, 1), { alignExpected: 1, alignObserved: 1 }).classes.pitch.differingCalls > 0, "the pitch changed");
-    for (const v of [2, 3]) assert.deepEqual(voiceDiff(before, after, v), [], `voice ${v} keeps its register output`);
-    return { detail: `${v1.length} calls of voice 1 differ, from ${v1[0]} to ${v1[v1.length - 1]} (note ${start}..${next})` };
+    const before = await irOfText(text);
+    const original = modelOfScoreText(text);
+    const horizon = SECONDS * original.fps - 20;
+    for (let skip = 0; skip < 40; skip++) {
+      const c = unshare(text, skip);
+      if (!c) break;
+      // The note in the middle of the pattern's sounding entries, so that it has a predecessor and a successor when possible.
+      const index = c.plain[c.plain.length >> 1];
+      const entry = c.pattern.groove[index];
+      const midi = noteNameToMidi(noteOf(entry));
+      if (midi === undefined) continue;
+      c.pattern.groove[index] = setNote(entry, midiToNoteName(midi + 7 <= 84 ? midi + 7 : midi - 7));
+      const edited = dump(c.doc);
+      const after = modelOfScoreText(edited);
+      const changed = after.notes.map((n, i) => [n, original.notes[i]]).filter(([n, o]) => o && (n.midi !== o.midi || n.voice !== o.voice));
+      if (after.notes.length !== original.notes.length || changed.length !== 1) continue;
+      const [note] = changed[0];
+      const later = after.notes.filter((n) => n.voice === note.voice && n.start > note.start).map((n) => n.start);
+      const next = later.length ? later[0] : Infinity;
+      if (note.start > horizon) continue;
+      try { sidOfScore(edited); } catch { continue; }
+      const after_ir = await irOfText(edited);
+      const v = note.voice;
+      const diff = voiceDiff(before, after_ir, v);
+      assert.ok(diff.length > 0, "the edited voice changed");
+      assert.ok(diff[0] >= note.start - 4, `no difference before the edited note: first at ${diff[0]}, note at ${note.start}`);
+      assert.ok(diff[diff.length - 1] <= next + 4, `no difference after the edited note: last at ${diff[diff.length - 1]}, next note at ${next}`);
+      assert.ok(fdiff(restrictIrToVoice(before, v), restrictIrToVoice(after_ir, v), { alignExpected: 1, alignObserved: 1 }).classes.pitch.differingCalls > 0, "the pitch changed");
+      for (let other = 1; other <= 3; other++) if (other !== v) assert.deepEqual(voiceDiff(before, after_ir, other), [], `voice ${other} keeps its register output`);
+      return { detail: `voice ${v}: ${diff.length} calls differ, from ${diff[0]} to ${diff[diff.length - 1]} (note ${note.start}..${next})` };
+    }
+    return { skip: "no sounding note inside the horizon that can be edited alone" };
   },
 
   async "swap an instrument"(text) {
     const doc = parse(text);
-    const names = Object.keys(doc.instruments ?? {});
-    if (doc.voices.length < 2) return { skip: "the score has one voice" };
-    const target = doc.voices[1];
+    const target = doc.voices[doc.voices.length > 1 ? 1 : 0];
     const own = target.instrument;
-    const candidates = names.filter((n) => n !== own && JSON.stringify(doc.instruments[n]) !== JSON.stringify(doc.instruments[own]));
+    const names = Object.keys(doc.instruments ?? {});
     const before = await irOfText(text);
-    for (const other of candidates) {
-      target.instrument = other;
+    // Candidates: the other instruments of the score, then a variant of the voice's own instrument with another envelope.
+    const candidates = names.filter((n) => n !== own && JSON.stringify(doc.instruments[n]) !== JSON.stringify(doc.instruments[own])).map((n) => [n, doc]);
+    for (const adsr of [[0, 0, 15, 0], [2, 4, 8, 4]]) {
+      const variant = parse(text);
+      variant.instruments[`${own}_alt`] = { ...variant.instruments[own], adsr };
+      candidates.push([`${own}_alt`, variant]);
+    }
+    for (const [other, base] of candidates) {
+      const trial = JSON.parse(JSON.stringify(base));
+      trial.voices[doc.voices.indexOf(target)].instrument = other;
       let after;
       try {
-        after = await irOfText(dump(doc));
+        after = await irOfText(dump(trial));
       } catch (error) {
-        if (/Invalid SIDWAVE/.test(error.message)) continue; // the new instrument does not fit the notes of the voice (language rule)
+        if (/Invalid SIDWAVE/.test(error.message)) continue; // the instrument does not fit the notes of the voice (language rule)
         throw error;
       }
-      const v2 = voiceDiff(before, after, 2);
-      assert.ok(v2.length > 0, "the voice with the new instrument changed");
-      for (const v of [1, 3]) assert.deepEqual(voiceDiff(before, after, v), [], `voice ${v} keeps its register output`);
-      return { detail: `${own} to ${other}: ${v2.length} calls of voice 2 differ` };
+      const v = doc.voices.indexOf(target) + 1;
+      const diff = voiceDiff(before, after, v);
+      if (!diff.length) continue;
+      for (let o = 1; o <= 3; o++) if (o !== v) assert.deepEqual(voiceDiff(before, after, o), [], `voice ${o} keeps its register output`);
+      return { detail: `${own} to ${other}: ${diff.length} calls of voice ${v} differ` };
     }
-    return { skip: candidates.length ? "every other instrument is rejected by the compiler for the notes of voice 2 (hard restart longer than the shortest note)" : "no second distinct instrument" };
+    return { skip: "every candidate instrument is rejected by the compiler for the notes of the voice or leaves its registers unchanged" };
   },
 
   async "transpose a section"(text) {
@@ -125,6 +159,17 @@ const EDITS = {
     const result = transpose(split, { semitones: 2, scope: { sections: ["Second"] } });
     const [before, after] = [await irOfText(split, seconds), await irOfText(result.text, seconds)];
     assert.ok(result.report.changed.length > 0, "notes were transposed");
+    const m0 = modelOfScoreText(split);
+    const m1 = modelOfScoreText(result.text);
+    assert.equal(m1.notes.length, m0.notes.length);
+    const secondFrame = m0.sections[1].startFrame;
+    let moved = 0;
+    m0.notes.forEach((n, i) => {
+      const delta = m1.notes[i].midi - n.midi;
+      if (n.start < secondFrame) assert.equal(delta, 0, `note ${i} of section 1 is unchanged`);
+      else if (!n.percussion) { assert.equal(delta, 2, `note ${i} of section 2 moved by exactly 2 semitones`); moved++; }
+    });
+    assert.ok(moved > 0, "section 2 has pitched notes");
     const diff = differingCalls(before, after, 1, 1);
     assert.ok(diff.length > 0, "the transposed section changed");
     assert.ok(diff[0] >= second - 4, `the first section keeps its register output: first difference at ${diff[0]}, section starts at ${second}`);
@@ -149,15 +194,18 @@ const EDITS = {
       }
       return out;
     };
+    let compared = 0;
     for (let v = 1; v <= 3; v++) {
       const a = onsets(before, v);
       const b = onsets(after, v);
       const n = Math.min(a.length, b.length);
-      if (n < 3) return { skip: `voice ${v} has fewer than three note onsets within ${SECONDS} s` };
-      assert.deepEqual(b.slice(0, n), a.slice(0, n), `voice ${v} plays the same pitches in the same order`);
+      if (n >= 1) { compared++; assert.deepEqual(b.slice(0, n), a.slice(0, n), `voice ${v} plays the same pitches in the same order`); }
     }
-    const lengthBefore = modelOfScore(parseSidwave(text)).totalFrames;
-    const lengthAfter = modelOfScore(parseSidwave(result.text)).totalFrames;
+    assert.ok(compared >= 1, "at least one voice has a note onset in the horizon");
+    const seq = (m) => m.notes.map((n) => `${n.voice}:${n.midi}`).join(",");
+    assert.equal(seq(modelOfScoreText(result.text)), seq(modelOfScoreText(text)), "the whole note sequence is unchanged");
+    const lengthBefore = modelOfScoreText(text).totalFrames;
+    const lengthAfter = modelOfScoreText(result.text).totalFrames;
     assert.ok(Math.abs(lengthAfter / lengthBefore - Number(doc.tempo) / bpm) < 0.02, `the length scales with the tempo: ${lengthBefore} to ${lengthAfter}`);
     return { detail: `${doc.tempo} to ${bpm} BPM, ${lengthBefore} to ${lengthAfter} calls` };
   },
@@ -165,7 +213,7 @@ const EDITS = {
   async "reuse an extracted instrument"(text) {
     const extracted = await extractInstruments(text, { created: "2026-11-27" });
     if (!extracted.instruments.length) return { skip: "no instrument" };
-    const check = await checkInstrumentReuse({ library: extracted.library, instrument: extracted.instruments[0].name, source: text, engine: sharedEngine(), seconds: 4 });
+    const check = await checkInstrumentReuse({ library: extracted.library, instrument: extracted.instruments[0].name, sourceInstrument: extracted.instruments[0].sourceName, source: text, engine: sharedEngine(), seconds: 4 });
     assert.equal(check.equal, true, JSON.stringify(check.first));
     return { detail: `${extracted.instruments[0].name}: ${check.comparedCalls} calls equal` };
   },
@@ -208,9 +256,16 @@ test("edits keep unrelated voices and sections unchanged on seeded scores and on
   console.log(`\nEditability results (pass, n/a: precondition not met, FAIL)\n${lines.join("\n")}\n${table.flatMap((r) => names.filter((n) => r[n].startsWith("n/a")).map((n) => `  n/a ${r.input} / ${n}: ${r[n].slice(5)}`)).join("\n")}`);
   t.diagnostic?.(lines.join("\n"));
   assert.deepEqual(failures, []);
-  // Every edit passes on at least the seeded scores of every feature, and each edit ran on at least one reconstructed score.
+  // Per edit and input class: every input passes, except the listed impossibilities.
+  const classOf = (name) => (name.startsWith("reconstructed fixture") ? "fixtures" : name.startsWith("reconstructed") ? "reconstructed" : "seeded");
+  const ALLOWED_NA = { "transpose a section": /no bar line splits/ };
   for (const n of names) {
-    assert.ok(table.filter((r) => r.input.startsWith("reconstructed") && r[n] === "pass").length >= 3, `${n} passes on reconstructed scores`);
-    assert.ok(table.filter((r) => !r.input.startsWith("reconstructed") && r[n] === "pass").length >= 3, `${n} passes on seeded scores`);
+    for (const cls of ["seeded", "reconstructed", "fixtures"]) {
+      const rows = table.filter((r) => classOf(r.input) === cls);
+      const na = rows.filter((r) => r[n].startsWith("n/a"));
+      for (const r of na) assert.match(r[n], ALLOWED_NA[n] ?? /^$/, `${r.input} / ${n} is n/a without a listed reason`);
+      assert.equal(rows.filter((r) => r[n] === "pass").length + na.length, rows.length, `${n} on ${cls}`);
+      assert.ok(rows.filter((r) => r[n] === "pass").length >= Math.ceil(rows.length * 0.6), `${n} passes on most ${cls} inputs`);
+    }
   }
 });

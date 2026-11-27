@@ -39,7 +39,7 @@ test("development tunes: analysis, extraction, isolation and preservation with o
     const analysisCpu = cpuMicros() - cpu0;
     checkMarks(report);
     assert.equal(report.horizon.seconds, SECONDS);
-    assert.ok(report.techniques.every((x) => x.basis === "observed"));
+    assert.ok(report.techniques.every((x) => (x.basis === "inferred" && x.method) || ["oscillator sync", "ring modulation", "test bit", "noise", "combined waveforms", "multispeed", "sample playback"].includes(x.name)));
     assert.ok(formatAnalysis(report).length > 200);
     const library = await extractInstruments(bytes, { engine: sharedEngine(), song, seconds: SECONDS, created: "2026-11-27" });
     assert.match(library.library, /library:/);

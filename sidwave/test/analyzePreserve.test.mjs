@@ -1,7 +1,7 @@
 // Preservation bundle: contents, rights handling, offline verification and tamper detection.
 import test from "#test/runner";
 import assert from "#test/assert";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPreservation, lookupStil, MANIFEST_FILE, ORIGINAL_FILE, verifyPreservation, writePreservation } from "../src/analyze/preserve.ts";
@@ -81,7 +81,8 @@ test("verify: an untouched bundle verifies offline and reproduces the verdict", 
   const result = await verifyPreservation(dir, { engine: sharedEngine() });
   assert.equal(result.ok, true, JSON.stringify(result.checks.filter((c) => !c.ok)));
   assert.equal(result.verdict.reproduced, "recompiled trace matches the stored fingerprint");
-  assert.deepEqual(result.checks.map((c) => c.name), ["file score.yaml", "file reconstruction-report.json", "no unlisted files", "original", "recompile", "trace fingerprint", "strict verdict consistent"]);
+  assert.deepEqual(result.checks.map((c) => c.name), ["file score.yaml", "file reconstruction-report.json", "no unlisted files", "original", "subtune consistent", "verdict flags consistent", "recompile", "trace fingerprint", "clock consistent", "SID count consistent", "strict verdict consistent"]);
+  assert.ok(result.unauthenticated.includes("rights") && result.unauthenticated.includes("verdict.a1"));
 });
 
 test("verify with the original re-derives the verdict from the original and the recompiled score", { timeout: 120_000 }, async () => {
@@ -140,6 +141,75 @@ test("verify detects every kind of change: score, report, manifest hash, extra f
   dir = fresh("verdict");
   manifest(dir, (m) => { m.verdict.strict = true; m.fingerprints.reference = "a".repeat(64); });
   assert.ok((await failing(dir)).includes("strict verdict consistent"));
+});
+
+test("verify cross-checks what it can recompute: original, rights, header, subtune, clock, SID count and verdict flags", { timeout: 240_000 }, async () => {
+  const base = temp();
+  const withOriginal = await make(seededSid("combined", 1), { includeOriginal: true, rightsPermitted: true });
+  const plain = await make(seededSid("combined", 1));
+  const fresh = (bundle, name) => { const dir = join(base, name); writePreservation(bundle, dir); return dir; };
+  const failing = async (dir) => (await verifyPreservation(dir, { engine: sharedEngine() })).checks.filter((c) => !c.ok).map((c) => c.name);
+  const manifest = (dir, fn) => writeFileSync(join(dir, MANIFEST_FILE), JSON.stringify((() => { const m = JSON.parse(readFileSync(join(dir, MANIFEST_FILE), "utf8")); fn(m); return m; })(), null, 2));
+
+  let dir = fresh(withOriginal, "o-ok");
+  assert.deepEqual(await failing(dir), []);
+  dir = fresh(withOriginal, "o-rights");
+  manifest(dir, (m) => { m.rights.redistribution = "unknown"; });
+  assert.deepEqual(await failing(dir), ["redistribution"], "original.sid without permitted redistribution fails");
+  dir = fresh(withOriginal, "o-clock");
+  manifest(dir, (m) => { m.referenceConfiguration.clock = "NTSC"; });
+  const clock = await failing(dir);
+  assert.ok(clock.includes("header consistent") && clock.includes("clock consistent"), String(clock));
+  dir = fresh(withOriginal, "o-state");
+  manifest(dir, (m) => { m.verdict.registerStateExact = false; });
+  const state = await failing(dir);
+  assert.ok(state.includes("registerStateExact re-derived") && state.includes("verdict flags consistent"), String(state));
+  dir = fresh(withOriginal, "o-sids");
+  manifest(dir, (m) => { m.referenceConfiguration.sidCount = 2; });
+  assert.ok((await failing(dir)).includes("original SID count"));
+  dir = fresh(plain, "subtune");
+  manifest(dir, (m) => { m.horizon.song = 2; });
+  assert.deepEqual(await failing(dir), ["subtune consistent"]);
+  dir = fresh(plain, "sids");
+  manifest(dir, (m) => { m.referenceConfiguration.sidCount = 2; });
+  assert.deepEqual(await failing(dir), ["SID count consistent"]);
+  dir = fresh(plain, "clock");
+  manifest(dir, (m) => { m.referenceConfiguration.clock = "NTSC"; });
+  assert.ok((await failing(dir)).includes("clock consistent"));
+  dir = fresh(plain, "versions");
+  manifest(dir, (m) => { m.identities.sidwavePackage.version = "0.0.1"; m.identities.compiler.version = "0.0.1"; m.identities.engine.version = "0.0.1"; });
+  const result = await verifyPreservation(dir, { engine: sharedEngine() });
+  assert.equal(result.ok, true, "a different tool version is a warning");
+  assert.ok(result.identityNotes.length >= 2, result.identityNotes.join("; "));
+});
+
+test("verify reads regular files only, and not more bytes than the manifest lists", { timeout: 120_000 }, async () => {
+  const base = temp();
+  const bundle = await make(seededSid("basic", 2));
+  let dir = join(base, "link");
+  writePreservation(bundle, dir);
+  const target = join(base, "elsewhere.yaml");
+  writeFileSync(target, readFileSync(join(dir, "score.yaml")));
+  rmSync(join(dir, "score.yaml"));
+  symlinkSync(target, join(dir, "score.yaml"));
+  let r = (await verifyPreservation(dir, { engine: sharedEngine() })).checks.find((c) => c.name === "file score.yaml");
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /not a regular file/);
+  dir = join(base, "big");
+  writePreservation(bundle, dir);
+  appendFileSync(join(dir, "score.yaml"), "x".repeat(1000));
+  r = (await verifyPreservation(dir, { engine: sharedEngine() })).checks.find((c) => c.name === "file score.yaml");
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /not read/);
+});
+
+test("a STIL entry that is not found is a warning and an ambiguity; a long entry is truncated", async () => {
+  const bundle = await make(seededSid("basic", 1), { stil: { text: "/MUSICIANS/X/Y.sid\n  COMMENT: x\n", path: "/MUSICIANS/A/B.sid" } });
+  assert.equal(bundle.manifest.rights.stil, undefined);
+  assert.match(bundle.warnings[0], /no STIL entry for \/MUSICIANS\/A\/B\.sid/);
+  assert.ok(bundle.manifest.ambiguities.some((a) => a.kind === "STIL"));
+  const long = lookupStil(`/A/B.sid\n${"  COMMENT: y\n".repeat(5000)}`, "/A/B.sid");
+  assert.ok(long.text.length < 17_000 && /truncated/.test(long.text));
 });
 
 test("verify rejects a directory without a valid manifest", async () => {

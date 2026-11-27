@@ -8,7 +8,7 @@ Every operation is a function first. The command line only reads files, calls th
 
 Every fact in an analysis report carries a `basis` field.
 
-- `observed`: read from the register trace of the tune, or from the score text. A detector with fixed thresholds that reads register values counts as observation. The thresholds are in the evidence or in the table below.
+- `observed`: read from the register trace of the tune, or from the score text: register values, control bits, call timing. A classification by thresholds (hard restart, arpeggio, vibrato, slide, pulse and filter sweeps) is not an observation; it is `inferred` with the detector named, and the register facts in its evidence stay observed.
 - `inferred`: the result of a model applied to observations. An inferred fact always has a `method` field that names the model. For a SID tune, everything derived from the note list is inferred, because the notes come from the SIDWave reconstruction of the tune and not from the tune itself.
 
 The report field `limits` lists what bounds the facts for this input (for example that the cycle figures are write spans, or that the compiler rejected the reconstruction).
@@ -25,14 +25,14 @@ The file is a SIDWave score or a SID file. A SID tune is reconstructed first (`r
 | `form` | Bar labels (bars with the same notes at the same offsets in the same voices get the same label), runs, repetitions, share of repeated bars, the loop (longest suffix with at least two exact repetitions of one period, found with the prefix function), sections | labels and runs: observed for a score, inferred for a SID tune; loop: inferred; the declared `loop_to` and the declared sections: observed |
 | `motifs` | Recurring figures of 4, 5, 6 or 8 notes: interval steps, inter-onset intervals in eighths of a beat, number of occurrences, voices and the first locations (bar and beat) | inferred: n-gram mining, at least 3 non-overlapping occurrences, repeated single notes excluded, a shorter motif that lies inside a longer one is dropped |
 | `voices` | Note count, range, notes per second, sounding share, role | role: observed when the score declares it, else inferred from the pitch rank of the median note, note length and the share of percussion. For a SID tune each voice also has `trace`: gate share, waveforms used and the frequency range of the registers, all observed |
-| `techniques` | See below | observed |
+| `techniques` | See below | from a trace: control-bit and rate facts (sync, ring, test bit, noise, combined waveforms, multispeed, sample playback) observed; threshold classifications inferred with the detector named. From a score: observed in the instrument definitions |
 | `resources` | See below | observed or inferred, per entry |
 
 Offsets and lengths in the form and motif comparison are rounded to eighths of a beat (lengths to half beats). A tempo that is not a whole number of calls per beat moves the same musical position by one call from bar to bar, and the comparison must not call such bars different.
 
 ### Techniques
 
-A technique lists the voices (global number 1 to 3 per SID) that use it and its evidence. Detectors read the register trace of one voice at a time and are linear in the number of calls. The init call (every register written) is skipped.
+Techniques found in a trace by thresholds carry `basis: "inferred"` and a `method` that names the detector (`DETECTORS` in `techniques.ts`). A technique lists the voices (global number 1 to 3 per SID) that use it and its evidence. Detectors read the register trace of one voice at a time and are linear in the number of calls. The init call (every register written) is skipped.
 
 | Technique | Rule (thresholds in `THRESHOLDS`) |
 | --- | --- |
@@ -85,7 +85,7 @@ Writes a 48 kHz mono WAV of voice `n` alone (global number: SID 1 has voices 1 t
 - Oscillator phases differ from the original: the SIDWave player writes a few cycles apart from the original player, and the phase of a voice depends on the exact cycle of each frequency write. The solo renders of the three voices of a tune that is not coupled add up in power to the power of the full tune (tested within 15 %), not sample by sample. The first 20 ms hold a start-up transient that differs.
 - The result is marked **non-additive** (`coupling.nonAdditive`, with the reasons) when the trace shows: the target or several voices routed through the filter (the filter does not give the sum of its inputs; on the 6581 it is nonlinear); the target uses sync or ring modulation or is the modulator of a voice that does (voice 1 is modulated by voice 3, voice 2 by 1, voice 3 by 2, on each SID); or sample playback writes the shared volume register.
 
-Library: `isolateVoice(sidBytes, options)`.
+`-o` refuses to overwrite an existing file without `--force` (also for `extract-instruments`). Library: `isolateVoice(sidBytes, options)`.
 
 ## `sidwave extract-instruments <file.sid|score> [-o library.yaml] [--name n] [--licence spdx] [--author a] [--created date]`
 
@@ -93,9 +93,9 @@ Writes the instruments of a score, or of the reconstruction of a SID tune, as a 
 
 Provenance: `provenance.source` names the origin: for a SID tune the MD5 and SHA-256 of the file, the subtune and the horizon; for a score the SHA-256 of the score. The library file also has a comment header with the same data and, for a SID tune, whether the reconstruction was strictly exact (an inexact reconstruction can have wrong instruments). The library format has no field for more provenance, so the checksums are in the free-text `source` field and the comments. The licence is `LicenseRef-unknown` unless `--licence` is given: an extracted instrument carries the rights of its source, which SIDWave does not know. `created` defaults to today; pass it for reproducible output. Instruments that the score uses but does not define (`lib:` and imported ones) are listed in `external` and not copied. Library: `extractInstruments`.
 
-**Reuse test.** `checkInstrumentReuse` builds a one-voice probe score twice from the extracted instrument: once with the definition inline and once imported from the library file, plays the same notes, compiles and traces both, and compares the register output of the voice call by call (F-diff restricted to that voice). `replaceWithImports` replaces every extracted instrument in the source score by an import; the voices of the source and of the replaced score must then give identical registers.
+**Reuse test.** `checkInstrumentReuse` builds a one-voice probe score twice from the extracted instrument: once with the definition inline and once imported from the library file, plays the same notes, compiles and traces both, and compares the register output of the voice call by call (F-diff restricted to that voice). The source side of the comparison is the source score's own definition of the instrument (`sourceInstrument`), not a copy from the library, so a corrupted extraction fails the check. For a SID tune the source score is its reconstruction; the check then shows that the library reproduces that score, not that the reconstruction reproduces the tune (see the strict verdict). `replaceWithImports` replaces every extracted instrument in the source score by an import; the voices of the source and of the replaced score must then give identical registers.
 
-Status: verified within declared bounds: 12 instruments of seeded scores (pulse tables, arpeggio wavetables, hard restart, vibrato, filter tables) and instruments of reconstructions are reusable with an equal F-diff; the check is shown to fail for a changed instrument.
+Status: verified within declared bounds: instruments of seeded scores (a sample of three in the default test run, all of them with `SIDWAVE_FULL_REUSE=1`) (pulse tables, arpeggio wavetables, hard restart, vibrato, filter tables) and instruments of reconstructions are reusable with an equal F-diff; the check is shown to fail for a changed instrument.
 
 ## Editability
 
@@ -107,14 +107,13 @@ Prompt section 6 requires that a reconstructed score can be edited. The test `an
 - change the tempo: `setTempo` to 80 %; the tempo field changed, the length in calls scales, and each voice plays the same pitches in the same order.
 - reuse an extracted instrument: the reuse test above.
 
-Results (pass; n/a means the precondition of the edit is not met by the input; there was no failure):
+Results: pass on every cell. No cell is n/a at this commit. The edits apply to any layout: the note to change is any plain sounding note of any voice and pattern occurrence (the occurrence gets a private copy of its pattern and the changed note is found by comparing the note lists read from the text), the instrument swap uses another instrument of the score or, when there is none that the compiler accepts, a copy of the voice's instrument with another envelope, and the tempo edit applies to any score. The test asserts that every cell of each input class (seeded, reconstructed, reconstructed fixtures) passes, and allows n/a only where no bar line splits the score into two sections that compile (transpose a section); that has not occurred. The transposition check asserts that every pitched note of section 2 moved by exactly the interval and every note of section 1 did not move.
 
-| Input | change one note | swap an instrument | transpose a section | change the tempo | reuse an instrument |
+| Input class | change one note | swap an instrument | transpose a section | change the tempo | reuse an instrument |
 | --- | --- | --- | --- | --- | --- |
 | seeded basic/1, arpeggio/3, hard_restart/4, vibrato/5, combined/1 | pass | pass | pass | pass | pass |
-| reconstructed basic/1, arpeggio/3, hard_restart/4 | pass | pass | pass | pass | pass |
-| reconstructed vibrato/5, combined/1 | n/a (fewer than four sounding notes in the first pattern) | pass | pass | pass | pass |
-| reconstructed fixtures arpeggio, vibrato, pulseSweep | n/a (as before) | n/a (one voice) | pass | n/a (fewer than three note onsets in 4 s) | pass |
+| reconstructed (the same five tunes) | pass | pass | pass | pass | pass |
+| reconstructed fixtures arpeggio, vibrato, pulseSweep | pass | pass | pass | pass | pass |
 
 ## Performance
 

@@ -117,6 +117,26 @@ test("extract-instruments writes a library file or prints it, for scores and SID
   assert.equal((await run(["extract-instruments", "a.yaml", "--json"], dir)).exit, 2);
 });
 
+test("isolate and extract-instruments do not overwrite an existing output without --force; preserve --stil reports a missing entry", { timeout: 120_000 }, async () => {
+  const dir = workspace();
+  writeFileSync(join(dir, "out.wav"), "keep");
+  const refused = await run(["isolate", "tune.sid", "--voice", "1", "--seconds", "1", "-o", "out.wav"], dir);
+  assert.equal(refused.exit, 2);
+  assert.match(refused.err, /exists; use --force/);
+  assert.equal(readFileSync(join(dir, "out.wav"), "utf8"), "keep");
+  assert.equal((await run(["isolate", "tune.sid", "--voice", "1", "--seconds", "1", "-o", "out.wav", "--force"], dir)).exit, 0);
+  assert.equal(readFileSync(join(dir, "out.wav")).subarray(0, 4).toString(), "RIFF");
+  writeFileSync(join(dir, "lib.yaml"), "keep");
+  assert.equal((await run(["extract-instruments", "a.yaml", "-o", "lib.yaml"], dir)).exit, 2);
+  assert.equal(readFileSync(join(dir, "lib.yaml"), "utf8"), "keep");
+  assert.equal((await run(["extract-instruments", "a.yaml", "-o", "lib.yaml", "--force", "--created", "2026-11-27"], dir)).exit, 0);
+  writeFileSync(join(dir, "STIL.txt"), "/MUSICIANS/X/Y.sid\n  COMMENT: x\n");
+  const stil = await run(["preserve", "tune.sid", "--seconds", "1", "--no-ladder", "--stil", "STIL.txt", "--stil-path", "/MUSICIANS/A/B.sid", "-o", "st"], dir);
+  assert.match(stil.err, /warning: no STIL entry for/);
+  const tooBig = await run(["preserve", "tune.sid", "--seconds", "1", "--stil", "STIL.txt", "--stil-path", "/A.sid", "--max-bytes", "5", "-o", "st2"], dir);
+  assert.equal(tooBig.exit, 5);
+});
+
 test("usage and input errors have their own exit codes", async () => {
   const dir = workspace();
   assert.equal((await run(["analyze"], dir)).exit, 2);
