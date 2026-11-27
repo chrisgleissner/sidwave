@@ -1220,7 +1220,7 @@ development tunes of `data/reconstruct/corpus-manifest.json`; no tune is named, 
 
 ### Why a language change
 
-#### Player options: `player.soft_start`
+#### Player options: `player.soft_start` and `player.idle_writes`
 
 **Reproducer.** A tune that sets the master volume to 15 in its first call and keeps it there. Recovered as a 1.4 score
 and compiled, the 1.4 player writes volume 1, 2, ... 15 over its first 15 frames (`$D418`), so every call of the first
@@ -1235,6 +1235,50 @@ player writes the chip volume of the song from its first call.
 
 **Rejected alternative.** A volume ramp length in frames. No tune needs a ramp of a different length, and a ramp table is the
 trace dump that the language avoids.
+
+`player.idle_writes` follows the same pattern.
+
+**Reproducer.** A tune in which one voice plays no note for the first seconds and whose player never writes that voice's
+frequency registers. The 1.4 player writes the frequency registers of every voice in every call, including a voice that has
+not started a note, so those registers differ from the tune in the pitch class from call 0.
+
+**Why 1.4 cannot express it.** The frequency write of an idle voice is part of the player's voice loop; no field switches it
+off. A rest or a silent note still writes the frequency.
+
+**Evidence.** The development tunes show the difference at call 0 or in the first calls of a voice that starts silent (see
+`data/reconstruct/dev-report.md`).
+
+**Design.** `player: { idle_writes: false }` makes the player skip the frequency registers of a voice until it has an
+instrument, that is, until the voice has played its first note. The default is `true`, which keeps the 1.4 bytes. Recovery
+emits `false` when a voice's registers stay unwritten until its first note. The field belongs to the `player` object, which
+accepts only `soft_start`, `idle_writes` and `start`; any other key is an error.
+
+**Rejected alternative.** Initialising the registers of idle voices from the score. That adds a start-up write per voice for
+no musical content, and a tune that never writes them still differs.
+
+`idle_writes: control` is a third value. A tune whose player writes only the control register of a voice that has not
+played yet (value 0, every call) leaves its other registers at zero. The F-diff compares the in-call control writes, so
+`false` (no write) and `true` (all seven registers, with the player's default pulse width and C0 frequency) both differ.
+With `control` the player writes only `v_ctrl` of an idle voice in every call. Evidence: before this option, the first difference of most development tunes was a missing control write of an idle voice at call 0 or 1 (see the first-difference column of `data/reconstruct/dev-report.md`).
+
+#### Player options: `player.start`
+
+**Reproducer.** A tune whose player, in its first calls and before any note, writes the test bit to the control registers
+(`$08` to `$D404`, `$D40B`, `$D412`) and sets `$D417`. After the init call, the 1.4 player writes nothing in those calls.
+
+**Why 1.4 cannot express it.** The language has no construct for register writes that are not part of a note, an
+instrument or a global effect.
+
+**Evidence.** Several development tunes write the test bit or filter registers in the first call after the init, before
+any gate-on; the per-tune first differences are in `data/reconstruct/dev-report.md`.
+
+**Design.** `player: { start: [ [ { reg: $D404, value: 8 }, ... ], ... ] }` lists the writes of up to 8 player calls, up to
+32 writes per call, registers `$D400` to `$D418` of the first SID, in the given order. In each of these calls the player
+writes only the listed registers and does nothing else; the song starts in the call after the last list. Recovery lists only
+calls before the first gate-on of any voice. The option is limited to that start-up phase so that it cannot hold music.
+
+**Rejected alternative.** An `init` register list written by the init routine instead of in play calls. The original writes
+in play calls, and the F-diff compares call by call, so a write in the init call would be in the wrong call.
 
 #### Tuning: `tuning.cents` and `tuning.registers`
 

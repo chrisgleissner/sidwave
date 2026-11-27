@@ -173,3 +173,14 @@ timeline:
   assert.throws(() => parseSidwave(two("player: { idle_writes: 1 }\n")), /idle_writes/);
   assert.throws(() => parseSidwave(two("player: { idle_writes: false }\n").replace('"1.5"', '"1.4"')), /player/);
 });
+
+test("player.idle_writes is documented in the schema, the spec chapter and the changelog", async () => {
+  const { readFileSync } = await import("node:fs");
+  const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
+  const schema = JSON.parse(read("data/sound/sidwave.schema.json"));
+  assert.ok(schema.properties.player.properties.idle_writes.oneOf);
+  assert.ok(schema.properties.player.properties.start);
+  assert.equal(schema.properties.player.additionalProperties, false);
+  assert.match(read("data/sound/sidwave.md"), /#### Player options: `player.soft_start` and `player.idle_writes`/);
+  assert.match(read("CHANGELOG.md"), /`player\.idle_writes`/);
+});

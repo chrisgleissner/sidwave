@@ -1116,6 +1116,10 @@ export interface Arrangement {
   softVolume?: boolean;
   /** SIDWave 1.5 `player.idle_writes: false`: a voice that has not played a note writes no register. */
   idleSilent?: boolean;
+  /** SIDWave 1.5 `player.idle_writes: control`: a voice that has not played a note writes only its control register. */
+  idleControl?: boolean;
+  /** SIDWave 1.5 `player.start`: the register writes of the first player calls. */
+  startSteps?: Array<Array<{ reg: number; value: number }>>;
   /** SIDWave 1.5 `tuning`: the 96 register values C0..B7 of the document's clock; absent without a tuning. */
   noteTable?: number[];
   clock?: TimelineClock;
@@ -1326,6 +1330,8 @@ function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrange
     turbo: doc.cpu === "turbo",
     softVolume: isModern(doc) && doc.player?.softStart !== false,
     ...(doc.player?.idleWrites === false ? { idleSilent: true } : {}),
+    ...(doc.player?.idleWrites === "control" ? { idleControl: true } : {}),
+    ...(doc.player?.start ? { startSteps: doc.player.start } : {}),
     ...(doc.tuning && (doc.tuning.cents || doc.tuning.registers.length) ? { noteTable: noteTableOf(doc) } : {}),
   };
 }
@@ -3887,6 +3893,27 @@ init_core:`);
     }
     playerCode += onceCode;
   }
+  if (arr.startSteps) {
+    // SIDWave 1.5 `player.start`: each of the first calls writes its listed registers and does nothing else; the song starts after them.
+    const label = loop ? "play:\n" : "play_tick:\n";
+    if (!playerCode.includes(`\n${label}`)) throw new Error("SIDWAVE player code changed: the start patch point was not found");
+    const steps = arr.startSteps.map((step, k) => `  lda st_i
+  cmp #${k}
+  beq st_run_${k}
+  jmp st_skip_${k}
+st_run_${k}:
+  lda $01
+  pha
+  lda #$36
+  sta $01
+${arr.chips && step.some((w) => w.reg >= 0x15) ? "  lda sid_io\n  pha\n  lda sid_io+1\n  pha\n  lda #0\n  sta sid_io\n  lda #$D4\n  sta sid_io+1\n" : ""}${step.map((w) => `  lda #$${hex2(w.value)}\n  sta $${(0xd400 + w.reg).toString(16).toUpperCase()}`).join("\n")}
+${arr.chips && step.some((w) => w.reg >= 0x15) ? "  pla\n  sta sid_io+1\n  pla\n  sta sid_io\n" : ""}  pla
+  sta $01
+  inc st_i
+  rts
+st_skip_${k}:`).join("\n");
+    playerCode = playerCode.replace(`\n${label}`, `\n${label}${steps}\n`);
+  }
   if (arr.streamCalls) playerCode += `
 c_call:
   jsr fetch
@@ -3923,6 +3950,10 @@ c_ret:
   if (arr.idleSilent) {
     playerCode = playerCode.replace("  ldy voff,x\n  lda f_lo\n  sta $D400,y", "  lda v_inst,x\n  beq vr_after_write\n  ldy voff,x\n  lda f_lo\n  sta $D400,y");
   }
+  if (arr.idleControl) {
+    // The marked store becomes an indirect store through sid_io once the SID multiplexer has run (see below).
+    playerCode = playerCode.replace("  ldy voff,x\n  lda f_lo\n  sta $D400,y", "  lda v_inst,x\n  bne vr_full_write\n  lda voff,x\n  clc\n  adc #4\n  tay\n  lda v_ctrl,x\n  sta $D400,y ; idle control\n  jmp vr_after_write\nvr_full_write:\n  ldy voff,x\n  lda f_lo\n  sta $D400,y");
+  }
   if (arr.chips) {
     playerCode = omitUnusedVoiceEffects(playerCode, insts, hasPortamento);
     if (hasFade) playerCode = addVibratoFade(playerCode);
@@ -3936,6 +3967,7 @@ c_ret:
     if (arr.tuning) playerCode = addTunedLookup(playerCode, arr.tuning);
     if (arr.samples) playerCode = addDigiPlayer(playerCode, arr.samples, arr.chips, [CLOCK_HZ.PAL, CLOCK_HZ.NTSC]);
   }
+  if (arr.idleControl) playerCode = playerCode.replace("  sta $D400,y ; idle control", arr.chips ? "  sta (sid_io),y" : "  sta $D400,y");
   if (songs) {
     // The song selector copies each song's loop targets into loop_lo and loop_hi.
     playerCode = playerCode.replace("c_loop:\n  lda start_lo,x\n  sta ptr\n  lda start_hi,x", "c_loop:\n  lda loop_lo,x\n  sta ptr\n  lda loop_hi,x");
@@ -4157,6 +4189,7 @@ c_ret:
     if (arr.chips?.some((chip) => chip.owner !== undefined)) R.push("g_fthold: .res 1");
   }
   if (arr.chips?.some((chip) => chip.hasOffset)) for (const name of ["g_so0", "g_so1", "g_so2", "g_sres"]) R.push(`${name}: .res 1`);
+  if (arr.startSteps) R.push("st_i: .res 1");
   R.push(`vars_end:`);
   if (arr.effects) R.push(...effectRam(channels, arr.chips!.length, arr.effects.some((effect) => effect.steps.some((step) => step.filter === "off"))));
 

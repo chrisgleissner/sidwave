@@ -93,6 +93,8 @@ export interface FDiffResult {
   maxCumulativeOffsetCycles: number;
   /** Number of calls in which a register was written in one IR but not in the other, with equal resulting state. */
   writtenSetMismatchCalls: number;
+  /** Number of compared calls with at least one difference in any class (a call that differs in two classes counts once). */
+  callsWithDifference: number;
 }
 
 export interface FDiffOptions {
@@ -231,6 +233,7 @@ export function fdiff(expected: FrameIr, observed: FrameIr, options: FDiffOption
   const classFirst: Partial<Record<RegisterClass, FDiffDifference>> = {};
   let maxOffset = 0;
   let writtenSetMismatchCalls = 0;
+  let callsWithDifference = 0;
 
   for (let i = 0; i < compared; i++) {
     const ce = expected.calls[ea + i];
@@ -271,6 +274,7 @@ export function fdiff(expected: FrameIr, observed: FrameIr, options: FDiffOption
         sinks.timing({ class: "timing", expected: 0, observed: offset, detail: "cumulative call offset in cycles" });
       }
     }
+    if (callDifferences > 0) callsWithDifference++;
   }
 
   const callCountMismatch = nE !== nO ? { expected: nE, observed: nO } : undefined;
@@ -307,5 +311,6 @@ export function fdiff(expected: FrameIr, observed: FrameIr, options: FDiffOption
     ...(sorted.length ? { first: sorted[0] } : {}),
     maxCumulativeOffsetCycles: maxOffset,
     writtenSetMismatchCalls,
+    callsWithDifference,
   };
 }

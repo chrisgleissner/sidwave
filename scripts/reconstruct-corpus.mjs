@@ -14,7 +14,7 @@
 
 import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -27,7 +27,7 @@ const dist = path.join(root, "sidwave", "dist");
 const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 const MAX_WORKERS = 4;
 const DESIGN_HORIZON = 180;
-const SCRIPT_VERSION = 2;
+const SCRIPT_VERSION = 3;
 
 const { values: args } = parseArgs({
   options: {
@@ -47,6 +47,11 @@ const { values: args } = parseArgs({
   },
 });
 
+/**
+ * Identity of the code that produced a result: SHA-256 over the path and bytes of every .js file of sidwave/dist, so that a
+ * change in any module (not only in the reconstruction modules) gives other cache keys. A stale or partial build changes
+ * the value; rebuild with `rm -rf sidwave/dist && npm run build` before a report run.
+ */
 function codeVersion() {
   const files = [];
   const walk = (dir) => {
@@ -57,15 +62,22 @@ function codeVersion() {
       else if (e.name.endsWith(".js")) files.push(p);
     }
   };
-  for (const d of ["reconstruct", "format", "verify", "engine"]) walk(path.join(dist, d));
-  for (const f of ["sidwave.js", "sidwaveCompiler.js", "sidwaveOps.js", "sidFile.js", "sidwaveEffects.js", "sidwaveLint.js"]) files.push(path.join(dist, f));
+  walk(dist);
   const h = createHash("sha256");
-  for (const f of files) if (existsSync(f)) h.update(path.relative(dist, f)).update(readFileSync(f));
+  for (const f of files) h.update(path.relative(dist, f)).update("\0").update(readFileSync(f));
   let engineVersion = "unknown";
   try {
     engineVersion = JSON.parse(readFileSync(path.join(root, "node_modules/libsidplayfp-wasm/package.json"), "utf8")).version;
   } catch { /* unknown */ }
-  return { code: h.digest("hex").slice(0, 16), engine: engineVersion };
+  return { code: h.digest("hex").slice(0, 16), engine: engineVersion, distFiles: files.length };
+}
+
+/** The git revision of the working tree and whether sidwave/src, scripts or data differ from it. */
+function sourceRevision() {
+  const git = (...a) => spawnSync("git", ["-C", root, ...a], { encoding: "utf8" });
+  const head = git("rev-parse", "HEAD");
+  const status = git("status", "--porcelain", "--", "sidwave/src", "sidwave/data", "scripts");
+  return { commit: head.status === 0 ? head.stdout.trim() : "unknown", dirty: status.status === 0 ? status.stdout.trim().length > 0 : null };
 }
 
 function loadRomsDir(dir) {
@@ -163,12 +175,14 @@ async function runOne(tune) {
     strictExact: report.strictExact,
     registerStateExact: report.registerStateExact,
     compileOk: report.compile?.ok === true,
-    ...(report.compile?.cycleBudgetExceeded ? { cycleBudgetExceeded: report.compile.cycleBudgetExceeded } : {}),
+    // The recovered score does not run at 1 MHz: it was saved with `cpu: turbo` and is excluded from the A1 counts.
+    turbo: Boolean(report.compile?.turboFallback),
+    ...(report.compile?.turboFallback ? { turboMessage: report.compile.turboFallback.message, scoreIncludesTurbo: report.compile.turboFallback.scoreIncludesTurbo, cycleBudgetExceeded: report.compile.cycleBudgetExceeded } : {}),
     ...(report.compile?.ok ? {} : { compileError: report.compile?.error }),
     calls: report.horizon.calls,
     callRate: report.callRate,
     fdiff: {
-      differingCalls: report.fdiff.differingCalls, comparedCalls: report.fdiff.comparedCalls,
+      differingCalls: report.fdiff.differingCalls, callsWithDifference: report.fdiff.callsWithDifference, comparedCalls: report.fdiff.comparedCalls,
       expectedCalls: report.fdiff.expectedCalls, observedCalls: report.fdiff.observedCalls,
       standardAlignment: report.fdiff.standardAlignment, first: report.fdiff.first ?? null,
       classes: Object.fromEntries(Object.entries(report.fdiff.classes).map(([k, v]) => [k, { differingCalls: v.differingCalls, matchShare: Number(v.matchShare.toFixed(6)) }])),
@@ -194,7 +208,8 @@ async function runOne(tune) {
     reconstructCpuPerMusicMinute: Number(((rec.totalCpuMs / 1000) / (seconds / 60)).toFixed(2)),
     recoverMsPerMusicMinute: Number((rec.recoverMs / (seconds / 60)).toFixed(1)),
   };
-  if (settings.a1 && compiled && report.compile?.ok) {
+  if (settings.a1 && report.compile?.turboFallback) result.a1 = { status: "not evaluated", reason: "turbo fallback: the score does not run at 1 MHz" };
+  else if (settings.a1 && compiled && report.compile?.ok) {
     const roms = loadRomsDir(args.roms);
     if (!roms) result.a1 = { status: "not evaluated", reason: "ROM images not found" };
     else {
@@ -311,13 +326,18 @@ function buildReport(results, versions) {
     manifestSha256: sha256(readFileSync(args.manifest)),
     versions,
     settings,
+    // Reproducibility: the revision of the source tree and the inputs of every cache key. `scripts/check-reconstruct-repro.mjs` reruns tunes and compares.
+    source: sourceRevision(),
+    cacheKeyInputs: { scriptVersion: SCRIPT_VERSION, settings, codeSha256Prefix: versions.code, engine: versions.engine, key: "sha256(sid sha256, subtune, horizon, settings, versions)" },
     summary: {
       tunes: results.length,
       strictExact: results.filter((r) => r.strictExact).length,
       registerStateExact: results.filter((r) => r.registerStateExact).length,
       compileFailures: results.filter((r) => r.compileOk === false).length,
-      a1Pass: results.filter((r) => r.a1?.level === "pass").length,
-      a1Evaluated: results.filter((r) => r.a1?.level).length,
+      a1Pass: results.filter((r) => !r.turbo && r.a1?.level === "pass").length,
+      a1Evaluated: results.filter((r) => !r.turbo && r.a1?.level).length,
+      turbo: results.filter((r) => r.turbo).length,
+      turboTunes: results.filter((r) => r.turbo).map((r) => `${r.path}:${r.subtune}`),
       horizonReduced: results.filter((r) => r.horizon.reduced).length,
       rootCauseCounts: Object.fromEntries(Object.entries(byClass).map(([k, v]) => [k, v.length]).sort((a, b) => b[1] - a[1])),
       differingCalls: sum((r) => r.fdiff?.differingCalls ?? 0),
@@ -338,18 +358,21 @@ function markdown(report) {
   L.push(`- Strict exact: ${s.strictExact} of ${s.tunes}`);
   L.push(`- Register state exact (secondary, weaker): ${s.registerStateExact} of ${s.tunes}`);
   L.push(`- Recovered score did not compile: ${s.compileFailures}`);
-  L.push(`- A1 pass (approximate status): ${s.a1Pass} of ${s.a1Evaluated} evaluated`);
+  L.push(`- A1 pass (approximate status): ${s.a1Pass} of ${s.a1Evaluated} evaluated (turbo-fallback tunes are not evaluated)`);
+  L.push(`- Turbo fallback: ${s.turbo} of ${s.tunes}. Each of these recovered scores does not run at 1 MHz; the saved file needs \`cpu: turbo\` and Ultimate Turbo Registers. The saved score includes \`cpu: turbo\` with a warning comment. They are never strict matches and are excluded from the A1 counts.`);
   L.push(`- Horizon shorter than the design horizon: ${s.horizonReduced}`);
   L.push(`- Reconstruct CPU time: ${s.reconstructCpuSecondsPerMusicMinute} s per minute of music (traces of both the tune and the recompiled score included); recovery step alone ${s.recoverMsPerMusicMinute} ms per minute of music`, "");
+  if (s.turboTunes.length) L.push("Turbo-fallback tunes:", "", ...s.turboTunes.map((t) => `- ${t}`), "");
+  L.push(`Source revision ${report.source.commit.slice(0, 12)}${report.source.dirty ? " (working tree with uncommitted changes)" : ""}; \`scripts/check-reconstruct-repro.mjs\` reruns tunes with an empty cache and compares them with this report.`, "");
   L.push("## Root-cause classes (first material difference)", "");
   L.push("| Class | Tunes |", "| --- | ---: |");
   for (const [k, v] of Object.entries(s.rootCauseCounts)) L.push(`| ${k} | ${v} |`);
   L.push("", "## Tunes", "");
-  L.push("| Tune | Horizon s | Strict | State | A1 | Class | First difference | Differing calls | Score bytes | CPU s/min |", "| --- | ---: | :-: | :-: | :-: | --- | --- | ---: | ---: | ---: |");
+  L.push("| Tune | Horizon s | Strict | State | Turbo | A1 | Class | First difference | Calls that differ | Score bytes | CPU s/min |", "| --- | ---: | :-: | :-: | :-: | :-: | --- | --- | ---: | ---: | ---: |");
   for (const r of report.tunes) {
     const f = r.fdiff?.first;
-    const first = r.error ? `error: ${r.error}` : f ? `${f.class} call ${f.call} (${f.timeSeconds.toFixed(2)} s)${f.voice !== undefined ? ` voice ${f.voice}` : ""}${f.register !== undefined ? ` reg $${f.register.toString(16)}` : ""}${f.expected !== undefined ? ` ${f.expected}->${f.observed}` : ""}` : r.compileOk === false ? `no compile: ${(r.compileError ?? "").slice(0, 60)}` : "none";
-    L.push(`| ${r.path}:${r.subtune} | ${r.horizon.usedSeconds}${r.horizon.reduced ? " (reduced)" : ""} | ${r.strictExact ? "yes" : "no"} | ${r.registerStateExact ? "yes" : "no"} | ${r.a1?.level ?? r.a1?.status ?? "-"} | ${r.rootCause} | ${first} | ${r.fdiff?.differingCalls ?? "-"} | ${r.scoreBytes ?? "-"} | ${r.timing?.reconstructCpuPerMusicMinute ?? "-"} |`);
+    const first = r.error ? `error: ${r.error}` : f ? `${f.class}${f.call === 0 ? " (start-up)" : ""} call ${f.call} (${f.timeSeconds.toFixed(2)} s)${f.voice !== undefined ? ` voice ${f.voice}` : ""}${f.register !== undefined ? ` reg $${f.register.toString(16)}` : ""}${f.expected !== undefined ? ` ${f.expected}->${f.observed}` : ""}` : r.compileOk === false ? `no compile: ${(r.compileError ?? "").slice(0, 60)}` : "none";
+    L.push(`| ${r.path}:${r.subtune} | ${r.horizon.usedSeconds}${r.horizon.reduced ? " (reduced)" : ""} | ${r.strictExact ? "yes" : "no"} | ${r.registerStateExact ? "yes" : "no"} | ${r.turbo ? "yes" : "no"} | ${r.turbo ? "excluded" : r.a1?.level ?? r.a1?.status ?? "-"} | ${r.rootCause} | ${first} | ${r.fdiff ? `${r.fdiff.callsWithDifference ?? "?"} of ${r.fdiff.comparedCalls}` : "-"} | ${r.scoreBytes ?? "-"} | ${r.timing?.reconstructCpuPerMusicMinute ?? "-"} |`);
   }
   L.push("", "## Unsupported features and language-extension candidates", "");
   const kinds = {};
