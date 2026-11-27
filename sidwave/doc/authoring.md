@@ -44,6 +44,7 @@ several times faster on a large score.
 ```sh
 sidwave diff song-v1.yaml song-v2.yaml
 sidwave diff a.yaml b.yaml --json
+sidwave diff a.yaml b.yaml --no-compile   # skip the compile of both scores: about ten times faster on a large score
 ```
 
 The comparison is on parsed values. Each change has a class (`musical`, `synthesis`, `hardware`, `structural`,

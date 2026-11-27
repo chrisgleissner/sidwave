@@ -135,6 +135,44 @@ test("diff treats a formatting-only difference as a difference unless --ignore-f
   } finally { done(); }
 });
 
+test("diff --no-compile gives the same changes without compiling", () => {
+  const { dir, done } = sandbox();
+  try {
+    const changed = withTempo(SCORE, 99);
+    write(dir, "a.yaml", SCORE);
+    write(dir, "b.yaml", changed);
+    const full = diffSidwave(SCORE, changed);
+    const fast = diffSidwave(SCORE, changed, undefined, { compile: false });
+    assert.deepEqual(fast.changes, full.changes);
+    assert.equal(fast.compiledEqual, null);
+    const result = run(dir, "diff", "a.yaml", "b.yaml", "--no-compile");
+    assert.equal(result.code, EXIT_FAILED);
+    assert.match(result.out, /not compared \(--no-compile\)/);
+    const json = JSON.parse(run(dir, "diff", "a.yaml", "b.yaml", "--no-compile", "--json").out);
+    assert.deepEqual(json.result.changes, full.changes);
+    assert.equal(json.result.compiledEqual, null);
+    assert.equal(run(dir, "diff", "a.yaml", "a.yaml", "--no-compile").code, EXIT_OK);
+  } finally { done(); }
+});
+
+test("transform validate result checks only the result, and a chain gives the text of the stepwise library calls", () => {
+  const first = transpose(SCORE, { semitones: 2, validate: "parse" });
+  const stepwise = setTempo(first.text, { bpm: 120 });
+  const skipped = setTempo(first.text, { bpm: 120, validate: "result" });
+  assert.equal(skipped.text, stepwise.text);
+  assert.throws(() => setTempo(first.text, { bpm: 120, validate: "result" }) && scaleTempo(first.text, { factor: 1.25, validate: "result" }), /does not compile/);
+  const { dir, done } = sandbox();
+  try {
+    write(dir, "s.yaml", SCORE);
+    const chain = run(dir, "transform", "s.yaml", "--transpose", "2", "--quantise", "0.25", "--tempo", "120");
+    assert.equal(chain.code, EXIT_OK, chain.err);
+    assert.equal(chain.out, setTempo(quantise(first.text, { grid: 0.25, validate: "none" }).text, { bpm: 120 }).text);
+    write(dir, "bad.yaml", "title: x\nvoices: nope\n");
+    assert.equal(run(dir, "transform", "bad.yaml", "--tempo", "99", "--quantise", "0.25").code, EXIT_INPUT, "the input is still checked");
+    assert.equal(run(dir, "transform", "s.yaml", "--tempo", "99", "--tempo-factor", "1.9", "--quantise", "0.25").code, EXIT_INPUT, "the final result is checked");
+  } finally { done(); }
+});
+
 test("diff --git follows the external diff driver convention and always exits 0", () => {
   const { dir, done } = sandbox();
   try {

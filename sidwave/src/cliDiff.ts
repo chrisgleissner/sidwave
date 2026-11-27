@@ -10,7 +10,7 @@ import { confinedReadOptions } from "./sidwaveOps.js";
 export const DIFF_HELP = `sidwave diff: show what differs between two SIDWave scores
 
 Usage:
-  sidwave diff <a> <b> [--ignore-formatting] [--allow-dir <dir>] [--json]
+  sidwave diff <a> <b> [--ignore-formatting] [--no-compile] [--allow-dir <dir>] [--json]
   sidwave diff --git <path> <old-file> <old-hex> <old-mode> <new-file> <new-hex> <new-mode>
 
 The comparison is on the parsed values, not on the text, so a change of key order, quoting, indentation or comments
@@ -25,7 +25,9 @@ Options:
   --ignore-formatting  Treat scores that differ only in formatting as equal (exit 0).
   --allow-dir <dir>    Allow "file:" sources and library files below <dir> when checking that the scores compile
                        to the same PRG. May be repeated.
-  --git                Run as a git external diff driver (see below). Always exits 0, as git requires.
+  --no-compile         Do not compile the scores (about three times faster on a large score); "compiled output"
+                       is then not reported and compiledEqual is null.
+  --git                Run as a git external diff driver (see below). Always exits 0, as git requires, and does not compile the scores.
   --json               Machine-readable output: { "changes": [...], "compiledEqual": bool }.
   -h, --help           Show this text.
 
@@ -48,7 +50,7 @@ const PLURAL = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const MAX_LINES = 200;
 
 /** The text of a diff; `names` label the two sides. */
-export function formatDiff(diff: SemanticDiff, names: [string, string]): string {
+export function formatDiff(diff: Omit<SemanticDiff, "compiledEqual"> & { compiledEqual: boolean | null }, names: [string, string]): string {
   if (diff.changes.length === 0) return `${names[0]} and ${names[1]} are semantically identical`;
   const byClass = new Map<string, number>();
   for (const change of diff.changes) byClass.set(change.class, (byClass.get(change.class) ?? 0) + 1);
@@ -61,7 +63,7 @@ export function formatDiff(diff: SemanticDiff, names: [string, string]): string 
     lines.push(`  ${change.class.padEnd(width)}  ${change.path || "/"}  ${before} -> ${after}`);
   }
   if (diff.changes.length > MAX_LINES) lines.push(`  ... ${diff.changes.length - MAX_LINES} more changes; use --json for all of them`);
-  lines.push(diff.changes.every((c) => c.class === "formatting") ? "only the formatting differs" : `compiled output: ${diff.compiledEqual ? "identical" : "different"}`);
+  lines.push(diff.changes.every((c) => c.class === "formatting") ? "only the formatting differs" : diff.compiledEqual === null ? "compiled output: not compared (--no-compile)" : `compiled output: ${diff.compiledEqual ? "identical" : "different"}`);
   return lines.join("\n");
 }
 
@@ -72,7 +74,7 @@ function gitDriver(io: CliIo, rest: string[]): number {
   if (oldFile === "/dev/null") { io.out(`${path}: new score\n`); return EXIT_OK; }
   if (newFile === "/dev/null") { io.out(`${path}: score deleted\n`); return EXIT_OK; }
   const a = readText(io, oldFile).text, b = readText(io, newFile).text;
-  const diff = guard(path, () => diffSidwave(a, b, confinedReadOptions(io.cwd, [])));
+  const diff = guard(path, () => diffSidwave(a, b, confinedReadOptions(io.cwd, []), { compile: false }));
   io.out(`${formatDiff(diff, [`a/${path}`, `b/${path}`])}\n`);
   return EXIT_OK;
 }
@@ -82,12 +84,12 @@ export function runDiffCli(args: string[], io: CliIo): number {
   if (args[0] === "--git") {
     return runAuthoring("diff", DIFF_HELP, { value: [] }, [], io, () => gitDriver(io, args.slice(1)));
   }
-  return runAuthoring("diff", DIFF_HELP, { value: ["--allow-dir"], bool: ["--ignore-formatting"] }, args, io, (p, { json }) => {
+  return runAuthoring("diff", DIFF_HELP, { value: ["--allow-dir"], bool: ["--ignore-formatting", "--no-compile"] }, args, io, (p, { json }) => {
     if (p.positional.length !== 2) throw new UsageError("diff needs two score files: sidwave diff <a> <b>");
     const [a, b] = p.positional as [string, string];
     const A = readText(io, a), B = readText(io, b);
     const read = confinedReadOptions(io.cwd, p.values.get("--allow-dir") ?? [], A.path);
-    const diff = guard(`${a} / ${b}`, () => diffSidwave(A.text, B.text, read));
+    const diff = guard(`${a} / ${b}`, () => p.flags.has("--no-compile") ? diffSidwave(A.text, B.text, read, { compile: false }) : diffSidwave(A.text, B.text, read));
     const onlyFormatting = diff.changes.length > 0 && diff.changes.every((c) => c.class === "formatting");
     const equal = diff.changes.length === 0 || (onlyFormatting && p.flags.has("--ignore-formatting"));
     emit(io, json, "diff", { a, b, equal, changes: diff.changes, compiledEqual: diff.compiledEqual }, formatDiff(diff, [a, b]), equal);

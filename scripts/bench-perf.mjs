@@ -95,6 +95,7 @@ for (const name of names) {
     const cli = (...argv) => { runCli(argv, { cwd: dir, out() {}, err() {}, outBytes() {} }); };
     measure(`cli.format/${name}`, () => cli("format", formatted, "--check"));
     measure(`cli.diff/${name}`, () => cli("diff", a, b));
+    measure(`cli.diff.nocompile/${name}`, () => cli("diff", a, b, "--no-compile"));
     measure(`cli.merge/${name}`, () => cli("merge", a, b, a));
     measure(`cli.transform/${name}`, () => cli("transform", a, "--transpose", "1"));
     measure(`cli.transform.parse/${name}`, () => cli("transform", a, "--transpose", "1", "--validate", "parse"));

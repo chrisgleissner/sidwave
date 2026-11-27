@@ -16,9 +16,10 @@ export interface TransformResult { text: string; report: TransformReport }
  * How a transformation checks its input and result: "compile" (default) parses the score and compiles it to a PRG,
  * "parse" only parses it, "none" skips the check (for fragments that are not complete scores). The input must parse
  * (otherwise code "input"); a result that does not pass the check is never returned, the transformation throws
- * code "precondition" with the message of the parser or compiler instead.
+ * code "precondition" with the message of the parser or compiler instead. "result" checks the result like "compile" but does
+ * not parse the input first; it is for the last step of a chain whose earlier steps already checked the input.
  */
-export type TransformValidation = "compile" | "parse" | "none";
+export type TransformValidation = "compile" | "parse" | "none" | "result";
 export interface TransformOptions {
   validate?: TransformValidation;
   /** Read options for the parser, as for compiling: a score with `imports` needs `imports` (see `confinedReadOptions`). */
@@ -31,7 +32,7 @@ function docFor(text: string, validate: TransformValidation = "compile", read?: 
   const doc = YAML.parseDocument(text, { version: "1.2", keepSourceTokens: true });
   if (doc.errors.length) throw new SidwaveTransformError("input", doc.errors[0]!.message);
   if (!YAML.isMap(doc.contents)) throw new SidwaveTransformError("input", "The input is not a SIDWave score: expected a YAML mapping at the top level");
-  if (validate !== "none") {
+  if (validate !== "none" && validate !== "result") {
     try { parseSidwave(text, read); } catch (e) { throw new SidwaveTransformError("input", `The input is not a valid SIDWave score: ${e instanceof Error ? e.message : String(e)}`); }
   }
   return doc;
@@ -41,7 +42,7 @@ function finish(doc: AnyDoc, changed: string[], preserved: string[], warnings: s
   if (validate !== "none") {
     let parsed;
     try { parsed = parseSidwave(text, read); } catch (e) { throw new SidwaveTransformError("precondition", `The result is not a valid SIDWave score: ${e instanceof Error ? e.message : String(e)}`); }
-    if (validate === "compile") {
+    if (validate === "compile" || validate === "result") {
       try { compileSidwaveToPrg(parsed, { loop: false }); } catch (e) { throw new SidwaveTransformError("precondition", `The result does not compile: ${e instanceof Error ? e.message : String(e)}`); }
     }
   }

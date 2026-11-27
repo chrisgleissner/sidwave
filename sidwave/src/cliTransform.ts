@@ -142,8 +142,10 @@ export function runTransformCli(args: string[], io: CliIo): number {
     const reports: Array<{ op: string; param: unknown } & TransformReport> = [];
     try {
       steps.forEach((step, index) => {
-        // Intermediate results are parsed; the last one is also compiled, which is the check that counts.
-        const validate = index === steps.length - 1 ? level : "parse";
+        // The first step checks the input, the last one the final result (compiled with --validate compile).
+        // The steps between need no check of their own: each reads the previous result and the last step checks the end.
+        const first = index === 0, final = index === steps.length - 1;
+        const validate = steps.length === 1 ? level : first ? "parse" : final ? (level === "compile" ? "result" : "none") : "none";
         const result = step.run(text, { validate, read });
         text = result.text;
         reports.push({ op: step.op, param: step.param, ...result.report });

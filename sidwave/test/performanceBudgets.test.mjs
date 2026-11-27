@@ -221,6 +221,7 @@ test("the authoring commands of the command line stay within their budgets", () 
     within("cli format --check", () => cli("format", formatted, "--check"), 8);
     within("cli diff", () => cli("diff", base, ours), 50, 3);
     within("cli transform --transpose --validate parse", () => cli("transform", base, "--transpose", "2", "--validate", "parse"), 10, 3);
+    within("cli diff --no-compile", () => cli("diff", base, ours, "--no-compile"), 8, 3);
     within("cli merge", () => cli("merge", base, ours, theirs), 30, 3);
     within("cli transform --transpose", () => cli("transform", base, "--transpose", "2"), 35, 3);
     within("cli generate (composer 2)", () => cli("generate", "--seed", "3"), 6, 3);

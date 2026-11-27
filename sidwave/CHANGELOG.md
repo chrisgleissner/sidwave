@@ -40,6 +40,7 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 - `sidwave extract-instruments` and `extractInstruments`: the instruments of a score or of a reconstruction as a SIDWave 1.4 library with provenance; `checkInstrumentReuse` compares an extracted instrument in a new score with the source.
 - Documentation: `doc/analysis.md`, `doc/preservation.md`.
 - `sidwave transform`, `format`, `diff`, `merge` and `generate`: the transformation library (transpose by voice or section, tempo, instrument swap, quantise, humanise, section order), canonical formatting with `--check` and `--write` for CI and pre-commit hooks, a semantic diff (exit 1 when the scores differ, `--json`), a three-way merge (exit 1 on conflicts, lists each conflict), and generation from a style, profile and seed with `--prg` and `--sid`. `sidwave diff --git` is a git external diff driver and `sidwave merge` works as a git merge driver; both are documented in `doc/authoring.md` and the merge driver is tested in a temporary repository.
+- `diffSidwave(a, b, read, { compile: false })` and `sidwave diff --no-compile` skip the compile of both scores (`compiledEqual` is null); `sidwave diff --git` uses it. `TransformValidation` has a new value `"result"`, which checks the result like `"compile"` without parsing the input; `sidwave transform` uses it so that a chain of operations parses the input once and compiles the end result once.
 - CPU budgets for the authoring commands in `test/performanceBudgets.test.mjs`, and entries in `scripts/bench-perf.mjs`.
 
 ### Changed

@@ -146,7 +146,10 @@ export function formatSidwave(text: string): string {
 }
 
 /** `read` is the parser's read options (`confinedReadOptions`); a score with `imports` needs it for `compiledEqual`. */
-export function diffSidwave(a: string, b: string, read?: SidwaveReadOptions): SemanticDiff {
+export function diffSidwave(a: string, b: string, read?: SidwaveReadOptions): SemanticDiff;
+/** With `compile: false` the scores are not compiled (about two thirds of the time of a diff) and `compiledEqual` is null. */
+export function diffSidwave(a: string, b: string, read: SidwaveReadOptions | undefined, options: { compile: false }): Omit<SemanticDiff, "compiledEqual"> & { compiledEqual: null };
+export function diffSidwave(a: string, b: string, read?: SidwaveReadOptions, options?: { compile?: boolean }): Omit<SemanticDiff, "compiledEqual"> & { compiledEqual: boolean | null } {
   const av = YAML.parse(a), bv = YAML.parse(b);
   const changes: SemanticChange[] = [];
   const walk = (x: any, y: any, path: string) => {
@@ -159,7 +162,7 @@ export function diffSidwave(a: string, b: string, read?: SidwaveReadOptions): Se
   };
   walk(av, bv, "");
   if (!changes.length && a !== b) changes.push({ class: "formatting", path: "", summary: "YAML formatting changed" });
-  return { changes, compiledEqual: compileEqual(a, b, equal(av, bv), read) };
+  return { changes, compiledEqual: options?.compile === false ? null : compileEqual(a, b, equal(av, bv), read) };
 }
 
 /**
