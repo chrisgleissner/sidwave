@@ -4,7 +4,7 @@
   "note": "Development tunes only. No SID data, no scores. Held-out tunes are not run.",
   "manifestSha256": "a555e5955e28c138177036629f2a56739d4ac8121e19a6e9bbbb1567e879f491",
   "versions": {
-    "code": "7edf80101cade8f5",
+    "code": "bdd7736039e3b334",
     "engine": "1.1.1"
   },
   "settings": {
@@ -22,16 +22,15 @@
     "horizonReduced": 0,
     "rootCauseCounts": {
       "gate/hard restart": 13,
-      "pitch": 5,
-      "filter": 3,
+      "pitch": 8,
       "volume": 2,
       "unsupported": 1
     },
-    "differingCalls": 2442859,
-    "scoreBytes": 2133695,
+    "differingCalls": 2428386,
+    "scoreBytes": 2136785,
     "musicMinutes": 52.3,
-    "reconstructCpuSecondsPerMusicMinute": 4.74,
-    "recoverMsPerMusicMinute": 550.2
+    "reconstructCpuSecondsPerMusicMinute": 4.73,
+    "recoverMsPerMusicMinute": 578.7
   },
   "tunes": [
     {
@@ -305,18 +304,18 @@
       "scoreSha256": "7b3e3d8f6d4d05d1f0a7fc7580e707340f2227ac3b48803cc0e25152a09b00d0",
       "compiledBytes": 8023,
       "timing": {
-        "wallSeconds": 10.75,
-        "cpuSeconds": 8.88,
+        "wallSeconds": 11.02,
+        "cpuSeconds": 9.18,
         "phasesMs": {
-          "trace": 41,
-          "ir": 809,
-          "recover": 1131,
-          "compile": 694,
-          "retrace": 7501,
-          "fdiff": 572
+          "trace": 17,
+          "ir": 660,
+          "recover": 1126,
+          "compile": 510,
+          "retrace": 8052,
+          "fdiff": 655
         },
-        "reconstructCpuPerMusicMinute": 3.83,
-        "recoverMsPerMusicMinute": 488.4
+        "reconstructCpuPerMusicMinute": 3.96,
+        "recoverMsPerMusicMinute": 486.2
       },
       "a1": {
         "level": "fail",
@@ -324,9 +323,9 @@
         "windows": 13030,
         "badWindows": 5142,
         "lagMs": 4,
-        "wallSeconds": 126.4
+        "wallSeconds": 104.5
       },
-      "finishedAt": "2026-11-27T09:33:55.618Z"
+      "finishedAt": "2026-11-27T09:47:48.035Z"
     },
     {
       "path": "MUSICIANS/M/Mythus/Odd_Jam.sid",
@@ -341,8 +340,8 @@
       "model": "8580",
       "sidCount": 1,
       "speed": "VBI",
-      "rootCause": "filter",
-      "why": "first difference in filter",
+      "rootCause": "gate/hard restart",
+      "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
       "compileOk": true,
@@ -354,35 +353,36 @@
         "irregularShare": 0.00026072220049537216
       },
       "fdiff": {
-        "differingCalls": 35968,
+        "differingCalls": 35970,
         "comparedCalls": 7670,
         "expectedCalls": 7672,
         "observedCalls": 7671,
         "standardAlignment": true,
         "first": {
-          "class": "filter",
+          "class": "gate",
           "call": 0,
           "timeSeconds": 0,
-          "register": 22,
+          "voice": 1,
+          "register": 4,
           "expected": 0,
-          "observed": 128
+          "detail": "in-call control write 1: 1 expected, 0 observed"
         },
         "classes": {
           "pitch": {
-            "differingCalls": 7178,
-            "matchShare": 0.064146
+            "differingCalls": 7179,
+            "matchShare": 0.064016
           },
           "gate": {
-            "differingCalls": 3100,
-            "matchShare": 0.595828
+            "differingCalls": 3101,
+            "matchShare": 0.595698
           },
           "waveform": {
-            "differingCalls": 7662,
-            "matchShare": 0.001043
+            "differingCalls": 7663,
+            "matchShare": 0.000913
           },
           "pulse": {
-            "differingCalls": 7662,
-            "matchShare": 0.001043
+            "differingCalls": 7663,
+            "matchShare": 0.000913
           },
           "adsr": {
             "differingCalls": 12,
@@ -397,13 +397,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2860,
-            "matchShare": 0.627119
+            "differingCalls": 2858,
+            "matchShare": 0.627379
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 35961,
+        "differingCalls": 35963,
         "first": {
           "class": "filter",
           "call": 0,
@@ -414,20 +414,20 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 7178,
-            "matchShare": 0.064146
+            "differingCalls": 7179,
+            "matchShare": 0.064016
           },
           "gate": {
-            "differingCalls": 3093,
-            "matchShare": 0.596741
+            "differingCalls": 3094,
+            "matchShare": 0.59661
           },
           "waveform": {
-            "differingCalls": 7662,
-            "matchShare": 0.001043
+            "differingCalls": 7663,
+            "matchShare": 0.000913
           },
           "pulse": {
-            "differingCalls": 7662,
-            "matchShare": 0.001043
+            "differingCalls": 7663,
+            "matchShare": 0.000913
           },
           "adsr": {
             "differingCalls": 12,
@@ -442,36 +442,36 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2860,
-            "matchShare": 0.627119
+            "differingCalls": 2858,
+            "matchShare": 0.627379
           }
         }
       },
       "recovery": {
         "speed": 1,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 7672,
+        "firstCall": 1,
+        "rows": 7671,
         "tuningCents": 0.45,
         "noteCount": 2540,
         "phantomNotes": 0,
         "instrumentCount": 63,
-        "patternCount": 224,
+        "patternCount": 225,
         "structure": {
           "blockBars": 1,
-          "bytes": 148641,
+          "bytes": 148902,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 146219
+              "bytes": 146490
             },
             {
               "blockBars": 2,
-              "bytes": 149800
+              "bytes": 151224
             },
             {
               "blockBars": 4,
-              "bytes": 180654
+              "bytes": 180641
             },
             {
               "blockBars": 8,
@@ -3339,32 +3339,32 @@
           "reason": "the filter state of a routed note cannot be written as a filter table"
         }
       ],
-      "scoreBytes": 148641,
-      "scoreSha256": "55852df5659322a2297a649050f0059ce741a56adb115fbb8faf2f8b12d496b8",
+      "scoreBytes": 148902,
+      "scoreSha256": "1b78eccf84caf6e72591fadddd65d90767e7c35d4b5221996acf3da316612577",
       "compiledBytes": 15641,
       "timing": {
-        "wallSeconds": 17.36,
-        "cpuSeconds": 10.44,
+        "wallSeconds": 13.96,
+        "cpuSeconds": 10.33,
         "phasesMs": {
-          "trace": 35,
-          "ir": 760,
-          "recover": 2373,
-          "compile": 1128,
-          "retrace": 11585,
-          "fdiff": 1481
+          "trace": 23,
+          "ir": 650,
+          "recover": 2159,
+          "compile": 1089,
+          "retrace": 9383,
+          "fdiff": 658
         },
-        "reconstructCpuPerMusicMinute": 4.09,
-        "recoverMsPerMusicMinute": 929.4
+        "reconstructCpuPerMusicMinute": 4.05,
+        "recoverMsPerMusicMinute": 845.6
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 14363,
-        "badWindows": 12989,
-        "lagMs": 20,
-        "wallSeconds": 133.8
+        "badWindows": 12996,
+        "lagMs": 0,
+        "wallSeconds": 113.7
       },
-      "finishedAt": "2026-11-27T09:33:55.666Z"
+      "finishedAt": "2026-11-27T09:47:47.981Z"
     },
     {
       "path": "MUSICIANS/D/Dr_Piotr/Defibrylacja.sid",
@@ -3384,7 +3384,7 @@
       "strictExact": false,
       "registerStateExact": false,
       "compileOk": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 4510 cycles per call at speed 4 (4139 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 4538 cycles per call at speed 4 (4139 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 36043,
       "callRate": {
         "periodCycles": 4931,
@@ -4112,18 +4112,18 @@
       "scoreSha256": "c5c8149dce852ff65062d78bb92f3ce5b3bfa575dfb03f3b648f212c55f9bfe7",
       "compiledBytes": 12481,
       "timing": {
-        "wallSeconds": 22.01,
-        "cpuSeconds": 15.94,
+        "wallSeconds": 20.12,
+        "cpuSeconds": 15.9,
         "phasesMs": {
-          "trace": 303,
-          "ir": 2899,
-          "recover": 2436,
-          "compile": 745,
-          "retrace": 11859,
-          "fdiff": 3770
+          "trace": 136,
+          "ir": 2939,
+          "recover": 1926,
+          "compile": 746,
+          "retrace": 11513,
+          "fdiff": 2858
         },
-        "reconstructCpuPerMusicMinute": 5.31,
-        "recoverMsPerMusicMinute": 811.8
+        "reconstructCpuPerMusicMinute": 5.3,
+        "recoverMsPerMusicMinute": 641.9
       },
       "a1": {
         "level": "fail",
@@ -4131,9 +4131,9 @@
         "windows": 16874,
         "badWindows": 12054,
         "lagMs": 0,
-        "wallSeconds": 182.9
+        "wallSeconds": 139.5
       },
-      "finishedAt": "2026-11-27T09:33:55.561Z"
+      "finishedAt": "2026-11-27T09:47:48.041Z"
     },
     {
       "path": "MUSICIANS/W/Wijnhoven_Joachim/Bomb_Jack_Title_Deluxe_2SID.sid",
@@ -4148,8 +4148,8 @@
       "model": "8580",
       "sidCount": 2,
       "speed": "VBI",
-      "rootCause": "filter",
-      "why": "first difference in filter",
+      "rootCause": "gate/hard restart",
+      "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
       "compileOk": true,
@@ -4161,47 +4161,48 @@
         "irregularShare": 0.0008022462896109105
       },
       "fdiff": {
-        "differingCalls": 17923,
+        "differingCalls": 17929,
         "comparedCalls": 2493,
         "expectedCalls": 2494,
         "observedCalls": 2494,
         "standardAlignment": true,
         "first": {
-          "class": "filter",
+          "class": "gate",
           "call": 0,
           "timeSeconds": 0,
-          "register": 22,
+          "voice": 1,
+          "register": 4,
           "expected": 0,
-          "observed": 128
+          "detail": "in-call control write 1: 1 expected, 0 observed"
         },
         "classes": {
           "pitch": {
-            "differingCalls": 2490,
-            "matchShare": 0.001203
+            "differingCalls": 2491,
+            "matchShare": 0.000802
           },
           "gate": {
-            "differingCalls": 2216,
-            "matchShare": 0.111111
+            "differingCalls": 2217,
+            "matchShare": 0.11071
           },
           "waveform": {
+            "differingCalls": 2486,
+            "matchShare": 0.002808
+          },
+          "pulse": {
             "differingCalls": 2485,
             "matchShare": 0.003209
           },
-          "pulse": {
-            "differingCalls": 2484,
-            "matchShare": 0.00361
-          },
           "adsr": {
-            "differingCalls": 2487,
-            "matchShare": 0.002407
+            "differingCalls": 2488,
+            "matchShare": 0.002006
           },
           "filter": {
             "differingCalls": 2493,
             "matchShare": 0
           },
           "volume": {
-            "differingCalls": 2491,
-            "matchShare": 0.000802
+            "differingCalls": 2492,
+            "matchShare": 0.000401
           },
           "timing": {
             "differingCalls": 777,
@@ -4210,7 +4211,7 @@
         }
       },
       "fdiffState": {
-        "differingCalls": 17916,
+        "differingCalls": 17922,
         "first": {
           "class": "filter",
           "call": 0,
@@ -4221,32 +4222,32 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 2490,
-            "matchShare": 0.001203
+            "differingCalls": 2491,
+            "matchShare": 0.000802
           },
           "gate": {
-            "differingCalls": 2209,
-            "matchShare": 0.113919
+            "differingCalls": 2210,
+            "matchShare": 0.113518
           },
           "waveform": {
+            "differingCalls": 2486,
+            "matchShare": 0.002808
+          },
+          "pulse": {
             "differingCalls": 2485,
             "matchShare": 0.003209
           },
-          "pulse": {
-            "differingCalls": 2484,
-            "matchShare": 0.00361
-          },
           "adsr": {
-            "differingCalls": 2487,
-            "matchShare": 0.002407
+            "differingCalls": 2488,
+            "matchShare": 0.002006
           },
           "filter": {
             "differingCalls": 2493,
             "matchShare": 0
           },
           "volume": {
-            "differingCalls": 2491,
-            "matchShare": 0.000802
+            "differingCalls": 2492,
+            "matchShare": 0.000401
           },
           "timing": {
             "differingCalls": 777,
@@ -4257,8 +4258,8 @@
       "recovery": {
         "speed": 1,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 2494,
+        "firstCall": 1,
+        "rows": 2493,
         "tuningCents": 0.4,
         "noteCount": 840,
         "phantomNotes": 0,
@@ -4266,23 +4267,23 @@
         "patternCount": 74,
         "structure": {
           "blockBars": 1,
-          "bytes": 28669,
+          "bytes": 28914,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 28075
+              "bytes": 28320
             },
             {
               "blockBars": 2,
-              "bytes": 31797
+              "bytes": 31664
             },
             {
               "blockBars": 4,
-              "bytes": 36917
+              "bytes": 37162
             },
             {
               "blockBars": 8,
-              "bytes": 44520
+              "bytes": 44624
             }
           ]
         },
@@ -4620,32 +4621,32 @@
           "reason": "the filter state of a routed note cannot be written as a filter table"
         }
       ],
-      "scoreBytes": 28669,
-      "scoreSha256": "a76ca19b075de72cd722ca36f60fb6e24ecc19a7b0bedcf47d21213f3d20c2be",
+      "scoreBytes": 28914,
+      "scoreSha256": "4c018d85fbe0626d1accf0bea28863a7ce3c09f291b27637f4752707465a9d53",
       "compiledBytes": 4733,
       "timing": {
-        "wallSeconds": 6.7,
-        "cpuSeconds": 4.26,
+        "wallSeconds": 6.54,
+        "cpuSeconds": 4.31,
         "phasesMs": {
-          "trace": 43,
-          "ir": 861,
-          "recover": 775,
-          "compile": 552,
-          "retrace": 3805,
-          "fdiff": 660
+          "trace": 25,
+          "ir": 570,
+          "recover": 752,
+          "compile": 563,
+          "retrace": 4173,
+          "fdiff": 452
         },
-        "reconstructCpuPerMusicMinute": 5.13,
-        "recoverMsPerMusicMinute": 934.2
+        "reconstructCpuPerMusicMinute": 5.2,
+        "recoverMsPerMusicMinute": 905.6
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 4667,
-        "badWindows": 3634,
-        "lagMs": 20,
-        "wallSeconds": 59.4
+        "badWindows": 3624,
+        "lagMs": 0,
+        "wallSeconds": 53.8
       },
-      "finishedAt": "2026-11-27T09:33:55.588Z"
+      "finishedAt": "2026-11-27T09:47:48.054Z"
     },
     {
       "path": "MUSICIANS/N/Nordischsound/Ninjas_Delight.sid",
@@ -4673,11 +4674,11 @@
         "irregularShare": 0.00008990380293086398
       },
       "fdiff": {
-        "differingCalls": 112230,
-        "comparedCalls": 22246,
+        "differingCalls": 108914,
+        "comparedCalls": 22245,
         "expectedCalls": 22247,
-        "observedCalls": 22247,
-        "standardAlignment": false,
+        "observedCalls": 22246,
+        "standardAlignment": true,
         "first": {
           "class": "gate",
           "call": 0,
@@ -4689,27 +4690,27 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 21799,
-            "matchShare": 0.020093
+            "differingCalls": 21148,
+            "matchShare": 0.049314
           },
           "gate": {
-            "differingCalls": 19505,
-            "matchShare": 0.123213
+            "differingCalls": 18626,
+            "matchShare": 0.162688
           },
           "waveform": {
             "differingCalls": 13745,
-            "matchShare": 0.382136
+            "matchShare": 0.382108
           },
           "pulse": {
             "differingCalls": 22226,
-            "matchShare": 0.000899
+            "matchShare": 0.000854
           },
           "adsr": {
-            "differingCalls": 8102,
-            "matchShare": 0.6358
+            "differingCalls": 6410,
+            "matchShare": 0.711845
           },
           "filter": {
-            "differingCalls": 22226,
+            "differingCalls": 22225,
             "matchShare": 0.000899
           },
           "volume": {
@@ -4717,13 +4718,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 4627,
-            "matchShare": 0.792008
+            "differingCalls": 4534,
+            "matchShare": 0.796179
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 112211,
+        "differingCalls": 108895,
         "first": {
           "class": "timing",
           "call": 1,
@@ -4734,27 +4735,27 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 21799,
-            "matchShare": 0.020093
+            "differingCalls": 21148,
+            "matchShare": 0.049314
           },
           "gate": {
-            "differingCalls": 19486,
-            "matchShare": 0.124067
+            "differingCalls": 18607,
+            "matchShare": 0.163542
           },
           "waveform": {
             "differingCalls": 13745,
-            "matchShare": 0.382136
+            "matchShare": 0.382108
           },
           "pulse": {
             "differingCalls": 22226,
-            "matchShare": 0.000899
+            "matchShare": 0.000854
           },
           "adsr": {
-            "differingCalls": 8102,
-            "matchShare": 0.6358
+            "differingCalls": 6410,
+            "matchShare": 0.711845
           },
           "filter": {
-            "differingCalls": 22226,
+            "differingCalls": 22225,
             "matchShare": 0.000899
           },
           "volume": {
@@ -4762,16 +4763,16 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 4627,
-            "matchShare": 0.792008
+            "differingCalls": 4534,
+            "matchShare": 0.796179
           }
         }
       },
       "recovery": {
         "speed": 3,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 22247,
+        "firstCall": 1,
+        "rows": 22246,
         "tuningCents": 0.45,
         "noteCount": 2549,
         "phantomNotes": 1,
@@ -4779,23 +4780,23 @@
         "patternCount": 154,
         "structure": {
           "blockBars": 1,
-          "bytes": 72013,
+          "bytes": 72753,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 71515
+              "bytes": 72255
             },
             {
               "blockBars": 2,
-              "bytes": 78141
+              "bytes": 78575
             },
             {
               "blockBars": 4,
-              "bytes": 105185
+              "bytes": 105635
             },
             {
               "blockBars": 8,
-              "bytes": 116741
+              "bytes": 117207
             }
           ]
         },
@@ -6619,32 +6620,32 @@
           "reason": "the language has no construct for an arbitrary cutoff, resonance, routing, mode or volume sequence"
         }
       ],
-      "scoreBytes": 72013,
-      "scoreSha256": "d481dc45260fba3fc382a4f7e37d8b4c24894391cbc5f5caddd7180769bf779c",
+      "scoreBytes": 72753,
+      "scoreSha256": "7bf79144c6923b0a79ae4a0ee5b96a98b334ea7696ea176a2f0f17d12723b03f",
       "compiledBytes": 11210,
       "timing": {
-        "wallSeconds": 16.39,
-        "cpuSeconds": 12.37,
+        "wallSeconds": 12.8,
+        "cpuSeconds": 11.67,
         "phasesMs": {
-          "trace": 47,
-          "ir": 1284,
-          "recover": 1233,
-          "compile": 589,
-          "retrace": 9810,
-          "fdiff": 3426
+          "trace": 48,
+          "ir": 1399,
+          "recover": 1026,
+          "compile": 485,
+          "retrace": 7657,
+          "fdiff": 2187
         },
-        "reconstructCpuPerMusicMinute": 5.01,
-        "recoverMsPerMusicMinute": 499.4
+        "reconstructCpuPerMusicMinute": 4.73,
+        "recoverMsPerMusicMinute": 415.7
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 13886,
-        "badWindows": 9922,
-        "lagMs": 8,
-        "wallSeconds": 152.4
+        "badWindows": 9948,
+        "lagMs": 2,
+        "wallSeconds": 109.1
       },
-      "finishedAt": "2026-11-27T09:35:01.897Z"
+      "finishedAt": "2026-11-27T09:48:48.629Z"
     },
     {
       "path": "MUSICIANS/B/Beggerow_Alan/Meet_Me_in_St_Louis.sid",
@@ -6825,18 +6826,18 @@
       "scoreSha256": "90f0de913b7224b6abb6505cf0f2727675146e61b7678cffa332dd9e7386a453",
       "compiledBytes": 5986,
       "timing": {
-        "wallSeconds": 11.58,
-        "cpuSeconds": 8.01,
+        "wallSeconds": 9.6,
+        "cpuSeconds": 8.02,
         "phasesMs": {
           "trace": 2,
-          "ir": 511,
-          "recover": 622,
-          "compile": 350,
-          "retrace": 9799,
-          "fdiff": 296
+          "ir": 723,
+          "recover": 605,
+          "compile": 394,
+          "retrace": 7590,
+          "fdiff": 283
         },
-        "reconstructCpuPerMusicMinute": 3.53,
-        "recoverMsPerMusicMinute": 274.5
+        "reconstructCpuPerMusicMinute": 3.54,
+        "recoverMsPerMusicMinute": 266.9
       },
       "a1": {
         "level": "fail",
@@ -6844,9 +6845,9 @@
         "windows": 12747,
         "badWindows": 11820,
         "lagMs": 2,
-        "wallSeconds": 154.2
+        "wallSeconds": 100.9
       },
-      "finishedAt": "2026-11-27T09:36:13.008Z"
+      "finishedAt": "2026-11-27T09:49:43.877Z"
     },
     {
       "path": "MUSICIANS/H/Hubbard_Rob/Skate_or_Die_intro.sid",
@@ -7057,18 +7058,18 @@
       "scoreSha256": "6832179102dba746337980af9519c02c35a5a5a1fcc4c12675dea08dc05e28e2",
       "compiledBytes": 10319,
       "timing": {
-        "wallSeconds": 13.37,
-        "cpuSeconds": 11.46,
+        "wallSeconds": 12.1,
+        "cpuSeconds": 11.09,
         "phasesMs": {
-          "trace": 151,
-          "ir": 1187,
-          "recover": 1013,
-          "compile": 595,
-          "retrace": 9506,
-          "fdiff": 913
+          "trace": 129,
+          "ir": 1238,
+          "recover": 1115,
+          "compile": 452,
+          "retrace": 8427,
+          "fdiff": 735
         },
-        "reconstructCpuPerMusicMinute": 3.82,
-        "recoverMsPerMusicMinute": 337.6
+        "reconstructCpuPerMusicMinute": 3.7,
+        "recoverMsPerMusicMinute": 371.7
       },
       "a1": {
         "level": "fail",
@@ -7076,9 +7077,9 @@
         "windows": 16874,
         "badWindows": 12623,
         "lagMs": 16,
-        "wallSeconds": 210.1
+        "wallSeconds": 158.7
       },
-      "finishedAt": "2026-11-27T09:36:27.063Z"
+      "finishedAt": "2026-11-27T09:49:55.868Z"
     },
     {
       "path": "MUSICIANS/T/Toggle/Cheers_and_Tributes.sid",
@@ -8207,24 +8208,24 @@
       "scoreSha256": "e360730b65d9f985905bfe81de9635cbf77117eb7901280bc8cfcac8d12463ea",
       "compiledBytes": 11446,
       "timing": {
-        "wallSeconds": 23.7,
-        "cpuSeconds": 13.17,
+        "wallSeconds": 14.67,
+        "cpuSeconds": 13.01,
         "phasesMs": {
-          "trace": 270,
-          "ir": 2051,
-          "recover": 2376,
-          "compile": 601,
-          "retrace": 14727,
-          "fdiff": 3674
+          "trace": 57,
+          "ir": 1067,
+          "recover": 1021,
+          "compile": 371,
+          "retrace": 10652,
+          "fdiff": 1500
         },
-        "reconstructCpuPerMusicMinute": 4.39,
-        "recoverMsPerMusicMinute": 792.2
+        "reconstructCpuPerMusicMinute": 4.34,
+        "recoverMsPerMusicMinute": 340.2
       },
       "a1": {
         "status": "error",
         "error": "Invalid SID write at record 1"
       },
-      "finishedAt": "2026-11-27T09:37:20.904Z"
+      "finishedAt": "2026-11-27T09:50:27.820Z"
     },
     {
       "path": "MUSICIANS/Z/Zonzo/Xcellent_part_3.sid",
@@ -8256,7 +8257,7 @@
         "comparedCalls": 15,
         "expectedCalls": 9013,
         "observedCalls": 16,
-        "standardAlignment": true,
+        "standardAlignment": false,
         "first": {
           "class": "volume",
           "call": 0,
@@ -8348,8 +8349,8 @@
       "recovery": {
         "speed": 1,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 9013,
+        "firstCall": 2,
+        "rows": 9011,
         "tuningCents": 0.1,
         "noteCount": 672,
         "phantomNotes": 1,
@@ -8357,7 +8358,7 @@
         "patternCount": 1,
         "structure": {
           "blockBars": "flat",
-          "bytes": 22428,
+          "bytes": 22399,
           "alternatives": []
         },
         "tuningEvidence": {
@@ -8438,22 +8439,22 @@
           "reason": "294 steps exceed 255"
         }
       ],
-      "scoreBytes": 22428,
-      "scoreSha256": "1fcd992bced25dc882a68c5afd74139469567db1a1363e58fea4cfe2e5209ffb",
-      "compiledBytes": 1989,
+      "scoreBytes": 22399,
+      "scoreSha256": "beebf16304e9ed18e6bb43c9a963f112fb4b77f0143e2c533d9a22f3303106f6",
+      "compiledBytes": 1984,
       "timing": {
-        "wallSeconds": 11.24,
-        "cpuSeconds": 8.96,
+        "wallSeconds": 11.43,
+        "cpuSeconds": 9.23,
         "phasesMs": {
-          "trace": 103,
-          "ir": 900,
-          "recover": 634,
-          "compile": 246,
-          "retrace": 9353,
-          "fdiff": 8
+          "trace": 40,
+          "ir": 406,
+          "recover": 546,
+          "compile": 182,
+          "retrace": 10245,
+          "fdiff": 14
         },
-        "reconstructCpuPerMusicMinute": 2.99,
-        "recoverMsPerMusicMinute": 211.2
+        "reconstructCpuPerMusicMinute": 3.08,
+        "recoverMsPerMusicMinute": 182.2
       },
       "a1": {
         "level": "fail",
@@ -8461,9 +8462,9 @@
         "windows": 16874,
         "badWindows": 16741,
         "lagMs": 20,
-        "wallSeconds": 190.3
+        "wallSeconds": 159.6
       },
-      "finishedAt": "2026-11-27T09:37:51.100Z"
+      "finishedAt": "2026-11-27T09:50:50.762Z"
     },
     {
       "path": "MUSICIANS/S/SIDwave/Electro_Mechanica.sid",
@@ -12055,18 +12056,18 @@
       "scoreSha256": "c49014844b89b89022515d8abdcf7ad60d1b3281652e2cce1066b7a2bd3da1c3",
       "compiledBytes": 16679,
       "timing": {
-        "wallSeconds": 28.05,
-        "cpuSeconds": 19.85,
+        "wallSeconds": 22.74,
+        "cpuSeconds": 19.31,
         "phasesMs": {
-          "trace": 116,
-          "ir": 2984,
-          "recover": 1487,
-          "compile": 1069,
-          "retrace": 11481,
-          "fdiff": 10914
+          "trace": 127,
+          "ir": 2565,
+          "recover": 1896,
+          "compile": 1020,
+          "retrace": 11459,
+          "fdiff": 5677
         },
-        "reconstructCpuPerMusicMinute": 6.62,
-        "recoverMsPerMusicMinute": 495.7
+        "reconstructCpuPerMusicMinute": 6.44,
+        "recoverMsPerMusicMinute": 632
       },
       "a1": {
         "level": "fail",
@@ -12074,9 +12075,9 @@
         "windows": 16874,
         "badWindows": 11538,
         "lagMs": -6,
-        "wallSeconds": 209.9
+        "wallSeconds": 180.5
       },
-      "finishedAt": "2026-11-27T09:37:58.873Z"
+      "finishedAt": "2026-11-27T09:50:52.419Z"
     },
     {
       "path": "MUSICIANS/L/Linus/Your_Time_Is_Running_Thin.sid",
@@ -12096,7 +12097,7 @@
       "strictExact": false,
       "registerStateExact": false,
       "compileOk": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 2713 cycles per call at speed 8 (1819 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 2727 cycles per call at speed 8 (1819 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 24542,
       "callRate": {
         "periodCycles": 2457,
@@ -12105,10 +12106,10 @@
         "irregularShare": 0.2500713092376024
       },
       "fdiff": {
-        "differingCalls": 84299,
-        "comparedCalls": 13399,
+        "differingCalls": 84035,
+        "comparedCalls": 13310,
         "expectedCalls": 24542,
-        "observedCalls": 13399,
+        "observedCalls": 13310,
         "standardAlignment": false,
         "first": {
           "class": "gate",
@@ -12121,41 +12122,41 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 11630,
-            "matchShare": 0.132025
+            "differingCalls": 11556,
+            "matchShare": 0.131781
           },
           "gate": {
-            "differingCalls": 13385,
-            "matchShare": 0.001045
+            "differingCalls": 13290,
+            "matchShare": 0.001503
           },
           "waveform": {
-            "differingCalls": 13390,
-            "matchShare": 0.000672
+            "differingCalls": 13301,
+            "matchShare": 0.000676
           },
           "pulse": {
-            "differingCalls": 11125,
-            "matchShare": 0.169714
+            "differingCalls": 11036,
+            "matchShare": 0.170849
           },
           "adsr": {
-            "differingCalls": 10259,
-            "matchShare": 0.234346
+            "differingCalls": 10518,
+            "matchShare": 0.209767
           },
           "filter": {
-            "differingCalls": 11044,
-            "matchShare": 0.175759
+            "differingCalls": 10955,
+            "matchShare": 0.176935
           },
           "volume": {
-            "differingCalls": 68,
-            "matchShare": 0.994925
+            "differingCalls": 70,
+            "matchShare": 0.994741
           },
           "timing": {
-            "differingCalls": 13398,
+            "differingCalls": 13309,
             "matchShare": 0.000075
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 84283,
+        "differingCalls": 84019,
         "first": {
           "class": "volume",
           "call": 0,
@@ -12166,35 +12167,35 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 11630,
-            "matchShare": 0.132025
+            "differingCalls": 11556,
+            "matchShare": 0.131781
           },
           "gate": {
-            "differingCalls": 13369,
-            "matchShare": 0.002239
+            "differingCalls": 13274,
+            "matchShare": 0.002705
           },
           "waveform": {
-            "differingCalls": 13390,
-            "matchShare": 0.000672
+            "differingCalls": 13301,
+            "matchShare": 0.000676
           },
           "pulse": {
-            "differingCalls": 11125,
-            "matchShare": 0.169714
+            "differingCalls": 11036,
+            "matchShare": 0.170849
           },
           "adsr": {
-            "differingCalls": 10259,
-            "matchShare": 0.234346
+            "differingCalls": 10518,
+            "matchShare": 0.209767
           },
           "filter": {
-            "differingCalls": 11044,
-            "matchShare": 0.175759
+            "differingCalls": 10955,
+            "matchShare": 0.176935
           },
           "volume": {
-            "differingCalls": 68,
-            "matchShare": 0.994925
+            "differingCalls": 70,
+            "matchShare": 0.994741
           },
           "timing": {
-            "differingCalls": 13398,
+            "differingCalls": 13309,
             "matchShare": 0.000075
           }
         }
@@ -12202,8 +12203,8 @@
       "recovery": {
         "speed": 8,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 24542,
+        "firstCall": 2,
+        "rows": 24540,
         "tuningCents": 0.45,
         "noteCount": 1418,
         "phantomNotes": 1,
@@ -12211,23 +12212,23 @@
         "patternCount": 81,
         "structure": {
           "blockBars": 1,
-          "bytes": 107852,
+          "bytes": 108364,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 105637
+              "bytes": 106149
             },
             {
               "blockBars": 2,
-              "bytes": 122536
+              "bytes": 123080
             },
             {
               "blockBars": 4,
-              "bytes": 145171
+              "bytes": 145715
             },
             {
               "blockBars": 8,
-              "bytes": 178956
+              "bytes": 179500
             }
           ]
         },
@@ -13315,32 +13316,32 @@
           "reason": "the language has no construct for an arbitrary cutoff, resonance, routing, mode or volume sequence"
         }
       ],
-      "scoreBytes": 107852,
-      "scoreSha256": "331b1eefafdd48d3e20a2a4aab2da81b4b7eda38ac49e1b9b520632e1e8a3468",
+      "scoreBytes": 108364,
+      "scoreSha256": "e48869a37a8e269d12e7ff85d6899aeef99ffca4863b8cdf35a2a9b55c299d1c",
       "compiledBytes": 7454,
       "timing": {
-        "wallSeconds": 15.8,
-        "cpuSeconds": 8.16,
+        "wallSeconds": 14.09,
+        "cpuSeconds": 8.27,
         "phasesMs": {
-          "trace": 123,
-          "ir": 3118,
-          "recover": 1421,
-          "compile": 761,
-          "retrace": 7362,
-          "fdiff": 3014
+          "trace": 80,
+          "ir": 1756,
+          "recover": 1891,
+          "compile": 1084,
+          "retrace": 5932,
+          "fdiff": 3350
         },
-        "reconstructCpuPerMusicMinute": 7.99,
-        "recoverMsPerMusicMinute": 1390.7
+        "reconstructCpuPerMusicMinute": 8.1,
+        "recoverMsPerMusicMinute": 1850.9
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 5744,
-        "badWindows": 5532,
-        "lagMs": -6,
-        "wallSeconds": 64
+        "badWindows": 5536,
+        "lagMs": -12,
+        "wallSeconds": 63.2
       },
-      "finishedAt": "2026-11-27T09:38:59.538Z"
+      "finishedAt": "2026-11-27T09:51:34.688Z"
     },
     {
       "path": "MUSICIANS/H/Hancock_John/Die_Hard_2_Die_Harder.sid",
@@ -13549,18 +13550,18 @@
       "scoreSha256": "ce95c568ded93ca52f48c993af5d8020066de4ee3d663c302e39a4e70898e887",
       "compiledBytes": 3823,
       "timing": {
-        "wallSeconds": 4.89,
-        "cpuSeconds": 2.95,
+        "wallSeconds": 3.35,
+        "cpuSeconds": 2.89,
         "phasesMs": {
-          "trace": 7,
-          "ir": 211,
-          "recover": 551,
-          "compile": 319,
-          "retrace": 3676,
-          "fdiff": 126
+          "trace": 2,
+          "ir": 237,
+          "recover": 412,
+          "compile": 309,
+          "retrace": 2225,
+          "fdiff": 161
         },
-        "reconstructCpuPerMusicMinute": 4.43,
-        "recoverMsPerMusicMinute": 827
+        "reconstructCpuPerMusicMinute": 4.34,
+        "recoverMsPerMusicMinute": 618.3
       },
       "a1": {
         "level": "fail",
@@ -13568,9 +13569,9 @@
         "windows": 3749,
         "badWindows": 2744,
         "lagMs": 8,
-        "wallSeconds": 39.8
+        "wallSeconds": 50.6
       },
-      "finishedAt": "2026-11-27T09:40:10.980Z"
+      "finishedAt": "2026-11-27T09:52:47.032Z"
     },
     {
       "path": "MUSICIANS/D/Dgazz/Icy_Slide.sid",
@@ -17778,18 +17779,18 @@
       "scoreSha256": "4d9ad027dffe729574e7a057e31997e11167101858b88ff7669f3dfff8dd59a8",
       "compiledBytes": 17057,
       "timing": {
-        "wallSeconds": 25.72,
-        "cpuSeconds": 18.1,
+        "wallSeconds": 34.01,
+        "cpuSeconds": 19.08,
         "phasesMs": {
-          "trace": 268,
-          "ir": 3113,
-          "recover": 2017,
-          "compile": 1476,
-          "retrace": 13124,
-          "fdiff": 5723
+          "trace": 152,
+          "ir": 3475,
+          "recover": 3638,
+          "compile": 2914,
+          "retrace": 19256,
+          "fdiff": 4579
         },
-        "reconstructCpuPerMusicMinute": 6.03,
-        "recoverMsPerMusicMinute": 672.2
+        "reconstructCpuPerMusicMinute": 6.36,
+        "recoverMsPerMusicMinute": 1212.8
       },
       "a1": {
         "level": "fail",
@@ -17797,9 +17798,9 @@
         "windows": 16874,
         "badWindows": 13332,
         "lagMs": -18,
-        "wallSeconds": 152.8
+        "wallSeconds": 162
       },
-      "finishedAt": "2026-11-27T09:40:19.899Z"
+      "finishedAt": "2026-11-27T09:52:52.911Z"
     },
     {
       "path": "MUSICIANS/P/PCH/Music_Dream.sid",
@@ -17827,11 +17828,11 @@
         "irregularShare": 0.4261996198456108
       },
       "fdiff": {
-        "differingCalls": 145574,
-        "comparedCalls": 25728,
+        "differingCalls": 144499,
+        "comparedCalls": 25727,
         "expectedCalls": 25780,
         "observedCalls": 25729,
-        "standardAlignment": false,
+        "standardAlignment": true,
         "first": {
           "class": "gate",
           "call": 0,
@@ -17843,27 +17844,27 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 23355,
-            "matchShare": 0.092234
+            "differingCalls": 22791,
+            "matchShare": 0.114121
           },
           "gate": {
-            "differingCalls": 14143,
-            "matchShare": 0.450288
+            "differingCalls": 14237,
+            "matchShare": 0.446613
           },
           "waveform": {
-            "differingCalls": 17213,
-            "matchShare": 0.330962
+            "differingCalls": 17194,
+            "matchShare": 0.331675
           },
           "pulse": {
-            "differingCalls": 25604,
-            "matchShare": 0.00482
+            "differingCalls": 23203,
+            "matchShare": 0.098107
           },
           "adsr": {
-            "differingCalls": 16782,
-            "matchShare": 0.347715
+            "differingCalls": 16871,
+            "matchShare": 0.34423
           },
           "filter": {
-            "differingCalls": 25727,
+            "differingCalls": 25726,
             "matchShare": 0.000039
           },
           "volume": {
@@ -17871,13 +17872,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 22750,
-            "matchShare": 0.115749
+            "differingCalls": 24477,
+            "matchShare": 0.048587
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 145557,
+        "differingCalls": 144482,
         "first": {
           "class": "gate",
           "call": 0,
@@ -17889,27 +17890,27 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 23355,
-            "matchShare": 0.092234
+            "differingCalls": 22791,
+            "matchShare": 0.114121
           },
           "gate": {
-            "differingCalls": 14126,
-            "matchShare": 0.450948
+            "differingCalls": 14220,
+            "matchShare": 0.447273
           },
           "waveform": {
-            "differingCalls": 17213,
-            "matchShare": 0.330962
+            "differingCalls": 17194,
+            "matchShare": 0.331675
           },
           "pulse": {
-            "differingCalls": 25604,
-            "matchShare": 0.00482
+            "differingCalls": 23203,
+            "matchShare": 0.098107
           },
           "adsr": {
-            "differingCalls": 16782,
-            "matchShare": 0.347715
+            "differingCalls": 16871,
+            "matchShare": 0.34423
           },
           "filter": {
-            "differingCalls": 25727,
+            "differingCalls": 25726,
             "matchShare": 0.000039
           },
           "volume": {
@@ -17917,8 +17918,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 22750,
-            "matchShare": 0.115749
+            "differingCalls": 24477,
+            "matchShare": 0.048587
           }
         }
       },
@@ -18450,18 +18451,18 @@
       "scoreSha256": "c12783d23a6d98a1d525f4b47ad2e060c1374402d3b2c77f18432f4ddb94b335",
       "compiledBytes": 15516,
       "timing": {
-        "wallSeconds": 21.75,
-        "cpuSeconds": 11.3,
+        "wallSeconds": 15.4,
+        "cpuSeconds": 11.49,
         "phasesMs": {
-          "trace": 151,
-          "ir": 2922,
-          "recover": 1440,
-          "compile": 953,
-          "retrace": 11414,
-          "fdiff": 4873
+          "trace": 146,
+          "ir": 1888,
+          "recover": 2195,
+          "compile": 1198,
+          "retrace": 7369,
+          "fdiff": 2605
         },
-        "reconstructCpuPerMusicMinute": 6.59,
-        "recoverMsPerMusicMinute": 838.6
+        "reconstructCpuPerMusicMinute": 6.7,
+        "recoverMsPerMusicMinute": 1278.7
       },
       "a1": {
         "level": "fail",
@@ -18469,9 +18470,9 @@
         "windows": 9655,
         "badWindows": 5773,
         "lagMs": 4,
-        "wallSeconds": 87.3
+        "wallSeconds": 91.6
       },
-      "finishedAt": "2026-11-27T09:40:56.181Z"
+      "finishedAt": "2026-11-27T09:53:41.965Z"
     },
     {
       "path": "DEMOS/UNKNOWN/Music_Shop/At_the_Hop.sid",
@@ -18486,11 +18487,12 @@
       "model": "6581",
       "sidCount": 1,
       "speed": "CIA",
-      "rootCause": "gate/hard restart",
-      "why": "first difference in gate",
+      "rootCause": "pitch",
+      "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
       "compileOk": true,
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 3074 cycles per call at speed 5 (2699 available at 1 MHz NTSC); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 6887,
       "callRate": {
         "periodCycles": 3584,
@@ -18499,96 +18501,97 @@
         "irregularShare": 0.20418239907057797
       },
       "fdiff": {
-        "differingCalls": 34576,
-        "comparedCalls": 6887,
+        "differingCalls": 34519,
+        "comparedCalls": 6881,
         "expectedCalls": 6887,
-        "observedCalls": 14655,
-        "standardAlignment": false,
+        "observedCalls": 14650,
+        "standardAlignment": true,
         "first": {
-          "class": "gate",
+          "class": "pitch",
           "call": 0,
           "timeSeconds": 0,
-          "voice": 1,
-          "register": 4,
-          "observed": 0,
-          "detail": "in-call control write 1: 0 expected, 1 observed"
+          "voice": 3,
+          "register": 14,
+          "expected": 48,
+          "observed": 97
         },
         "classes": {
           "pitch": {
-            "differingCalls": 6822,
-            "matchShare": 0.009438
+            "differingCalls": 6801,
+            "matchShare": 0.011626
           },
           "gate": {
-            "differingCalls": 6887,
-            "matchShare": 0
+            "differingCalls": 6880,
+            "matchShare": 0.000145
           },
           "waveform": {
-            "differingCalls": 7,
-            "matchShare": 0.998984
+            "differingCalls": 3,
+            "matchShare": 0.999564
           },
           "pulse": {
-            "differingCalls": 6886,
-            "matchShare": 0.000145
+            "differingCalls": 6881,
+            "matchShare": 0
           },
           "adsr": {
-            "differingCalls": 8,
-            "matchShare": 0.998838
+            "differingCalls": 5,
+            "matchShare": 0.999273
           },
           "filter": {
-            "differingCalls": 6886,
-            "matchShare": 0.000145
+            "differingCalls": 6881,
+            "matchShare": 0
           },
           "volume": {
-            "differingCalls": 194,
-            "matchShare": 0.971831
+            "differingCalls": 188,
+            "matchShare": 0.972678
           },
           "timing": {
-            "differingCalls": 6886,
+            "differingCalls": 6880,
             "matchShare": 0.000145
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 28670,
+        "differingCalls": 28622,
         "first": {
-          "class": "volume",
+          "class": "pitch",
           "call": 0,
           "timeSeconds": 0,
-          "register": 24,
-          "expected": 15,
-          "observed": 0
+          "voice": 3,
+          "register": 14,
+          "expected": 48,
+          "observed": 97
         },
         "classes": {
           "pitch": {
-            "differingCalls": 6822,
-            "matchShare": 0.009438
+            "differingCalls": 6801,
+            "matchShare": 0.011626
           },
           "gate": {
-            "differingCalls": 981,
-            "matchShare": 0.857558
+            "differingCalls": 983,
+            "matchShare": 0.857143
           },
           "waveform": {
-            "differingCalls": 7,
-            "matchShare": 0.998984
+            "differingCalls": 3,
+            "matchShare": 0.999564
           },
           "pulse": {
-            "differingCalls": 6886,
-            "matchShare": 0.000145
+            "differingCalls": 6881,
+            "matchShare": 0
           },
           "adsr": {
-            "differingCalls": 8,
-            "matchShare": 0.998838
+            "differingCalls": 5,
+            "matchShare": 0.999273
           },
           "filter": {
-            "differingCalls": 6886,
-            "matchShare": 0.000145
+            "differingCalls": 6881,
+            "matchShare": 0
           },
           "volume": {
-            "differingCalls": 194,
-            "matchShare": 0.971831
+            "differingCalls": 188,
+            "matchShare": 0.972678
           },
           "timing": {
-            "differingCalls": 6886,
+            "differingCalls": 6880,
             "matchShare": 0.000145
           }
         }
@@ -18596,32 +18599,32 @@
       "recovery": {
         "speed": 5,
         "tempo": 199.42029833284585,
-        "firstCall": 0,
-        "rows": 6887,
+        "firstCall": 6,
+        "rows": 6881,
         "tuningCents": -0.25,
         "noteCount": 42,
         "phantomNotes": 0,
-        "instrumentCount": 17,
+        "instrumentCount": 19,
         "patternCount": 18,
         "structure": {
           "blockBars": 1,
-          "bytes": 29266,
+          "bytes": 29083,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 29173
+              "bytes": 29040
             },
             {
               "blockBars": 2,
-              "bytes": 47357
+              "bytes": 44920
             },
             {
               "blockBars": 4,
-              "bytes": 68817
+              "bytes": 64172
             },
             {
               "blockBars": 8,
-              "bytes": 90347
+              "bytes": 81094
             }
           ]
         },
@@ -18644,7 +18647,7 @@
         },
         {
           "kind": "instrument_budget",
-          "detail": "16 notes use instruments whose tables or vibrato were dropped to stay within 63 instrument shapes and 255 table steps per kind"
+          "detail": "14 notes use instruments whose tables or vibrato were dropped to stay within 63 instrument shapes and 255 table steps per kind"
         },
         {
           "kind": "pitch",
@@ -18653,6 +18656,10 @@
         {
           "kind": "pitch",
           "detail": "instrument i3: the frequency registers of 1 notes are not equal-temperament pitches and no vibrato reproduces them"
+        },
+        {
+          "kind": "pitch",
+          "detail": "instrument i4: the frequency registers of 2 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
@@ -18685,16 +18692,16 @@
       ],
       "languageExtensions": [
         {
+          "id": "exact-frequency",
+          "construct": "a note given as an exact frequency register value (or a per-note cents offset)",
+          "occurrences": 3,
+          "reason": "constant frequency registers that are not equal-temperament pitches under any single tuning"
+        },
+        {
           "id": "pitch-table",
           "construct": "per-call frequency register values (pitch table, portamento or a vibrato shape the language lacks)",
           "occurrences": 1,
           "reason": "frequency registers deviate from the note pitch in a way no vibrato of the language reproduces"
-        },
-        {
-          "id": "exact-frequency",
-          "construct": "a note given as an exact frequency register value (or a per-note cents offset)",
-          "occurrences": 2,
-          "reason": "constant frequency registers that are not equal-temperament pitches under any single tuning"
         },
         {
           "id": "table-wavetable",
@@ -18715,32 +18722,32 @@
           "reason": "the language has no construct for an arbitrary cutoff, resonance, routing, mode or volume sequence"
         }
       ],
-      "scoreBytes": 29266,
-      "scoreSha256": "b5c1430e948c8bd6b431f49d1722732bda6e7e510eab7a588fc302c1035d20fa",
-      "compiledBytes": 4889,
+      "scoreBytes": 29083,
+      "scoreSha256": "d90ad09d3e38421fed96255b3a27c8e2b764118f7a0c75dcdc0ae7d25a8246a3",
+      "compiledBytes": 5068,
       "timing": {
-        "wallSeconds": 8.1,
-        "cpuSeconds": 4.95,
+        "wallSeconds": 7.25,
+        "cpuSeconds": 5.24,
         "phasesMs": {
-          "trace": 4,
-          "ir": 1048,
-          "recover": 1896,
-          "compile": 273,
-          "retrace": 3511,
-          "fdiff": 1366
+          "trace": 7,
+          "ir": 1004,
+          "recover": 652,
+          "compile": 448,
+          "retrace": 4082,
+          "fdiff": 1053
         },
-        "reconstructCpuPerMusicMinute": 6.06,
-        "recoverMsPerMusicMinute": 2321.2
+        "reconstructCpuPerMusicMinute": 6.41,
+        "recoverMsPerMusicMinute": 798.5
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 4592,
-        "badWindows": 4534,
-        "lagMs": -2,
-        "wallSeconds": 54.7
+        "badWindows": 4536,
+        "lagMs": 10,
+        "wallSeconds": 43.9
       },
-      "finishedAt": "2026-11-27T09:41:13.605Z"
+      "finishedAt": "2026-11-27T09:53:42.335Z"
     },
     {
       "path": "MUSICIANS/B/Bakewell_Dwayne/Experiment_2.sid",
@@ -18755,8 +18762,8 @@
       "model": "8580",
       "sidCount": 1,
       "speed": "CIA",
-      "rootCause": "gate/hard restart",
-      "why": "first difference in gate",
+      "rootCause": "pitch",
+      "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
       "compileOk": true,
@@ -18768,130 +18775,130 @@
         "irregularShare": 0.6789072398692956
       },
       "fdiff": {
-        "differingCalls": 261852,
-        "comparedCalls": 44987,
+        "differingCalls": 258651,
+        "comparedCalls": 44985,
         "expectedCalls": 44988,
-        "observedCalls": 45052,
-        "standardAlignment": false,
+        "observedCalls": 45056,
+        "standardAlignment": true,
         "first": {
-          "class": "gate",
+          "class": "pitch",
           "call": 0,
           "timeSeconds": 0,
           "voice": 1,
-          "register": 4,
-          "expected": 9,
+          "register": 0,
+          "expected": 12,
           "observed": 0
         },
         "classes": {
           "pitch": {
-            "differingCalls": 44298,
-            "matchShare": 0.015316
+            "differingCalls": 43882,
+            "matchShare": 0.024519
           },
           "gate": {
-            "differingCalls": 31952,
-            "matchShare": 0.28975
+            "differingCalls": 31180,
+            "matchShare": 0.30688
           },
           "waveform": {
-            "differingCalls": 34702,
-            "matchShare": 0.228622
+            "differingCalls": 33608,
+            "matchShare": 0.252907
           },
           "pulse": {
-            "differingCalls": 44978,
-            "matchShare": 0.0002
+            "differingCalls": 44973,
+            "matchShare": 0.000267
           },
           "adsr": {
-            "differingCalls": 16842,
-            "matchShare": 0.625625
+            "differingCalls": 16004,
+            "matchShare": 0.644237
           },
           "filter": {
             "differingCalls": 44941,
-            "matchShare": 0.001023
+            "matchShare": 0.000978
           },
           "volume": {
             "differingCalls": 0,
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 44139,
-            "matchShare": 0.01885
+            "differingCalls": 44063,
+            "matchShare": 0.020496
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 261849,
+        "differingCalls": 258651,
         "first": {
-          "class": "gate",
+          "class": "pitch",
           "call": 0,
           "timeSeconds": 0,
           "voice": 1,
-          "register": 4,
-          "expected": 9,
+          "register": 0,
+          "expected": 12,
           "observed": 0
         },
         "classes": {
           "pitch": {
-            "differingCalls": 44298,
-            "matchShare": 0.015316
+            "differingCalls": 43882,
+            "matchShare": 0.024519
           },
           "gate": {
-            "differingCalls": 31949,
-            "matchShare": 0.289817
+            "differingCalls": 31180,
+            "matchShare": 0.30688
           },
           "waveform": {
-            "differingCalls": 34702,
-            "matchShare": 0.228622
+            "differingCalls": 33608,
+            "matchShare": 0.252907
           },
           "pulse": {
-            "differingCalls": 44978,
-            "matchShare": 0.0002
+            "differingCalls": 44973,
+            "matchShare": 0.000267
           },
           "adsr": {
-            "differingCalls": 16842,
-            "matchShare": 0.625625
+            "differingCalls": 16004,
+            "matchShare": 0.644237
           },
           "filter": {
             "differingCalls": 44941,
-            "matchShare": 0.001023
+            "matchShare": 0.000978
           },
           "volume": {
             "differingCalls": 0,
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 44139,
-            "matchShare": 0.01885
+            "differingCalls": 44063,
+            "matchShare": 0.020496
           }
         }
       },
       "recovery": {
         "speed": 5,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 44988,
+        "firstCall": 3,
+        "rows": 44985,
         "tuningCents": -45.5,
-        "noteCount": 4054,
+        "noteCount": 4051,
         "phantomNotes": 0,
         "instrumentCount": 63,
-        "patternCount": 255,
+        "patternCount": 256,
         "structure": {
           "blockBars": 1,
-          "bytes": 224350,
+          "bytes": 227680,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 217144
+              "bytes": 220370
             },
             {
               "blockBars": 2,
-              "bytes": 278345
+              "bytes": 285634
             },
             {
               "blockBars": 4,
-              "bytes": 297780
+              "bytes": 315007
             },
             {
               "blockBars": 8,
-              "bytes": 323337
+              "bytes": 358852
             }
           ]
         },
@@ -18922,11 +18929,15 @@
         },
         {
           "kind": "instrument_budget",
-          "detail": "1519 notes use instruments whose tables or vibrato were dropped to stay within 63 instrument shapes and 255 table steps per kind"
+          "detail": "1450 notes use instruments whose tables or vibrato were dropped to stay within 63 instrument shapes and 255 table steps per kind"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i4: the frequency registers of 78 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i3: the frequency registers of 78 notes are not equal-temperament pitches and no vibrato reproduces them"
+        },
+        {
+          "kind": "pitch",
+          "detail": "instrument i5: the frequency registers of 90 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
@@ -18934,75 +18945,83 @@
         },
         {
           "kind": "pitch",
+          "detail": "instrument i2: the frequency registers of 85 notes are not equal-temperament pitches and no vibrato reproduces them"
+        },
+        {
+          "kind": "pitch",
           "detail": "instrument i7: the frequency registers of 90 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i8: the frequency registers of 84 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i11: the frequency registers of 36 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i9: the frequency registers of 90 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i19: the frequency registers of 196 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i3: the frequency registers of 37 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i23: the frequency registers of 352 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i22: the frequency registers of 196 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i24: the frequency registers of 145 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i26: the frequency registers of 352 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i25: the frequency registers of 104 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i27: the frequency registers of 145 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i26: the frequency registers of 70 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i28: the frequency registers of 104 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i18: the frequency registers of 48 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i29: the frequency registers of 70 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i27: the frequency registers of 96 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i21: the frequency registers of 47 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i28: the frequency registers of 158 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i30: the frequency registers of 96 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i29: the frequency registers of 211 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i31: the frequency registers of 158 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i30: the frequency registers of 61 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i32: the frequency registers of 211 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i31: the frequency registers of 60 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i33: the frequency registers of 61 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i32: the frequency registers of 132 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i34: the frequency registers of 60 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i34: the frequency registers of 50 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i35: the frequency registers of 132 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i38: the frequency registers of 24 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i37: the frequency registers of 50 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i40: the frequency registers of 24 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i41: the frequency registers of 24 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i41: the frequency registers of 48 notes are not equal-temperament pitches and no vibrato reproduces them"
+        },
+        {
+          "kind": "pitch",
+          "detail": "instrument i42: the frequency registers of 24 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
@@ -19010,19 +19029,15 @@
         },
         {
           "kind": "pitch",
-          "detail": "instrument i44: the frequency registers of 48 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i44: the frequency registers of 22 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i45: the frequency registers of 24 notes are not equal-temperament pitches and no vibrato reproduces them"
+          "detail": "instrument i45: the frequency registers of 22 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "pitch",
-          "detail": "instrument i46: the frequency registers of 24 notes are not equal-temperament pitches and no vibrato reproduces them"
-        },
-        {
-          "kind": "waveform",
-          "detail": "control value $8 has no waveform bits"
+          "detail": "instrument i46: the frequency registers of 22 notes are not equal-temperament pitches and no vibrato reproduces them"
         },
         {
           "kind": "waveform",
@@ -20717,19 +20732,19 @@
         {
           "id": "pitch-table",
           "construct": "per-call frequency register values (pitch table, portamento or a vibrato shape the language lacks)",
-          "occurrences": 14,
+          "occurrences": 13,
           "reason": "frequency registers deviate from the note pitch in a way no vibrato of the language reproduces"
         },
         {
           "id": "exact-frequency",
           "construct": "a note given as an exact frequency register value (or a per-note cents offset)",
-          "occurrences": 10,
+          "occurrences": 14,
           "reason": "constant frequency registers that are not equal-temperament pitches under any single tuning"
         },
         {
           "id": "table-waveform",
           "construct": "waveform that the language cannot express",
-          "occurrences": 272,
+          "occurrences": 271,
           "reason": "control value $8 has no waveform bits"
         },
         {
@@ -20751,32 +20766,32 @@
           "reason": "the language has no construct for an arbitrary cutoff, resonance, routing, mode or volume sequence"
         }
       ],
-      "scoreBytes": 224350,
-      "scoreSha256": "b805f24c74f3469b1335bad6e45708d1a486813885e3f8e343d6ff3336c7f5eb",
-      "compiledBytes": 14679,
+      "scoreBytes": 227680,
+      "scoreSha256": "d87cd3adb5ffbef35ae42612b30b7fc65690a60d46f4ed936e97892c9ad1fb44",
+      "compiledBytes": 14712,
       "timing": {
-        "wallSeconds": 22.14,
-        "cpuSeconds": 17.81,
+        "wallSeconds": 23.82,
+        "cpuSeconds": 17.8,
         "phasesMs": {
-          "trace": 98,
-          "ir": 2951,
-          "recover": 2122,
-          "compile": 777,
-          "retrace": 10664,
-          "fdiff": 5530
+          "trace": 89,
+          "ir": 3009,
+          "recover": 2004,
+          "compile": 782,
+          "retrace": 11683,
+          "fdiff": 6257
         },
-        "reconstructCpuPerMusicMinute": 5.94,
-        "recoverMsPerMusicMinute": 707.3
+        "reconstructCpuPerMusicMinute": 5.93,
+        "recoverMsPerMusicMinute": 668.1
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 16874,
-        "badWindows": 14069,
-        "lagMs": -8,
-        "wallSeconds": 123.7
+        "badWindows": 13995,
+        "lagMs": -20,
+        "wallSeconds": 163.2
       },
-      "finishedAt": "2026-11-27T09:41:57.264Z"
+      "finishedAt": "2026-11-27T09:54:15.951Z"
     },
     {
       "path": "DEMOS/A-F/City_of_New_Orleans.sid",
@@ -20791,12 +20806,12 @@
       "model": "6581",
       "sidCount": 1,
       "speed": "CIA",
-      "rootCause": "gate/hard restart",
-      "why": "first difference in gate",
+      "rootCause": "pitch",
+      "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
       "compileOk": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 2932 cycles per call at speed 5 (2699 available at 1 MHz NTSC); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 3090 cycles per call at speed 5 (2699 available at 1 MHz NTSC); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 14949,
       "callRate": {
         "periodCycles": 3584,
@@ -20805,96 +20820,97 @@
         "irregularShare": 0.20404067433770404
       },
       "fdiff": {
-        "differingCalls": 87378,
-        "comparedCalls": 14949,
+        "differingCalls": 87318,
+        "comparedCalls": 14948,
         "expectedCalls": 14949,
-        "observedCalls": 47555,
+        "observedCalls": 47546,
         "standardAlignment": false,
         "first": {
-          "class": "gate",
+          "class": "pitch",
           "call": 0,
           "timeSeconds": 0,
           "voice": 1,
-          "register": 4,
-          "observed": 0,
-          "detail": "in-call control write 1: 0 expected, 1 observed"
+          "register": 0,
+          "expected": 165,
+          "observed": 0
         },
         "classes": {
           "pitch": {
-            "differingCalls": 14905,
-            "matchShare": 0.002943
+            "differingCalls": 14855,
+            "matchShare": 0.006222
           },
           "gate": {
-            "differingCalls": 14943,
+            "differingCalls": 14942,
             "matchShare": 0.000401
           },
           "waveform": {
             "differingCalls": 175,
-            "matchShare": 0.988294
+            "matchShare": 0.988293
           },
           "pulse": {
             "differingCalls": 14948,
-            "matchShare": 0.000067
+            "matchShare": 0
           },
           "adsr": {
-            "differingCalls": 12456,
-            "matchShare": 0.166767
+            "differingCalls": 12449,
+            "matchShare": 0.16718
           },
           "filter": {
             "differingCalls": 14876,
-            "matchShare": 0.004883
+            "matchShare": 0.004817
           },
           "volume": {
-            "differingCalls": 127,
-            "matchShare": 0.991504
+            "differingCalls": 126,
+            "matchShare": 0.991571
           },
           "timing": {
-            "differingCalls": 14948,
+            "differingCalls": 14947,
             "matchShare": 0.000067
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 75928,
+        "differingCalls": 75791,
         "first": {
-          "class": "volume",
+          "class": "pitch",
           "call": 0,
           "timeSeconds": 0,
-          "register": 24,
-          "expected": 15,
+          "voice": 1,
+          "register": 0,
+          "expected": 165,
           "observed": 0
         },
         "classes": {
           "pitch": {
-            "differingCalls": 14905,
-            "matchShare": 0.002943
+            "differingCalls": 14855,
+            "matchShare": 0.006222
           },
           "gate": {
-            "differingCalls": 3493,
-            "matchShare": 0.766339
+            "differingCalls": 3415,
+            "matchShare": 0.771541
           },
           "waveform": {
             "differingCalls": 175,
-            "matchShare": 0.988294
+            "matchShare": 0.988293
           },
           "pulse": {
             "differingCalls": 14948,
-            "matchShare": 0.000067
+            "matchShare": 0
           },
           "adsr": {
-            "differingCalls": 12456,
-            "matchShare": 0.166767
+            "differingCalls": 12449,
+            "matchShare": 0.16718
           },
           "filter": {
             "differingCalls": 14876,
-            "matchShare": 0.004883
+            "matchShare": 0.004817
           },
           "volume": {
-            "differingCalls": 127,
-            "matchShare": 0.991504
+            "differingCalls": 126,
+            "matchShare": 0.991571
           },
           "timing": {
-            "differingCalls": 14948,
+            "differingCalls": 14947,
             "matchShare": 0.000067
           }
         }
@@ -20902,8 +20918,8 @@
       "recovery": {
         "speed": 5,
         "tempo": 199.42029833284585,
-        "firstCall": 0,
-        "rows": 14949,
+        "firstCall": 1,
+        "rows": 14948,
         "tuningCents": -0.2,
         "noteCount": 142,
         "phantomNotes": 0,
@@ -20911,23 +20927,23 @@
         "patternCount": 38,
         "structure": {
           "blockBars": 1,
-          "bytes": 55109,
+          "bytes": 56644,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 55371
+              "bytes": 56906
             },
             {
               "blockBars": 2,
-              "bytes": 75200
+              "bytes": 79056
             },
             {
               "blockBars": 4,
-              "bytes": 110907
+              "bytes": 114490
             },
             {
               "blockBars": 8,
-              "bytes": 128486
+              "bytes": 128949
             }
           ]
         },
@@ -21111,32 +21127,32 @@
           "reason": "the language has no construct for an arbitrary cutoff, resonance, routing, mode or volume sequence"
         }
       ],
-      "scoreBytes": 55109,
-      "scoreSha256": "9f881ee5c93eb1d1b7de6016265d51be8242ab548ef10288acffba64b8a76d91",
+      "scoreBytes": 56644,
+      "scoreSha256": "0143ac99a2124bb3e81fdd171f7837d391396198f666f0a2ebf4836e4120f113",
       "compiledBytes": 6661,
       "timing": {
-        "wallSeconds": 14.33,
-        "cpuSeconds": 12.83,
+        "wallSeconds": 17.54,
+        "cpuSeconds": 12.51,
         "phasesMs": {
-          "trace": 6,
-          "ir": 1401,
-          "recover": 893,
-          "compile": 657,
-          "retrace": 10090,
-          "fdiff": 1285
+          "trace": 7,
+          "ir": 2135,
+          "recover": 1273,
+          "compile": 452,
+          "retrace": 11784,
+          "fdiff": 1885
         },
-        "reconstructCpuPerMusicMinute": 4.84,
-        "recoverMsPerMusicMinute": 337.1
+        "reconstructCpuPerMusicMinute": 4.72,
+        "recoverMsPerMusicMinute": 480.3
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 14905,
-        "badWindows": 14523,
-        "lagMs": 24,
-        "wallSeconds": 118.4
+        "badWindows": 14548,
+        "lagMs": -6,
+        "wallSeconds": 156.8
       },
-      "finishedAt": "2026-11-27T09:42:16.656Z"
+      "finishedAt": "2026-11-27T09:54:34.012Z"
     },
     {
       "path": "MUSICIANS/S/Sad/Pahos.sid",
@@ -21156,7 +21172,7 @@
       "strictExact": false,
       "registerStateExact": false,
       "compileOk": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 4148 cycles per call at speed 5 (3211 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 4162 cycles per call at speed 5 (3211 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 28033,
       "callRate": {
         "periodCycles": 3931,
@@ -21165,11 +21181,11 @@
         "irregularShare": 0.2971603881278539
       },
       "fdiff": {
-        "differingCalls": 142782,
-        "comparedCalls": 27722,
+        "differingCalls": 142339,
+        "comparedCalls": 27721,
         "expectedCalls": 28033,
         "observedCalls": 27723,
-        "standardAlignment": false,
+        "standardAlignment": true,
         "first": {
           "class": "gate",
           "call": 0,
@@ -21181,41 +21197,41 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 22583,
-            "matchShare": 0.185376
+            "differingCalls": 22389,
+            "matchShare": 0.192345
           },
           "gate": {
-            "differingCalls": 16637,
-            "matchShare": 0.399863
+            "differingCalls": 16667,
+            "matchShare": 0.398759
           },
           "waveform": {
-            "differingCalls": 9343,
-            "matchShare": 0.662975
+            "differingCalls": 9371,
+            "matchShare": 0.661953
           },
           "pulse": {
-            "differingCalls": 27193,
-            "matchShare": 0.019082
+            "differingCalls": 25676,
+            "matchShare": 0.073771
           },
           "adsr": {
-            "differingCalls": 13421,
-            "matchShare": 0.515872
+            "differingCalls": 13468,
+            "matchShare": 0.514159
           },
           "filter": {
-            "differingCalls": 27573,
-            "matchShare": 0.005375
+            "differingCalls": 27567,
+            "matchShare": 0.005555
           },
           "volume": {
             "differingCalls": 0,
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 26032,
-            "matchShare": 0.060962
+            "differingCalls": 27201,
+            "matchShare": 0.018758
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 142733,
+        "differingCalls": 142290,
         "first": {
           "class": "gate",
           "call": 0,
@@ -21227,36 +21243,36 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 22583,
-            "matchShare": 0.185376
+            "differingCalls": 22389,
+            "matchShare": 0.192345
           },
           "gate": {
-            "differingCalls": 16592,
-            "matchShare": 0.401486
+            "differingCalls": 16623,
+            "matchShare": 0.400346
           },
           "waveform": {
-            "differingCalls": 9339,
-            "matchShare": 0.66312
+            "differingCalls": 9366,
+            "matchShare": 0.662133
           },
           "pulse": {
-            "differingCalls": 27193,
-            "matchShare": 0.019082
+            "differingCalls": 25676,
+            "matchShare": 0.073771
           },
           "adsr": {
-            "differingCalls": 13421,
-            "matchShare": 0.515872
+            "differingCalls": 13468,
+            "matchShare": 0.514159
           },
           "filter": {
-            "differingCalls": 27573,
-            "matchShare": 0.005375
+            "differingCalls": 27567,
+            "matchShare": 0.005555
           },
           "volume": {
             "differingCalls": 0,
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 26032,
-            "matchShare": 0.060962
+            "differingCalls": 27201,
+            "matchShare": 0.018758
           }
         }
       },
@@ -21478,18 +21494,18 @@
       "scoreSha256": "d99a80278edbd00379f4c971c320c6e003e3896d53e555d730900f3eb3e8a5c2",
       "compiledBytes": 8635,
       "timing": {
-        "wallSeconds": 13.49,
-        "cpuSeconds": 11.93,
+        "wallSeconds": 17.92,
+        "cpuSeconds": 11.64,
         "phasesMs": {
-          "trace": 73,
-          "ir": 1701,
-          "recover": 831,
-          "compile": 602,
-          "retrace": 8063,
-          "fdiff": 2224
+          "trace": 66,
+          "ir": 2100,
+          "recover": 1469,
+          "compile": 696,
+          "retrace": 10868,
+          "fdiff": 2726
         },
-        "reconstructCpuPerMusicMinute": 6.39,
-        "recoverMsPerMusicMinute": 445
+        "reconstructCpuPerMusicMinute": 6.23,
+        "recoverMsPerMusicMinute": 786.9
       },
       "a1": {
         "level": "fail",
@@ -21497,9 +21513,9 @@
         "windows": 10499,
         "badWindows": 2215,
         "lagMs": 4,
-        "wallSeconds": 78.5
+        "wallSeconds": 100.2
       },
-      "finishedAt": "2026-11-27T09:42:45.544Z"
+      "finishedAt": "2026-11-27T09:55:29.222Z"
     },
     {
       "path": "MUSICIANS/Z/Zirias/EX_Beach.sid",
@@ -21514,8 +21530,8 @@
       "model": "both",
       "sidCount": 1,
       "speed": "VBI",
-      "rootCause": "filter",
-      "why": "first difference in filter",
+      "rootCause": "gate/hard restart",
+      "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
       "compileOk": true,
@@ -21527,31 +21543,32 @@
         "irregularShare": 0.00030012004801920766
       },
       "fdiff": {
-        "differingCalls": 8774,
-        "comparedCalls": 3332,
+        "differingCalls": 8773,
+        "comparedCalls": 3331,
         "expectedCalls": 3333,
         "observedCalls": 3333,
         "standardAlignment": true,
         "first": {
-          "class": "filter",
+          "class": "gate",
           "call": 0,
           "timeSeconds": 0,
-          "register": 22,
+          "voice": 1,
+          "register": 4,
           "expected": 0,
-          "observed": 128
+          "detail": "in-call control write 1: 1 expected, 0 observed"
         },
         "classes": {
           "pitch": {
-            "differingCalls": 3245,
-            "matchShare": 0.02611
+            "differingCalls": 3246,
+            "matchShare": 0.025518
           },
           "gate": {
             "differingCalls": 1547,
-            "matchShare": 0.535714
+            "matchShare": 0.535575
           },
           "waveform": {
             "differingCalls": 1512,
-            "matchShare": 0.546218
+            "matchShare": 0.546082
           },
           "pulse": {
             "differingCalls": 0,
@@ -21562,8 +21579,8 @@
             "matchShare": 0.998199
           },
           "filter": {
-            "differingCalls": 2256,
-            "matchShare": 0.322929
+            "differingCalls": 2254,
+            "matchShare": 0.323326
           },
           "volume": {
             "differingCalls": 0,
@@ -21571,7 +21588,7 @@
           },
           "timing": {
             "differingCalls": 208,
-            "matchShare": 0.937575
+            "matchShare": 0.937556
           }
         }
       },
@@ -21587,16 +21604,16 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 3245,
-            "matchShare": 0.02611
+            "differingCalls": 3246,
+            "matchShare": 0.025518
           },
           "gate": {
-            "differingCalls": 758,
-            "matchShare": 0.772509
+            "differingCalls": 759,
+            "matchShare": 0.77214
           },
           "waveform": {
             "differingCalls": 1512,
-            "matchShare": 0.546218
+            "matchShare": 0.546082
           },
           "pulse": {
             "differingCalls": 0,
@@ -21607,8 +21624,8 @@
             "matchShare": 0.998199
           },
           "filter": {
-            "differingCalls": 2256,
-            "matchShare": 0.322929
+            "differingCalls": 2254,
+            "matchShare": 0.323326
           },
           "volume": {
             "differingCalls": 0,
@@ -21616,15 +21633,15 @@
           },
           "timing": {
             "differingCalls": 208,
-            "matchShare": 0.937575
+            "matchShare": 0.937556
           }
         }
       },
       "recovery": {
         "speed": 1,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 3333,
+        "firstCall": 2,
+        "rows": 3331,
         "tuningCents": 42.8,
         "noteCount": 167,
         "phantomNotes": 0,
@@ -21632,23 +21649,23 @@
         "patternCount": 71,
         "structure": {
           "blockBars": 1,
-          "bytes": 19640,
+          "bytes": 18905,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 21369
+              "bytes": 20634
             },
             {
               "blockBars": 2,
-              "bytes": 25885
+              "bytes": 24062
             },
             {
               "blockBars": 4,
-              "bytes": 31456
+              "bytes": 30938
             },
             {
               "blockBars": 8,
-              "bytes": 37511
+              "bytes": 35623
             }
           ]
         },
@@ -21952,32 +21969,32 @@
           "reason": "the filter state of a routed note cannot be written as a filter table"
         }
       ],
-      "scoreBytes": 19640,
-      "scoreSha256": "93a674c2b49e75c7aa97f316ebe42b8a4c47030ff5632274adfac5453371774c",
+      "scoreBytes": 18905,
+      "scoreSha256": "b198b2aaea716a34c38ff74bc1a2a7a41a2f19f6ba035d28d6a2648dc173038d",
       "compiledBytes": 4699,
       "timing": {
-        "wallSeconds": 4.13,
-        "cpuSeconds": 4.35,
+        "wallSeconds": 5.92,
+        "cpuSeconds": 4.57,
         "phasesMs": {
           "trace": 12,
-          "ir": 272,
-          "recover": 315,
-          "compile": 116,
-          "retrace": 3154,
-          "fdiff": 264
+          "ir": 430,
+          "recover": 342,
+          "compile": 194,
+          "retrace": 4128,
+          "fdiff": 820
         },
-        "reconstructCpuPerMusicMinute": 3.92,
-        "recoverMsPerMusicMinute": 283.5
+        "reconstructCpuPerMusicMinute": 4.12,
+        "recoverMsPerMusicMinute": 308.1
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 6238,
-        "badWindows": 4712,
-        "lagMs": 6,
-        "wallSeconds": 46
+        "badWindows": 4590,
+        "lagMs": -16,
+        "wallSeconds": 57.2
       },
-      "finishedAt": "2026-11-27T09:43:18.618Z"
+      "finishedAt": "2026-11-27T09:56:09.442Z"
     },
     {
       "path": "MUSICIANS/A/Avory_Sarah_Jane/Soul_Force.sid",
@@ -22005,40 +22022,40 @@
         "irregularShare": 0.0008960573476702509
       },
       "fdiff": {
-        "differingCalls": 15755,
-        "comparedCalls": 3349,
+        "differingCalls": 13203,
+        "comparedCalls": 3346,
         "expectedCalls": 3349,
         "observedCalls": 3357,
         "standardAlignment": true,
         "first": {
           "class": "pitch",
-          "call": 1,
-          "timeSeconds": 0.15395920621001008,
-          "voice": 3,
-          "register": 15,
-          "expected": 2,
-          "observed": 0
+          "call": 0,
+          "timeSeconds": 0,
+          "voice": 1,
+          "register": 0,
+          "expected": 0,
+          "observed": 22
         },
         "classes": {
           "pitch": {
-            "differingCalls": 3155,
-            "matchShare": 0.057928
+            "differingCalls": 3153,
+            "matchShare": 0.057681
           },
           "gate": {
-            "differingCalls": 2720,
-            "matchShare": 0.187817
+            "differingCalls": 2715,
+            "matchShare": 0.188583
           },
           "waveform": {
-            "differingCalls": 3344,
-            "matchShare": 0.001493
+            "differingCalls": 3343,
+            "matchShare": 0.000897
           },
           "pulse": {
             "differingCalls": 3186,
-            "matchShare": 0.048671
+            "matchShare": 0.047818
           },
           "adsr": {
-            "differingCalls": 2,
-            "matchShare": 0.999403
+            "differingCalls": 0,
+            "matchShare": 1
           },
           "filter": {
             "differingCalls": 0,
@@ -22049,42 +22066,42 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 3348,
-            "matchShare": 0.000299
+            "differingCalls": 806,
+            "matchShare": 0.759115
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 15750,
+        "differingCalls": 13203,
         "first": {
           "class": "pitch",
-          "call": 1,
-          "timeSeconds": 0.15395920621001008,
-          "voice": 3,
-          "register": 15,
-          "expected": 2,
-          "observed": 0
+          "call": 0,
+          "timeSeconds": 0,
+          "voice": 1,
+          "register": 0,
+          "expected": 0,
+          "observed": 22
         },
         "classes": {
           "pitch": {
-            "differingCalls": 3155,
-            "matchShare": 0.057928
+            "differingCalls": 3153,
+            "matchShare": 0.057681
           },
           "gate": {
             "differingCalls": 2715,
-            "matchShare": 0.18931
+            "matchShare": 0.188583
           },
           "waveform": {
-            "differingCalls": 3344,
-            "matchShare": 0.001493
+            "differingCalls": 3343,
+            "matchShare": 0.000897
           },
           "pulse": {
             "differingCalls": 3186,
-            "matchShare": 0.048671
+            "matchShare": 0.047818
           },
           "adsr": {
-            "differingCalls": 2,
-            "matchShare": 0.999403
+            "differingCalls": 0,
+            "matchShare": 1
           },
           "filter": {
             "differingCalls": 0,
@@ -22095,40 +22112,40 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 3348,
-            "matchShare": 0.000299
+            "differingCalls": 806,
+            "matchShare": 0.759115
           }
         }
       },
       "recovery": {
         "speed": 1,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 3349,
+        "firstCall": 3,
+        "rows": 3346,
         "tuningCents": 0.35,
         "noteCount": 754,
         "phantomNotes": 0,
         "instrumentCount": 30,
-        "patternCount": 94,
+        "patternCount": 93,
         "structure": {
           "blockBars": 1,
-          "bytes": 40505,
+          "bytes": 40108,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 41327
+              "bytes": 40944
             },
             {
               "blockBars": 2,
-              "bytes": 49326
+              "bytes": 49360
             },
             {
               "blockBars": 4,
-              "bytes": 51689
+              "bytes": 51929
             },
             {
               "blockBars": 8,
-              "bytes": 52438
+              "bytes": 52564
             }
           ]
         },
@@ -22630,32 +22647,32 @@
           "reason": "control value $8 has no waveform bits"
         }
       ],
-      "scoreBytes": 40505,
-      "scoreSha256": "011069df1e323b77e0091f2e97740c62ab9ef4fadcb1b30c99520dfa54aa5a9f",
-      "compiledBytes": 6053,
+      "scoreBytes": 40108,
+      "scoreSha256": "965ce4eece9978c8025b5e713d9c09357937bc6c01499c997653e328cc321f75",
+      "compiledBytes": 6048,
       "timing": {
-        "wallSeconds": 4.61,
-        "cpuSeconds": 4.83,
+        "wallSeconds": 6.31,
+        "cpuSeconds": 4.75,
         "phasesMs": {
-          "trace": 6,
-          "ir": 302,
-          "recover": 441,
-          "compile": 215,
-          "retrace": 3204,
-          "fdiff": 443
+          "trace": 7,
+          "ir": 326,
+          "recover": 612,
+          "compile": 254,
+          "retrace": 4677,
+          "fdiff": 430
         },
-        "reconstructCpuPerMusicMinute": 4.32,
-        "recoverMsPerMusicMinute": 394.6
+        "reconstructCpuPerMusicMinute": 4.25,
+        "recoverMsPerMusicMinute": 547.9
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 6283,
-        "badWindows": 4415,
-        "lagMs": -6,
-        "wallSeconds": 46.8
+        "badWindows": 4002,
+        "lagMs": 0,
+        "wallSeconds": 52.1
       },
-      "finishedAt": "2026-11-27T09:44:09.031Z"
+      "finishedAt": "2026-11-27T09:57:12.868Z"
     },
     {
       "path": "MUSICIANS/C/Chiummo_Gaetano/A_Walk_in_the_Countryside_3SID.sid",
@@ -22687,7 +22704,7 @@
         "comparedCalls": 9011,
         "expectedCalls": 9012,
         "observedCalls": 9012,
-        "standardAlignment": true,
+        "standardAlignment": false,
         "first": {
           "class": "gate",
           "call": 1,
@@ -22780,8 +22797,8 @@
       "recovery": {
         "speed": 1,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 9012,
+        "firstCall": 1,
+        "rows": 9011,
         "tuningCents": 0.45,
         "noteCount": 2068,
         "phantomNotes": 0,
@@ -22789,23 +22806,23 @@
         "patternCount": 51,
         "structure": {
           "blockBars": 1,
-          "bytes": 10049,
+          "bytes": 10888,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 10235
+              "bytes": 11074
             },
             {
               "blockBars": 2,
-              "bytes": 11890
+              "bytes": 12729
             },
             {
               "blockBars": 4,
-              "bytes": 14445
+              "bytes": 15284
             },
             {
               "blockBars": 8,
-              "bytes": 21235
+              "bytes": 22074
             }
           ]
         },
@@ -23017,32 +23034,32 @@
           "reason": "the language has no construct for an arbitrary cutoff, resonance, routing, mode or volume sequence"
         }
       ],
-      "scoreBytes": 10049,
-      "scoreSha256": "4b7048d25b2f5228a3cf49bfa624de50e822af863161cc3766cabb8ac9243b2e",
+      "scoreBytes": 10888,
+      "scoreSha256": "f5767ca64a28fb13fda9e9c74671329ff9bdabb0742c4efe02d399345e1cfbf9",
       "compiledBytes": 14269,
       "timing": {
-        "wallSeconds": 12.38,
-        "cpuSeconds": 11.32,
+        "wallSeconds": 13.16,
+        "cpuSeconds": 11.34,
         "phasesMs": {
-          "trace": 48,
-          "ir": 735,
-          "recover": 286,
-          "compile": 283,
-          "retrace": 9235,
-          "fdiff": 1790
+          "trace": 47,
+          "ir": 806,
+          "recover": 439,
+          "compile": 321,
+          "retrace": 9640,
+          "fdiff": 1908
         },
-        "reconstructCpuPerMusicMinute": 3.77,
-        "recoverMsPerMusicMinute": 95.5
+        "reconstructCpuPerMusicMinute": 3.78,
+        "recoverMsPerMusicMinute": 146.5
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 16874,
-        "badWindows": 16862,
-        "lagMs": -24,
-        "wallSeconds": 191.5
+        "badWindows": 16874,
+        "lagMs": 20,
+        "wallSeconds": 204.4
       },
-      "finishedAt": "2026-11-27T09:44:17.805Z"
+      "finishedAt": "2026-11-27T09:57:23.216Z"
     },
     {
       "path": "MUSICIANS/P/PRI/Hit_n_Run.sid",
@@ -24776,24 +24793,24 @@
       "scoreSha256": "aba8e02dd148394d7a8b5caf991f6c54cd28a483be8e484692bdfdaf44bc62d0",
       "compiledBytes": null,
       "timing": {
-        "wallSeconds": 2.4,
-        "cpuSeconds": 2.8,
+        "wallSeconds": 2.98,
+        "cpuSeconds": 2.71,
         "phasesMs": {
-          "trace": 77,
-          "ir": 906,
-          "recover": 1045,
+          "trace": 86,
+          "ir": 817,
+          "recover": 1510,
           "compile": 0,
           "retrace": 0,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.07,
-        "recoverMsPerMusicMinute": 397
+        "reconstructCpuPerMusicMinute": 1.03,
+        "recoverMsPerMusicMinute": 573.2
       },
       "a1": {
         "status": "not evaluated",
         "reason": "recompiled score missing"
       },
-      "finishedAt": "2026-11-27T09:44:23.475Z"
+      "finishedAt": "2026-11-27T09:57:27.660Z"
     },
     {
       "path": "MUSICIANS/A/Avory_Sarah_Jane/Soul_Force.sid",
@@ -24821,40 +24838,40 @@
         "irregularShare": 0.0006746120980436249
       },
       "fdiff": {
-        "differingCalls": 21332,
-        "comparedCalls": 4448,
+        "differingCalls": 17820,
+        "comparedCalls": 4445,
         "expectedCalls": 4448,
         "observedCalls": 4455,
         "standardAlignment": true,
         "first": {
           "class": "pitch",
-          "call": 1,
-          "timeSeconds": 0.1340058543635714,
-          "voice": 3,
-          "register": 15,
-          "expected": 2,
-          "observed": 0
+          "call": 0,
+          "timeSeconds": 0,
+          "voice": 1,
+          "register": 0,
+          "expected": 0,
+          "observed": 23
         },
         "classes": {
           "pitch": {
-            "differingCalls": 4267,
-            "matchShare": 0.040692
+            "differingCalls": 4265,
+            "matchShare": 0.040495
           },
           "gate": {
-            "differingCalls": 3762,
-            "matchShare": 0.154227
+            "differingCalls": 3757,
+            "matchShare": 0.154781
           },
           "waveform": {
-            "differingCalls": 4443,
-            "matchShare": 0.001124
+            "differingCalls": 4442,
+            "matchShare": 0.000675
           },
           "pulse": {
             "differingCalls": 4411,
-            "matchShare": 0.008318
+            "matchShare": 0.007649
           },
           "adsr": {
-            "differingCalls": 2,
-            "matchShare": 0.99955
+            "differingCalls": 0,
+            "matchShare": 1
           },
           "filter": {
             "differingCalls": 0,
@@ -24865,42 +24882,42 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 4447,
-            "matchShare": 0.000225
+            "differingCalls": 945,
+            "matchShare": 0.787402
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 21327,
+        "differingCalls": 17820,
         "first": {
           "class": "pitch",
-          "call": 1,
-          "timeSeconds": 0.1340058543635714,
-          "voice": 3,
-          "register": 15,
-          "expected": 2,
-          "observed": 0
+          "call": 0,
+          "timeSeconds": 0,
+          "voice": 1,
+          "register": 0,
+          "expected": 0,
+          "observed": 23
         },
         "classes": {
           "pitch": {
-            "differingCalls": 4267,
-            "matchShare": 0.040692
+            "differingCalls": 4265,
+            "matchShare": 0.040495
           },
           "gate": {
             "differingCalls": 3757,
-            "matchShare": 0.155351
+            "matchShare": 0.154781
           },
           "waveform": {
-            "differingCalls": 4443,
-            "matchShare": 0.001124
+            "differingCalls": 4442,
+            "matchShare": 0.000675
           },
           "pulse": {
             "differingCalls": 4411,
-            "matchShare": 0.008318
+            "matchShare": 0.007649
           },
           "adsr": {
-            "differingCalls": 2,
-            "matchShare": 0.99955
+            "differingCalls": 0,
+            "matchShare": 1
           },
           "filter": {
             "differingCalls": 0,
@@ -24911,40 +24928,40 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 4447,
-            "matchShare": 0.000225
+            "differingCalls": 945,
+            "matchShare": 0.787402
           }
         }
       },
       "recovery": {
         "speed": 1,
         "tempo": 187.96703296703296,
-        "firstCall": 0,
-        "rows": 4448,
+        "firstCall": 3,
+        "rows": 4445,
         "tuningCents": 0.85,
         "noteCount": 645,
         "phantomNotes": 0,
         "instrumentCount": 23,
-        "patternCount": 105,
+        "patternCount": 96,
         "structure": {
           "blockBars": 1,
-          "bytes": 30972,
+          "bytes": 27944,
           "alternatives": [
             {
               "blockBars": 1,
-              "bytes": 32187
+              "bytes": 29233
             },
             {
               "blockBars": 2,
-              "bytes": 34223
+              "bytes": 34302
             },
             {
               "blockBars": 4,
-              "bytes": 38213
+              "bytes": 38339
             },
             {
               "blockBars": 8,
-              "bytes": 42338
+              "bytes": 42464
             }
           ]
         },
@@ -25386,32 +25403,32 @@
           "reason": "control value $8 has no waveform bits"
         }
       ],
-      "scoreBytes": 30972,
-      "scoreSha256": "ce58c2b24e35817f9db46f0cfc06cabfdd5ac7da9d197db3cda7c24745004cae",
-      "compiledBytes": 5811,
+      "scoreBytes": 27944,
+      "scoreSha256": "552212cf154a82c140a00d77682d992221f1bd3b678c8b94b0320b116c886916",
+      "compiledBytes": 5806,
       "timing": {
-        "wallSeconds": 5.9,
-        "cpuSeconds": 5.83,
+        "wallSeconds": 7.03,
+        "cpuSeconds": 6,
         "phasesMs": {
-          "trace": 8,
-          "ir": 385,
-          "recover": 342,
-          "compile": 164,
-          "retrace": 4439,
-          "fdiff": 557
+          "trace": 9,
+          "ir": 460,
+          "recover": 549,
+          "compile": 273,
+          "retrace": 5020,
+          "fdiff": 723
         },
-        "reconstructCpuPerMusicMinute": 3.93,
-        "recoverMsPerMusicMinute": 230.5
+        "reconstructCpuPerMusicMinute": 4.05,
+        "recoverMsPerMusicMinute": 370.2
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 8340,
-        "badWindows": 7794,
-        "lagMs": 16,
-        "wallSeconds": 58.5
+        "badWindows": 7782,
+        "lagMs": 18,
+        "wallSeconds": 63.6
       },
-      "finishedAt": "2026-11-27T09:44:26.114Z"
+      "finishedAt": "2026-11-27T09:57:28.584Z"
     },
     {
       "path": "MUSICIANS/S/SIDwave/Gnumpf_Espresso.sid",
@@ -25444,7 +25461,7 @@
         "comparedCalls": 48743,
         "expectedCalls": 49555,
         "observedCalls": 48743,
-        "standardAlignment": true,
+        "standardAlignment": false,
         "first": {
           "class": "gate",
           "call": 0,
@@ -25999,18 +26016,18 @@
       "scoreSha256": "029fe3f17b8a6b04476f4126831aef8d7b6d0da0df7f0321d3bfcf526bd784d4",
       "compiledBytes": 10689,
       "timing": {
-        "wallSeconds": 17.33,
-        "cpuSeconds": 17.29,
+        "wallSeconds": 21.22,
+        "cpuSeconds": 17.21,
         "phasesMs": {
-          "trace": 65,
-          "ir": 1711,
-          "recover": 1097,
-          "compile": 748,
-          "retrace": 9539,
-          "fdiff": 4172
+          "trace": 59,
+          "ir": 3327,
+          "recover": 1106,
+          "compile": 685,
+          "retrace": 10548,
+          "fdiff": 5491
         },
-        "reconstructCpuPerMusicMinute": 6.21,
-        "recoverMsPerMusicMinute": 394.1
+        "reconstructCpuPerMusicMinute": 6.18,
+        "recoverMsPerMusicMinute": 397.3
       },
       "a1": {
         "level": "fail",
@@ -26018,9 +26035,9 @@
         "windows": 15655,
         "badWindows": 12865,
         "lagMs": -14,
-        "wallSeconds": 117.3
+        "wallSeconds": 131.7
       },
-      "finishedAt": "2026-11-27T09:44:29.581Z"
+      "finishedAt": "2026-11-27T09:57:31.102Z"
     }
   ]
 }
