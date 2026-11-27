@@ -13,6 +13,7 @@ export * from "./wav.js";
 export * from "./errors.js";
 export * from "./musicxmlExport.js";
 export * from "./musicxmlImport.js";
+export * from "./abcImport.js";
 export { parseXml, XmlError, type XmlNode } from "./xml.js";
 export * from "./goattracker.js";
 export * from "./goattrackerImport.js";

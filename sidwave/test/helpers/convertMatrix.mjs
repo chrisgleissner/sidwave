@@ -34,7 +34,7 @@ const FIXTURES = {
   ],
   midi: ["fuer-elise", "chiptune-drive", "chamber-waltz", "title-fanfare"].map((n) => [n, () => generated(`${n}.mid`)]),
   musicxml: ["fuer-elise", "chiptune-drive", "title-fanfare"].map((n) => [n, () => generated(`${n}.musicxml`)]),
-  abc: [["hand-authored", () => Buffer.from("X:1\nT:ABC fixture\nC:Composer\nM:4/4\nL:1/4\nQ:1/4=120\nK:C\nC D E F|G A B c|\n")]],
+  abc: [["two-part-air", () => read("test/fixtures/abc/two-part-air.abc")]],
   goattracker: [...["fuer-elise", "chiptune-drive"].map((n) => [n, () => generated(`${n}.sng`)]), ["hand-authored", () => Buffer.from(gts())]],
   furnace: [...["fuer-elise", "chiptune-drive"].map((n) => [n, () => generated(`${n}.fur`)]), ["hand-authored", () => Buffer.from(fur228())]],
   sidwizard: [["fuer-elise", () => generated("fuer-elise.swm")], ["hand-built", () => read("test/fixtures/sidwizard/hand-built.swm")]],

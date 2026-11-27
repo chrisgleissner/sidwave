@@ -4,6 +4,7 @@
 // ABC 2.1 is a read-only notation source.
 import type { FormatDefinition } from "../formatTypes.js";
 import { lossesFromText } from "../loss.js";
+import { decodeAbc, scanAbc } from "../abc.js";
 import { importAbc } from "../abcImport.js";
 
 export const ABC: FormatDefinition = {
@@ -15,9 +16,9 @@ export const ABC: FormatDefinition = {
   readQuantises: true,
   magic(bytes) {
     const text = new TextDecoder().decode(bytes.subarray(0, Math.min(bytes.length, 65_536)));
-    const firstTune = /^X:\s*\d+\s*(?:\r?\n|$)/m.exec(text);
+    const firstTune = /^X:[ \t]*\d+[ \t]*(?:%[^\r\n]*)?$/m.exec(text);
     if (!firstTune) return 0;
-    return /^K:\s*\S/m.test(text.slice(firstTune.index + firstTune[0].length)) ? 0.95 : 0;
+    return /^K:/m.test(text.slice(firstTune.index + firstTune[0].length)) ? 0.95 : 0;
   },
   detection: "an X: tune line followed by a K: key header",
   caps: {
@@ -29,13 +30,13 @@ export const ABC: FormatDefinition = {
     loop: false,
     metadata: true,
   },
-  lossSummary: "read only: chords are reduced to simultaneous SID voice lanes; grace notes, decorations, lyrics, slurs and unknown directives are omitted",
+  lossSummary: "read only: chords are reduced to simultaneous SID voice lanes; grace notes, decorations, chord symbols, lyrics, slurs, voice overlays, part order and unknown directives are omitted",
   read(bytes, context) {
     const result = importAbc(bytes, {
       ...(context.song === undefined ? {} : { song: context.song }),
       ...(context.title ? { title: context.title } : {}),
-      ...(context.grid ? { grid: context.grid } : {}),
-      ...(context.voices ? { voices: context.voices } : {}),
+      ...(context.grid === undefined ? {} : { grid: context.grid }),
+      ...(context.voices === undefined ? {} : { voices: context.voices }),
       ...(context.mode ? { mode: context.mode } : {}),
       validate: context.validate,
     });
@@ -44,5 +45,10 @@ export const ABC: FormatDefinition = {
       report: result.report,
       losses: lossesFromText("read", result.losses),
     };
+  },
+  describe: (bytes) => {
+    const { lines, tunes } = scanAbc(decodeAbc(bytes).text);
+    const title = ({ start, end }: { start: number; end: number }): string | undefined => lines.slice(start, Math.min(end, start + 32)).find((line) => line.startsWith("T:"))?.slice(2, 82).trim();
+    return { tunes: tunes.length, tuneList: tunes.slice(0, 50).map((tune) => `X:${tune.number.slice(0, 12)} ${title(tune) ?? ""}`.trim()) };
   },
 };

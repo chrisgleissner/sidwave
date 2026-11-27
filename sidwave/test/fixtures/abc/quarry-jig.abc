@@ -1,0 +1,23 @@
+% Original test tunes written for SIDWave: a file header, free text and two tunes.
+M:6/8
+L:1/8
+
+Free text between the header and the first tune is not music.
+
+X:7
+T:Quarry Road Jig
+T:The Second Title
+Q:3/8=104
+K:Em
+D|:EFE G2B|A2F DFA|EFE G2B|[1 AGF E2D:|[2 AGF E3||
+K:G
+|:g2d B2d|(2ef (4gfed|e>fg f<af|g3 G3:|
+
+Notes about the jig, outside the tune.
+
+X:9
+T:Slip Across
+M:9/8
+K:Ador
+A2e ecA G2B|\
+c2A AGE A3|]
