@@ -312,8 +312,12 @@ export function resolveMotion(voices: GridVoice[], frameStart: number[], instrum
   const ticks = frameStart.length - 1;
   for (const voice of voices) {
     const cells = voice.cells;
+    // A legato note keeps the sounding instrument, so that is the instrument a bend on it plays on.
+    let sounding: string | undefined;
     for (let i = 0; i < cells.length; i++) {
       const c = cells[i]!;
+      if (c.kind === "rest") sounding = undefined;
+      else if (c.kind === "note" && !(c.legato && sounding !== undefined)) sounding = c.inst;
       if (c.slideRate === undefined && c.portaRate === undefined) continue;
       let j = i + 1;
       while (j < cells.length && cells[j]!.kind === "tie") j++;
@@ -322,9 +326,10 @@ export function resolveMotion(voices: GridVoice[], frameStart: number[], instrum
         const n = Math.min(portamentoFrames(c.portaFrom, c.pitch!, c.portaRate, mode), duration);
         if (n >= 1) c.portamento = n;
       } else if (c.slideRate !== undefined && duration >= 1) {
-        const target = pitched(c.inst) ? undefined : slideTarget(c.pitch!, c.slideRate, duration, mode, maxMidi);
+        const onPitchTable = pitched(c.inst) || pitched(sounding);
+        const target = onPitchTable ? undefined : slideTarget(c.pitch!, c.slideRate, duration, mode, maxMidi);
         if (target !== undefined) c.bend = { to: target - c.pitch!, frames: duration };
-        else if (pitched(c.inst)) out.pitchedBends++; else out.tooSmall++;
+        else if (onPitchTable) out.pitchedBends++; else out.tooSmall++;
       }
       delete c.slideRate; delete c.portaRate; delete c.portaFrom;
     }

@@ -264,6 +264,17 @@ test("a pitch effect ends where the driver ends it: vibrato at the next note, ar
   assert.ok(result.report.losses.some((l) => /^1 change\(s\) of arpeggio.* not heard/.test(l)), JSON.stringify(result.report.losses));
 });
 
+test("a slide on a continuing note whose sounding instrument sets pitches is reported, not written", () => {
+  // The note starts on an arpeggio; a slide command on a hold row ends the arpeggio, but the legato note keeps that instrument.
+  const seq = seqBytes([[0, 0x30, 1], [null, 0x7e], [null, 0x7e, 2], ...Array.from({ length: 5 }, () => [null, 0x7e])]);
+  const result = importSf2(sf2File({
+    tracks: [[[0, 1]], [[0, 0]], [[0, 0]]], sequences: { 1: seq }, instruments: { 0: [0, 0xf0, 0x80, 0, 0, 0] },
+    wave: { 0: [0x41, 0], 1: [0x7f, 0] }, cmds: { 1: [3, 0, 0], 2: [0, 0, 0x80] }, arp: { 0: 0, 1: 4, 2: 7, 3: 0x70 },
+  }));
+  compileSidwaveToPrg(parseSidwave(result.yaml));
+  assert.ok(result.report.losses.some((l) => /slide\(s\) are not imported/.test(l)), JSON.stringify(result.report.losses));
+});
+
 test("vibrato depth and rate follow the counters of the driver", () => {
   // Measured in driver 11 at XX=4, YY=2: five frames up and five down, 65 register units per frame at C-4.
   const v = sf2Vibrato(4, 2, 50.1245);
@@ -399,13 +410,14 @@ test("differential: the driver inside each driver 11 example song against the im
   for (const file of listSf2(MUSIC).sort()) {
     const bytes = fs.readFileSync(file);
     if (parseSf2(bytes).driver.major !== 11) continue;
-    let result;
-    try { result = importSf2(bytes); } catch (error) { console.log(`# ${path.basename(file)}: not imported (${error.message.slice(0, 90)})`); continue; }
+    const result = importSf2(bytes);
     const diff = await compareSids(psidFromSf2(bytes, 0), compileScoreToSid(result.yaml), 8, -STARTUP_CALLS);
     console.log(`# ${path.basename(file)}: gate ${fmt(diff.agree.gate)}, note ${fmt(diff.agree.pitch)} (of ${diff.agree.both.join('/')} calls with both gates on), best shift ${diff.agree.bestShift}, tempo ${result.report.tempo.values.join(",")}, F-diff ${JSON.stringify(diff.fdiffClasses)}`);
     rows.push({ name: path.basename(file), gate: diff.agree.gate, note: diff.agree.pitch, both: diff.agree.both });
   }
-  const summary = assertQuality(rows, { songs: 45, gateVoice: 0.3, gateSong: 0.5, gateMedian: 0.9, noteSong: 0.15, noteMedian: 0.55 });
+  // The lowest voice (0.28, Pipes and Pearls voice 2) releases its gate with a wave program on a continuing note, which a
+  // SIDWave legato note cannot do.
+  const summary = assertQuality(rows, { songs: 54, gateVoice: 0.25, gateSong: 0.5, gateMedian: 0.94, noteSong: 0.15, noteMedian: 0.67 });
   console.log(`# sf2 quality: ${rows.length} songs, ${summary.voices} voices, gate median ${summary.gateMedian.toFixed(3)}, note median ${summary.noteMedian.toFixed(3)} over ${summary.noteVoices} voices`);
 });
 
@@ -425,14 +437,13 @@ test("differential: each driver 11 example song exported with itself as driver, 
   for (const file of listSf2(MUSIC).sort()) {
     const bytes = fs.readFileSync(file);
     if (parseSf2(bytes).driver.major !== 11) continue;
-    let first;
-    try { first = importSf2(bytes); } catch { continue; }
+    const first = importSf2(bytes);
     const exported = exportSf2(parseSidwave(first.yaml), { driver: bytes });
     const diff = await compareSids(compileScoreToSid(first.yaml), psidFromSf2(exported.bytes, 0), 8, STARTUP_CALLS);
     console.log(`# export of ${path.basename(file)}: gate ${fmt(diff.agree.gate)}, note ${fmt(diff.agree.pitch)} (of ${diff.agree.both.join('/')} calls with both gates on), best shift ${diff.agree.bestShift}`);
     rows.push({ name: path.basename(file), gate: diff.agree.gate, note: diff.agree.pitch, both: diff.agree.both });
   }
-  const summary = assertQuality(rows, { songs: 45, gateVoice: 0, gateSong: 0, gateMedian: 0, noteSong: 0, noteMedian: 0 });
+  const summary = assertQuality(rows, { songs: 54, gateVoice: 0.65, gateSong: 0.8, gateMedian: 0.95, noteSong: 0.08, noteMedian: 0.7 });
   console.log(`# sf2 export quality: ${rows.length} songs, gate median ${summary.gateMedian.toFixed(3)}, note median ${summary.noteMedian.toFixed(3)} over ${summary.noteVoices} voices`);
 });
 
@@ -476,7 +487,7 @@ test("round trip on the example songs: import, export with the original as drive
     const bytes = fs.readFileSync(file);
     if (parseSf2(bytes).driver.major !== 11) continue;
     let first;
-    try { first = importSf2(bytes); } catch { continue; }
+    first = importSf2(bytes);
     const exported = exportSf2(parseSidwave(first.yaml), { driver: bytes });
     const back = importSf2(exported.bytes);
     const r = compareVoices(first.yaml, back.yaml);
@@ -487,6 +498,6 @@ test("round trip on the example songs: import, export with the original as drive
     for (const u of r.unmatched) assert.equal(u.pitch, 12, `${path.basename(file)}: voice ${u.voice} note ${u.pitch} at ${u.on.toFixed(3)}-${u.off.toFixed(3)} s is not equal after the round trip`);
   }
   console.log(`# sf2 round trip: ${songs} songs export and import again; ${matched} of ${notes} notes equal (the rest are C0 notes)`);
-  assert.ok(songs >= 50, `only ${songs} songs`);
+  assert.ok(songs >= 54, `only ${songs} songs`);
   assert.ok(matched / notes >= 0.999, `${matched} of ${notes}`);
 });
