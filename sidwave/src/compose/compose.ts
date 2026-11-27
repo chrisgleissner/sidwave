@@ -73,6 +73,8 @@ export interface ComposeResult {
   cycles: { worst: number; budget: number; met: boolean; frames: number; kind: "estimated" | "measured" };
   /** The motif of the piece as scale steps and durations in sixteenths. */
   motif: Motif;
+  /** Notes about the request, for example version 1 options that composer 2 ignores. */
+  warnings: string[];
 }
 
 interface Flags { vibrato: boolean; drop: Set<Role>; speed: number }
@@ -235,17 +237,17 @@ export function composeSidwave(options: ComposeOptions): ComposeResult {
         kind = "measured";
       }
     }
-    if (worst <= budget) return { ...built, profile, repairs, cycles: { worst, budget, met: true, frames, kind } };
+    if (worst <= budget) return { ...built, profile, repairs, warnings: [], cycles: { worst, budget, met: true, frames, kind } };
     let applied = false;
     while (steps.length > 0 && !applied) {
       const [label, run] = steps.shift()!;
       if (run()) { repairs.push(label); applied = true; }
     }
-    if (!applied) return { ...built, profile, repairs, cycles: { worst, budget, met: false, frames, kind } };
+    if (!applied) return { ...built, profile, repairs, warnings: [], cycles: { worst, budget, met: false, frames, kind } };
   }
 }
 
-type Built = Omit<ComposeResult, "profile" | "repairs" | "cycles">;
+type Built = Omit<ComposeResult, "profile" | "repairs" | "cycles" | "warnings">;
 
 function buildScore(profile: ComposeProfile, options: ComposeOptions, system: SystemMode, flags: Flags): Built {
   const { seed } = options;

@@ -309,7 +309,7 @@ function doContinue(ctx: Ctx, o: CompleteOptions): Outcome {
     targets, entries: [index], addedBars: bars,
     // The added entry follows the last one, so the original ring-out tail is not compared, and a voice that plays in the
     // last original entry and continues has its hard restart written in the end of that entry.
-    spec: { entryMap: identityMap(a), excluded: [], guarded: playsIn(a, targets, index - 1), tail: "unprotected" },
+    spec: { entryMap: identityMap(a), excluded: [], guarded: playsIn(a, targets, index - 1), tail: "unprotected", gateMayMoveLater: true },
   };
 }
 
@@ -456,6 +456,7 @@ function doFill(ctx: Ctx, o: CompleteOptions): Outcome {
       excluded: existing ? targets.map((voice) => ({ voice, entry: index })) : [],
       guarded: playsIn(a, targets, index - 1),
       tail: !existing && index === a.entries.length ? "unprotected" : "compared",
+      gateMayMoveLater: !existing,
     },
   };
 }

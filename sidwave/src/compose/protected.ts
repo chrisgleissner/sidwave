@@ -19,8 +19,9 @@ export interface ProtectedSpec {
   excluded: ReadonlyArray<{ voice: number; entry: number }>;
   /**
    * Original (voice, entry) cells of a voice that plays in the cell and is followed by new material of the same voice. In
-   * the last `guard` player calls of such a cell, the comparison ends at the first call in which either score writes the
-   * voice's control register with the gate bit clear. From there the writes belong to the hard restart of the next attack
+   * the last `guard` player calls of such a cell, both scores must write the voice's control register with the gate bit clear
+   * in the same call (except that an appended score may clear it later in the last original entry, where the original's
+   * gate-off can be its loop restart), and the comparison ends at that call. From there the writes belong to the hard restart of the next attack
    * (in the original, of the loop's first note): gate off, zero envelope, and the next note's frequency and pulse width, which
    * the player writes with the restart. Before that call all seven registers must be identical, so a difference in pitch
    * earlier in the guard is a failure.
@@ -32,6 +33,8 @@ export interface ProtectedSpec {
    * it was and is not compared; the report names it.
    */
   tail?: "compared" | "unprotected";
+  /** True when a guarded cell is followed in the original by other material or by its loop, so the original's gate-off can be a restart. */
+  gateMayMoveLater?: boolean;
 }
 
 export interface Mismatch { voice: number; entry: number; call: number; original: string; completed: string }
@@ -169,9 +172,23 @@ export function verifyProtected(original: ParsedSidwave, completed: ParsedSidwav
       if (excluded.has(key)) return;
       const target = framesB[spec.entryMap[entry]!]![0];
       const length = to - from;
-      // In a guarded cell the comparison stops where the completed score's voice gate goes off inside the guard: from there on
-      // the writes belong to the hard restart of the next attack (gate off, zero envelope, the next note's pitch and pulse).
-      const guardFrom = guarded.has(key) ? Math.min(gateOffCall(b, target + length - guard, target + length, lo) - target, gateOffCall(a!, to - guard, to, lo) - from) : length;
+      // In a guarded cell the comparison stops where a score clears the voice's gate inside the guard: from there the writes
+      // belong to the hard restart of the next attack (gate off, zero envelope, the next note's frequency and pulse width).
+      // Both scores must clear the gate in the same call, so a note that ends later or earlier fails. The exception is a
+      // cell that the original follows with other material (an inserted section) or with its loop (an appended one): the
+      // original's gate-off there can be the restart for that following attack, so the completed score may clear the gate
+      // later, never earlier.
+      let guardFrom = length;
+      if (guarded.has(key)) {
+        const gateA = gateOffCall(a!, to - guard, to, lo) - from;
+        const gateB = gateOffCall(b, target + length - guard, target + length, lo) - target;
+        guardFrom = Math.min(gateA, gateB);
+        if (gateA !== gateB && !(spec.gateMayMoveLater === true && gateB > gateA)) {
+          report.identical = false;
+          if (report.mismatches.length < 10) report.mismatches.push({ voice: voice.id, entry, call: guardFrom, original: `gate off at call ${gateA}`, completed: `gate off at call ${gateB}` });
+          return;
+        }
+      }
       report.cellsCompared++;
       for (let i = 0; i < Math.min(length, guardFrom); i++) {
         report.callsCompared++;

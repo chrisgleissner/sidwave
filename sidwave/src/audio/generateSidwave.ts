@@ -68,10 +68,18 @@ const pitchClass = (midi: number) => ((midi % 12) + 12) % 12;
 
 export function generateSidwave(options: GenerateOptions) {
   if (options.composer === 2) {
-    return composeSidwave({
+    const result = composeSidwave({
       profile: options.profile ?? DEFAULT_COMPOSER2_PROFILES[options.style], seed: options.seed, system: options.system,
       root: options.root, ...(options.cycleBudget === undefined ? {} : { cycleBudget: options.cycleBudget }),
     });
+    // Options of the version 1 generator that composer 2 does not use are reported, not dropped silently.
+    const warnings = [...result.warnings];
+    for (const name of ["steps", "tempoMs", "intervals", "waveform"] as const) {
+      if (options[name] !== undefined) warnings.push(`option "${name}" belongs to the version 1 generator and is ignored by composer 2`);
+    }
+    if (options.preset === "expression") warnings.push(`option "preset: expression" belongs to the version 1 generator and is ignored by composer 2`);
+    if (options.profile !== undefined && options.style !== undefined) warnings.push(`option "style" only selects a default profile and is ignored because profile "${options.profile}" was given`);
+    return { ...result, warnings };
   }
   const { style, system, seed, preset } = options;
   const { tempo, bass, drumLine } = MUSIC_STYLES[style];

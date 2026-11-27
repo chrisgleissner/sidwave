@@ -31,8 +31,9 @@ register writes of every protected voice are compared call by call; a difference
 Two things are not compared, and the output names them: when new entries follow the original ones (continue, and
 fill-section at the end) the ring-out tail of the original (the calls after its last entry, with "end") is not compared,
 because it no longer follows the last original entry; and in the last hard-restart-plus-one calls of a voice's section
-that the voice continues, the comparison ends where either score first clears the voice's gate, because the next attack's
-hard restart (gate off, zero envelope, the next note's frequency and pulse width) is written there.
+that the voice continues, the comparison ends where the voice's gate is cleared, which must be the same call in both scores (an appended score may
+clear it later in the last original entry), because the next attack's hard restart (gate off, zero envelope, the next
+note's frequency and pulse width) is written there.
 
 Options:
   -o <file>        Output file (default <score>.completed.yaml in the current directory); "-o -" writes to standard output.

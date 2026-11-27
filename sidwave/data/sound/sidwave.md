@@ -1371,8 +1371,9 @@ command and nothing is written. Two things are not compared, and the result name
   (`continue`, and `fill-section` at the end) the tail no longer follows the last original entry; it is not compared and
   `unprotectedTail` gives its call range and the reason.
 - **The hard restart before a continued voice.** In the last (longest hard restart in frames + 1) x speed calls of a voice's
-  last original section, when that voice plays there and continues, the comparison ends where either score first clears the
-  voice's gate: the next attack's hard restart (gate off, zero envelope, the next note's frequency and pulse width) is written
+  last original section, when that voice plays there and continues, the comparison ends where the voice's gate is cleared, which
+  must be the same call in both scores (an appended score may clear it later in the last original entry, where the original's
+  gate-off can be its loop restart): the next attack's hard restart (gate off, zero envelope, the next note's frequency and pulse width) is written
   there. Every call before it must be identical in all seven registers.
 
 New material for a voice that plays in the entry before starts with a rest, and material inserted before later entries ends

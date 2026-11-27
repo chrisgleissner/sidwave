@@ -15,6 +15,7 @@ import { PROFILES } from "../src/compose/profiles.js";
 import { completeScore } from "../src/compose/complete.js";
 import { analyseScore, detectKey } from "../src/compose/analyse.js";
 import { verifyProtected } from "../src/compose/protected.js";
+import { traceDocument } from "../src/compose/trace.js";
 
 const base = () => composeSidwave({ profile: "chip-aaba-minor", seed: 5 }).score;
 
@@ -73,7 +74,7 @@ test("the protected-material check fails when a protected voice is changed", () 
   const lead = tampered.voices.find((v) => v.name === "Lead");
   const first = Object.values(lead.patterns)[0];
   first.groove = first.groove.replace(/^\((\w#?\d)/, (m, note) => `(${note === "C4" ? "D4" : "C4"}`);
-  const report = verifyProtected(parseSidwave(original), parseSidwave(tampered), { entryMap: original.timeline.map((_, i) => i), excluded: [], guarded: [1, 2, 3].map((voice) => ({ voice, entry: original.timeline.length - 1 })), tail: "unprotected" });
+  const report = verifyProtected(parseSidwave(original), parseSidwave(tampered), { entryMap: original.timeline.map((_, i) => i), excluded: [], guarded: [1, 2, 3].map((voice) => ({ voice, entry: original.timeline.length - 1 })), tail: "unprotected", gateMayMoveLater: true });
   assert.equal(report.identical, false);
   assert.ok(report.mismatches.length > 0);
   assert.equal(report.mismatches[0].voice, 3);
@@ -216,7 +217,7 @@ test("the guard window covers only voices that play in the last entry, and pitch
   assert.equal(accompany.protected.guardedCells, 0);
   // A changed pitch in the last note of a guarded cell is a failure: the guard exempts nothing before the gate goes off.
   const original = parseSidwave(score);
-  const spec = { entryMap: score.timeline.map((_, i) => i), excluded: [], guarded: [1, 2, 3].map((voice) => ({ voice, entry: score.timeline.length - 1 })), tail: "unprotected" };
+  const spec = { entryMap: score.timeline.map((_, i) => i), excluded: [], guarded: [1, 2, 3].map((voice) => ({ voice, entry: score.timeline.length - 1 })), tail: "unprotected", gateMayMoveLater: true };
   assert.equal(verifyProtected(original, full.parsed, spec).identical, true);
   const wrong = structuredClone(full.score);
   const lead = wrong.voices.find((v) => v.id === 3);
@@ -226,6 +227,63 @@ test("the guard window covers only voices that play in the last entry, and pitch
   const lastNote = notes.at(-1);
   lead.patterns[patternName].groove = groove.slice(0, lastNote.index) + (lastNote[0] === "C7" ? "D7" : "C7") + groove.slice(lastNote.index + lastNote[0].length);
   assert.equal(verifyProtected(original, parseSidwave(wrong), spec).identical, false);
+});
+
+test("both scores must clear the gate in the same call inside the guard window", () => {
+  const tiny = (note) => ({
+    sidwave: "1.2", tempo: 120, mode: "PAL", speed: 1,
+    voices: [{ id: 1, instrument: "lib:bass_pluck", patterns: { a: { length: 1, groove: [note] } } }],
+    timeline: [{ section: "A", bars: 1, layers: { v1: "a" } }, { section: "B", bars: 1, layers: { v1: "-" } }],
+  });
+  const plain = parseSidwave(tiny({ note: "C3", len: 4 }));
+  // The same note, but its gate drops a frame earlier: the last note ends a call sooner.
+  const earlier = parseSidwave(tiny({ note: "C3", len: 4, gate_off: 2 }));
+  const spec = { entryMap: [0, 1], excluded: [], guarded: [{ voice: 1, entry: 0 }], tail: "compared" };
+  assert.equal(verifyProtected(plain, plain, spec).identical, true);
+  const report = verifyProtected(plain, earlier, spec);
+  assert.equal(report.identical, false);
+  assert.match(report.mismatches[0].original, /gate off at call|=/);
+  // Where the original is followed by other material (an inserted section) a later gate-off is accepted, an earlier one is not.
+  const relaxed = { ...spec, gateMayMoveLater: true };
+  assert.equal(verifyProtected(earlier, plain, relaxed).identical, true);
+  assert.equal(verifyProtected(plain, earlier, relaxed).identical, false);
+});
+
+test("an effect-driven pitch change in the last calls before the guard's gate-off is compared", () => {
+  const score = base();
+  const original = parseSidwave(score);
+  const done = completeScore(score, "continue", { bars: 4 });
+  assert.equal(done.protected.identical, true);
+  // The chord arpeggio instrument steps its pitch every two frames up to the end of the cell, so pitch moves inside the window.
+  const arp = done.protected.voices.includes(2);
+  assert.ok(arp);
+  const spec = { entryMap: score.timeline.map((_, k) => k), excluded: [], guarded: [1, 2, 3].map((voice) => ({ voice, entry: score.timeline.length - 1 })), tail: "unprotected", gateMayMoveLater: true };
+  assert.equal(verifyProtected(original, done.parsed, spec).identical, true);
+  // The vibrato of the lead writes its frequency in the last two calls of the last entry, inside the guard window.
+  const trace = traceDocument(original);
+  const lastCall = Math.round(original.song.length_bars * original.song.meter * (trace.compile.framesPerSecond * 60) / original.song.tempo);
+  let frequencyWrites = 0;
+  for (let call = lastCall - 2; call < lastCall; call++) {
+    for (let w = trace.starts[call]; w < trace.starts[call + 1]; w++) if ((trace.writes[w] >> 8) === 14 || (trace.writes[w] >> 8) === 15) frequencyWrites++;
+  }
+  assert.ok(frequencyWrites > 0, "the lead's pitch moves in the last two calls");
+  // Change the effect: a slower arpeggio step in the completed score's last arpeggio note moves pitches inside the window.
+  const changed = structuredClone(done.score);
+  changed.instruments = { ...(changed.instruments ?? {}), }; 
+  const lead = changed.voices.find((v) => v.id === 3);
+  lead.patterns[score.timeline.at(-1).layers.v3].fx = { vibrato: { depth: 0.9, rate: 9, delay: 0 } };
+  const report = verifyProtected(original, parseSidwave(changed), spec);
+  assert.equal(report.identical, false);
+  assert.equal(report.mismatches[0].voice, 3);
+});
+
+test("composer 2 reports version 1 options it ignores", () => {
+  const options = { root: "C3", preset: "classic", style: "chiptune", seed: 9, system: "PAL", composer: 2 };
+  assert.deepEqual(generateSidwave(options).warnings, []);
+  const warned = generateSidwave({ ...options, steps: 8, tempoMs: 100, intervals: [0, 4], waveform: "saw", preset: "expression", profile: "chip-aaba-major" }).warnings;
+  assert.equal(warned.length, 6);
+  assert.match(warned.join("\n"), /"steps".*ignored/);
+  assert.match(warned.join("\n"), /"style".*profile "chip-aaba-major"/);
 });
 
 test("--allow-dir lets the complete command read file: samples outside the working directory", () => {
