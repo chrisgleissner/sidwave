@@ -1,0 +1,967 @@
+{
+  "phase": "heldout",
+  "rulesSha256": "841cdae0df92ada5bc30182ad7664db1f540d19a539631c6e88cd51c18a3b1a1",
+  "tunes": [
+    "example:acid_line",
+    "example:arp_ballad",
+    "example:chamber_waltz",
+    "example:drum_and_bass",
+    "example:metal_sync",
+    "gen:chiptune:202",
+    "gen:funk:121"
+  ],
+  "scored": 147,
+  "skipped": [
+    {
+      "tune": "example:acid_line",
+      "class": "timing_shift",
+      "severity": "3",
+      "reason": "no note with a note before it that is long enough"
+    },
+    {
+      "tune": "example:acid_line",
+      "class": "timing_shift",
+      "severity": "6",
+      "reason": "no note with a note before it that is long enough"
+    },
+    {
+      "tune": "example:acid_line",
+      "class": "sync_ring",
+      "severity": "off",
+      "reason": "no instrument with ring or sync"
+    },
+    {
+      "tune": "example:acid_line",
+      "class": "loop_point",
+      "severity": "1",
+      "reason": "the score has no numeric loop_to"
+    },
+    {
+      "tune": "example:acid_line",
+      "class": "refactor_rename_instrument",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:acid_line",
+      "class": "refactor_duplicate_pattern",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:arp_ballad",
+      "class": "gate_length",
+      "severity": "frame",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:arp_ballad",
+      "class": "sync_ring",
+      "severity": "off",
+      "reason": "no instrument with ring or sync"
+    },
+    {
+      "tune": "example:arp_ballad",
+      "class": "missing_percussion",
+      "severity": "1",
+      "reason": "no drum voice"
+    },
+    {
+      "tune": "example:arp_ballad",
+      "class": "loop_point",
+      "severity": "1",
+      "reason": "the score has no numeric loop_to"
+    },
+    {
+      "tune": "example:arp_ballad",
+      "class": "refactor_rename_instrument",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:arp_ballad",
+      "class": "refactor_duplicate_pattern",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "gate_length",
+      "severity": "frame",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "filter",
+      "severity": "5",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "filter",
+      "severity": "40",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "filter",
+      "severity": "off",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "sync_ring",
+      "severity": "off",
+      "reason": "no instrument with ring or sync"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "missing_percussion",
+      "severity": "1",
+      "reason": "no drum voice"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "loop_point",
+      "severity": "1",
+      "reason": "the score has no numeric loop_to"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "refactor_rename_instrument",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "refactor_duplicate_pattern",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "timing_shift",
+      "severity": "1",
+      "reason": "no note with a note before it that is long enough"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "timing_shift",
+      "severity": "3",
+      "reason": "no note with a note before it that is long enough"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "timing_shift",
+      "severity": "6",
+      "reason": "no note with a note before it that is long enough"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "gate_length",
+      "severity": "frame",
+      "reason": "no note of at least 8 frames"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "gate_length",
+      "severity": "half",
+      "reason": "no note of at least 8 frames"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "filter",
+      "severity": "5",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "filter",
+      "severity": "40",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "filter",
+      "severity": "off",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "sync_ring",
+      "severity": "off",
+      "reason": "no instrument with ring or sync"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "loop_point",
+      "severity": "1",
+      "reason": "the score has no numeric loop_to"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "refactor_rename_instrument",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "refactor_duplicate_pattern",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "extra_note",
+      "severity": "1",
+      "reason": "no plain note near the rest"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "detune_voice",
+      "severity": "3",
+      "reason": "the mutated score does not compile: Invalid SIDWAVE at $.cpu: the player needs up to 8831 cycles per call at speed 2 (8778 available at 1 MHz PAL); use cpu:"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "detune_voice",
+      "severity": "8",
+      "reason": "the mutated score does not compile: Invalid SIDWAVE at $.cpu: the player needs up to 8831 cycles per call at speed 2 (8778 available at 1 MHz PAL); use cpu:"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "detune_voice",
+      "severity": "25",
+      "reason": "the mutated score does not compile: Invalid SIDWAVE at $.cpu: the player needs up to 8831 cycles per call at speed 2 (8778 available at 1 MHz PAL); use cpu:"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "detune_voice",
+      "severity": "50",
+      "reason": "the mutated score does not compile: Invalid SIDWAVE at $.cpu: the player needs up to 8831 cycles per call at speed 2 (8778 available at 1 MHz PAL); use cpu:"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "timing_shift",
+      "severity": "1",
+      "reason": "no note with a note before it that is long enough"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "timing_shift",
+      "severity": "3",
+      "reason": "no note with a note before it that is long enough"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "timing_shift",
+      "severity": "6",
+      "reason": "no note with a note before it that is long enough"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "sync_ring",
+      "severity": "off",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "missing_percussion",
+      "severity": "1",
+      "reason": "the mutated score does not compile: Invalid SIDWAVE at $.voices[1].patterns.swell: pattern swell lasts 3.5 beats; the song metre is 4/4, which needs 4 beats"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "loop_point",
+      "severity": "1",
+      "reason": "the score has no numeric loop_to"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "refactor_rename_instrument",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "refactor_duplicate_pattern",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "detune_voice",
+      "severity": "3",
+      "reason": "voice detune needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "detune_voice",
+      "severity": "8",
+      "reason": "voice detune needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "detune_voice",
+      "severity": "25",
+      "reason": "voice detune needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "detune_voice",
+      "severity": "50",
+      "reason": "voice detune needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "gate_length",
+      "severity": "frame",
+      "reason": "gate_off needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "gate_length",
+      "severity": "half",
+      "reason": "gate_off needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "envelope",
+      "severity": "release",
+      "reason": "no instrument with an ADSR"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "envelope",
+      "severity": "attack_decay",
+      "reason": "no instrument with an ADSR"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "waveform",
+      "severity": "1",
+      "reason": "no instrument with a pitched waveform"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "pulse_width",
+      "severity": "64",
+      "reason": "no pulse instrument with a pulse width"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "pulse_width",
+      "severity": "512",
+      "reason": "no pulse instrument with a pulse width"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "filter",
+      "severity": "5",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "filter",
+      "severity": "40",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "filter",
+      "severity": "off",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "sync_ring",
+      "severity": "off",
+      "reason": "no instrument with ring or sync"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "missing_percussion",
+      "severity": "1",
+      "reason": "no drum voice"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "sound_in_silence",
+      "severity": "50ms",
+      "reason": "the score declares no instruments"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "sections_swapped",
+      "severity": "1",
+      "reason": "the score has no timeline list"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "loop_point",
+      "severity": "1",
+      "reason": "the score has no numeric loop_to"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "long_tune_defect",
+      "severity": "1",
+      "reason": "the tune is shorter than 90 s"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "refactor_rename_instrument",
+      "severity": "1",
+      "reason": "no instrument to rename"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "refactor_duplicate_pattern",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "extra_note",
+      "severity": "1",
+      "reason": "no plain note near the rest"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "detune_voice",
+      "severity": "3",
+      "reason": "voice detune needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "detune_voice",
+      "severity": "8",
+      "reason": "voice detune needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "detune_voice",
+      "severity": "25",
+      "reason": "voice detune needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "detune_voice",
+      "severity": "50",
+      "reason": "voice detune needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "gate_length",
+      "severity": "frame",
+      "reason": "gate_off needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "gate_length",
+      "severity": "half",
+      "reason": "gate_off needs SIDWave 1.2 or later"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "envelope",
+      "severity": "release",
+      "reason": "no instrument with an ADSR"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "envelope",
+      "severity": "attack_decay",
+      "reason": "no instrument with an ADSR"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "waveform",
+      "severity": "1",
+      "reason": "no instrument with a pitched waveform"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "pulse_width",
+      "severity": "64",
+      "reason": "no pulse instrument with a pulse width"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "pulse_width",
+      "severity": "512",
+      "reason": "no pulse instrument with a pulse width"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "filter",
+      "severity": "5",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "filter",
+      "severity": "40",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "filter",
+      "severity": "off",
+      "reason": "no instrument with a filter table"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "sync_ring",
+      "severity": "off",
+      "reason": "no instrument with ring or sync"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "missing_percussion",
+      "severity": "1",
+      "reason": "no drum voice"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "sound_in_silence",
+      "severity": "50ms",
+      "reason": "the score declares no instruments"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "sections_swapped",
+      "severity": "1",
+      "reason": "the score has no timeline list"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "loop_point",
+      "severity": "1",
+      "reason": "the score has no numeric loop_to"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "long_tune_defect",
+      "severity": "1",
+      "reason": "the tune is shorter than 90 s"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "refactor_rename_instrument",
+      "severity": "1",
+      "reason": "no instrument to rename"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "refactor_duplicate_pattern",
+      "severity": "1",
+      "reason": "the compiled SID is identical to the base tune"
+    }
+  ],
+  "parameters": {
+    "thetaSpec": 6,
+    "thetaLevel": 3,
+    "sGap": 15,
+    "k": 2,
+    "m": 8
+  },
+  "falseAccept": {
+    "count": 15,
+    "total": 98,
+    "rate": 0.1531,
+    "ci95": [
+      0.095,
+      0.2373
+    ]
+  },
+  "falseReject": {
+    "count": 4,
+    "total": 18,
+    "rate": 0.2222,
+    "ci95": [
+      0.09,
+      0.4521
+    ]
+  },
+  "byClass": {
+    "wrong_note": {
+      "falseAccept": {
+        "count": 2,
+        "total": 14,
+        "rate": 0.1429,
+        "ci95": [
+          0.0401,
+          0.3994
+        ]
+      }
+    },
+    "octave_error": {
+      "falseAccept": {
+        "count": 1,
+        "total": 7,
+        "rate": 0.1429,
+        "ci95": [
+          0.0257,
+          0.5131
+        ]
+      }
+    },
+    "missing_note": {
+      "falseAccept": {
+        "count": 1,
+        "total": 7,
+        "rate": 0.1429,
+        "ci95": [
+          0.0257,
+          0.5131
+        ]
+      }
+    },
+    "extra_note": {
+      "falseAccept": {
+        "count": 0,
+        "total": 5,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.4345
+        ]
+      }
+    },
+    "detune_voice": {
+      "falseAccept": {
+        "count": 0,
+        "total": 8,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.3244
+        ]
+      },
+      "falseReject": {
+        "count": 4,
+        "total": 4,
+        "rate": 1,
+        "ci95": [
+          0.5101,
+          1
+        ]
+      }
+    },
+    "timing_shift": {
+      "falseAccept": {
+        "count": 3,
+        "total": 8,
+        "rate": 0.375,
+        "ci95": [
+          0.1368,
+          0.6943
+        ]
+      }
+    },
+    "tempo_drift": {
+      "falseAccept": {
+        "count": 0,
+        "total": 7,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.3543
+        ]
+      }
+    },
+    "gate_length": {
+      "falseAccept": {
+        "count": 0,
+        "total": 4,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.4899
+        ]
+      }
+    },
+    "envelope": {
+      "falseAccept": {
+        "count": 0,
+        "total": 5,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.4345
+        ]
+      }
+    },
+    "waveform": {
+      "falseAccept": {
+        "count": 4,
+        "total": 5,
+        "rate": 0.8,
+        "ci95": [
+          0.3755,
+          0.9638
+        ]
+      }
+    },
+    "pulse_width": {
+      "falseAccept": {
+        "count": 2,
+        "total": 5,
+        "rate": 0.4,
+        "ci95": [
+          0.1176,
+          0.7693
+        ]
+      }
+    },
+    "filter": {
+      "falseAccept": {
+        "count": 2,
+        "total": 6,
+        "rate": 0.3333,
+        "ci95": [
+          0.0968,
+          0.7
+        ]
+      }
+    },
+    "missing_percussion": {
+      "falseAccept": {
+        "count": 0,
+        "total": 2,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.6576
+        ]
+      }
+    },
+    "sound_in_silence": {
+      "falseAccept": {
+        "count": 0,
+        "total": 5,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.4345
+        ]
+      }
+    },
+    "sections_swapped": {
+      "falseAccept": {
+        "count": 0,
+        "total": 5,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.4345
+        ]
+      }
+    },
+    "long_tune_defect": {
+      "falseAccept": {
+        "count": 0,
+        "total": 5,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.4345
+        ]
+      }
+    },
+    "identical": {
+      "falseReject": {
+        "count": 0,
+        "total": 7,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.3543
+        ]
+      }
+    },
+    "pcm_delay": {
+      "falseReject": {
+        "count": 0,
+        "total": 7,
+        "rate": 0,
+        "ci95": [
+          0,
+          0.3543
+        ]
+      }
+    }
+  },
+  "borderline": {
+    "passed": 7,
+    "total": 31
+  },
+  "misclassified": [
+    {
+      "tune": "example:acid_line",
+      "class": "detune_voice",
+      "severity": "3",
+      "label": "B",
+      "verdict": "fail",
+      "firstBad": "5.152 s (level)"
+    },
+    {
+      "tune": "example:acid_line",
+      "class": "waveform",
+      "severity": "1",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:arp_ballad",
+      "class": "detune_voice",
+      "severity": "3",
+      "label": "B",
+      "verdict": "fail",
+      "firstBad": "1.920 s (spectral)"
+    },
+    {
+      "tune": "example:arp_ballad",
+      "class": "waveform",
+      "severity": "1",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:arp_ballad",
+      "class": "filter",
+      "severity": "40",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "wrong_note",
+      "severity": "1",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "octave_error",
+      "severity": "12",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "detune_voice",
+      "severity": "3",
+      "label": "B",
+      "verdict": "fail",
+      "firstBad": "2.272 s (level)"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "timing_shift",
+      "severity": "6",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:chamber_waltz",
+      "class": "pulse_width",
+      "severity": "512",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "detune_voice",
+      "severity": "3",
+      "label": "B",
+      "verdict": "fail",
+      "firstBad": "32.939 s (level)"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "waveform",
+      "severity": "1",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:drum_and_bass",
+      "class": "pulse_width",
+      "severity": "512",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "waveform",
+      "severity": "1",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "example:metal_sync",
+      "class": "filter",
+      "severity": "40",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "wrong_note",
+      "severity": "2",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "gen:chiptune:202",
+      "class": "timing_shift",
+      "severity": "3",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "missing_note",
+      "severity": "1",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    },
+    {
+      "tune": "gen:funk:121",
+      "class": "timing_shift",
+      "severity": "3",
+      "label": "M",
+      "verdict": "pass",
+      "firstBad": "no bad window"
+    }
+  ],
+  "status": "approximate",
+  "engine": {
+    "id": "libsidplayfp-wasm",
+    "version": "1.1.1",
+    "emulation": "residfp"
+  },
+  "limitations": {
+    "summary": "Most benign controls were vacuous (identical recompile read the same cached PCM; the rename and duplicate-pattern refactors compile to identical SIDs and were skipped). The effective benign set was 7 identical, 7 delay and 4 detune items. Two benign classes of the design were not implemented. Bases that do not compile to a PSID were excluded, among them ultisid_orchestra in this held-out set (more than three SID chips).",
+    "details": "a1-limitations.md",
+    "unsupportedBases": [
+      "example:ultisid_orchestra"
+    ]
+  }
+}

@@ -3,7 +3,7 @@ import assert from "#test/assert";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { runCli, EXIT_OK, EXIT_FAILED, EXIT_USAGE } from "../src/cli.js";
+import { runCli, EXIT_OK, EXIT_INPUT, EXIT_USAGE } from "../src/cli.js";
 import { compileSidwave } from "../src/sidwaveGame.js";
 import { parseSidwave } from "../src/sidwave.js";
 import { readExampleScore } from "../src/sidwaveOps.js";
@@ -57,9 +57,11 @@ test("--json prints the contract, the cycles, the outputs and the labels", () =>
   try {
     const r = run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0x1000", "--json", "--symbols", "kickass,ca65", "--symbols-all");
     assert.equal(r.code, EXIT_OK, r.err);
-    const json = JSON.parse(r.out);
+    const envelope = JSON.parse(r.out);
+    assert.equal(envelope.command, "compile");
+    const json = envelope.result;
     const expected = compileSidwave(doc, { target: "game", origin: 0x1000 });
-    assert.equal(json.ok, true);
+    assert.equal(envelope.ok, true);
     assert.equal(json.target, "game");
     assert.deepEqual(json.contract, JSON.parse(JSON.stringify(expected.contract)));
     assert.deepEqual(json.cycles, JSON.parse(JSON.stringify(expected.cycles)));
@@ -84,19 +86,19 @@ test("--format sid writes a PSID with the player image and the free page range",
     const sid = fs.readFileSync(path.join(dir, "song.sid"));
     assert.equal(sid.subarray(0, 4).toString("ascii"), "PSID");
     assert.deepEqual([sid[0x78], sid[0x79], sid.readUInt16BE(10), sid.readUInt16BE(12)], [0x20, 0xb0, 0x1f73, 0x1003]);
-    assert.equal(run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0xCF00", "--format", "sid", "--no-measure").code, EXIT_FAILED);
+    assert.equal(run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0xCF00", "--format", "sid", "--no-measure").code, EXIT_INPUT);
   } finally { done(); }
 });
 
-test("a score or layout that cannot be built exits 1 with the path of the problem; bad options exit 2", () => {
+test("a score or layout that cannot be built exits 3 with the path of the problem; bad options exit 2", () => {
   const { dir, done } = sandbox();
   try {
     const bad = run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0x100");
-    assert.equal(bad.code, EXIT_FAILED);
+    assert.equal(bad.code, EXIT_INPUT);
     assert.match(bad.err, /song\.yaml: Invalid SIDWAVE at \$\.origin: must lie in \$0200-\$CFF4/);
     const json = run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0x1000", "--zp", "0", "--json");
-    assert.equal(json.code, EXIT_FAILED);
-    assert.equal(JSON.parse(json.out).error.path, "$.zeroPage");
+    assert.equal(json.code, EXIT_INPUT);
+    assert.equal(JSON.parse(json.out).error.details.path, "$.zeroPage");
     const usage = (args, pattern) => {
       const r = run(dir, "compile", "song.yaml", ...args);
       assert.equal(r.code, EXIT_USAGE, `${args.join(" ")}: ${r.err}`);
@@ -125,16 +127,16 @@ test("a score or layout that cannot be built exits 1 with the path of the proble
     assert.equal(run(dir, "compile", "song.yaml", "--target", "prg", "-o", "x.prg").code, EXIT_OK);
     fs.writeFileSync(path.join(dir, "broken.yaml"), "sidwave: 1.2\n");
     const broken = run(dir, "compile", "broken.yaml", "--target", "game", "--origin", "0x1000");
-    assert.equal(broken.code, EXIT_FAILED);
+    assert.equal(broken.code, EXIT_INPUT);
   } finally { done(); }
 });
 
-test("an unwritable output is a usage error", () => {
+test("an unwritable output is an input error", () => {
   const { dir, done } = sandbox();
   try {
     fs.writeFileSync(path.join(dir, "blocked"), "file");
     const r = run(dir, "compile", "song.yaml", "--target", "game", "--origin", "0x1000", "--no-measure", "-o", "blocked/out.bin");
-    assert.equal(r.code, EXIT_USAGE);
+    assert.equal(r.code, EXIT_INPUT);
     assert.match(r.err, /cannot write .*blocked\/out\.bin: (ENOTDIR|EEXIST)/);
   } finally { done(); }
 });

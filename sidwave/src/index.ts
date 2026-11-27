@@ -19,3 +19,5 @@ export * from "./audio/sidwaveReference.js";
 export * from "./audio/sidwaveSimilarity.js";
 export * from "./audio/sidwaveFidelity.js";
 export * from "./audio/sidwaveQuality.js";
+export * from "./sidwaveTools.js";
+export { classifyError, SidwaveOperationError, EXIT_CODES, type ErrorCategory, type ErrorReport } from "./cliCore.js";

@@ -25,6 +25,8 @@ const MAX_SID_BYTES = 65_536 + 0x7c;
 const DEFAULT_MAX_SECONDS = 600;
 const MAX_TRACE_RECORDS = 4_194_304;
 const SLICE_SECONDS = 0.02;
+/** Slices between yields to the event loop: about every 0.5 s of audio. */
+const YIELD_EVERY_SLICES = 25;
 const CLOCK_HZ = { PAL: 985_248, NTSC: 1_022_727 } as const;
 /** Cycles from the start of the probe tune's init routine to its first SID write (LDA #imm, then STA abs). */
 const PROBE_FIRST_WRITE_CYCLE = 6;
@@ -233,6 +235,8 @@ export function createLibsidplayfpEngine({
       const cyclesPerSlice = Math.max(1, Math.floor(clockHz * sliceSeconds));
       while (sampleCount < wantSamples) {
         checkAbort(req);
+        // Rendering is synchronous WASM; yield now and then so that a signal handler (SIGINT) can run and abort.
+        if (slice > 0 && slice % YIELD_EVERY_SLICES === 0) await new Promise<void>((resolve) => setImmediate(resolve));
         const chunk = ctx.render(cyclesPerSlice);
         if (!chunk) throw new SidLoadError(ctx.getLastError() || "libsidplayfp render failed");
         const copy = chunk.slice();

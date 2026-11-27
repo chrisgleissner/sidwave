@@ -7,21 +7,16 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { parseSidwave } from "./sidwave.js";
 import { SIDWAVE_SYMBOL_FORMATS, compileSidwave, sidwaveGamePsid, type SidwaveSymbolFormat } from "./sidwaveGame.js";
 import {
+  classifyError, envelope, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, SidwaveOperationError, UsageError, withFile,
+  type CliIo,
+} from "./cliCore.js";
+import { RUN_COMMANDS, RUN_HELP, flagName, takeRunFlag, type RunFlags } from "./cliVerify.js";
+import {
   compileSidwaveBytes, confinedReadOptions, describeSidwave, isExampleName, lintSidwave, listSidwaveExamples,
-  readExampleScore, validationFailure, type SidwaveOutputFormat,
+  readExampleScore, type SidwaveOutputFormat,
 } from "./sidwaveOps.js";
 
-/** Exit codes: 0 success, 1 invalid input or failed verdict, 2 operational or usage error. */
-export const EXIT_OK = 0;
-export const EXIT_FAILED = 1;
-export const EXIT_USAGE = 2;
-
-export interface CliIo {
-  cwd: string;
-  out(text: string): void;
-  err(text: string): void;
-  outBytes(bytes: Uint8Array): void;
-}
+export * from "./cliCore.js";
 
 export const HELP = `sidwave: compile SIDWave scores to C64 programs and SID files
 
@@ -32,10 +27,10 @@ Usage:
                           [--symbols-all] [--no-measure] [--format bin|sid] [-o <out>] [--loop|--no-loop] [--json]
   sidwave lint     <file> [--loop|--no-loop] [--strict] [--json] [--allow-dir <dir>]
   sidwave examples [<name>] [-o <dir>] [--force] [--json]
-  sidwave --help | --version
+${RUN_HELP.usage}  sidwave --help | --version
 
 Commands:
-  validate   Parse a score. Exit 0 when it is valid, 1 with the path of the first error otherwise.
+  validate   Parse a score. Exit 0 when it is valid, 3 with the path of the first error otherwise.
   compile    Write a PRG (default) or PSID file. The output defaults to the input name with .prg or .sid in the
              current directory; "-o -" writes the bytes to standard output. With --format omitted, a -o name
              ending in .sid selects PSID. --json prints the format, sizes, addresses, SID count and duration.
@@ -51,17 +46,21 @@ Commands:
              finding that is not an informational note.
   examples   Without a name, list the bundled example scores. With a name, print the score, or write
              <name>.yaml into the directory given by -o (it is not overwritten without --force).
-
+${RUN_HELP.commands}
 Options:
   --allow-dir <dir>   Allow "file:" sample sources below <dir>. Without it they must lie below the current
                       directory. May be repeated. The sidwave command never uses the network.
   --song <n>          Score with songs (SIDWave 1.4): the song the PRG plays and the PSID starts with, 0-based (default 0).
   --symbols-all       With --target game: also export every internal label as sidwave_int_<label>.
   --json              Machine-readable output on standard output.
-  -h, --help          Show this text.
+${RUN_HELP.options}  -h, --help          Show this text.
   -V, --version       Show the package version.
 
-Exit codes: 0 success, 1 invalid input or failed verdict, 2 operational or usage error.
+Exit codes: 0 success; 1 failed verdict (verify below the requested level, lint --strict findings); 2 usage;
+3 input or validation error; 4 engine unavailable; 5 limit exceeded or aborted; 70 internal error.
+With --json every command prints { "ok", "command", "result" } or { "ok": false, "command", "error": { "category",
+"message", "details" } } on standard output. Error categories: usage, input, validation, engine_unavailable,
+limit_exceeded, aborted, internal.
 `;
 
 interface Options {
@@ -84,9 +83,9 @@ interface Options {
   symbols: string[];
   symbolsAll: boolean;
   noMeasure: boolean;
+  /** Flags of verify, render, trace and sid-info. */
+  run: RunFlags;
 }
-
-class UsageError extends Error {}
 
 const VALUE_FLAGS = new Set(["-o", "--output", "--format", "--allow-dir", "--target", "--origin", "--data-origin", "--zp", "--symbols", "--song"]);
 
@@ -104,8 +103,8 @@ function parseAddress(flag: string, text: string): number {
   return value;
 }
 
-function parseArgs(args: string[]): Options {
-  const options: Options = { positional: [], json: false, strict: false, force: false, help: false, version: false, allowDirs: [], symbols: [], symbolsAll: false, noMeasure: false };
+function parseArgs(args: string[], command: string): Options {
+  const options: Options = { positional: [], json: false, strict: false, force: false, help: false, version: false, allowDirs: [], symbols: [], symbolsAll: false, noMeasure: false, run: {} };
   for (let i = 0; i < args.length; i++) {
     let arg = args[i]!;
     let inline: string | undefined;
@@ -114,6 +113,7 @@ function parseArgs(args: string[]): Options {
       arg = arg.slice(0, arg.indexOf("="));
     }
     if (arg === "--") { options.positional.push(...args.slice(i + 1)); break; }
+    if (!(command === "compile" && arg === "--song") && takeRunFlag(options.run, arg, inline, () => args[++i])) continue;
     if (VALUE_FLAGS.has(arg)) {
       const value = inline ?? args[++i];
       if (value === undefined) throw new UsageError(`${arg} needs a value`);
@@ -164,39 +164,32 @@ function rejectOptions(options: Options, command: string, unsupported: Array<[ke
   }
 }
 
+function rejectRunFlags(options: Options, command: string): void {
+  const used = Object.keys(options.run);
+  if (used.length > 0) throw new UsageError(`${flagName(used[0]!)} does not apply to ${command}`);
+}
+
 function readScore(io: CliIo, file: string): { text: string; path: string } {
   const path = resolve(io.cwd, file);
   try {
     return { text: readFileSync(path, "utf8"), path };
   } catch (error) {
-    throw new UsageError(`cannot read ${file}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`);
+    throw new SidwaveOperationError("input", `cannot read ${file}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file });
   }
 }
 
-function emit(io: CliIo, options: Options, value: unknown, text: string): void {
-  io.out(options.json ? `${JSON.stringify(value, null, 2)}\n` : `${text}\n`);
-}
-
-/** Reports invalid input. Returns EXIT_FAILED for a score error and rethrows anything else. */
-function invalid(io: CliIo, options: Options, file: string, error: unknown): number {
-  const failure = validationFailure(error);
-  if (!failure) throw error;
-  if (options.json) io.out(`${JSON.stringify({ ok: false, file, error: failure }, null, 2)}\n`);
-  else io.err(`${file}: ${failure.message}\n`);
-  return EXIT_FAILED;
+/** Prints a result: the JSON envelope with --json, else the text line. */
+function emit(io: CliIo, options: Options, command: string, result: unknown, text: string, ok = true): void {
+  io.out(options.json ? `${JSON.stringify(envelope(command, ok, { result }), null, 2)}\n` : `${text}\n`);
 }
 
 function validate(io: CliIo, options: Options): number {
   rejectOptions(options, "validate", [["output", "-o"], ["format", "--format"], ["loop", "--loop/--no-loop"], ["strict", "--strict"], ["force", "--force"], ...GAME_FLAGS]);
   const file = pickFile(options, "validate");
   const { text } = readScore(io, file);
-  try {
-    const description = describeSidwave(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs)));
-    emit(io, options, { ok: true, file, ...description }, `${file}: valid SIDWAVE ${description.version}, ${description.voices} voices, ${description.sids} SID${description.sids === 1 ? "" : "s"}`);
-    return EXIT_OK;
-  } catch (error) {
-    return invalid(io, options, file, error);
-  }
+  const description = withFile(file, () => describeSidwave(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs))));
+  emit(io, options, "validate", { file, ...description }, `${file}: valid SIDWAVE ${description.version}, ${description.voices} voices, ${description.sids} SID${description.sids === 1 ? "" : "s"}`);
+  return EXIT_OK;
 }
 
 function pickFormat(options: Options): SidwaveOutputFormat {
@@ -229,12 +222,7 @@ function compile(io: CliIo, options: Options): number {
   const stem = basename(file, extname(file)).replace(/\.sidwave$/i, "");
   const outPath = toStdout ? undefined : resolve(io.cwd, options.output ?? `${stem}.${format}`);
   if (outPath !== undefined && sameFile(outPath, path)) throw new UsageError("the output file is the input file; refusing to overwrite it");
-  let compiled;
-  try {
-    compiled = compileSidwaveBytes(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs)), { format, ...(options.loop === undefined ? {} : { loop: options.loop }), ...(options.song === undefined ? {} : { song: options.song }) });
-  } catch (error) {
-    return invalid(io, options, file, error);
-  }
+  const compiled = withFile(file, () => compileSidwaveBytes(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs)), { format, ...(options.loop === undefined ? {} : { loop: options.loop }), ...(options.song === undefined ? {} : { song: options.song }) }));
   const { summary, bytes } = compiled;
   if (outPath === undefined) io.outBytes(bytes);
   else {
@@ -242,12 +230,12 @@ function compile(io: CliIo, options: Options): number {
       mkdirSync(dirname(outPath), { recursive: true });
       writeFileSync(outPath, bytes);
     } catch (error) {
-      throw new UsageError(`cannot write ${outPath}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`);
+      throw new SidwaveOperationError("input", `cannot write ${outPath}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: outPath });
     }
   }
   const where = outPath ?? "standard output";
   const line = `${where}: ${summary.format.toUpperCase()} ${summary.outputBytes} bytes, ${summary.durationSeconds.toFixed(1)} s, ${summary.sidCount} SID${summary.sidCount === 1 ? "" : "s"}`;
-  const report = options.json ? `${JSON.stringify({ ok: true, file, output: outPath ?? null, ...summary }, null, 2)}\n` : `${line}\n`;
+  const report = options.json ? `${JSON.stringify(envelope("compile", true, { result: { file, output: outPath ?? null, ...summary } }), null, 2)}\n` : `${line}\n`;
   // With bytes on standard output the summary goes to standard error so the two never mix.
   if (toStdout) io.err(report); else io.out(report);
   for (const warning of summary.warnings) io.err(`warning: ${warning}\n`);
@@ -280,7 +268,7 @@ function compileGame(io: CliIo, options: Options, file: string): number {
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, bytes);
     } catch (error) {
-      throw new UsageError(`cannot write ${target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`);
+      throw new SidwaveOperationError("input", `cannot write ${target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: target });
     }
     outputs.push({ kind, path: target, bytes: typeof bytes === "string" ? Buffer.byteLength(bytes) : bytes.length, ...(address === undefined ? {} : { address }) });
   };
@@ -293,7 +281,7 @@ function compileGame(io: CliIo, options: Options, file: string): number {
       symbols, symbolsAll: options.symbolsAll, measure: !options.noMeasure, ...(options.loop === undefined ? {} : { loop: options.loop }),
     });
   } catch (error) {
-    return invalid(io, options, file, error);
+    return withFile(file, (): number => { throw error; });
   }
   try {
     if (format === "sid") write(`${base}.sid`, sidwaveGamePsid(doc, build), "psid", build.combinedOrigin);
@@ -302,7 +290,7 @@ function compileGame(io: CliIo, options: Options, file: string): number {
       write(`${base}.data.bin`, build.data, "data", build.contract.memory.data!.start);
     } else write(`${base}.bin`, build.player, "player", build.contract.memory.player.start);
   } catch (error) {
-    return invalid(io, options, file, error);
+    return withFile(file, (): number => { throw error; });
   }
   for (const [name, content] of Object.entries(build.symbols)) write(`${base}${SYMBOL_EXTENSIONS[name as SidwaveSymbolFormat]}`, content!, `symbols-${name}`);
   const { cycles, contract } = build;
@@ -311,11 +299,11 @@ function compileGame(io: CliIo, options: Options, file: string): number {
   const line = `${outputs[0]!.path}: game build, player $${contract.memory.player.start.toString(16).toUpperCase()}-$${(contract.memory.player.end - 1).toString(16).toUpperCase()}`
     + `${contract.memory.data ? `, data $${contract.memory.data.start.toString(16).toUpperCase()}-$${(contract.memory.data.end - 1).toString(16).toUpperCase()}` : ""}, ${cycleText}`;
   const report = options.json
-    ? `${JSON.stringify({
-      ok: true, file, target: "game", format, outputs, origin: contract.memory.player.start, dataOrigin: options.dataOrigin ?? null,
+    ? `${JSON.stringify(envelope("compile", true, { result: {
+      file, target: "game", format, outputs, origin: contract.memory.player.start, dataOrigin: options.dataOrigin ?? null,
       zeroPage: options.zeroPage ?? 0xfb, contract, cycles, labels: build.labels, totalFrames: build.totalFrames,
       durationSeconds: build.durationSeconds, warnings: build.warnings,
-    }, null, 2)}\n`
+    } }), null, 2)}\n`
     : `${line}\n`;
   io.out(report);
   for (const warning of build.warnings) io.err(`warning: ${warning}\n`);
@@ -326,15 +314,11 @@ function lint(io: CliIo, options: Options): number {
   rejectOptions(options, "lint", [["output", "-o"], ["format", "--format"], ["force", "--force"], ...GAME_FLAGS]);
   const file = pickFile(options, "lint");
   const { text } = readScore(io, file);
-  try {
-    const report = lintSidwave(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs)), options.loop === undefined ? {} : { loop: options.loop });
-    const failed = options.strict && report.actionable > 0;
-    emit(io, options, { ok: !failed, file, findings: report.findings, actionable: report.actionable },
-      report.findings.length === 0 ? `${file}: no lint findings` : report.formatted.map((line) => `${file}: ${line}`).join("\n"));
-    return failed ? EXIT_FAILED : EXIT_OK;
-  } catch (error) {
-    return invalid(io, options, file, error);
-  }
+  const report = withFile(file, () => lintSidwave(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs)), options.loop === undefined ? {} : { loop: options.loop }));
+  const failed = options.strict && report.actionable > 0;
+  emit(io, options, "lint", { file, findings: report.findings, actionable: report.actionable },
+    report.findings.length === 0 ? `${file}: no lint findings` : report.formatted.map((line) => `${file}: ${line}`).join("\n"), !failed);
+  return failed ? EXIT_FAILED : EXIT_OK;
 }
 
 function examples(io: CliIo, options: Options): number {
@@ -344,7 +328,7 @@ function examples(io: CliIo, options: Options): number {
   if (name === undefined) {
     rejectOptions(options, "examples without a name", [["output", "-o"], ["force", "--force"]]);
     const list = listSidwaveExamples();
-    emit(io, options, list, list.map((e) => `${e.name.padEnd(18)} ${e.title}: ${e.style}`).join("\n"));
+    emit(io, options, "examples", list, list.map((e) => `${e.name.padEnd(18)} ${e.title}: ${e.style}`).join("\n"));
     return EXIT_OK;
   }
   if (!isExampleName(name)) throw new UsageError(`unknown example "${name}"; run "sidwave examples" for the list`);
@@ -359,30 +343,51 @@ function examples(io: CliIo, options: Options): number {
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, score);
   } catch (error) {
-    throw new UsageError(`cannot write ${target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`);
+    throw new SidwaveOperationError("input", `cannot write ${target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: target });
   }
-  emit(io, options, { ok: true, name, output: target, bytes: Buffer.byteLength(score) }, `wrote ${target}`);
+  emit(io, options, "examples", { name, output: target, bytes: Buffer.byteLength(score) }, `wrote ${target}`);
   return EXIT_OK;
 }
 
-const COMMANDS: Record<string, (io: CliIo, options: Options) => number> = { validate, compile, lint, examples };
+type Command = (io: CliIo, options: Options) => number | Promise<number>;
+const COMMANDS: Record<string, Command> = { validate, compile, lint, examples, ...RUN_COMMANDS };
 
-/** Runs the command line. `args` excludes the node binary and script path. */
-export function runCli(args: string[], io: CliIo): number {
+/** Reports a failure in the form the caller asked for and returns the exit code of its category. */
+function fail(io: CliIo, json: boolean, command: string, error: unknown): number {
+  const report = classifyError(error);
+  if (json) {
+    io.out(`${JSON.stringify(envelope(command, false, { error: report }), null, 2)}\n`);
+  } else if (report.category === "usage") {
+    io.err(`sidwave: ${report.message}\nRun "sidwave --help" for usage.\n`);
+  } else if (report.category === "validation" && typeof report.details.file === "string") {
+    io.err(`${report.details.file}: ${report.message}\n`);
+  } else {
+    io.err(`sidwave: ${report.message}\n`);
+  }
+  return EXIT_CODES[report.category];
+}
+
+/**
+ * Runs the command line. `args` excludes the node binary and script path. The commands validate, compile, lint,
+ * examples and sid-info finish synchronously; verify, render and trace return a promise.
+ */
+export function runCli(args: string[], io: CliIo): number | Promise<number> {
+  const json = args.includes("--json");
+  const [first, ...rest] = args;
+  const name = first !== undefined && Object.prototype.hasOwnProperty.call(COMMANDS, first) ? first : "sidwave";
   try {
-    const [first, ...rest] = args;
     if (first === undefined) { io.err(HELP); return EXIT_USAGE; }
     if (first === "-h" || first === "--help" || first === "help") { io.out(HELP); return EXIT_OK; }
     if (first === "-V" || first === "--version") { io.out(`${packageVersion()}\n`); return EXIT_OK; }
-    const command = Object.prototype.hasOwnProperty.call(COMMANDS, first) ? COMMANDS[first] : undefined;
+    const command = name === "sidwave" ? undefined : COMMANDS[name];
     if (!command) throw new UsageError(`unknown command "${first}"`);
-    const options = parseArgs(rest);
+    const options = parseArgs(rest, name);
     if (options.help) { io.out(HELP); return EXIT_OK; }
     if (options.version) { io.out(`${packageVersion()}\n`); return EXIT_OK; }
-    return command(io, options);
+    if (!Object.prototype.hasOwnProperty.call(RUN_COMMANDS, name)) rejectRunFlags(options, name);
+    const outcome = command(io, options);
+    return outcome instanceof Promise ? outcome.catch((error: unknown) => fail(io, json, name, error)) : outcome;
   } catch (error) {
-    if (error instanceof UsageError) io.err(`sidwave: ${error.message}\nRun "sidwave --help" for usage.\n`);
-    else io.err(`sidwave: ${error instanceof Error ? error.message : String(error)}\n`);
-    return EXIT_USAGE;
+    return fail(io, json, name, error);
   }
 }

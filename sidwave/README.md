@@ -50,18 +50,52 @@ sidwave validate <file> [--json] [--allow-dir <dir>]
 sidwave compile  <file> [-o <out>] [--format prg|sid] [--loop|--no-loop] [--json] [--allow-dir <dir>]
 sidwave lint     <file> [--loop|--no-loop] [--strict] [--json] [--allow-dir <dir>]
 sidwave examples [<name>] [-o <dir>] [--force] [--json]
+sidwave verify   <reference.sid|score> <candidate.sid|score> [--song <n>] [--seconds <s>] [--level T0|T1|A0|A1] [--tolerance-cycles <n>]
+sidwave render   <file.sid|score> [-o <out.wav>] [--song <n>] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite]
+sidwave trace    <file.sid|score> [-o <out>] [--format csv|jsonl] [--song <n>] [--seconds <s>]
+sidwave sid-info <file.sid> [--songlengths <Songlengths.md5>] [--json]
 sidwave --help | --version
 ```
 
 `compile --target game` has further options, described in [Using the player in a game](#using-the-player-in-a-game).
 
-- `validate` parses the score. Exit 0 when valid; exit 1 and the path of the first error (`Invalid SIDWAVE at $.voices[0].adsr: ...`) otherwise.
+- `validate` parses the score. Exit 0 when valid; exit 3 and the path of the first error (`Invalid SIDWAVE at $.voices[0].adsr: ...`) otherwise.
 - `compile` writes a PRG (default) or PSID. Without `-o` the file is named after the input, with `.prg` or `.sid`, in the current directory. A `-o` name ending in `.sid` selects PSID unless `--format` is given. `-o -` writes the bytes to standard output and the summary to standard error. `--json` prints the format, sizes, load, entry, init and play addresses, SID count, duration, frame counts and lint count. `--loop` (the default) and `--no-loop` select whether the song restarts at its end. The input file is never overwritten.
 - `lint` prints the lint findings. It exits 0 for a valid score, whatever the findings; with `--strict` it exits 1 when there is a finding that is not an informational note.
 - `examples` lists the bundled example scores. `examples <name>` prints one to standard output, or with `-o <dir>` writes `<dir>/<name>.yaml`; an existing file is only replaced with `--force`.
+- `verify` compiles a score argument to a PSID, then compares reference and candidate at the levels described under [Verify](#verify). `--level` is the weakest level that counts as a pass (default `A1`); the levels up to it are evaluated. The output names the highest level reached, the status of each level, the first difference and the horizon. The horizon is `--seconds`, else one pass of a score, else the songlengths entry, else 30 s, and at most 180 s. A1 uses the frozen rule file in `data/verify/a1-rules.json`, or the file given with `--a1-rules`.
+- `render` writes 16-bit mono PCM as a WAV file (48 kHz by default, reSIDfp by default). `trace` writes the SID register writes as CSV (`sid,address,value,cycle`) or JSON lines, to standard output or `-o`. `trace --json` needs `-o`, because standard output carries the trace otherwise.
+- `sid-info` prints the PSID/RSID header; with `--songlengths` it adds the length of each subtune.
 - `--allow-dir <dir>` (repeatable) permits `file:` sample sources below `<dir>`. Without it they must lie below the current directory (symbolic links are resolved first). The command never uses the network.
+- Run options of `verify`, `render` and `trace`: `--progress` writes progress to standard error (never standard output), `--max-seconds`, `--max-records` and `--max-bytes` bound the audio length, the trace size and the input and output size, `--roms <dir>` supplies `kernal.rom`, `basic.rom` and `chargen.rom`, `--clock PAL|NTSC` overrides the header (and `--model 6581|8580` for `render`). Ctrl-C (SIGINT) aborts the run through an `AbortSignal` that is passed to the library; a second Ctrl-C ends the process at once.
 
-Exit codes: 0 success; 1 invalid input or failed verdict; 2 usage or operational error (unknown option, unreadable or unwritable file, refusing to overwrite). Every command is a library function (`compileSidwaveBytes`, `lintSidwave`, `confinedFileReader`, ...); the command line only translates arguments and output.
+### Breaking changes of the command line
+
+Compared with the earlier command line: an invalid score and an unreadable input file now exit 3 (they exited 1 and 2); an unwritable output path exits 3 (it exited 2); a failed verdict is the only case that exits 1. With `--json` the output is now an envelope `{ "ok", "command", "result" }` or `{ "ok": false, "command", "error": { "category", "message", "details" } }` instead of one flat object per command, and the file name of a failed validation moved to `error.details.file`. A second Ctrl-C exits 5.
+
+### JSON output, error categories and exit codes
+
+With `--json` every command prints one JSON document on standard output:
+
+```json
+{ "ok": true, "command": "verify", "result": { } }
+{ "ok": false, "command": "verify", "error": { "category": "input", "message": "cannot read b.yaml: ENOENT", "details": { "file": "b.yaml" } } }
+```
+
+`ok` is false for a failed verdict (verify below the requested level, `lint --strict` with findings); such a document has a `result` and no `error`. An operational failure has an `error` and no `result`.
+
+| Category | Exit | Meaning |
+| --- | --- | --- |
+| (none, failed verdict) | 1 | `verify` did not reach the requested level, or `lint --strict` found a problem |
+| `usage` | 2 | unknown command or option, missing or invalid argument, refusing to overwrite an input file |
+| `input` | 3 | unreadable or invalid file (including SID files), unwritable output path |
+| `validation` | 3 | the score is invalid; `details.path` is the JSON path of the first error |
+| `engine_unavailable` | 4 | `libsidplayfp-wasm` is not installed or could not be loaded |
+| `limit_exceeded` | 5 | a `--max-*` budget or an engine limit was exceeded |
+| `aborted` | 5 | the run was cancelled (SIGINT) |
+| `internal` | 70 | an unexpected error |
+
+Operational failures never use exit code 1, so a failed verdict cannot be mistaken for a broken run. Every command is a library function (`compileSidwaveBytes`, `lintSidwave`, `loadTune`, `verifyTunes`, `renderTune`, `traceTune`, `sidInfo`, ...); the command line only translates arguments and output. `classifyError` maps any thrown error to its category.
 
 ## Using the player in a game
 
@@ -214,7 +248,7 @@ The build compiles the score at the first page behind the program, passes the AC
 - Lint checks and error messages that name the failing path in the score.
 - 15 example scores in [`data/sound/examples`](data/sound/examples).
 
-Planned and not yet available: `sidwave verify`, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
+Planned and not yet available: reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
 
 ## Formatting, diff and merge
 
@@ -330,8 +364,30 @@ if (result.firstDifference) {
 - T0: both tunes make the same writes in the same order in every player call.
 - T1: the same writes with every write within `toleranceCycles` (default 0) of the reference. Cycles are compared from engine start, so a tune that starts writing later than the reference fails at its first write.
 - A0: identical SIDLite PCM.
+- A1: a calibrated comparison of reSIDfp PCM, for tunes whose register writes differ but may still sound the same. See below.
 - A trace with no writes inside the horizon fails T0 and T1 with category `empty_trace`.
 - The clock is taken from the PSID header of the reference tune unless `clock` is given. Every difference carries `cycle` and `timeSeconds` on that clock.
+
+### A1: calibrated audio comparison
+
+A1 compares two 48 kHz mono reSIDfp renders (with the pinned engine and ROMs) in windows of 1024 samples (hop 512, Hann), using 48 log-spaced band energies from 40 Hz to 16 kHz and the window level. After one global alignment of at most +-24 ms (a larger shift is a timing defect and fails), a window is bad when the mean band difference exceeds `thetaSpec` dB, the level difference exceeds `thetaLevel` dB, or only one of the two is above the -60 dBFS floor by more than `sGap` dB. The tune fails when `k` consecutive windows or `m` windows within 2 s are bad. A render that ends before the horizon counts its missing windows as bad. The result reports the lag, the number of bad windows, the first failing time and its class, the horizon and the SHA-256 of the rule file.
+
+```ts
+import { createLibsidplayfpEngine } from "sidwave/engine";
+import { verifySid, loadA1Rules } from "sidwave/verify";
+const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+const residfp = createLibsidplayfpEngine({ emulation: "residfp" });
+const result = await verifySid(reference, candidate, { engine, seconds: 60, a1: { engine: residfp, rules: loadA1Rules() } });
+// result.levels.A1 is "pass", "fail" or "not evaluated"; result.a1.reason says why it was not evaluated.
+```
+
+**Status: approximate.** On the held-out tunes the frozen rules accepted 15 of 98 material defects (false accepts 15.3 %, 95 % interval 9.5-23.7 %) and rejected 4 of 18 benign changes (false rejects 22.2 %, 9.0-45.2 %; all four are 3-cent detunes). The bound for "verified within declared bounds" is 5 % for both, so A1 stays "approximate": a pass means the audio is plausibly the same, not that it is proven. Pitch-only changes (waveform swaps, small timing shifts, pulse width, filter cutoff) are the weakest area. `result.a1.status` carries the status, the CLI prints it, and [`data/verify/a1-heldout-report.json`](data/verify/a1-heldout-report.json) lists the per-class rates and every misclassified case.
+
+**Limits of the calibration.** The error rates are less reliable than their intervals suggest. Most benign controls were vacuous: the identical recompile read the same cached PCM, and the instrument-rename and duplicate-pattern refactors compile to identical SIDs and were skipped, so the effective benign set was 7 identical, 7 one-sample-delay and 4 detune items. The false-reject rate says little about how often A1 rejects equivalent tunes. Two benign classes of the design (inaudible voice volume, register reordering) were not implemented, and bases that do not compile to a PSID (`digi_groove`, `wall_of_sid`, and `ultisid_orchestra` in the held-out set) were excluded. [`data/verify/a1-limitations.md`](data/verify/a1-limitations.md) lists these and the requirements for a second version (independently rendered benign controls that differ in their SID bytes).
+
+When the rule file pins ROM hashes, A1 hashes the ROMs it is given (`--roms <dir>` on the command line) and reports "not evaluated" with the reason if they are missing or differ.
+
+The thresholds come from `data/verify/a1-rules.json`, which `scripts/calibrate-a1.mjs` writes after a grid search over score-level mutations (wrong, missing and extra notes, octave errors, detuning, timing, envelope, waveform, pulse width, filter, sync and ring, percussion, sections) and benign refactors. See the rule file for the corpus, the split between development and held-out tunes, and the measured error rates.
 
 ## Versioning and support
 
