@@ -1,0 +1,3277 @@
+{
+  "schema": 1,
+  "procedure": {
+    "source": "scripts/select-corpus.mjs",
+    "pool": {
+      "songlengthsSha256": "384e18f7aabd2644b2edbb5741fc14e0305dd96df2d52d07d320f62449560605",
+      "songlengthsFiles": 59886,
+      "minLengthSeconds": 30,
+      "subtunes": 65310,
+      "order": "SHA-256 of the lower-case hex MD5 followed by the decimal subtune number, ascending",
+      "candidates": 3000
+    },
+    "trace": {
+      "engine": "libsidplayfp-wasm@1.1.1/sidlite",
+      "horizonSeconds": "min(60, Songlengths length)",
+      "maxRecords": 2000000,
+      "featureCodeVersion": 1
+    },
+    "candidateOutcome": {
+      "traced": 3000,
+      "usable": 2935,
+      "failures": {
+        "load_failed": 2,
+        "no_periodic_calls": 59,
+        "trace_overflow": 4
+      }
+    },
+    "styleSource": {
+      "name": "sidflow-data",
+      "release": "1.0.0",
+      "file": "sidcorr-hvsc-full-features-1.jsonl.gz",
+      "sha256": "006cd38804ee5289a28072f169d5dd0dd3b7d7c2ddb8e9369a8f2fbb5045f39b",
+      "hvscVersion": "HVSC 85 + Update 85",
+      "featureSchemaVersion": "1.5.0",
+      "tracks": 87868
+    },
+    "selection": {
+      "total": 30,
+      "tunesPerBin": 2,
+      "tunesPerComposer": 2,
+      "selectedByCover": 19,
+      "heldOut": 6,
+      "playerSignature": "SHA-256 over 512 bytes at the init address and 512 bytes at the play address, first 16 hex digits",
+      "composer": "directory MUSICIANS/<letter>/<composer>; for other directories the header author"
+    },
+    "uncoveredBins": []
+  },
+  "bins": [
+    {
+      "bin": "clock:NTSC",
+      "candidates": 137,
+      "target": 2,
+      "selected": 3,
+      "development": 3,
+      "heldOut": 0
+    },
+    {
+      "bin": "clock:PAL",
+      "candidates": 2654,
+      "target": 2,
+      "selected": 21,
+      "development": 15,
+      "heldOut": 6
+    },
+    {
+      "bin": "clock:both",
+      "candidates": 4,
+      "target": 2,
+      "selected": 4,
+      "development": 4,
+      "heldOut": 0
+    },
+    {
+      "bin": "clock:unknown",
+      "candidates": 140,
+      "target": 2,
+      "selected": 2,
+      "development": 2,
+      "heldOut": 0
+    },
+    {
+      "bin": "cpf:1",
+      "candidates": 2639,
+      "target": 2,
+      "selected": 13,
+      "development": 10,
+      "heldOut": 3
+    },
+    {
+      "bin": "cpf:2",
+      "candidates": 92,
+      "target": 2,
+      "selected": 2,
+      "development": 1,
+      "heldOut": 1
+    },
+    {
+      "bin": "cpf:3-4",
+      "candidates": 31,
+      "target": 2,
+      "selected": 2,
+      "development": 2,
+      "heldOut": 0
+    },
+    {
+      "bin": "cpf:5+",
+      "candidates": 13,
+      "target": 2,
+      "selected": 11,
+      "development": 10,
+      "heldOut": 1
+    },
+    {
+      "bin": "cpf:slow",
+      "candidates": 160,
+      "target": 2,
+      "selected": 2,
+      "development": 1,
+      "heldOut": 1
+    },
+    {
+      "bin": "filter:bp",
+      "candidates": 701,
+      "target": 2,
+      "selected": 17,
+      "development": 15,
+      "heldOut": 2
+    },
+    {
+      "bin": "filter:hp",
+      "candidates": 461,
+      "target": 2,
+      "selected": 6,
+      "development": 5,
+      "heldOut": 1
+    },
+    {
+      "bin": "filter:lp",
+      "candidates": 2277,
+      "target": 2,
+      "selected": 22,
+      "development": 18,
+      "heldOut": 4
+    },
+    {
+      "bin": "filter:multimode",
+      "candidates": 699,
+      "target": 2,
+      "selected": 15,
+      "development": 13,
+      "heldOut": 2
+    },
+    {
+      "bin": "filter:v1",
+      "candidates": 1407,
+      "target": 2,
+      "selected": 15,
+      "development": 12,
+      "heldOut": 3
+    },
+    {
+      "bin": "filter:v2",
+      "candidates": 724,
+      "target": 2,
+      "selected": 12,
+      "development": 9,
+      "heldOut": 3
+    },
+    {
+      "bin": "filter:v3",
+      "candidates": 758,
+      "target": 2,
+      "selected": 17,
+      "development": 13,
+      "heldOut": 4
+    },
+    {
+      "bin": "hr:most",
+      "candidates": 1014,
+      "target": 2,
+      "selected": 9,
+      "development": 7,
+      "heldOut": 2
+    },
+    {
+      "bin": "hr:none",
+      "candidates": 1038,
+      "target": 2,
+      "selected": 16,
+      "development": 13,
+      "heldOut": 3
+    },
+    {
+      "bin": "hr:some",
+      "candidates": 883,
+      "target": 2,
+      "selected": 5,
+      "development": 4,
+      "heldOut": 1
+    },
+    {
+      "bin": "intro:long",
+      "candidates": 784,
+      "target": 2,
+      "selected": 6,
+      "development": 5,
+      "heldOut": 1
+    },
+    {
+      "bin": "intro:medium",
+      "candidates": 626,
+      "target": 2,
+      "selected": 9,
+      "development": 7,
+      "heldOut": 2
+    },
+    {
+      "bin": "intro:short",
+      "candidates": 1525,
+      "target": 2,
+      "selected": 15,
+      "development": 12,
+      "heldOut": 3
+    },
+    {
+      "bin": "magic:PSID",
+      "candidates": 2818,
+      "target": 2,
+      "selected": 26,
+      "development": 22,
+      "heldOut": 4
+    },
+    {
+      "bin": "magic:RSID",
+      "candidates": 117,
+      "target": 2,
+      "selected": 4,
+      "development": 2,
+      "heldOut": 2
+    },
+    {
+      "bin": "model:6581",
+      "candidates": 1181,
+      "target": 2,
+      "selected": 8,
+      "development": 6,
+      "heldOut": 2
+    },
+    {
+      "bin": "model:8580",
+      "candidates": 1215,
+      "target": 2,
+      "selected": 16,
+      "development": 13,
+      "heldOut": 3
+    },
+    {
+      "bin": "model:both",
+      "candidates": 43,
+      "target": 2,
+      "selected": 2,
+      "development": 1,
+      "heldOut": 1
+    },
+    {
+      "bin": "model:unknown",
+      "candidates": 496,
+      "target": 2,
+      "selected": 4,
+      "development": 4,
+      "heldOut": 0
+    },
+    {
+      "bin": "ring",
+      "candidates": 775,
+      "target": 2,
+      "selected": 8,
+      "development": 6,
+      "heldOut": 2
+    },
+    {
+      "bin": "sample:heavy",
+      "candidates": 91,
+      "target": 2,
+      "selected": 3,
+      "development": 1,
+      "heldOut": 2
+    },
+    {
+      "bin": "sample:none",
+      "candidates": 2843,
+      "target": 2,
+      "selected": 26,
+      "development": 22,
+      "heldOut": 4
+    },
+    {
+      "bin": "sample:some",
+      "candidates": 1,
+      "target": 1,
+      "selected": 1,
+      "development": 1,
+      "heldOut": 0
+    },
+    {
+      "bin": "sids:1",
+      "candidates": 2912,
+      "target": 2,
+      "selected": 26,
+      "development": 22,
+      "heldOut": 4
+    },
+    {
+      "bin": "sids:2",
+      "candidates": 21,
+      "target": 2,
+      "selected": 2,
+      "development": 1,
+      "heldOut": 1
+    },
+    {
+      "bin": "sids:3",
+      "candidates": 2,
+      "target": 2,
+      "selected": 2,
+      "development": 1,
+      "heldOut": 1
+    },
+    {
+      "bin": "speed:cia",
+      "candidates": 374,
+      "target": 2,
+      "selected": 16,
+      "development": 14,
+      "heldOut": 2
+    },
+    {
+      "bin": "speed:vbi",
+      "candidates": 2561,
+      "target": 2,
+      "selected": 14,
+      "development": 10,
+      "heldOut": 4
+    },
+    {
+      "bin": "style:arpeggio",
+      "candidates": 825,
+      "target": 2,
+      "selected": 8,
+      "development": 6,
+      "heldOut": 2
+    },
+    {
+      "bin": "style:dense",
+      "candidates": 849,
+      "target": 2,
+      "selected": 11,
+      "development": 9,
+      "heldOut": 2
+    },
+    {
+      "bin": "style:filter-motion",
+      "candidates": 884,
+      "target": 2,
+      "selected": 8,
+      "development": 7,
+      "heldOut": 1
+    },
+    {
+      "bin": "style:major",
+      "candidates": 1263,
+      "target": 2,
+      "selected": 11,
+      "development": 10,
+      "heldOut": 1
+    },
+    {
+      "bin": "style:minor",
+      "candidates": 1629,
+      "target": 2,
+      "selected": 18,
+      "development": 14,
+      "heldOut": 4
+    },
+    {
+      "bin": "style:pluck",
+      "candidates": 663,
+      "target": 2,
+      "selected": 9,
+      "development": 8,
+      "heldOut": 1
+    },
+    {
+      "bin": "style:pwm",
+      "candidates": 783,
+      "target": 2,
+      "selected": 10,
+      "development": 8,
+      "heldOut": 2
+    },
+    {
+      "bin": "style:sparse",
+      "candidates": 659,
+      "target": 2,
+      "selected": 8,
+      "development": 5,
+      "heldOut": 3
+    },
+    {
+      "bin": "style:tempo-fast",
+      "candidates": 791,
+      "target": 2,
+      "selected": 9,
+      "development": 7,
+      "heldOut": 2
+    },
+    {
+      "bin": "style:tempo-mid",
+      "candidates": 859,
+      "target": 2,
+      "selected": 5,
+      "development": 2,
+      "heldOut": 3
+    },
+    {
+      "bin": "style:tempo-slow",
+      "candidates": 1274,
+      "target": 2,
+      "selected": 16,
+      "development": 15,
+      "heldOut": 1
+    },
+    {
+      "bin": "sync",
+      "candidates": 775,
+      "target": 2,
+      "selected": 7,
+      "development": 5,
+      "heldOut": 2
+    },
+    {
+      "bin": "tables:high",
+      "candidates": 543,
+      "target": 2,
+      "selected": 12,
+      "development": 10,
+      "heldOut": 2
+    },
+    {
+      "bin": "tables:low",
+      "candidates": 727,
+      "target": 2,
+      "selected": 5,
+      "development": 3,
+      "heldOut": 2
+    },
+    {
+      "bin": "tables:mid",
+      "candidates": 1665,
+      "target": 2,
+      "selected": 13,
+      "development": 11,
+      "heldOut": 2
+    },
+    {
+      "bin": "testbit",
+      "candidates": 2166,
+      "target": 2,
+      "selected": 25,
+      "development": 19,
+      "heldOut": 6
+    },
+    {
+      "bin": "wave:combined",
+      "candidates": 830,
+      "target": 2,
+      "selected": 7,
+      "development": 6,
+      "heldOut": 1
+    },
+    {
+      "bin": "wave:noise",
+      "candidates": 2462,
+      "target": 2,
+      "selected": 24,
+      "development": 20,
+      "heldOut": 4
+    },
+    {
+      "bin": "wave:pulse",
+      "candidates": 2813,
+      "target": 2,
+      "selected": 29,
+      "development": 23,
+      "heldOut": 6
+    },
+    {
+      "bin": "wave:sawtooth",
+      "candidates": 1483,
+      "target": 2,
+      "selected": 14,
+      "development": 11,
+      "heldOut": 3
+    },
+    {
+      "bin": "wave:triangle",
+      "candidates": 2186,
+      "target": 2,
+      "selected": 23,
+      "development": 19,
+      "heldOut": 4
+    },
+    {
+      "bin": "wpc:high",
+      "candidates": 291,
+      "target": 2,
+      "selected": 7,
+      "development": 5,
+      "heldOut": 2
+    },
+    {
+      "bin": "wpc:low",
+      "candidates": 191,
+      "target": 2,
+      "selected": 4,
+      "development": 4,
+      "heldOut": 0
+    },
+    {
+      "bin": "wpc:mid",
+      "candidates": 2453,
+      "target": 2,
+      "selected": 19,
+      "development": 15,
+      "heldOut": 4
+    }
+  ],
+  "tunes": [
+    {
+      "path": "MUSICIANS/A/Ass_It/DLL-Sound.sid",
+      "md5": "6f6c3f7b120a377887260f97601f8fb4",
+      "subtune": 1,
+      "lengthSeconds": 139,
+      "title": "DLL-Sound",
+      "author": "Kai Lehmann (Doctor Death)",
+      "composer": "MUSICIANS/A/Ass_It",
+      "group": "MUSICIANS/A/Ass_It|5c86a9658393b8a7",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "unknown",
+        "clock": "unknown",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 3005,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 0.9991358714990088,
+        "writesPerCall": 17,
+        "irregularShare": 0.05326231691078562,
+        "syncWrites": 1344,
+        "ringWrites": 1344,
+        "testBitWrites": 918,
+        "waveformWrites": {
+          "1": 1344,
+          "2": 2220,
+          "4": 3749,
+          "8": 781
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0.9993344425956738
+        ],
+        "filterModeCalls": {
+          "lp": 3003,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 679,
+        "hardRestarts": 486,
+        "hardRestartRate": 0.7157584683357879,
+        "notePrograms": {
+          "distinct": 76,
+          "perMinute": 76
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.03447050894800091,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 83.33333333333333,
+        "arpeggio": 0.004073319755600814,
+        "pwm": 0.010263100674059545,
+        "filterMotion": 0,
+        "polyphony": 0.4368888888888889,
+        "pluck": 0.6436781609195402,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:unknown",
+        "cpf:1",
+        "filter:lp",
+        "filter:v3",
+        "hr:most",
+        "intro:short",
+        "magic:PSID",
+        "model:unknown",
+        "ring",
+        "sample:none",
+        "sids:1",
+        "speed:vbi",
+        "style:major",
+        "style:pluck",
+        "style:tempo-slow",
+        "sync",
+        "tables:mid",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/M/Mythus/Odd_Jam.sid",
+      "md5": "cfaa414ab011312982bee8f36c922dee",
+      "subtune": 1,
+      "lengthSeconds": 153.219,
+      "title": "Odd Jam",
+      "author": "Benny Härdin (Mythus) & Psycho",
+      "composer": "MUSICIANS/M/Mythus",
+      "group": "MUSICIANS/M/Mythus|5bd314cd3da214b1",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 3005,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 16,
+        "irregularShare": 0.0006657789613848203,
+        "syncWrites": 230,
+        "ringWrites": 360,
+        "testBitWrites": 948,
+        "waveformWrites": {
+          "1": 1186,
+          "2": 458,
+          "3": 2090,
+          "4": 2915,
+          "5": 130,
+          "6": 38,
+          "8": 1225
+        },
+        "filterRoutedShare": [
+          0.8545757071547421,
+          0.48785357737104823,
+          0.21430948419301166
+        ],
+        "filterModeCalls": {
+          "lp": 2767,
+          "bp": 2115,
+          "hp": 453
+        },
+        "filterMultiModeCalls": 2339,
+        "gateOns": 949,
+        "hardRestarts": 780,
+        "hardRestartRate": 0.821917808219178,
+        "notePrograms": {
+          "distinct": 268,
+          "perMinute": 268
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 18.847559193218355,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 125,
+        "arpeggio": 0.231,
+        "pwm": 0.02642081393961088,
+        "filterMotion": 0.15428093996685363,
+        "polyphony": 0.5271111111111111,
+        "pluck": 0.6869565217391305,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:1",
+        "filter:bp",
+        "filter:hp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "filter:v2",
+        "filter:v3",
+        "hr:most",
+        "intro:medium",
+        "magic:PSID",
+        "model:8580",
+        "ring",
+        "sample:none",
+        "sids:1",
+        "speed:vbi",
+        "style:arpeggio",
+        "style:filter-motion",
+        "style:minor",
+        "style:pluck",
+        "style:tempo-mid",
+        "sync",
+        "tables:high",
+        "testbit",
+        "wave:combined",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/D/Dr_Piotr/Defibrylacja.sid",
+      "md5": "db5bbefa20704fadbda86edf2e3db97b",
+      "subtune": 1,
+      "lengthSeconds": 273,
+      "title": "Defibrylacja",
+      "author": "Piotr Rakint (Dr. Piotr)",
+      "composer": "MUSICIANS/D/Dr_Piotr",
+      "group": "MUSICIANS/D/Dr_Piotr|f8b0d18018d9f5b5",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "unknown",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 12015,
+        "seconds": 60,
+        "callsPerFrame": 4,
+        "callsPerFrameExact": 3.9845935536184878,
+        "writesPerCall": 17,
+        "irregularShare": 0.4376560679207591,
+        "syncWrites": 13088,
+        "ringWrites": 7069,
+        "testBitWrites": 259,
+        "waveformWrites": {
+          "1": 17249,
+          "2": 2652,
+          "4": 14371,
+          "5": 1149,
+          "6": 292,
+          "8": 25
+        },
+        "filterRoutedShare": [
+          0.5710362047440699,
+          0.2555139409071993,
+          0.13050353724511027
+        ],
+        "filterModeCalls": {
+          "lp": 12013,
+          "bp": 4788,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 4788,
+        "gateOns": 269,
+        "hardRestarts": 254,
+        "hardRestartRate": 0.9442379182156134,
+        "notePrograms": {
+          "distinct": 76,
+          "perMinute": 76
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 60,
+        "repeats": false
+      },
+      "style": {
+        "bpm": 200,
+        "arpeggio": 0.04755434782608696,
+        "pwm": 0.019598732439199313,
+        "filterMotion": 0.002504560713747625,
+        "polyphony": 0.9853333333333333,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:3-4",
+        "filter:bp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "filter:v2",
+        "filter:v3",
+        "hr:most",
+        "intro:long",
+        "magic:PSID",
+        "model:unknown",
+        "ring",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:dense",
+        "style:minor",
+        "style:tempo-fast",
+        "sync",
+        "tables:mid",
+        "testbit",
+        "wave:combined",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/W/Wijnhoven_Joachim/Bomb_Jack_Title_Deluxe_2SID.sid",
+      "md5": "487b8d63ec9efb467249595ff8819e08",
+      "subtune": 1,
+      "lengthSeconds": 49.797,
+      "title": "Bomb Jack Title Deluxe",
+      "author": "Joachim Wijnhoven & R. Hermans",
+      "composer": "MUSICIANS/W/Wijnhoven_Joachim",
+      "group": "MUSICIANS/W/Wijnhoven_Joachim|f7ed5ca6fd7ad669",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 2,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 2494,
+        "seconds": 49.79700643898795,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 48,
+        "irregularShare": 0.0008022462896109105,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 1722,
+        "waveformWrites": {
+          "1": 4726,
+          "4": 7045,
+          "8": 1411
+        },
+        "filterRoutedShare": [
+          1.9927826784282276,
+          0.9963913392141138,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 4970,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 1722,
+        "hardRestarts": 1556,
+        "hardRestartRate": 0.9036004645760743,
+        "notePrograms": {
+          "distinct": 192,
+          "perMinute": 231.33920739019683
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.2937148819383546,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 62.5,
+        "arpeggio": 0,
+        "pwm": 0.015756159314441645,
+        "filterMotion": 0.20236850567080758,
+        "polyphony": 1,
+        "pluck": 0.5764705882352941,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:1",
+        "filter:lp",
+        "filter:v1",
+        "filter:v2",
+        "hr:most",
+        "intro:short",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:2",
+        "speed:vbi",
+        "style:dense",
+        "style:filter-motion",
+        "style:major",
+        "style:pluck",
+        "style:tempo-slow",
+        "tables:high",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:triangle",
+        "wpc:high"
+      ]
+    },
+    {
+      "path": "MUSICIANS/N/Nordischsound/Ninjas_Delight.sid",
+      "md5": "490376f8dd18a5c6e3361c7f14aead4d",
+      "subtune": 1,
+      "lengthSeconds": 148.129,
+      "title": "Ninja's Delight",
+      "author": "Benjamin Dibbert (Nordischsound)",
+      "composer": "MUSICIANS/N/Nordischsound",
+      "group": "MUSICIANS/N/Nordischsound|2a971297d624db01",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 9011,
+        "seconds": 60,
+        "callsPerFrame": 3,
+        "callsPerFrameExact": 3,
+        "writesPerCall": 16,
+        "irregularShare": 0.00022197558268590456,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 833,
+        "waveformWrites": {
+          "1": 5231,
+          "2": 35,
+          "3": 1082,
+          "4": 17725,
+          "5": 1118,
+          "8": 949
+        },
+        "filterRoutedShare": [
+          0.7419820219731439,
+          0.2556874930640328,
+          0.2556874930640328
+        ],
+        "filterModeCalls": {
+          "lp": 6543,
+          "bp": 8990,
+          "hp": 2447
+        },
+        "filterMultiModeCalls": 8990,
+        "gateOns": 849,
+        "hardRestarts": 26,
+        "hardRestartRate": 0.030624263839811542,
+        "notePrograms": {
+          "distinct": 178,
+          "perMinute": 178
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 60,
+        "repeats": false
+      },
+      "style": {
+        "bpm": 62.5,
+        "arpeggio": 0.04285714285714286,
+        "pwm": 0.01843410815148634,
+        "filterMotion": 0.09784483855040728,
+        "polyphony": 0.21333333333333335,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:3-4",
+        "filter:bp",
+        "filter:hp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "filter:v2",
+        "filter:v3",
+        "hr:none",
+        "intro:long",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:minor",
+        "style:tempo-slow",
+        "tables:high",
+        "testbit",
+        "wave:combined",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/B/Beggerow_Alan/Meet_Me_in_St_Louis.sid",
+      "md5": "cfac87812c57acfcd3597577cee478b2",
+      "subtune": 1,
+      "lengthSeconds": 135.988,
+      "title": "Meet Me in St. Louis",
+      "author": "Alan Beggerow",
+      "composer": "MUSICIANS/B/Beggerow_Alan",
+      "group": "MUSICIANS/B/Beggerow_Alan|d68fd87037fc5c6d",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "unknown",
+        "clock": "NTSC",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 441,
+        "seconds": 60,
+        "callsPerFrame": 0,
+        "callsPerFrameExact": 0.12656868914966868,
+        "writesPerCall": 3,
+        "irregularShare": 0.8704545454545455,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 0,
+        "waveformWrites": {
+          "1": 59,
+          "2": 354,
+          "4": 620
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 0,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 477,
+        "hardRestarts": 134,
+        "hardRestartRate": 0.2809224318658281,
+        "notePrograms": {
+          "distinct": 15,
+          "perMinute": 15
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 60,
+        "repeats": false
+      },
+      "style": {
+        "bpm": 184.6153846153846,
+        "arpeggio": 0,
+        "pwm": 0.00013715356181109606,
+        "filterMotion": 0,
+        "polyphony": 0.6974074074074075,
+        "pluck": 0.328,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:NTSC",
+        "cpf:slow",
+        "hr:some",
+        "intro:long",
+        "magic:PSID",
+        "model:unknown",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:dense",
+        "style:major",
+        "style:tempo-fast",
+        "tables:low",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:low"
+      ]
+    },
+    {
+      "path": "MUSICIANS/B/Buddha/Last_Party_2SID.sid",
+      "md5": "411a9ea4bfec7e8a18caaee011411bfd",
+      "subtune": 1,
+      "lengthSeconds": 164,
+      "title": "Last Party",
+      "author": "Sylwester Hasiak (Buddha)",
+      "composer": "MUSICIANS/B/Buddha",
+      "group": "MUSICIANS/B/Buddha|05935e2e2b11af22",
+      "split": "held-out",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 2,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 3005,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 48,
+        "irregularShare": 0.00033288948069241014,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 7353,
+        "waveformWrites": {
+          "1": 1044,
+          "4": 7630,
+          "8": 1969
+        },
+        "filterRoutedShare": [
+          1.9960066555740432,
+          1.9960066555740432,
+          1.9960066555740432
+        ],
+        "filterModeCalls": {
+          "lp": 5998,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 1011,
+        "hardRestarts": 564,
+        "hardRestartRate": 0.5578635014836796,
+        "notePrograms": {
+          "distinct": 114,
+          "perMinute": 114
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 10.328725356458476,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 93.75,
+        "arpeggio": 0.26382660687593423,
+        "pwm": 0.009431383970603828,
+        "filterMotion": 0,
+        "polyphony": 0.692888888888889,
+        "pluck": 0.05974025974025974,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:1",
+        "filter:lp",
+        "filter:v1",
+        "filter:v2",
+        "filter:v3",
+        "hr:most",
+        "intro:medium",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:2",
+        "speed:vbi",
+        "style:arpeggio",
+        "style:dense",
+        "style:minor",
+        "style:tempo-mid",
+        "tables:mid",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:triangle",
+        "wpc:high"
+      ]
+    },
+    {
+      "path": "MUSICIANS/H/Hubbard_Rob/Skate_or_Die_intro.sid",
+      "md5": "7be7c5afced5be3b8243da063229e25d",
+      "subtune": 1,
+      "lengthSeconds": 242.596,
+      "title": "Skate or Die (intro)",
+      "author": "Rob Hubbard",
+      "composer": "MUSICIANS/H/Hubbard_Rob",
+      "group": "MUSICIANS/H/Hubbard_Rob|cc522221c149b4d5",
+      "split": "development",
+      "header": {
+        "magic": "RSID",
+        "model": "6581",
+        "clock": "both",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 3005,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 12,
+        "irregularShare": 0.0755659121171771,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 0,
+        "waveformWrites": {
+          "1": 827,
+          "4": 4376,
+          "8": 1285
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 0,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 1024,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 39,
+          "perMinute": 39
+        },
+        "sampleWrites": 229195,
+        "sampleShare": 0.8553360775342497,
+        "introSeconds": 0.05779255578290948,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 75,
+        "arpeggio": 0.08754208754208755,
+        "pwm": 0.014184944084160165,
+        "filterMotion": 0,
+        "polyphony": 0.33155555555555555,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:both",
+        "cpf:1",
+        "hr:none",
+        "intro:short",
+        "magic:RSID",
+        "model:6581",
+        "sample:heavy",
+        "sids:1",
+        "speed:vbi",
+        "style:minor",
+        "style:tempo-slow",
+        "tables:mid",
+        "wave:noise",
+        "wave:pulse",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/T/Toggle/Cheers_and_Tributes.sid",
+      "md5": "f89c74ecd81ca4ca707da00d4c5c4bdd",
+      "subtune": 1,
+      "lengthSeconds": 265,
+      "title": "Cheers & Tributes",
+      "author": "Tobias Göhlke (Toggle)",
+      "composer": "MUSICIANS/T/Toggle",
+      "group": "MUSICIANS/T/Toggle|40318f59a05a4dd3",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 6008,
+        "seconds": 60,
+        "callsPerFrame": 2,
+        "callsPerFrameExact": 1.9560155239327297,
+        "writesPerCall": 25,
+        "irregularShare": 0.9996670551023805,
+        "syncWrites": 0,
+        "ringWrites": 4,
+        "testBitWrites": 2060,
+        "waveformWrites": {
+          "1": 8825,
+          "2": 582,
+          "4": 6227,
+          "8": 1052,
+          "13": 4
+        },
+        "filterRoutedShare": [
+          0.25532623169107854,
+          0,
+          0.45539280958721706
+        ],
+        "filterModeCalls": {
+          "lp": 4720,
+          "bp": 704,
+          "hp": 2532
+        },
+        "filterMultiModeCalls": 2532,
+        "gateOns": 843,
+        "hardRestarts": 189,
+        "hardRestartRate": 0.22419928825622776,
+        "notePrograms": {
+          "distinct": 144,
+          "perMinute": 144
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 60,
+        "repeats": false
+      },
+      "style": {
+        "bpm": 62.5,
+        "arpeggio": 0.14044117647058824,
+        "pwm": 0.031131320786493118,
+        "filterMotion": 0.07784226876675822,
+        "polyphony": 0.6875555555555556,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:2",
+        "filter:bp",
+        "filter:hp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "filter:v3",
+        "hr:some",
+        "intro:long",
+        "magic:PSID",
+        "model:8580",
+        "ring",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:dense",
+        "style:minor",
+        "style:pwm",
+        "style:tempo-slow",
+        "tables:high",
+        "testbit",
+        "wave:combined",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:high"
+      ]
+    },
+    {
+      "path": "MUSICIANS/P/Psych858o/Little_Beat_of_SID.sid",
+      "md5": "1d18221546318f68b1c197cc559a51ec",
+      "subtune": 1,
+      "lengthSeconds": 58,
+      "title": "Little Beat of SID",
+      "author": "Marcin Majdzik (Psycho)",
+      "composer": "MUSICIANS/P/Psych858o",
+      "group": "MUSICIANS/P/Psych858o|de5edafc73b3a918",
+      "split": "held-out",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 15135,
+        "seconds": 58,
+        "callsPerFrame": 6,
+        "callsPerFrameExact": 5.998169057064388,
+        "writesPerCall": 15,
+        "irregularShare": 0.4055768468349412,
+        "syncWrites": 5049,
+        "ringWrites": 3014,
+        "testBitWrites": 678,
+        "waveformWrites": {
+          "1": 13000,
+          "2": 510,
+          "4": 26252,
+          "8": 10958
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0.9529567228278824
+        ],
+        "filterModeCalls": {
+          "lp": 15134,
+          "bp": 15134,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 15134,
+        "gateOns": 678,
+        "hardRestarts": 81,
+        "hardRestartRate": 0.11946902654867257,
+        "notePrograms": {
+          "distinct": 121,
+          "perMinute": 125.17241379310344
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.03711045340868492,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 200,
+        "arpeggio": 0.09194097616345062,
+        "pwm": 0.0646054342482912,
+        "filterMotion": 0.010519154997740025,
+        "polyphony": 0.37422222222222223,
+        "pluck": 0.16304347826086957,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:5+",
+        "filter:bp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v3",
+        "hr:some",
+        "intro:short",
+        "magic:PSID",
+        "model:8580",
+        "ring",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:minor",
+        "style:pwm",
+        "style:tempo-fast",
+        "sync",
+        "tables:high",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/Z/Zonzo/Xcellent_part_3.sid",
+      "md5": "628f5f4756606b7546a0b784af71d7a4",
+      "subtune": 1,
+      "lengthSeconds": 186,
+      "title": "Xcellent (part 3)",
+      "author": "Zonzo & Andreas Skötte (Fly)",
+      "composer": "MUSICIANS/Z/Zonzo",
+      "group": "MUSICIANS/Z/Zonzo|924e72b768b684cf",
+      "split": "development",
+      "header": {
+        "magic": "RSID",
+        "model": "6581",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 3005,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 12,
+        "irregularShare": 0.0009986684420772304,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 1078,
+        "waveformWrites": {
+          "4": 2057
+        },
+        "filterRoutedShare": [
+          0.9653910149750417,
+          0.9653910149750417,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 2901,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 135,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 1,
+          "perMinute": 1
+        },
+        "sampleWrites": 517,
+        "sampleShare": 0.013535803115591046,
+        "introSeconds": 2.066084884211894,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 200,
+        "arpeggio": 0,
+        "pwm": 0.0129270256929831,
+        "filterMotion": 0.31707738636044697,
+        "polyphony": 0.03422222222222222,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:1",
+        "filter:lp",
+        "filter:v1",
+        "filter:v2",
+        "hr:none",
+        "intro:short",
+        "magic:RSID",
+        "model:6581",
+        "sample:some",
+        "sids:1",
+        "speed:vbi",
+        "style:filter-motion",
+        "style:major",
+        "style:sparse",
+        "style:tempo-fast",
+        "tables:low",
+        "testbit",
+        "wave:pulse",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/C/Chiummo_Gaetano/Arcade_Memories_3SID.sid",
+      "md5": "dc5c173e6895b140500b107b94d8a3c0",
+      "subtune": 1,
+      "lengthSeconds": 160,
+      "title": "Arcade Memories",
+      "author": "Gaetano Chiummo",
+      "composer": "MUSICIANS/C/Chiummo_Gaetano",
+      "group": "MUSICIANS/C/Chiummo_Gaetano|c7a00ac4274a7a3a",
+      "split": "held-out",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 3,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 3005,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 37,
+        "irregularShare": 0.0006657789613848203,
+        "syncWrites": 0,
+        "ringWrites": 238,
+        "testBitWrites": 2231,
+        "waveformWrites": {
+          "1": 3953,
+          "2": 12818,
+          "4": 2704,
+          "8": 3977
+        },
+        "filterRoutedShare": [
+          1.994009983361065,
+          0.9970049916805325,
+          0.9970049916805325
+        ],
+        "filterModeCalls": {
+          "lp": 5992,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 2231,
+        "hardRestarts": 1617,
+        "hardRestartRate": 0.7247870909905871,
+        "notePrograms": {
+          "distinct": 291,
+          "perMinute": 291
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 13.14171761830524,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 150,
+        "arpeggio": 0.05808695652173913,
+        "pwm": 0.005106860217971316,
+        "filterMotion": 0,
+        "polyphony": 1,
+        "pluck": 0.10773899848254932,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:1",
+        "filter:lp",
+        "filter:v1",
+        "filter:v2",
+        "filter:v3",
+        "hr:most",
+        "intro:medium",
+        "magic:PSID",
+        "model:8580",
+        "ring",
+        "sample:none",
+        "sids:3",
+        "speed:vbi",
+        "style:dense",
+        "style:minor",
+        "style:tempo-mid",
+        "tables:high",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:high"
+      ]
+    },
+    {
+      "path": "MUSICIANS/S/SIDwave/Electro_Mechanica.sid",
+      "md5": "55ee156c0e64f15b8c24db15b98108ff",
+      "subtune": 1,
+      "lengthSeconds": 254,
+      "title": "Electro Mechanica",
+      "author": "Jan Diabelez Arent Harries",
+      "composer": "MUSICIANS/S/SIDwave",
+      "group": "MUSICIANS/S/SIDwave|9b9ffe1e410fbbd1",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "6581",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 16775,
+        "seconds": 60,
+        "callsPerFrame": 6,
+        "callsPerFrameExact": 6,
+        "writesPerCall": 13,
+        "irregularShare": 0.6793251460593777,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 4222,
+        "waveformWrites": {
+          "1": 2432,
+          "2": 3650,
+          "4": 34713,
+          "8": 8710
+        },
+        "filterRoutedShare": [
+          0.9996423248882266,
+          0,
+          0.2665275707898659
+        ],
+        "filterModeCalls": {
+          "lp": 16769,
+          "bp": 16769,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 16769,
+        "gateOns": 1037,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 63,
+          "perMinute": 63
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 15.598256479586865,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 62.5,
+        "arpeggio": 0.30721830985915494,
+        "pwm": 0.05966155166155192,
+        "filterMotion": 0,
+        "polyphony": 0.5964444444444444,
+        "pluck": 0.23595505617977527,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:5+",
+        "filter:bp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "filter:v3",
+        "hr:none",
+        "intro:medium",
+        "magic:PSID",
+        "model:6581",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:arpeggio",
+        "style:minor",
+        "style:pwm",
+        "style:tempo-slow",
+        "tables:mid",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/L/Linus/Your_Time_Is_Running_Thin.sid",
+      "md5": "3dd29c6d059b05ce268a1bdee56f67ff",
+      "subtune": 1,
+      "lengthSeconds": 61.289,
+      "title": "Your Time Is Running Thin",
+      "author": "Sascha Zeidler (Linus)",
+      "composer": "MUSICIANS/L/Linus",
+      "group": "MUSICIANS/L/Linus|c036425e4dd8f08f",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 24029,
+        "seconds": 60,
+        "callsPerFrame": 8,
+        "callsPerFrameExact": 8,
+        "writesPerCall": 25,
+        "irregularShare": 0.25004161811220244,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 46158,
+        "waveformWrites": {
+          "1": 23376
+        },
+        "filterRoutedShare": [
+          0.90195180823172,
+          0.70419076948687,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 21673,
+          "bp": 21673,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 21673,
+        "gateOns": 1838,
+        "hardRestarts": 746,
+        "hardRestartRate": 0.4058759521218716,
+        "notePrograms": {
+          "distinct": 80,
+          "perMinute": 80
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 15.702753012439508,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 83.33333333333333,
+        "arpeggio": 0.30714285714285716,
+        "pwm": 0,
+        "filterMotion": 0.19619058924356345,
+        "polyphony": 0.12488888888888888,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:5+",
+        "filter:bp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "filter:v2",
+        "hr:some",
+        "intro:medium",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:arpeggio",
+        "style:filter-motion",
+        "style:minor",
+        "style:sparse",
+        "style:tempo-slow",
+        "tables:mid",
+        "testbit",
+        "wave:triangle",
+        "wpc:high"
+      ]
+    },
+    {
+      "path": "MUSICIANS/H/Hancock_John/Die_Hard_2_Die_Harder.sid",
+      "md5": "8b51ca804aa420e25b88b20062b338e2",
+      "subtune": 3,
+      "lengthSeconds": 40,
+      "title": "Die Hard 2: Die Harder",
+      "author": "John Hancock",
+      "composer": "MUSICIANS/H/Hancock_John",
+      "group": "MUSICIANS/H/Hancock_John|7c2082948df96b59",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "unknown",
+        "clock": "unknown",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 676,
+        "seconds": 40,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 0.5,
+        "writesPerCall": 7,
+        "irregularShare": 0.9985185185185185,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 0,
+        "waveformWrites": {
+          "2": 572,
+          "4": 88,
+          "8": 474
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 0,
+          "bp": 676,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 567,
+        "hardRestarts": 384,
+        "hardRestartRate": 0.6772486772486772,
+        "notePrograms": {
+          "distinct": 26,
+          "perMinute": 39
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 26.18940510409562,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 73.61963190184049,
+        "arpeggio": 0,
+        "pwm": 0,
+        "filterMotion": 0,
+        "polyphony": 0.5075555555555555,
+        "pluck": 0.6460176991150443,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:unknown",
+        "cpf:1",
+        "filter:bp",
+        "hr:most",
+        "intro:medium",
+        "magic:PSID",
+        "model:unknown",
+        "sample:none",
+        "sids:1",
+        "speed:vbi",
+        "style:minor",
+        "style:pluck",
+        "style:tempo-slow",
+        "tables:mid",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wpc:low"
+      ]
+    },
+    {
+      "path": "DEMOS/A-F/Excellent_tune_2.sid",
+      "md5": "652bae966ea6c954f3f1e24bb3eb5fae",
+      "subtune": 1,
+      "lengthSeconds": 159.026,
+      "title": "Excellent (tune 2)",
+      "author": "Rickard Lihuvudh (Zeus)",
+      "composer": "DEMOS/rickard_lihuvudh_zeus",
+      "group": "DEMOS/rickard_lihuvudh_zeus|12576b2096ff9fd9",
+      "split": "held-out",
+      "header": {
+        "magic": "RSID",
+        "model": "6581",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 3004,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 13,
+        "irregularShare": 0.000666000666000666,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 102,
+        "waveformWrites": {
+          "4": 3284
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 0,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 386,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 3,
+          "perMinute": 3
+        },
+        "sampleWrites": 202980,
+        "sampleShare": 0.822643987014724,
+        "introSeconds": 7.818641600896424,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 83.33333333333333,
+        "arpeggio": 0,
+        "pwm": 0.04218632576442977,
+        "filterMotion": 0,
+        "polyphony": 0.13955555555555557,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:1",
+        "hr:none",
+        "intro:short",
+        "magic:RSID",
+        "model:6581",
+        "sample:heavy",
+        "sids:1",
+        "speed:vbi",
+        "style:major",
+        "style:pwm",
+        "style:sparse",
+        "style:tempo-slow",
+        "tables:low",
+        "testbit",
+        "wave:pulse",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/D/Dgazz/Icy_Slide.sid",
+      "md5": "0a2afc5f219a1085e81777d8c8ebff99",
+      "subtune": 1,
+      "lengthSeconds": 181,
+      "title": "Icy Slide",
+      "author": "Benjamin Goedereis (Dgazz)",
+      "composer": "MUSICIANS/D/Dgazz",
+      "group": "MUSICIANS/D/Dgazz|7a5ebe18050782c1",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 15018,
+        "seconds": 60,
+        "callsPerFrame": 5,
+        "callsPerFrameExact": 5.000254388196388,
+        "writesPerCall": 15,
+        "irregularShare": 0.393487380968236,
+        "syncWrites": 2223,
+        "ringWrites": 2223,
+        "testBitWrites": 826,
+        "waveformWrites": {
+          "1": 8268,
+          "2": 5550,
+          "4": 22260,
+          "8": 4870
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0.9989346117991743
+        ],
+        "filterModeCalls": {
+          "lp": 15017,
+          "bp": 20,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 20,
+        "gateOns": 1646,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 336,
+          "perMinute": 336
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 3.9271909204586053,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 62.5,
+        "arpeggio": 0.05,
+        "pwm": 0.011779187388943456,
+        "filterMotion": 0.22858290780803145,
+        "polyphony": 0.044000000000000004,
+        "pluck": 0.18292682926829268,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:5+",
+        "filter:lp",
+        "filter:v3",
+        "hr:none",
+        "intro:short",
+        "magic:PSID",
+        "model:8580",
+        "ring",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:filter-motion",
+        "style:minor",
+        "style:sparse",
+        "style:tempo-slow",
+        "sync",
+        "tables:high",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/E/Eeben_Aleksi/Supernoid.sid",
+      "md5": "904b46fd67e2c9e23cc864154585528b",
+      "subtune": 1,
+      "lengthSeconds": 97.2,
+      "title": "Supernoid",
+      "author": "Aleksi Eeben (E. Jones)",
+      "composer": "MUSICIANS/E/Eeben_Aleksi",
+      "group": "MUSICIANS/E/Eeben_Aleksi|3ed80990a5d08cd2",
+      "split": "held-out",
+      "header": {
+        "magic": "RSID",
+        "model": "both",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 2,
+        "seconds": 60,
+        "callsPerFrame": 0,
+        "callsPerFrameExact": 0.00574795330051128,
+        "writesPerCall": 15,
+        "irregularShare": 0,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 3,
+        "waveformWrites": {
+          "4": 4
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 0,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 3,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 2,
+          "perMinute": 2
+        },
+        "sampleWrites": 492107,
+        "sampleShare": 0.9999390413644981,
+        "introSeconds": 60,
+        "repeats": false
+      },
+      "style": {
+        "bpm": 200,
+        "arpeggio": 0,
+        "pwm": 0,
+        "filterMotion": 0,
+        "polyphony": 0,
+        "pluck": 0,
+        "tonal": false,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:slow",
+        "hr:none",
+        "intro:long",
+        "magic:RSID",
+        "model:both",
+        "sample:heavy",
+        "sids:1",
+        "speed:vbi",
+        "style:sparse",
+        "style:tempo-fast",
+        "tables:low",
+        "testbit",
+        "wave:pulse",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/P/PCH/Music_Dream.sid",
+      "md5": "c09885861fa55bdab425456852af2035",
+      "subtune": 1,
+      "lengthSeconds": 103,
+      "title": "Music Dream",
+      "author": "Petr Chlud (PCH)",
+      "composer": "MUSICIANS/P/PCH",
+      "group": "MUSICIANS/P/PCH|69d9be8fd2d1c772",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 15018,
+        "seconds": 60,
+        "callsPerFrame": 5,
+        "callsPerFrameExact": 5.009174311926605,
+        "writesPerCall": 18,
+        "irregularShare": 0.4490910301658121,
+        "syncWrites": 230,
+        "ringWrites": 0,
+        "testBitWrites": 3382,
+        "waveformWrites": {
+          "1": 4079,
+          "3": 1621,
+          "4": 34474,
+          "8": 1501
+        },
+        "filterRoutedShare": [
+          0.446930350246371,
+          0.6584099081102677,
+          0.17259288853375948
+        ],
+        "filterModeCalls": {
+          "lp": 15017,
+          "bp": 15017,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 15017,
+        "gateOns": 1848,
+        "hardRestarts": 1555,
+        "hardRestartRate": 0.8414502164502164,
+        "notePrograms": {
+          "distinct": 81,
+          "perMinute": 81
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.02492468901230959,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 77.92207792207792,
+        "arpeggio": 0.06938775510204082,
+        "pwm": 0.09284884416602034,
+        "filterMotion": 0.015361305710985434,
+        "polyphony": 0.8106666666666666,
+        "pluck": 0.2692307692307692,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:5+",
+        "filter:bp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "filter:v2",
+        "filter:v3",
+        "hr:most",
+        "intro:short",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:dense",
+        "style:major",
+        "style:pwm",
+        "style:tempo-slow",
+        "sync",
+        "tables:mid",
+        "testbit",
+        "wave:combined",
+        "wave:noise",
+        "wave:pulse",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "DEMOS/UNKNOWN/Music_Shop/At_the_Hop.sid",
+      "md5": "953bb225529df7dd81310c994779b110",
+      "subtune": 1,
+      "lengthSeconds": 49,
+      "title": "At the Hop",
+      "author": "<?>",
+      "composer": "DEMOS/unknown",
+      "group": "DEMOS/unknown|4628ea87061edd54",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "6581",
+        "clock": "NTSC",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 6887,
+        "seconds": 49,
+        "callsPerFrame": 5,
+        "callsPerFrameExact": 4.769810267857143,
+        "writesPerCall": 2,
+        "irregularShare": 0.20418239907057797,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 0,
+        "waveformWrites": {
+          "4": 1523
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 198,
+          "bp": 6688,
+          "hp": 6688
+        },
+        "filterMultiModeCalls": 6688,
+        "gateOns": 726,
+        "hardRestarts": 12,
+        "hardRestartRate": 0.01652892561983471,
+        "notePrograms": {
+          "distinct": 21,
+          "perMinute": 25.714285714285715
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 13.07643779816119,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 200,
+        "arpeggio": 0.04585052728106373,
+        "pwm": 0.00021585961519220699,
+        "filterMotion": 0.0009569336390159396,
+        "polyphony": 0.8137037037037037,
+        "pluck": 1,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:NTSC",
+        "cpf:5+",
+        "filter:bp",
+        "filter:hp",
+        "filter:multimode",
+        "hr:none",
+        "intro:medium",
+        "magic:PSID",
+        "model:6581",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:dense",
+        "style:major",
+        "style:pluck",
+        "style:tempo-fast",
+        "tables:mid",
+        "wave:pulse",
+        "wpc:low"
+      ]
+    },
+    {
+      "path": "MUSICIANS/B/Bakewell_Dwayne/Experiment_2.sid",
+      "md5": "71909117f5f91629c9bad5efba04c83d",
+      "subtune": 1,
+      "lengthSeconds": 215,
+      "title": "Experiment #2",
+      "author": "Dwayne Bakewell (Morbid)",
+      "composer": "MUSICIANS/B/Bakewell_Dwayne",
+      "group": "MUSICIANS/B/Bakewell_Dwayne|9b7ce129a64129a7",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 14994,
+        "seconds": 60,
+        "callsPerFrame": 5,
+        "callsPerFrameExact": 5.000254388196388,
+        "writesPerCall": 13,
+        "irregularShare": 0.6441005802707931,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 8091,
+        "waveformWrites": {
+          "1": 8237,
+          "4": 17100,
+          "5": 5631,
+          "8": 5165
+        },
+        "filterRoutedShare": [
+          0.9968654128317994,
+          0,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 14947,
+          "bp": 14947,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 14947,
+        "gateOns": 1391,
+        "hardRestarts": 57,
+        "hardRestartRate": 0.040977713874910136,
+        "notePrograms": {
+          "distinct": 167,
+          "perMinute": 167
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.21649574523368736,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 62.5,
+        "arpeggio": 0.24558823529411763,
+        "pwm": 0.022597634537933026,
+        "filterMotion": 0.1880090242453216,
+        "polyphony": 0.33911111111111114,
+        "pluck": 0.26666666666666666,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:5+",
+        "filter:bp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "hr:none",
+        "intro:short",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:arpeggio",
+        "style:filter-motion",
+        "style:major",
+        "style:tempo-slow",
+        "tables:high",
+        "testbit",
+        "wave:combined",
+        "wave:noise",
+        "wave:pulse",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "DEMOS/A-F/City_of_New_Orleans.sid",
+      "md5": "5d53ee4755ee2a3129ee105f7bd262e3",
+      "subtune": 1,
+      "lengthSeconds": 159,
+      "title": "City of New Orleans",
+      "author": "E.T",
+      "composer": "DEMOS/e_t",
+      "group": "DEMOS/e_t|4dfa53b901172ab1",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "6581",
+        "clock": "NTSC",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 6249,
+        "seconds": 60,
+        "callsPerFrame": 5,
+        "callsPerFrameExact": 4.769810267857143,
+        "writesPerCall": 2,
+        "irregularShare": 0.2029449423815621,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 0,
+        "waveformWrites": {
+          "4": 870,
+          "8": 114
+        },
+        "filterRoutedShare": [
+          0,
+          0.9687950072011522,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 6054,
+          "bp": 6054,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 6054,
+        "gateOns": 456,
+        "hardRestarts": 23,
+        "hardRestartRate": 0.05043859649122807,
+        "notePrograms": {
+          "distinct": 37,
+          "perMinute": 37
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 8.974171015334493,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 200,
+        "arpeggio": 0.02913800080938891,
+        "pwm": 0.00035149623581214235,
+        "filterMotion": 0.0008558605800398098,
+        "polyphony": 0.9214814814814815,
+        "pluck": 1,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:NTSC",
+        "cpf:5+",
+        "filter:bp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v2",
+        "hr:some",
+        "intro:medium",
+        "magic:PSID",
+        "model:6581",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:dense",
+        "style:major",
+        "style:pluck",
+        "style:tempo-fast",
+        "tables:mid",
+        "wave:noise",
+        "wave:pulse",
+        "wpc:low"
+      ]
+    },
+    {
+      "path": "MUSICIANS/S/Sad/Pahos.sid",
+      "md5": "ed9b9a2f313604cb11a71b3e121ae840",
+      "subtune": 1,
+      "lengthSeconds": 112,
+      "title": "Pahos",
+      "author": "David Cwik (Sad)",
+      "composer": "MUSICIANS/S/Sad",
+      "group": "MUSICIANS/S/Sad|8d15b0cca526ba15",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 15018,
+        "seconds": 60,
+        "callsPerFrame": 5,
+        "callsPerFrameExact": 5.000254388196388,
+        "writesPerCall": 18,
+        "irregularShare": 0.29146966770992877,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 3,
+        "waveformWrites": {
+          "1": 5704,
+          "2": 5800,
+          "4": 26473,
+          "8": 7074
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0.3477826608070316
+        ],
+        "filterModeCalls": {
+          "lp": 5223,
+          "bp": 6735,
+          "hp": 5184
+        },
+        "filterMultiModeCalls": 6735,
+        "gateOns": 709,
+        "hardRestarts": 1,
+        "hardRestartRate": 0.0014104372355430183,
+        "notePrograms": {
+          "distinct": 12,
+          "perMinute": 12
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 18.410218543960504,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 200,
+        "arpeggio": 0.09065420560747664,
+        "pwm": 0.04318271006635517,
+        "filterMotion": 0.0300547285649715,
+        "polyphony": 0.5008888888888888,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:5+",
+        "filter:bp",
+        "filter:hp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v3",
+        "hr:none",
+        "intro:medium",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:major",
+        "style:pwm",
+        "style:tempo-fast",
+        "tables:low",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/Z/Zirias/EX_Beach.sid",
+      "md5": "27e63c1950d578cb06a5e82541bf95fa",
+      "subtune": 1,
+      "lengthSeconds": 66.555,
+      "title": "EX Beach",
+      "author": "Felix Palmen (Zirias)",
+      "composer": "MUSICIANS/Z/Zirias",
+      "group": "MUSICIANS/Z/Zirias|0ce113458fb1b162",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "both",
+        "clock": "both",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 3005,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 25,
+        "irregularShare": 0.00033288948069241014,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 140,
+        "waveformWrites": {
+          "4": 6274,
+          "8": 1273
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0.49916805324459235
+        ],
+        "filterModeCalls": {
+          "lp": 2999,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 140,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 72,
+          "perMinute": 72
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.11415298483224529,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 62.17616580310881,
+        "arpeggio": 0,
+        "pwm": 0.0005683100780560896,
+        "filterMotion": 0.09383754140841084,
+        "polyphony": 0.6782222222222223,
+        "pluck": 0.023255813953488372,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:both",
+        "cpf:1",
+        "filter:lp",
+        "filter:v3",
+        "hr:none",
+        "intro:short",
+        "magic:PSID",
+        "model:both",
+        "sample:none",
+        "sids:1",
+        "speed:vbi",
+        "style:dense",
+        "style:minor",
+        "style:tempo-slow",
+        "tables:mid",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wpc:high"
+      ]
+    },
+    {
+      "path": "MUSICIANS/C/CMP/Gry.sid",
+      "md5": "9d1d96ed0f09b4480049390cb728c51a",
+      "subtune": 1,
+      "lengthSeconds": 562,
+      "title": "Gry",
+      "author": "CMP",
+      "composer": "MUSICIANS/C/CMP",
+      "group": "MUSICIANS/C/CMP|572c0a81ec6aba9b",
+      "split": "held-out",
+      "header": {
+        "magic": "PSID",
+        "model": "6581",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 6007,
+        "seconds": 60,
+        "callsPerFrame": 2,
+        "callsPerFrameExact": 1.9993896856881295,
+        "writesPerCall": 15,
+        "irregularShare": 0.8128538128538129,
+        "syncWrites": 6214,
+        "ringWrites": 0,
+        "testBitWrites": 378,
+        "waveformWrites": {
+          "1": 4734,
+          "2": 2054,
+          "4": 9593,
+          "5": 12,
+          "8": 777
+        },
+        "filterRoutedShare": [
+          0.9991676377559514,
+          0.9991676377559514,
+          0.9991676377559514
+        ],
+        "filterModeCalls": {
+          "lp": 4102,
+          "bp": 3178,
+          "hp": 1904
+        },
+        "filterMultiModeCalls": 3178,
+        "gateOns": 384,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 42,
+          "perMinute": 42
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.0668978774887135,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 108.10810810810811,
+        "arpeggio": 0.2830188679245283,
+        "pwm": 0.0008896562824658692,
+        "filterMotion": 0.4815435398965356,
+        "polyphony": 0.08488888888888889,
+        "pluck": 0.43902439024390244,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:2",
+        "filter:bp",
+        "filter:hp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "filter:v2",
+        "filter:v3",
+        "hr:none",
+        "intro:short",
+        "magic:PSID",
+        "model:6581",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:arpeggio",
+        "style:filter-motion",
+        "style:minor",
+        "style:pluck",
+        "style:sparse",
+        "style:tempo-mid",
+        "sync",
+        "tables:mid",
+        "testbit",
+        "wave:combined",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/A/Avory_Sarah_Jane/Soul_Force.sid",
+      "md5": "e1c22c45af1a04d34f94440329e84614",
+      "subtune": 15,
+      "lengthSeconds": 67.034,
+      "title": "Soul Force",
+      "author": "Sarah Jane Avory",
+      "composer": "MUSICIANS/A/Avory_Sarah_Jane",
+      "group": "MUSICIANS/A/Avory_Sarah_Jane|767c3d97542f1e79",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "both",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 2997,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 12,
+        "irregularShare": 0.0010013351134846463,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 663,
+        "waveformWrites": {
+          "1": 2979,
+          "3": 1,
+          "4": 5030,
+          "8": 286
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 0,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 663,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 122,
+          "perMinute": 122
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.2937128519925948,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 150,
+        "arpeggio": 0.18222222222222223,
+        "pwm": 0.03644048797713136,
+        "filterMotion": 0,
+        "polyphony": 0.16355555555555554,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": false
+      },
+      "bins": [
+        "clock:both",
+        "cpf:1",
+        "hr:none",
+        "intro:short",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:1",
+        "speed:vbi",
+        "style:major",
+        "style:pwm",
+        "style:sparse",
+        "style:tempo-mid",
+        "tables:high",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/C/Chiummo_Gaetano/A_Walk_in_the_Countryside_3SID.sid",
+      "md5": "4faa310aa39c2257a6bc0924457273ea",
+      "subtune": 1,
+      "lengthSeconds": 216,
+      "title": "A Walk in the Countryside",
+      "author": "Gaetano Chiummo",
+      "composer": "MUSICIANS/C/Chiummo_Gaetano",
+      "group": "MUSICIANS/C/Chiummo_Gaetano|b48131f5b50b7c02",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 3,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 3005,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 35,
+        "irregularShare": 0.0006657789613848203,
+        "syncWrites": 0,
+        "ringWrites": 442,
+        "testBitWrites": 790,
+        "waveformWrites": {
+          "1": 7224,
+          "2": 12578,
+          "4": 750,
+          "8": 471
+        },
+        "filterRoutedShare": [
+          0.9970049916805325,
+          1.1420965058236272,
+          0.9970049916805325
+        ],
+        "filterModeCalls": {
+          "lp": 436,
+          "bp": 2996,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 790,
+        "hardRestarts": 644,
+        "hardRestartRate": 0.8151898734177215,
+        "notePrograms": {
+          "distinct": 278,
+          "perMinute": 278
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 60,
+        "repeats": false
+      },
+      "style": {
+        "bpm": 187.5,
+        "arpeggio": 0,
+        "pwm": 0,
+        "filterMotion": 0,
+        "polyphony": 1,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:1",
+        "filter:bp",
+        "filter:lp",
+        "filter:v1",
+        "filter:v2",
+        "filter:v3",
+        "hr:most",
+        "intro:long",
+        "magic:PSID",
+        "model:8580",
+        "ring",
+        "sample:none",
+        "sids:3",
+        "speed:vbi",
+        "style:dense",
+        "style:minor",
+        "style:tempo-fast",
+        "tables:high",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:sawtooth",
+        "wave:triangle",
+        "wpc:high"
+      ]
+    },
+    {
+      "path": "MUSICIANS/P/PRI/Hit_n_Run.sid",
+      "md5": "78beb52e17b952af1ffe7b6ed4048f5b",
+      "subtune": 1,
+      "lengthSeconds": 158,
+      "title": "Hit 'n' Run",
+      "author": "Volker Meitz (PRI)",
+      "composer": "MUSICIANS/P/PRI",
+      "group": "MUSICIANS/P/PRI|76b72e68b5c7c031",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 12013,
+        "seconds": 60,
+        "callsPerFrame": 5,
+        "callsPerFrameExact": 4.838995568685377,
+        "writesPerCall": 17,
+        "irregularShare": 0.5293040293040293,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 1100,
+        "waveformWrites": {
+          "1": 5366,
+          "4": 18630,
+          "8": 4847
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0.5653874968783817
+        ],
+        "filterModeCalls": {
+          "lp": 8555,
+          "bp": 8555,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 8555,
+        "gateOns": 636,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 136,
+          "perMinute": 136
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 3.3453739566078795,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 62.5,
+        "arpeggio": 0.340941512125535,
+        "pwm": 0.04338867323941941,
+        "filterMotion": 0.11470888068964133,
+        "polyphony": 0.3551111111111111,
+        "pluck": 0.4444444444444444,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:5+",
+        "filter:bp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v3",
+        "hr:none",
+        "intro:short",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:arpeggio",
+        "style:minor",
+        "style:pluck",
+        "style:pwm",
+        "style:tempo-slow",
+        "tables:high",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/A/Avory_Sarah_Jane/Soul_Force.sid",
+      "md5": "e1c22c45af1a04d34f94440329e84614",
+      "subtune": 14,
+      "lengthSeconds": 88.979,
+      "title": "Soul Force",
+      "author": "Sarah Jane Avory",
+      "composer": "MUSICIANS/A/Avory_Sarah_Jane",
+      "group": "MUSICIANS/A/Avory_Sarah_Jane|767c3d97542f1e79",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "8580",
+        "clock": "both",
+        "sidCount": 1,
+        "speed": "VBI"
+      },
+      "features": {
+        "calls": 2998,
+        "seconds": 60,
+        "callsPerFrame": 1,
+        "callsPerFrameExact": 1,
+        "writesPerCall": 12,
+        "irregularShare": 0.001001001001001001,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 498,
+        "waveformWrites": {
+          "1": 4653,
+          "3": 1,
+          "4": 3544,
+          "8": 281
+        },
+        "filterRoutedShare": [
+          0,
+          0,
+          0
+        ],
+        "filterModeCalls": {
+          "lp": 0,
+          "bp": 0,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 0,
+        "gateOns": 498,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 127,
+          "perMinute": 127
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.27376457501055573,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 75,
+        "arpeggio": 0.4765957446808511,
+        "pwm": 0.042103123443905606,
+        "filterMotion": 0,
+        "polyphony": 0.14577777777777778,
+        "pluck": 0,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:both",
+        "cpf:1",
+        "hr:none",
+        "intro:short",
+        "magic:PSID",
+        "model:8580",
+        "sample:none",
+        "sids:1",
+        "speed:vbi",
+        "style:arpeggio",
+        "style:minor",
+        "style:pwm",
+        "style:sparse",
+        "style:tempo-slow",
+        "tables:high",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    },
+    {
+      "path": "MUSICIANS/S/SIDwave/Gnumpf_Espresso.sid",
+      "md5": "28a445060fd4377249ff97de3febdd58",
+      "subtune": 1,
+      "lengthSeconds": 167,
+      "title": "Gnumpf Espresso",
+      "author": "Jan D. Arent Harries (rambones)",
+      "composer": "MUSICIANS/S/SIDwave",
+      "group": "MUSICIANS/S/SIDwave|0b37598579ce386a",
+      "split": "development",
+      "header": {
+        "magic": "PSID",
+        "model": "6581",
+        "clock": "PAL",
+        "sidCount": 1,
+        "speed": "CIA"
+      },
+      "features": {
+        "calls": 17832,
+        "seconds": 60,
+        "callsPerFrame": 6,
+        "callsPerFrameExact": 5.998169057064388,
+        "writesPerCall": 8,
+        "irregularShare": 0.6390555773652628,
+        "syncWrites": 0,
+        "ringWrites": 0,
+        "testBitWrites": 3379,
+        "waveformWrites": {
+          "1": 4185,
+          "4": 14890,
+          "8": 6356
+        },
+        "filterRoutedShare": [
+          0.1701996410946613,
+          0,
+          0.9996074472857783
+        ],
+        "filterModeCalls": {
+          "lp": 17825,
+          "bp": 17825,
+          "hp": 0
+        },
+        "filterMultiModeCalls": 17825,
+        "gateOns": 792,
+        "hardRestarts": 0,
+        "hardRestartRate": 0,
+        "notePrograms": {
+          "distinct": 51,
+          "perMinute": 51
+        },
+        "sampleWrites": 0,
+        "sampleShare": 0,
+        "introSeconds": 0.16004092370651857,
+        "repeats": true
+      },
+      "style": {
+        "bpm": 75,
+        "arpeggio": 0.034106412005457026,
+        "pwm": 0.07233758210724034,
+        "filterMotion": 0.49623696275052065,
+        "polyphony": 0.31022222222222223,
+        "pluck": 0.5761904761904761,
+        "tonal": true,
+        "keyIsMinor": true
+      },
+      "bins": [
+        "clock:PAL",
+        "cpf:5+",
+        "filter:bp",
+        "filter:lp",
+        "filter:multimode",
+        "filter:v1",
+        "filter:v3",
+        "hr:none",
+        "intro:short",
+        "magic:PSID",
+        "model:6581",
+        "sample:none",
+        "sids:1",
+        "speed:cia",
+        "style:filter-motion",
+        "style:minor",
+        "style:pluck",
+        "style:pwm",
+        "style:tempo-slow",
+        "tables:mid",
+        "testbit",
+        "wave:noise",
+        "wave:pulse",
+        "wave:triangle",
+        "wpc:mid"
+      ]
+    }
+  ]
+}

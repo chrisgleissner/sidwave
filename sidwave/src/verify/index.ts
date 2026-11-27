@@ -66,10 +66,18 @@ export type VerifyResult = {
 };
 
 const CLOCK_HZ = { PAL: 985_248, NTSC: 1_022_727 } as const;
-const DEFAULT_BURST_GAP = 2_000;
+/** Default burst gap of callGroups, in cycles. */
+export const DEFAULT_BURST_GAP = 2_000;
 const DEFAULT_TOLERANCE = 0;
 
-type W = { sid: number; reg: number; value: number; cycle: number; index: number };
+/** One SID write of a trace: zero-based SID, register offset, value, cycle counted from engine start. */
+export type TraceWrite = { sid: number; reg: number; value: number; cycle: number; index: number };
+type W = TraceWrite;
+
+/** Validates a packed trace (four Float64 values per write) and unpacks it. */
+export function traceWrites(input: Float64Array): TraceWrite[] {
+  return records(input);
+}
 
 function records(input: Float64Array): W[] {
   if (!(input instanceof Float64Array) || input.length % 4) {
@@ -104,7 +112,11 @@ function median(xs: number[]): number {
   return xs.length % 2 ? xs[m] : (xs[m - 1] + xs[m]) / 2;
 }
 
-function callGroups(ws: W[], gap: number): W[][] {
+/**
+ * Groups writes into player calls: writes closer than `gap` cycles form a burst, and bursts closer than
+ * the larger of `gap` and half the median burst spacing form one call. Shared with the reconstruction IR.
+ */
+export function callGroups(ws: W[], gap: number): W[][] {
   const bs = bursts(ws, gap);
   const starts = bs.slice(1).map((burst, i) => burst[0].cycle - bs[i][0].cycle);
   const period = median(starts);
