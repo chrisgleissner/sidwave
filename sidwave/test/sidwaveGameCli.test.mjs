@@ -108,8 +108,8 @@ test("a score or layout that cannot be built exits 3 with the path of the proble
     usage(["--target", "rom"], /--target must be prg or game, not rom/);
     usage(["--target", "game", "--origin", "0x10000"], /--origin 0x10000 is outside \$0000-\$FFFF/);
     usage(["--target", "game", "--origin", "banana"], /--origin needs an address such as 0x1000, \$1000 or 4096, not "banana"/);
-    usage(["--target", "game", "--origin", "0x1000", "--format", "prg"], /--format for --target game must be bin or sid, not prg/);
-    usage(["--target", "game", "--origin", "0x1000", "--symbols", "acme,nope"], /--symbols takes acme, kickass, ca65, vice, json, not nope/);
+    usage(["--target", "game", "--origin", "0x1000", "--format", "prg"], /--format for --target game must be bin, sid or asm, not prg/);
+    usage(["--target", "game", "--origin", "0x1000", "--symbols", "acme,nope"], /--symbols takes 64tass, acme, kickass, ca65, vice, json, not nope/);
     usage(["--target", "game", "--origin", "0x1000", "-o", "-"], /-o - is not available with --target game/);
     usage(["--origin", "0x1000"], /--origin does not apply to compile without --target game/);
     usage(["--symbols-all"], /--symbols-all does not apply to compile without --target game/);
@@ -143,7 +143,7 @@ test("an unwritable output is an input error", () => {
 
 test("the help text names the game options", () => {
   const help = run(".", "--help").out;
-  for (const text of ["--target game --origin <addr>", "--data-origin", "--symbols-all", "--no-measure", "<out>.acme, .kickass, .ca65, .vice, .symbols.json"]) {
+  for (const text of ["--target game --origin <addr>", "--data-origin", "--symbols-all", "--no-measure", "<out>.64tass, .acme, .kickass, .ca65, .vice, .symbols.json"]) {
     assert.ok(help.includes(text), text);
   }
 });

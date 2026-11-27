@@ -118,9 +118,12 @@ This writes `song.bin`, the player and music at `$1000` (raw bytes, no load addr
 | `--origin <addr>` | Address of the entry table, `$0200` to `$CFFF`. The player, its variables and its data must end below `$D000`. Required. |
 | `--data-origin <addr>` | Put the streams and tables in a second file, `song.data.bin`, at this address. The player file then holds only code, constants and the entry table. Both files belong together; the contract records a SHA-256 of the data, and `init` does not check it. |
 | `--zp <addr>` | Zero page base of the player's pointers, `$02` to `$FE` (default `$FB`). A score with several SIDs needs four bytes, so the base must be at most `$FC`. |
-| `--symbols <list>` | Symbol files to write next to the output, separated by commas: `acme` (`song.acme`), `kickass` (`.kickass`), `ca65` (`.ca65`), `vice` (`.vice`), `json` (`.symbols.json`). `acme` also loads in 64tass. |
+| `--symbols <list>` | Symbol files to write next to the output, separated by commas: `64tass` (`song.64tass`), `acme` (`.acme`), `kickass` (`.kickass`), `ca65` (`.ca65`), `vice` (`.vice`), `json` (`.symbols.json`). |
 | `--symbols-all` | Export every internal label too, as `sidwave_int_<label>`. |
 | `--no-measure` | Skip the measurement run (see below). |
+| `--format asm` | Write one assembler include with the bytes and symbols instead of the binaries; `--asm 64tass\|acme\|kickass\|ca65` selects the syntax. See [Using a score in an assembler project](doc/authoring.md#using-a-score-in-an-assembler-project). |
+| `--max-cycles <n>` | Write nothing and exit 5 when a play call takes more than `n` cycles (measured; with `--no-measure` the upper bound). |
+| `--reloc` | Also write `<out>.reloc.json`, the bytes that change when the build moves by whole pages. |
 | `--format sid` | Write a PSID file of the same player instead. Its start routine passes the clock to `init`, and the header records the largest free page range of `$0400`-`$CFFF`. |
 
 In the library, `compileSidwave(doc, { target: "game", origin, dataOrigin, zeroPage, symbols })` returns `player`, `data`, `combined` (`Uint8Array`), `symbols`, `contract` and `cycles`.

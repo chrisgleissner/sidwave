@@ -8,6 +8,7 @@ import { parseSidwave } from "./sidwave.js";
 import { bundleCommand, lockCommand } from "./cliAssets.js";
 import { runRetarget } from "./retargetCli.js";
 import { SIDWAVE_SYMBOL_FORMATS, compileSidwave, sidwaveGamePsid, type SidwaveSymbolFormat } from "./sidwaveGame.js";
+import { SIDWAVE_ASSEMBLERS, renderSidwaveGameInclude, sidwaveRelocationTable, type SidwaveAssembler, type SidwaveRelocationTable } from "./sidwaveGameDeveloper.js";
 import {
   classifyError, envelope, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, SidwaveOperationError, UsageError, withFile,
   type CliIo,
@@ -39,7 +40,8 @@ Usage:
   sidwave validate <file> [--json] [--allow-dir <dir>]
   sidwave compile  <file> [-o <out>] [--format prg|sid] [--loop|--no-loop] [--song <n>] [--json] [--allow-dir <dir>]
   sidwave compile  <file> --target game --origin <addr> [--data-origin <addr>] [--zp <addr>] [--symbols <list>]
-                          [--symbols-all] [--no-measure] [--format bin|sid] [-o <out>] [--loop|--no-loop] [--json]
+                          [--symbols-all] [--no-measure] [--max-cycles <n>] [--reloc] [--format bin|sid|asm]
+                          [--asm 64tass|acme|kickass|ca65] [-o <out>] [--loop|--no-loop] [--json]
   sidwave lint     <file> [--loop|--no-loop] [--strict] [--json] [--allow-dir <dir>]
   sidwave lock     <score> [-o <out>] [--json] [--allow-dir <dir>]
   sidwave bundle   <score> -o <dir> [--force] [--json] [--allow-dir <dir>]
@@ -60,11 +62,17 @@ Commands:
   compile --target game
              Build the player for use inside a game or demo: assembled at --origin with no BASIC stub, IRQ or
              KERNAL use. Writes <out>.bin (player and data, or the player alone with --data-origin) and
-             <out>.data.bin, plus one symbol file per --symbols format (acme, kickass, ca65, vice, json) next to it:
-             <out>.acme, .kickass, .ca65, .vice, .symbols.json. Addresses are 0x1000, $1000 or decimal. --zp moves
+             <out>.data.bin, plus one symbol file per --symbols format (64tass, acme, kickass, ca65, vice, json) next to it:
+             <out>.64tass, .acme, .kickass, .ca65, .vice, .symbols.json. Addresses are 0x1000, $1000 or decimal. --zp moves
              the zero page pointers (default $FB). The build runs the score on the bundled emulator to measure the
              cycles per play call; --no-measure skips that. --format sid writes a PSID instead. --json prints the
              register contract, the cycles and the exported labels.
+             --format asm writes one assembler include instead of the binaries: <out>.inc (or the -o name ending in
+             .inc, .asm, .a or .s) with a header describing the call API, the symbols and the bytes at their
+             addresses, in the syntax of --asm (64tass by default, acme, kickass or ca65). --max-cycles <n> writes
+             nothing and exits 5 when the worst measured play call (with --no-measure the upper bound) takes more
+             than n cycles. --reloc also writes <out>.reloc.json, the byte offsets that change when the build moves
+             by whole pages (not with --format sid).
   lint       Print the lint findings. Exit 0 unless the score is invalid; with --strict, exit 1 when there is a
              finding that is not an informational note.
   lock       SIDWave 1.4 libraries: write the sha256 of each library the score imports into its imports (in place
@@ -113,18 +121,21 @@ interface Options {
   symbols: string[];
   symbolsAll: boolean;
   noMeasure: boolean;
+  asm?: string;
+  reloc: boolean;
+  maxCycles?: number;
   /** Flags of verify, render, trace and sid-info. */
   run: RunFlags;
   /** Flags of analyze, compare, isolate, preserve and extract-instruments. */
   analyze: AnalyzeFlags;
 }
 
-const VALUE_FLAGS = new Set(["-o", "--output", "--format", "--allow-dir", "--target", "--origin", "--data-origin", "--zp", "--symbols", "--song"]);
+const VALUE_FLAGS = new Set(["-o", "--output", "--format", "--allow-dir", "--target", "--origin", "--data-origin", "--zp", "--symbols", "--song", "--asm", "--max-cycles"]);
 
 /** Options that only apply to `compile --target game`. */
 const GAME_FLAGS: Array<[keyof Options, string]> = [
   ["target", "--target"], ["origin", "--origin"], ["dataOrigin", "--data-origin"], ["zeroPage", "--zp"],
-  ["symbols", "--symbols"], ["symbolsAll", "--symbols-all"], ["noMeasure", "--no-measure"],
+  ["symbols", "--symbols"], ["symbolsAll", "--symbols-all"], ["noMeasure", "--no-measure"], ["asm", "--asm"], ["reloc", "--reloc"], ["maxCycles", "--max-cycles"],
 ];
 
 function parseAddress(flag: string, text: string): number {
@@ -136,7 +147,7 @@ function parseAddress(flag: string, text: string): number {
 }
 
 function parseArgs(args: string[], command: string): Options {
-  const options: Options = { positional: [], json: false, strict: false, force: false, help: false, version: false, allowDirs: [], symbols: [], symbolsAll: false, noMeasure: false, run: {}, analyze: {} };
+  const options: Options = { positional: [], json: false, strict: false, force: false, help: false, version: false, allowDirs: [], symbols: [], symbolsAll: false, noMeasure: false, reloc: false, run: {}, analyze: {} };
   for (let i = 0; i < args.length; i++) {
     let arg = args[i]!;
     let inline: string | undefined;
@@ -160,6 +171,8 @@ function parseArgs(args: string[], command: string): Options {
         if (!/^\d+$/.test(value.trim())) throw new UsageError(`--song needs a song index such as 0 or 2, not "${value}"`);
         options.song = Number(value);
       }
+      else if (arg === "--asm") options.asm = value;
+      else if (arg === "--max-cycles") { if (!/^\d+$/.test(value)) throw new UsageError("--max-cycles needs a nonnegative integer"); options.maxCycles = Number(value); }
       else if (arg === "--symbols") options.symbols.push(...value.split(",").map((name) => name.trim()).filter(Boolean));
       else options.output = value;
     } else if (inline !== undefined) throw new UsageError(`${arg} does not take a value`);
@@ -170,6 +183,7 @@ function parseArgs(args: string[], command: string): Options {
     else if (arg === "--force") options.force = true;
     else if (arg === "--symbols-all") options.symbolsAll = true;
     else if (arg === "--no-measure") options.noMeasure = true;
+    else if (arg === "--reloc") options.reloc = true;
     else if (arg === "-h" || arg === "--help") options.help = true;
     else if (arg === "-V" || arg === "--version") options.version = true;
     else if (arg !== "-" && arg.startsWith("-")) throw new UsageError(`unknown option ${arg}`);
@@ -277,14 +291,18 @@ function compile(io: CliIo, options: Options): number {
 }
 
 const SYMBOL_EXTENSIONS: Record<SidwaveSymbolFormat, string> = {
-  acme: ".acme", kickass: ".kickass", ca65: ".ca65", vice: ".vice", json: ".symbols.json",
+  "64tass": ".64tass", acme: ".acme", kickass: ".kickass", ca65: ".ca65", vice: ".vice", json: ".symbols.json",
 };
 
 /** `compile --target game`: raw binaries at the origin, symbol files and the contract. */
 function compileGame(io: CliIo, options: Options, file: string): number {
   if (options.origin === undefined) throw new UsageError("--target game needs --origin");
   const format = options.format ?? (options.output !== undefined && extname(options.output).toLowerCase() === ".sid" ? "sid" : "bin");
-  if (format !== "bin" && format !== "sid") throw new UsageError(`--format for --target game must be bin or sid, not ${format}`);
+  if (format !== "bin" && format !== "sid" && format !== "asm") throw new UsageError(`--format for --target game must be bin, sid or asm, not ${format}`);
+  const asm = (options.asm ?? "64tass") as SidwaveAssembler;
+  if (!SIDWAVE_ASSEMBLERS.includes(asm)) throw new UsageError(`--asm must be ${SIDWAVE_ASSEMBLERS.join(", ")}, not ${asm}`);
+  if (options.asm !== undefined && format !== "asm") throw new UsageError("--asm needs --format asm");
+  if (options.reloc && format === "sid") throw new UsageError("--reloc describes the player and data bytes; use --format bin or asm");
   if (options.output === "-") throw new UsageError("-o - is not available with --target game (the build has several files)");
   const symbols = options.symbols.map((name) => {
     if (!SIDWAVE_SYMBOL_FORMATS.includes(name as SidwaveSymbolFormat)) {
@@ -294,7 +312,10 @@ function compileGame(io: CliIo, options: Options, file: string): number {
   });
   const { text, path } = readScore(io, file);
   const stem = basename(file, extname(file)).replace(/\.sidwave$/i, "");
-  const base = options.output === undefined ? resolve(io.cwd, stem) : resolve(io.cwd, options.output).replace(/\.(bin|sid)$/i, "");
+  const base = options.output === undefined ? resolve(io.cwd, stem)
+    : resolve(io.cwd, options.output).replace(format === "asm" ? /\.(inc|asm|a|s)$/i : /\.(bin|sid)$/i, "");
+  // An include keeps the name given with -o when it has a source extension.
+  const includePath = options.output !== undefined && /\.(inc|asm|a|s)$/i.test(options.output) ? resolve(io.cwd, options.output) : `${base}.inc`;
   const outputs: Array<{ kind: string; path: string; bytes: number; address?: number }> = [];
   const write = (target: string, bytes: Uint8Array | string, kind: string, address?: number) => {
     if (sameFile(target, path)) throw new UsageError("an output file is the input file; refusing to overwrite it");
@@ -308,21 +329,31 @@ function compileGame(io: CliIo, options: Options, file: string): number {
   };
   let build;
   let doc;
+  // Everything that can fail is computed before the first file is written.
+  let include: string | undefined;
+  let psid: Uint8Array | undefined;
+  let relocation: SidwaveRelocationTable | undefined;
   try {
     doc = parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs, path));
-    build = compileSidwave(doc, {
-      target: "game", origin: options.origin, dataOrigin: options.dataOrigin, zeroPage: options.zeroPage,
-      symbols, symbolsAll: options.symbolsAll, measure: !options.noMeasure, ...(options.loop === undefined ? {} : { loop: options.loop }),
-    });
+    const gameOptions = {
+      target: "game" as const, origin: options.origin, dataOrigin: options.dataOrigin, zeroPage: options.zeroPage,
+      symbols, symbolsAll: options.symbolsAll, measure: !options.noMeasure, maxCycles: options.maxCycles, ...(options.loop === undefined ? {} : { loop: options.loop }),
+    };
+    build = compileSidwave(doc, gameOptions);
+    if (format === "asm") include = renderSidwaveGameInclude(build, asm, doc.song.title);
+    if (format === "sid") psid = sidwaveGamePsid(doc, build);
+    if (options.reloc) relocation = sidwaveRelocationTable(doc, gameOptions);
   } catch (error) {
     return withFile(file, (): number => { throw error; });
   }
   try {
-    if (format === "sid") write(`${base}.sid`, sidwaveGamePsid(doc, build), "psid", build.combinedOrigin);
+    if (include !== undefined) write(includePath, include, `include-${asm}`, build.combinedOrigin);
+    else if (psid) write(`${base}.sid`, psid, "psid", build.combinedOrigin);
     else if (build.data) {
       write(`${base}.bin`, build.player, "player", build.contract.memory.player.start);
       write(`${base}.data.bin`, build.data, "data", build.contract.memory.data!.start);
     } else write(`${base}.bin`, build.player, "player", build.contract.memory.player.start);
+    if (relocation) write(`${base}.reloc.json`, `${JSON.stringify(relocation)}\n`, "relocation");
   } catch (error) {
     return withFile(file, (): number => { throw error; });
   }
