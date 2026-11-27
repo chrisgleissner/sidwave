@@ -1082,6 +1082,9 @@ function simplifyInstrument(y: Record<string, unknown>, level: number): Record<s
   // A pulse width of zero has no other spelling than a one-step table, which costs one step.
   const pulse = y.pulsetable as { steps: Array<{ set?: number }> } | undefined;
   if (level <= 2 && pulse?.steps.length === 1 && pulse.steps[0]!.set === 0) out.pulsetable = pulse;
+  // An instrument that never opens the gate (the lead note of a voice) stays silent: without its wavetable it would sound.
+  const wave = y.wavetable as Array<{ gate?: boolean }> | undefined;
+  if (wave?.length && wave.every((step) => step.gate === false)) out.wavetable = [{ ...wave[0], calls: 1 }];
   return out;
 }
 

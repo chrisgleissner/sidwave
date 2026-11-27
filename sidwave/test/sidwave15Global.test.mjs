@@ -6,7 +6,8 @@ import { parseSidwave } from "../src/sidwave.ts";
 import { compileSidwaveBytes } from "../src/sidwaveOps.ts";
 import { compileSidwaveToPrg } from "../src/sidwaveCompiler.ts";
 import { irOfTrace } from "../src/reconstruct/reconstruct.ts";
-import { globalTableSteps } from "../src/reconstruct/recover.ts";
+import { globalTableSteps, recoverScore } from "../src/reconstruct/recover.ts";
+import { buildIr } from "../src/reconstruct/ir.ts";
 import { sharedEngine, roundTrip } from "./helpers/reconstructRoundTrip.mjs";
 
 const doc = (version, extra, instrument = "{ waveform: pulse, adsr: [0, 4, 12, 3] }") => `sidwave: "${version}"
@@ -163,4 +164,21 @@ test("hard_restart wave none writes the test bit without waveform bits, and requ
   const ir = await trace(doc("1.5", "", instrument));
   assert.ok(ir.calls.some((c) => c.sids[0].regs[4] === 0x08));
   assert.equal(ir.calls[1].sids[0].regs[4], 0x41);
+});
+
+test("an instrument that never opens the gate stays silent when the instrument budget drops its tables", () => {
+  const frame = 19_656;
+  const writes = [];
+  // Voice 1 modulates its pitch without ever gating; voice 2 plays 400 notes, each with a different 4-call program.
+  for (let call = 0; call < 2400; call++) {
+    const at = 10_000 + call * frame;
+    writes.push(0, 0, (call * call) % 251, at, 0, 1, 1, at + 10, 0, 4, 0, at + 20);
+    const note = Math.floor(call / 6);
+    const k = call % 6;
+    writes.push(0, 7, (note * 5 + k * 3) & 255, at + 30, 0, 8, 20, at + 40, 0, 13, 0xf0, at + 50, 0, 11, k < 4 ? 0x41 : 0x40, at + 60);
+  }
+  const recovered = recoverScore(buildIr(Float64Array.from(writes), { clock: "PAL" }));
+  const voice = recovered.document.voices.find((v) => v.id === 1);
+  const used = new Set(JSON.stringify(voice).match(/i\d+/g));
+  for (const name of used) assert.ok(recovered.document.instruments[name].wavetable.every((step) => step.gate === false), name);
 });
