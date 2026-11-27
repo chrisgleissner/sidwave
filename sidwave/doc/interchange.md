@@ -263,3 +263,143 @@ Writes an SWM1 module for the subset that the format expresses; everything else 
 Not exported: drum voices, voices beyond three or on another SID, velocity and levels, vibrato, arpeggios, slides, wavetables, pulse and filter tables, filter routing, echo and follow copies, tempo changes and swing, bends and legato. `--format swi` writes one instrument (waveform, ADSR, pulse width) and lists what it leaves out. Scores whose speed is not 1 to 8 calls per frame, with more than 100 distinct patterns, more than 124 patterns per track or more than 37 instruments are refused (exit 3). `.sws` export is not available.
 
 Verification of the export: the exported file is read back by `sidwave import` (same note count, pitches and start times within 30 ms on the test score), and by SWMconvert, the SID-Wizard author's own converter built from its source (`SWMconvert.c`, public domain; the test builds it with `gcc` when the SID-Wizard checkout is present and skips otherwise): it converts the exported module to a MIDI file with the same three tracks, the same 14, 8 and 2 notes with the same pitches and the same relative timing as the score's event export. SWMconvert has no licence text in the repository; it was read and built locally for this check only, nothing from it is part of SIDWave. Player check not achieved: SID-Maker (`exporter.asm`) assembles with 64tass 1.60 (`-D SID_AMOUNT=1 -D SFX_SUPPORT=0 -D SLOWDOWN_SUPP=0 -D SWP_EXPORT=0`) and runs in `x64sc -sounddev dummy` under Xvfb with a remote monitor; its file selector (`*.SWM`, drive 8) came up and read the directory of a d64 image. Two steps failed: the exported file did not appear in the list (the selector filters on the file type name, which a plain c1541 `-write` does not set), and keys written into the KERNAL keyboard buffer through the monitor were not consumed (the program scans `$DC01` directly), so no module was converted. Status: exact for the expressible subset at note level (read back by two independent readers), not verified at register level against the player.
+
+## Conversion hub: `sidwave convert`
+
+`sidwave convert <in> [<out>]` converts between the formats of this document, the SIDWave score, the compiled PRG
+and PSID, and (as a source) a PSID. One command replaces the two-step `import` then `export`; the same conversion is
+available as `convert()` from the package root.
+
+```
+sidwave convert song.sng song.mid          # GoatTracker song to MIDI
+sidwave convert tune.mid tune.sid          # MIDI to a playable SID file
+sidwave convert tune.sid tune.sng          # SID to GoatTracker (traces the tune: slower, approximate)
+sidwave convert song.fur song.sng --dry-run --json
+sidwave formats                            # the format table below, from the registry
+sidwave info unknown.bin                   # detect and describe any supported file
+```
+
+### Formats
+
+| Id | Reads | Writes | Extensions | Detected by |
+|---|---|---|---|---|
+| `sidwave` | yes | yes | `.yaml` `.yml` `.sidwave` | top-level key `sidwave:` (older scores: `song:` and `voices:`) |
+| `sid` | approximate (reconstruct) | yes | `.sid` | magic `PSID` or `RSID` |
+| `midi` | yes | yes | `.mid` `.midi` `.smf` | header chunk `MThd` |
+| `musicxml` | yes (uncompressed) | yes | `.musicxml` `.xml` (`.mxl` input only) | root element `score-partwise` or `score-timewise` |
+| `goattracker` | yes | yes | `.sng` | magic `GTS!`, `GTS2` to `GTS5` |
+| `furnace` | yes | yes | `.fur` | header `-Furnace module-`, also inside zlib |
+| `wav` | no | yes (mix, mono 48 kHz) | `.wav` | `RIFF` and `WAVE` |
+| `prg` | no | yes | `.prg` | extension only |
+| `events` | no | yes (lossy JSON view) | `.json` | JSON key `schema: sidwave.events/1` |
+
+`sidwave formats` prints the same table with a loss summary per format. Reading events JSON, WAV and PRG is not
+supported by design or not yet: events are a lossy view, a PRG has no score, and audio transcription is planned.
+
+### Detection
+
+The content decides. Each format has a magic detector that returns a confidence from 0 to 1. A weak match gains 0.35
+when the extension agrees. If nothing matches the content, the extension alone gives confidence 0.5. The best
+candidate is used when its confidence is at least 0.6 and the second best is more than 0.2 behind. Otherwise
+`convert` exits 3 and lists the candidates with the `--from` option that fixes it. When the extension contradicts a
+clear magic (0.9 or more), the content wins and a warning is printed.
+
+### Chain
+
+`read` (importer, or reconstruct for a `.sid`) then `normalise` (the result is parsed as a SIDWave score) then `plan`
+(ScorePlan, below) then `write` (exporter). With `--verify` the output is read again and compared with the score.
+Converting a SIDWave score to the same format is a plain copy through the writer. The input and output of a
+converted pair are always checked first: nothing is written when any output file exists (without `--force`) or when
+the output is the input.
+
+### ScorePlan
+
+Every exporter receives its score from `planScore()` (`interchange/scorePlan.ts`). The plan decides, from the
+capabilities of the target (`TargetCaps`):
+
+- Voices: when the target holds fewer voices than the score has (GoatTracker and Furnace: three), the voices with the
+  highest notes x pitch range are kept; ties keep the voice that comes first. The dropped voices are reported
+  (`voices.dropped`, severity `lost`). `--voices n` lowers the limit further.
+- Tempo: a target with a tempo map gets the tempo map; a tracker with one tempo folds tempo changes into its row grid
+  (`tempo.folded`). Tempo ramps are reported for every target (`tempo.ramp`): they become steps in a tempo map and
+  are not stored in a single-tempo format.
+- Glides, slides and vibrato are reported when the target writes plain notes (`bend.dropped`).
+- A loop point that the target cannot store (`loop.restart`) and title and author that the target does not store
+  (`metadata.dropped`).
+- Row grid: the GoatTracker and Furnace exporters pick the largest row length of 3 to 12 calls that fits every note
+  start. They always count time in video frames: a score with `speed: 2` has its notes rounded to frames
+  (`timing.multispeed`).
+
+Drum hits that share a voice with pitched notes are written as pitched notes in MIDI and MusicXML, because a part with
+both kinds is read back as a drum part and loses its pitched notes.
+
+### Losses
+
+Each stage returns losses `{ stage, code, severity, count, where?, message }`. The hub groups them by stage and code.
+Severity `info`: nothing musical is lost. `approx`: the result is close, not equal. `lost`: content is missing in the
+output. `--strict` exits 1 and writes nothing when any loss is `lost`. The sentences that importers and exporters
+report are mapped to codes by `interchange/loss.ts`; a sentence with no rule gets the code `note` and severity `info`.
+
+### Quality measure (`--verify`)
+
+The output is read back and its notes are compared with the notes of the input score (all voices, before reduction).
+A note matches when pitch is equal and the onsets differ by at most 75 ms. Drum hits of the reference match any note
+that starts at the same time, because trackers have no drum channel. Reported: note F1 (with precision and recall),
+mean and maximum onset error, notes whose onset matches but whose pitch differs by whole octaves
+(`octaveShifted`, and the F1 that counts them as matches), voices dropped, instruments mapped, and for a `.sid` input
+the F-diff of the reconstruct. A1 is not computed by `convert`; use `sidwave verify` for compiled tunes. Targets that
+cannot be read back (`prg`, `sid`, `wav`, `events`) report `available: false` with the reason.
+
+Quality thresholds of the conversion test matrix (`test/convertMatrix.test.mjs`), per source and target format. Every
+pair is converted for each committed fixture, read back, and must reach the note F1 of its row. A score with more than
+three voices loses the notes of the voices that the target or the importer cannot hold (three voices per SID), so
+its F1 cannot reach 1: the second column applies to such scores (the fixture `title_fanfare`, five voices: 22 of 104
+notes are in the dropped voices, F1 0.88). The `sid` source is read by reconstruct with a 4 s horizon.
+
+<!-- quality-thresholds:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices |
+|---|---|---|---|
+| sidwave | sidwave | 0.99 | 0.99 |
+| sidwave | midi | 0.99 | 0.85 |
+| sidwave | musicxml | 0.99 | 0.85 |
+| sidwave | goattracker | 0.99 | 0.85 |
+| sidwave | furnace | 0.99 | 0.85 |
+| midi | sidwave | 0.99 | 0.99 |
+| midi | midi | 0.99 | 0.99 |
+| midi | musicxml | 0.99 | 0.99 |
+| midi | goattracker | 0.99 | 0.99 |
+| midi | furnace | 0.99 | 0.99 |
+| musicxml | sidwave | 0.99 | 0.99 |
+| musicxml | midi | 0.99 | 0.99 |
+| musicxml | musicxml | 0.99 | 0.99 |
+| musicxml | goattracker | 0.99 | 0.99 |
+| musicxml | furnace | 0.99 | 0.99 |
+| goattracker | sidwave | 0.99 | 0.99 |
+| goattracker | midi | 0.99 | 0.99 |
+| goattracker | musicxml | 0.99 | 0.99 |
+| goattracker | goattracker | 0.99 | 0.99 |
+| goattracker | furnace | 0.99 | 0.99 |
+| furnace | sidwave | 0.99 | 0.99 |
+| furnace | midi | 0.99 | 0.99 |
+| furnace | musicxml | 0.99 | 0.99 |
+| furnace | goattracker | 0.99 | 0.99 |
+| furnace | furnace | 0.99 | 0.99 |
+| sid | sidwave | 0.95 | 0.95 |
+| sid | midi | 0.95 | 0.95 |
+| sid | musicxml | 0.95 | 0.95 |
+| sid | goattracker | 0.95 | 0.95 |
+| sid | furnace | 0.95 | 0.95 |
+<!-- quality-thresholds:end -->
+
+The golden losses of every pair are in `test/fixtures/convert/golden-losses.json`. The file is generated by
+`scripts/regenerate-convert-golden.mjs`, never by hand. The binary fixtures are generated by
+`scripts/make-convert-fixtures.mjs` from the committed scores.
+
+### Adding a format
+
+Create `interchange/format<Name>.ts` that exports a `FormatDefinition` (`interchange/formatTypes.ts`): `id`,
+`extensions`, `magic(bytes)`, `caps`, a `detection` and `lossSummary` text, and `read` and/or `write` that wrap the
+format's importer and exporter (see `builtinFormats.ts` for the built-in ones). Then replace the placeholder comment
+of the format in `interchange/formatsExtra.ts` (one import and one array entry). Detection, `convert`, `formats`,
+`info` and the matrix pick it up. Add inputs to `test/helpers/convertMatrix.mjs`, a row per pair to the threshold
+table above, and run `scripts/regenerate-convert-golden.mjs`.

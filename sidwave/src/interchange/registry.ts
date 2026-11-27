@@ -8,7 +8,7 @@ import { extname } from "node:path";
 import { BUILTIN_FORMATS } from "./builtinFormats.js";
 import { EXTRA_FORMATS } from "./formatsExtra.js";
 import type { FormatCaps, FormatDefinition } from "./formatTypes.js";
-import { InterchangeUsageError } from "./errors.js";
+import { UsageError } from "../cliCore.js";
 
 export type { FormatDefinition, FormatCaps, ReadContext, ReadOutput, WriteContext, WriteOutput } from "./formatTypes.js";
 
@@ -54,7 +54,7 @@ export function findFormat(name: string): FormatDefinition | undefined {
 export function getFormat(name: string): FormatDefinition {
   const found = findFormat(name);
   if (!found) {
-    throw new InterchangeUsageError(`unknown format "${name}"; the formats are ${formats.map((f) => f.id).join(", ")} (run "sidwave formats")`);
+    throw new UsageError(`unknown format "${name}"; the formats are ${formats.map((f) => f.id).join(", ")} (run "sidwave formats")`);
   }
   return found;
 }
@@ -87,11 +87,11 @@ const MIN_MARGIN = 0.2;
  * equal ones; it never overrides a clear magic. Without any magic the extension alone gives confidence 0.5, which
  * `convert` treats as ambiguous.
  */
-export function detectFormat(bytes: Uint8Array, name?: string): Detection {
+export function detectFormat(bytes: Uint8Array, name?: string, definitions: readonly FormatDefinition[] = formats): Detection {
   const ext = name === undefined ? "" : extname(name).toLowerCase();
-  const byExtension = ext ? formatsForExtension(ext) : [];
+  const byExtension = ext ? definitions.filter((f) => f.extensions.includes(ext)) : [];
   const candidates: DetectionCandidate[] = [];
-  for (const f of formats) {
+  for (const f of definitions) {
     let confidence = f.magic(bytes);
     if (confidence <= 0) continue;
     let by: DetectionCandidate["by"] = "magic";
@@ -116,7 +116,7 @@ export function detectFormat(bytes: Uint8Array, name?: string): Detection {
   const warnings: string[] = [];
   const best = ambiguous ? undefined : candidates[0];
   if (best && best.by === "magic" && best.confidence >= CLEAR_MAGIC && name !== undefined && ext && byExtension.length > 0 && !byExtension.some((f) => f.id === best.id)) {
-    warnings.push(`${name} has the extension ${ext}, but its content is ${best.id} (${formats.find((f) => f.id === best.id)!.detection}); the content is used.`);
+    warnings.push(`${name} has the extension ${ext}, but its content is ${best.id} (${definitions.find((f) => f.id === best.id)!.detection}); the content is used.`);
   }
   return { ...(best ? { best } : {}), candidates, ambiguous, warnings };
 }
@@ -125,12 +125,12 @@ export function detectFormat(bytes: Uint8Array, name?: string): Detection {
 export function resolveTarget(to: string | undefined, outputName: string | undefined): FormatDefinition {
   if (to !== undefined) return getFormat(to);
   if (outputName === undefined || outputName === "-") {
-    throw new InterchangeUsageError(`name the target: --to <${formats.filter((f) => f.write).map((f) => f.id).join("|")}> or an output file with a known extension`);
+    throw new UsageError(`name the target: --to <${formats.filter((f) => f.write).map((f) => f.id).join("|")}> or an output file with a known extension`);
   }
   const ext = extname(outputName).toLowerCase();
-  const matches = formatsForExtension(ext).filter((f) => f.write);
+  const matches = formatsForExtension(ext).filter((f) => f.write && !f.readOnlyExtensions?.includes(ext));
   if (matches.length === 1) return matches[0]!;
   const any = formatsForExtension(ext);
-  if (any.length >= 1 && matches.length === 0) throw new InterchangeUsageError(`${outputName}: ${any[0]!.id} cannot be written; the target formats are ${formats.filter((f) => f.write).map((f) => f.id).join(", ")}`);
-  throw new InterchangeUsageError(`cannot tell the target format from "${outputName}"; pass --to <${formats.filter((f) => f.write).map((f) => f.id).join("|")}>`);
+  if (any.length >= 1 && matches.length === 0) throw new UsageError(`${outputName}: ${any[0]!.write ? `the extension ${ext} is read only (use ${any[0]!.extensions.find((e) => !any[0]!.readOnlyExtensions?.includes(e))})` : `${any[0]!.id} cannot be written`}; the target formats are ${formats.filter((f) => f.write).map((f) => f.id).join(", ")}`);
+  throw new UsageError(`cannot tell the target format from "${outputName}"; pass --to <${formats.filter((f) => f.write).map((f) => f.id).join("|")}>`);
 }

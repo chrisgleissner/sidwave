@@ -7,6 +7,7 @@ import { performance } from "node:perf_hooks";
 import type { SidEmulation, SidEngine } from "../engine/types.js";
 import { parseSidwave, type ParsedSidwave } from "../sidwave.js";
 import type { SidwaveReadOptions } from "../sidwavePcm.js";
+import { UsageError } from "../cliCore.js";
 import { InterchangeUsageError } from "./errors.js";
 import { exportEvents, type ExportedScore } from "./events.js";
 import { detectFormat, formatDefinitions, getFormat, resolveTarget, type Detection, type FormatDefinition } from "./registry.js";
@@ -62,7 +63,8 @@ export interface ConvertMetrics {
   fdiff?: { equal: boolean; differingCalls: number; comparedCalls: number };
 }
 
-export interface ConvertTimings { detectMs: number; readMs: number; parseMs: number; planMs: number; writeMs: number; verifyMs: number; totalMs: number; overheadMs: number }
+/** `eventsMs` is the event export that every exporter needs; the hub computes it once and hands it to the plan and the exporter, so it counts as a stage. */
+export interface ConvertTimings { detectMs: number; readMs: number; parseMs: number; eventsMs: number; planMs: number; writeMs: number; verifyMs: number; totalMs: number; overheadMs: number }
 
 export interface ConvertResult {
   from: string;
@@ -119,7 +121,7 @@ export async function convert(bytes: Uint8Array, options: ConvertOptions = {}): 
   const notices: string[] = [];
   const notice = (message: string): void => { notices.push(message); options.notice?.(message); };
   const target = resolveTarget(options.to, options.outputName);
-  if (!target.write) throw new InterchangeUsageError(`${target.id} cannot be written; the target formats are ${writable()}`);
+  if (!target.write) throw new UsageError(`${target.id} cannot be written; the target formats are ${writable()}`);
   const detectStart = now();
   const { format: source, detection, viaFrom } = inputFormat(bytes, options);
   const detectMs = now() - detectStart;
@@ -130,7 +132,8 @@ export async function convert(bytes: Uint8Array, options: ConvertOptions = {}): 
     throw new InterchangeUsageError(`the input and the output are both ${source.id}; nothing to convert`);
   }
   const songNumber = options.song;
-  if (songNumber !== undefined && (!Number.isInteger(songNumber) || songNumber < 1)) throw new InterchangeUsageError(`--song is 1-based; ${songNumber} is not a song number`);
+  if (songNumber !== undefined && (!Number.isInteger(songNumber) || songNumber < 1)) throw new UsageError(`--song is 1-based; ${songNumber} is not a song number`);
+  if (songNumber !== undefined && songNumber > 1 && !source.songs) throw new UsageError(`--song ${songNumber}: ${source.name} holds one song; --song is 1-based`);
 
   // Read.
   const readStart = now();
@@ -155,8 +158,10 @@ export async function convert(bytes: Uint8Array, options: ConvertOptions = {}): 
   }
 
   // Reduce to the target's capabilities.
-  const planStart = now();
+  const eventsStart = now();
   const events: ExportedScore = rangeToUsage(() => exportEvents(doc, { song: song0 }));
+  const eventsMs = now() - eventsStart;
+  const planStart = now();
   const plan = planScore(doc, target.caps, { song: song0, ...(options.voices === undefined ? {} : { voices: options.voices }) }, events);
   const planMs = now() - planStart;
 
@@ -194,8 +199,8 @@ export async function convert(bytes: Uint8Array, options: ConvertOptions = {}): 
     plan: { voices: plan.voices, dropped: plan.dropped, summary: plan.summary },
     reports: { ...(read.report === undefined ? {} : { read: read.report }), ...(written.report === undefined ? {} : { write: written.report }) },
     timings: {
-      detectMs: round(detectMs), readMs: round(readMs), parseMs: round(parseMs), planMs: round(planMs), writeMs: round(writeMs), verifyMs: round(verifyMs), totalMs: round(totalMs),
-      overheadMs: round(totalMs - readMs - parseMs - writeMs - verifyMs),
+      detectMs: round(detectMs), readMs: round(readMs), parseMs: round(parseMs), eventsMs: round(eventsMs), planMs: round(planMs), writeMs: round(writeMs), verifyMs: round(verifyMs), totalMs: round(totalMs),
+      overheadMs: round(totalMs - readMs - parseMs - eventsMs - writeMs - verifyMs),
     },
     defaults: defaultsOf(options, source, target),
   };

@@ -66,6 +66,8 @@ export interface FormatDefinition {
   name: string;
   /** Lower-case extensions with the dot; the first one is the default of an output file. */
   extensions: string[];
+  /** Extensions that are recognised on input but never chosen for an output (a compressed variant the writer does not produce). */
+  readOnlyExtensions?: string[];
   /** Names accepted by `--from` and `--to` besides the id. */
   aliases?: string[];
   /** Confidence 0..1 that `bytes` are this format, from the content only. 0 means not this format. */
@@ -76,6 +78,8 @@ export interface FormatDefinition {
   /** One sentence on what the format loses when it is the target (or the source). */
   lossSummary: string;
   read?(bytes: Uint8Array, ctx: ReadContext): ReadOutput | Promise<ReadOutput>;
+  /** The format holds several songs and `--song` selects one when it is the source. */
+  songs?: boolean;
   /** Source is a recovered approximation and slow (needs the engine). */
   readIsApproximate?: boolean;
   write?(ctx: WriteContext): WriteOutput | Promise<WriteOutput>;

@@ -88,13 +88,13 @@ export function planScore(doc: ParsedSidwave, caps: TargetCaps, options: PlanOpt
   });
   const limits = [caps.maxVoices, options.voices].filter((n): n is number => n !== undefined);
   const limit = limits.length ? Math.min(...limits) : Infinity;
-  let exportOptions: EventExportOptions = { song };
+  let exportOptions: EventExportOptions = { song, source: score };
   const dropped: number[] = [];
   if (ranked.length > limit) {
     const order = [...ranked].sort((a, b) => b.weight - a.weight || ranked.indexOf(a) - ranked.indexOf(b));
     for (const v of order.slice(limit)) { v.kept = false; dropped.push(v.id); }
     const keep = ranked.filter((v) => v.kept).map((v) => v.id);
-    exportOptions = { song, voiceIds: keep };
+    exportOptions = { song, source: score, voiceIds: keep };
     const lostNotes = ranked.filter((v) => !v.kept).reduce((sum, v) => sum + v.notes, 0);
     losses.push({
       stage: "plan", code: "voices.dropped", severity: "lost", count: dropped.length, where: dropped.map((id) => `v${id}`).join(","),
@@ -102,7 +102,7 @@ export function planScore(doc: ParsedSidwave, caps: TargetCaps, options: PlanOpt
     });
   } else if (caps.maxVoices !== undefined || options.voices !== undefined) {
     // The exporter takes the first voices of the first SID unless it is told which voices to write.
-    exportOptions = { song, voiceIds: ranked.map((v) => v.id) };
+    exportOptions = { song, source: score, voiceIds: ranked.map((v) => v.id) };
   }
 
   const ramps = view.timeline.some((section) => typeof (section as { tempo?: unknown }).tempo === "object");

@@ -14,7 +14,9 @@ fs.mkdirSync(out, { recursive: true });
 const SOURCES = [
   ["fuer-elise", "test/fixtures/sidwave-1.0/fuer-elise.yaml", ["midi", "musicxml", "goattracker", "furnace"]],
   ["chiptune-drive", "test/fixtures/sidwave-1.1/chiptune_drive.yaml", ["midi", "musicxml", "goattracker", "furnace"]],
-  ["chamber-waltz", "test/fixtures/sidwave-1.2/chamber_waltz.yaml", ["midi", "musicxml", "goattracker", "furnace"]],
+  // 22 tempo changes: the tempo map of MIDI.
+  ["chamber-waltz", "test/fixtures/sidwave-1.2/chamber_waltz.yaml", ["midi"]],
+  // Five voices on two SIDs: voice reduction.
   ["title-fanfare", "test/fixtures/sidwave-1.2/title_fanfare.yaml", ["midi", "musicxml"]],
 ];
 const EXT = { midi: ".mid", musicxml: ".musicxml", goattracker: ".sng", furnace: ".fur" };

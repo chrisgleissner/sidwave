@@ -1,0 +1,4954 @@
+{
+ "sidwave:fuer-elise -> sidwave": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwave:fuer-elise -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "sidwave:fuer-elise -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "sidwave:fuer-elise -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:fuer-elise -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:fuer-elise -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "sidwave:fuer-elise -> sid": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwave:fuer-elise -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sidwave:fuer-elise -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> sidwave": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwave:chiptune-drive -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 20,
+    "message": "18 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 20,
+    "message": "18 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "timing.multispeed",
+    "severity": "approx",
+    "count": 1,
+    "message": "The score calls its player 2 times per frame (multispeed); GoatTracker plays one call per frame, so note times are rounded to frames."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 18,
+    "message": "18 glides and portamento notes are exported as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "timing.multispeed",
+    "severity": "approx",
+    "count": 1,
+    "message": "The score calls its player 2 times per frame (multispeed); the module plays one tick per frame, so note times are rounded to frames."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> sid": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwave:chiptune-drive -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 20,
+    "message": "18 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "0 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "0 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 21,
+    "message": "21 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps cannot be stored; the notes keep their times but not the tempo curve."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 21,
+    "message": "21 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps cannot be stored; the notes keep their times but not the tempo curve."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "0 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sidwave:title-fanfare -> sidwave": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwave:title-fanfare -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "0 glides and 4 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "Some drum instruments have no General MIDI equivalent by name and play as acoustic snare (key 38)."
+   }
+  ]
+ },
+ "sidwave:title-fanfare -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "0 glides and 4 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 2,
+    "message": "A note that crosses a bar line is written as tied notes. | Some drum instruments have no General MIDI equivalent by name and are written as acoustic snare (key 38)."
+   }
+  ]
+ },
+ "sidwave:title-fanfare -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "where": "v4,v3",
+    "message": "2 voices dropped to fit 3 voices (22 notes): kept v1, v2, v5, ranked by notes x pitch range."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:title-fanfare -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "where": "v4,v3",
+    "message": "2 voices dropped to fit 3 voices (22 notes): kept v1, v2, v5, ranked by notes x pitch range."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:title-fanfare -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "sidwave:title-fanfare -> sid": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwave:title-fanfare -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "0 glides and 4 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sidwave:digi-groove -> sidwave": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwave:digi-groove -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 26,
+    "message": "24 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "samples.digi",
+    "severity": "lost",
+    "count": 1,
+    "message": "Digi sample playback (CIA2 NMI samples) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "sidwave:digi-groove -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 26,
+    "message": "24 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "samples.digi",
+    "severity": "lost",
+    "count": 1,
+    "message": "Digi sample playback (CIA2 NMI samples) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "sidwave:digi-groove -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "samples.digi",
+    "severity": "lost",
+    "count": 1,
+    "message": "Digi sample playback (CIA2 NMI samples) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 24,
+    "message": "24 glides and portamento notes are exported as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:digi-groove -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "samples.digi",
+    "severity": "lost",
+    "count": 1,
+    "message": "Digi sample playback (CIA2 NMI samples) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:digi-groove -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "CIA2 digi playback reserves up to 9764 CPU cycles per player call and temporarily replaces the sample SID's master volume."
+   }
+  ]
+ },
+ "sidwave:digi-groove -> sid": {
+  "ok": false,
+  "category": "validation",
+  "message": "Invalid SIDWAVE at $.samples: CIA2 NMI digi samples require standalone PRG output"
+ },
+ "sidwave:digi-groove -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 26,
+    "message": "24 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "samples.digi",
+    "severity": "lost",
+    "count": 1,
+    "message": "Digi sample playback (CIA2 NMI samples) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "midi:fuer-elise -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   }
+  ]
+ },
+ "midi:fuer-elise -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "midi:fuer-elise -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "midi:fuer-elise -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:fuer-elise -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:fuer-elise -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 2,
+    "message": "FLAT: Estimated loudness varies by 0.4 dB; set section level or volume to build and release (at bar 1) | TEMPO-GRID: A sixteenth lasts 9.89 calls; use tempo 83.54 or 75.19 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "midi:fuer-elise -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 2,
+    "message": "FLAT: Estimated loudness varies by 0.4 dB; set section level or volume to build and release (at bar 1) | TEMPO-GRID: A sixteenth lasts 9.89 calls; use tempo 83.54 or 75.19 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "midi:fuer-elise -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "midi:fuer-elise -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ },
+ "midi:chiptune-drive -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   }
+  ]
+ },
+ "midi:chiptune-drive -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "midi:chiptune-drive -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "midi:chiptune-drive -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:chiptune-drive -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:chiptune-drive -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 3,
+    "message": "FLAT: Estimated loudness varies by 1.2 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1) | TEMPO-GRID: A sixteenth lasts 5.70 calls; use tempo 150.37 or 125.31 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "midi:chiptune-drive -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 3,
+    "message": "FLAT: Estimated loudness varies by 1.2 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1) | TEMPO-GRID: A sixteenth lasts 5.70 calls; use tempo 150.37 or 125.31 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "midi:chiptune-drive -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "midi:chamber-waltz -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   }
+  ]
+ },
+ "midi:chamber-waltz -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "midi:chamber-waltz -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "midi:chamber-waltz -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 6,
+    "message": "6 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:chamber-waltz -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 6,
+    "message": "6 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:chamber-waltz -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 1,
+    "message": "TEMPO-GRID: A sixteenth lasts 5.07 calls; use tempo 150.37 or 125.31 for an exact grid (6 times, first at entry 27)"
+   }
+  ]
+ },
+ "midi:chamber-waltz -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 1,
+    "message": "TEMPO-GRID: A sixteenth lasts 5.07 calls; use tempo 150.37 or 125.31 for an exact grid (6 times, first at entry 27)"
+   }
+  ]
+ },
+ "midi:chamber-waltz -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "midi:title-fanfare -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   }
+  ]
+ },
+ "midi:title-fanfare -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "midi:title-fanfare -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "midi:title-fanfare -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:title-fanfare -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:title-fanfare -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 2,
+    "message": "TABLE-CUT: A wavetable needs 6 frames but only 4 are available before the next attack or the note end; lengthen the note or shorten the table (at bar 4 v3) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (2 times, first at bar 2)"
+   }
+  ]
+ },
+ "midi:title-fanfare -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 2,
+    "message": "TABLE-CUT: A wavetable needs 6 frames but only 4 are available before the next attack or the note end; lengthen the note or shorten the table (at bar 4 v3) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (2 times, first at bar 2)"
+   }
+  ]
+ },
+ "midi:title-fanfare -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "musicxml:fuer-elise -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   }
+  ]
+ },
+ "musicxml:fuer-elise -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "musicxml:fuer-elise -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "musicxml:fuer-elise -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "musicxml:fuer-elise -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "musicxml:fuer-elise -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 2,
+    "message": "FLAT: Estimated loudness varies by 0.4 dB; set section level or volume to build and release (at bar 1) | TEMPO-GRID: A sixteenth lasts 9.89 calls; use tempo 83.54 or 75.19 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "musicxml:fuer-elise -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 2,
+    "message": "FLAT: Estimated loudness varies by 0.4 dB; set section level or volume to build and release (at bar 1) | TEMPO-GRID: A sixteenth lasts 9.89 calls; use tempo 83.54 or 75.19 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "musicxml:fuer-elise -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "musicxml:fuer-elise -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ },
+ "musicxml:chiptune-drive -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   }
+  ]
+ },
+ "musicxml:chiptune-drive -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "musicxml:chiptune-drive -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "musicxml:chiptune-drive -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "musicxml:chiptune-drive -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "musicxml:chiptune-drive -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 3,
+    "message": "FLAT: Estimated loudness varies by 1.1 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1) | TEMPO-GRID: A sixteenth lasts 5.70 calls; use tempo 150.37 or 125.31 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "musicxml:chiptune-drive -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 3,
+    "message": "FLAT: Estimated loudness varies by 1.1 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1) | TEMPO-GRID: A sixteenth lasts 5.70 calls; use tempo 150.37 or 125.31 for an exact grid (at song tempo)"
+   }
+  ]
+ },
+ "musicxml:chiptune-drive -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 3,
+    "message": "TABLE-CUT: A wavetable needs 6 frames but only 4 are available before the next attack or the note end; lengthen the note or shorten the table (at bar 4 v3) | FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (2 times, first at bar 2)"
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 3,
+    "message": "TABLE-CUT: A wavetable needs 6 frames but only 4 are available before the next attack or the note end; lengthen the note or shorten the table (at bar 4 v3) | FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (2 times, first at bar 2)"
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "2 part(s) do not fit in 3 voices and are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "expression.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "goattracker:fuer-elise -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   }
+  ]
+ },
+ "goattracker:fuer-elise -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "goattracker:fuer-elise -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "goattracker:fuer-elise -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "goattracker:fuer-elise -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "goattracker:fuer-elise -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "goattracker:fuer-elise -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   }
+  ]
+ },
+ "goattracker:fuer-elise -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "goattracker:fuer-elise -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ },
+ "goattracker:chiptune-drive -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   }
+  ]
+ },
+ "goattracker:chiptune-drive -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "goattracker:chiptune-drive -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "goattracker:chiptune-drive -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "goattracker:chiptune-drive -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "goattracker:chiptune-drive -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 1,
+    "message": "FLAT: Estimated loudness varies by 2.8 dB; set section level or volume to build and release (at bar 1)"
+   }
+  ]
+ },
+ "goattracker:chiptune-drive -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 1,
+    "message": "FLAT: Estimated loudness varies by 2.8 dB; set section level or volume to build and release (at bar 1)"
+   }
+  ]
+ },
+ "goattracker:chiptune-drive -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "furnace:fuer-elise -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   }
+  ]
+ },
+ "furnace:fuer-elise -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "furnace:fuer-elise -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "furnace:fuer-elise -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "furnace:fuer-elise -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "furnace:fuer-elise -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "furnace:fuer-elise -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   }
+  ]
+ },
+ "furnace:fuer-elise -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "furnace:fuer-elise -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ },
+ "furnace:chiptune-drive -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 7: ring modulation and hard sync flags are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   }
+  ]
+ },
+ "furnace:chiptune-drive -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 7: ring modulation and hard sync flags are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "furnace:chiptune-drive -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 7: ring modulation and hard sync flags are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "furnace:chiptune-drive -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 7: ring modulation and hard sync flags are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "furnace:chiptune-drive -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 7: ring modulation and hard sync flags are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "furnace:chiptune-drive -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 7: ring modulation and hard sync flags are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 1,
+    "message": "FLAT: Estimated loudness varies by 2.8 dB; set section level or volume to build and release (at bar 1)"
+   }
+  ]
+ },
+ "furnace:chiptune-drive -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 7: ring modulation and hard sync flags are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 1,
+    "message": "FLAT: Estimated loudness varies by 2.8 dB; set section level or volume to build and release (at bar 1)"
+   }
+  ]
+ },
+ "furnace:chiptune-drive -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 7: ring modulation and hard sync flags are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "goattracker:hand-authored -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   }
+  ]
+ },
+ "goattracker:hand-authored -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "goattracker:hand-authored -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "goattracker:hand-authored -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "goattracker:hand-authored -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "goattracker:hand-authored -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 1,
+    "message": "HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1)"
+   }
+  ]
+ },
+ "goattracker:hand-authored -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "note",
+    "severity": "info",
+    "count": 1,
+    "message": "HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1)"
+   }
+  ]
+ },
+ "goattracker:hand-authored -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "furnace:hand-authored -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   }
+  ]
+ },
+ "furnace:hand-authored -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "furnace:hand-authored -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "furnace:hand-authored -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "furnace:hand-authored -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "furnace:hand-authored -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "furnace:hand-authored -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   }
+  ]
+ },
+ "furnace:hand-authored -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "read",
+    "code": "volume.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sid:fuer-elise -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 201,
+    "message": "Only the first 4 s (201 player calls) of subtune 1 were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 614,
+    "message": "The recovered score differs from the tune in 614 of 200 compared player calls (F-diff)."
+   }
+  ]
+ },
+ "sid:fuer-elise -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 201,
+    "message": "Only the first 4 s (201 player calls) of subtune 1 were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 614,
+    "message": "The recovered score differs from the tune in 614 of 200 compared player calls (F-diff)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "sid:fuer-elise -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 201,
+    "message": "Only the first 4 s (201 player calls) of subtune 1 were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 614,
+    "message": "The recovered score differs from the tune in 614 of 200 compared player calls (F-diff)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "sid:fuer-elise -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 201,
+    "message": "Only the first 4 s (201 player calls) of subtune 1 were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 614,
+    "message": "The recovered score differs from the tune in 614 of 200 compared player calls (F-diff)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sid:fuer-elise -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 201,
+    "message": "Only the first 4 s (201 player calls) of subtune 1 were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 614,
+    "message": "The recovered score differs from the tune in 614 of 200 compared player calls (F-diff)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sid:fuer-elise -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 201,
+    "message": "Only the first 4 s (201 player calls) of subtune 1 were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 614,
+    "message": "The recovered score differs from the tune in 614 of 200 compared player calls (F-diff)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "sid:fuer-elise -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 201,
+    "message": "Only the first 4 s (201 player calls) of subtune 1 were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 614,
+    "message": "The recovered score differs from the tune in 614 of 200 compared player calls (F-diff)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sid:fuer-elise -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 51,
+    "message": "Only the first 1 s (51 player calls) of subtune 1 were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 164,
+    "message": "The recovered score differs from the tune in 164 of 50 compared player calls (F-diff)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ }
+}

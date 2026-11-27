@@ -60,7 +60,7 @@ function rangeToUsage<T>(fn: () => T): T {
 const SIDWAVE_TEXT = /^[ \t]*["']?sidwave["']?[ \t]*:/m;
 
 export const SIDWAVE_SCORE: FormatDefinition = {
-  id: "sidwave", name: "SIDWave score", extensions: [".yaml", ".yml", ".sidwave"], aliases: ["score", "yaml", "yml"],
+  songs: true, id: "sidwave", name: "SIDWave score", extensions: [".yaml", ".yml", ".sidwave"], aliases: ["score", "yaml", "yml"],
   magic: (bytes) => {
     const text = head(bytes, 8192);
     if (SIDWAVE_TEXT.test(text)) return 1;
@@ -104,7 +104,7 @@ export const MIDI: FormatDefinition = {
 };
 
 export const MUSICXML: FormatDefinition = {
-  id: "musicxml", name: "MusicXML", extensions: [".musicxml", ".xml", ".mxl"], aliases: ["xml"],
+  id: "musicxml", name: "MusicXML", extensions: [".musicxml", ".xml", ".mxl"], readOnlyExtensions: [".mxl"], aliases: ["xml"],
   magic: (bytes) => {
     const text = head(bytes, 4096);
     if (/<score-(partwise|timewise)\b/.test(text)) return 1;
@@ -127,7 +127,7 @@ export const MUSICXML: FormatDefinition = {
 };
 
 export const GOATTRACKER: FormatDefinition = {
-  id: "goattracker", name: "GoatTracker song", extensions: [".sng"], aliases: ["gt", "gt2", "goat", "sng"],
+  songs: true, id: "goattracker", name: "GoatTracker song", extensions: [".sng"], aliases: ["gt", "gt2", "goat", "sng"],
   magic: (bytes) => (["GTS!", "GTS2", "GTS3", "GTS4", "GTS5"].includes(head(bytes, 4)) ? 1 : 0),
   detection: "the magic GTS!, GTS2, GTS3, GTS4 or GTS5",
   caps: { kind: "tracker", maxVoices: 3, tempo: "grid", instruments: "native", expression: "partial", loop: false, metadata: true },
@@ -203,7 +203,7 @@ export const PRG: FormatDefinition = {
 };
 
 export const SID: FormatDefinition = {
-  id: "sid", name: "PSID/RSID tune", extensions: [".sid"], aliases: ["psid", "rsid"],
+  songs: true, id: "sid", name: "PSID/RSID tune", extensions: [".sid"], aliases: ["psid", "rsid"],
   magic: (bytes) => ((startsWith(bytes, "PSID") || startsWith(bytes, "RSID")) && bytes.length >= 0x76 ? 1 : 0),
   detection: "the magic PSID or RSID",
   caps: { kind: "program", tempo: "exact", instruments: "native", expression: "exact", loop: true, metadata: true },
@@ -215,7 +215,15 @@ export const SID: FormatDefinition = {
     if (song < 1 || song > header.songs) throw new InterchangeUsageError(`--song ${song} is outside 1..${header.songs}, the subtunes of ${ctx.name}`);
     ctx.notice?.("Reading a .sid recovers the score by tracing the tune; the result is approximate and slower than other formats.");
     const engine = ctx.createEngine ? ctx.createEngine("sidlite") : createLibsidplayfpEngine({ emulation: "sidlite" });
-    const { score, report } = await reconstructSid(bytes, { engine, song, ...(ctx.seconds === undefined ? {} : { seconds: ctx.seconds }), ...(ctx.title === undefined ? {} : { title: ctx.title }) });
+    let recovered;
+    try {
+      recovered = await reconstructSid(bytes, { engine, song, ...(ctx.seconds === undefined ? {} : { seconds: ctx.seconds }), ...(ctx.title === undefined ? {} : { title: ctx.title }) });
+    } catch (error) {
+      // recoverScore reports a tune without enough player calls with a plain Error; that is a property of the input.
+      if (error instanceof Error && error.constructor === Error) throw new InterchangeUsageError(`cannot recover a score from ${ctx.name}: ${error.message}`);
+      throw error;
+    }
+    const { score, report } = recovered;
     const losses: Loss[] = [
       { stage: "read", code: "reconstruct.horizon", severity: "approx", count: report.horizon.calls, message: `Only the first ${report.horizon.seconds} s (${report.horizon.calls} player calls) of subtune ${song} were analysed.` },
     ];

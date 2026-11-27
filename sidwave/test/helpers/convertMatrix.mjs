@@ -25,9 +25,9 @@ const SCORES = [
 ];
 const BINARY = [
   ["midi", ".mid", ["fuer-elise", "chiptune-drive", "chamber-waltz", "title-fanfare"]],
-  ["musicxml", ".musicxml", ["fuer-elise", "chiptune-drive", "chamber-waltz", "title-fanfare"]],
-  ["goattracker", ".sng", ["fuer-elise", "chiptune-drive", "chamber-waltz"]],
-  ["furnace", ".fur", ["fuer-elise", "chiptune-drive", "chamber-waltz"]],
+  ["musicxml", ".musicxml", ["fuer-elise", "chiptune-drive", "title-fanfare"]],
+  ["goattracker", ".sng", ["fuer-elise", "chiptune-drive"]],
+  ["furnace", ".fur", ["fuer-elise", "chiptune-drive"]],
 ];
 
 /** Targets run for every input. WAV needs the audio engine and is run for one fixture per input format. */

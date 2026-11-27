@@ -111,6 +111,11 @@ export interface EventExportOptions {
    * ranked the voices for a target with a voice limit. Default: all voices.
    */
   voiceIds?: readonly number[];
+  /**
+   * The event export of this song at the same `ppq`, already computed by the caller (the convert hub computes it once
+   * for the plan and the exporter). It is returned instead of a new export, restricted to `voiceIds` when given.
+   */
+  source?: ExportedScore;
 }
 
 const round6 = (value: number): number => Math.round(value * 1e6) / 1e6;
@@ -186,6 +191,25 @@ function velocityOf(note: ArrangedNote, inst: Instrument): { velocity: number; b
 
 /** Exports one song of a parsed score as a structured event list. */
 export function exportEvents(doc: ParsedSidwave, options: EventExportOptions = {}): ExportedScore {
+  const { source, voiceIds, ...rest } = options;
+  const base = source && (rest.ppq === undefined || rest.ppq === source.ppq) ? source : buildEvents(doc, rest);
+  return voiceIds === undefined ? base : selectVoices(base, voiceIds);
+}
+
+/** The export restricted to the listed declared voice ids; voices and notes are renumbered, the other fields are shared. */
+export function selectVoices(score: ExportedScore, voiceIds: readonly number[]): ExportedScore {
+  const keep = new Set(voiceIds);
+  const remap = new Map<number, number>();
+  const voices = score.voices.filter((v) => keep.has(v.id)).map((v, i) => {
+    remap.set(v.index, i);
+    return { ...v, index: i, notes: v.notes.map((n) => ({ ...n, voice: i })) };
+  });
+  const events = score.events.filter((e) => !("voice" in e) || remap.has(e.voice)).map((e) => ("voice" in e ? { ...e, voice: remap.get(e.voice)! } : e));
+  const used = new Set(voices.flatMap((v) => v.notes.map((n) => n.instrument)));
+  return { ...score, voices, events, instruments: score.instruments.filter((i) => used.has(i.index)) };
+}
+
+function buildEvents(doc: ParsedSidwave, options: EventExportOptions): ExportedScore {
   const ppq = options.ppq ?? DEFAULT_PPQ;
   if (!Number.isInteger(ppq) || ppq < 24 || ppq > 9600) throw new RangeError("ppq must be an integer from 24 to 9600");
   const song = options.song ?? 0;
@@ -268,9 +292,7 @@ export function exportEvents(doc: ParsedSidwave, options: EventExportOptions = {
   let hidden = 0;
   let nextId = 0;
   const mirrorTargets = new Set((arr.mirrors ?? []).map(([, target]) => target));
-  const wanted = options.voiceIds === undefined ? undefined : new Set(options.voiceIds);
   for (const voice of doc.voices) {
-    if (wanted && !wanted.has(voice.id)) continue;
     const slot = doc.voiceSlots.get(voice.id)!;
     if (mirrorTargets.has(slot)) continue;
     const arranged = arr.voices[slot];

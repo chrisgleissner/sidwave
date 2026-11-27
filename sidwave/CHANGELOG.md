@@ -8,6 +8,10 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 
 - SID-Wizard files: `sidwave import` reads `.swm`, `.sws` and `.swi` (`--subtune`), `sidwave export --format swm` writes a module for the expressible subset and `--format swi --instrument` an instrument file. Library: `parseSwm`, `writeSwm`, `parseSwi`, `writeSwi`, `importSwm`, `importSwi`, `exportSwm`, `exportSwi`. Mappings, losses and the comparison with the SID-Wizard player are in `doc/interchange.md`.
 - `sidwave reconstruct <trace> --from vice-dump|siddump` recovers a score from a VICE `-sounddev dump` text (exact register writes) or a siddump table (approximate, one row per frame), and `sidwave export <score> --format vice-dump` writes the SID writes of a compiled score in the VICE dump text format. Library: `parseViceDump`, `parseSiddump`, `exportViceDump`, `reconstructFromTrace`.
+
+- Added `sidwave convert <in> [<out>]`: converts between SIDWave scores, MIDI, MusicXML, GoatTracker, Furnace, PRG, PSID, WAV and the event list in one step. The input format is detected from the content. The report lists every loss with a code, a severity and a count; `--strict`, `--dry-run`, `--verify` (note F1, onset error, octave shifts, voices dropped), `--keep-score`, `--report` and `--voices` are available. A `.sid` input is read by reconstruct.
+- Added `sidwave formats` and `sidwave info <file>`, and `convert()`, `detectFormat()` and `listFormats()` at the package root. A format registry (`interchange/registry.ts`) makes a new format a one-file addition (`interchange/formatsExtra.ts`).
+- Added the conversion test matrix: every importer and exporter pair on committed fixtures, with golden losses, per-pair quality thresholds in `doc/interchange.md`, typed errors for truncated and corrupted files, and a chain-equals-two-step identity check.
 - Added `sidwave/retarget` and `sidwave retarget`: convert a score between PAL and NTSC, 6581 and 8580, and SID counts. Every change is reported as exact, approximate or dropped with measured numbers (timing per event kind, filter cutoff deviation, voices kept and dropped).
 - `sidwave retarget` accepts `--budget-bytes`, `--budget-cycles` and `--allow-changes`: music-preserving steps run first and are checked on the register trace, lossy steps only on request, and a budget that cannot be met gives exit 1 with the best numbers reached.
 - npm package `sidwave`: language, parser, lint, compiler to PRG and PSID, generator, examples and the `sidwave` command. It is extracted from c64bridge with the history of the moved files. It is not published yet.
@@ -33,6 +37,8 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 
 ### Changed
 
+- GoatTracker and Furnace export count time in video frames. A score with `speed: 2` or more was written at twice the intended tempo; the multispeed rounding is now reported as `timing.multispeed`.
+- MIDI and MusicXML export write drum hits that share a voice with pitched notes as pitched notes at their written pitch, so that the voice is not read back as a drum voice that drops its pitched notes.
 - Breaking (command line): an invalid score or unreadable input exits 3 (was 1 or 2), an unwritable output exits 3 (was 2), a failed verdict is the only exit 1; `--json` prints `{ ok, command, result | error: { category, message, details } }`; the engine yields to the event loop while rendering.
 
 - Licence: GPL-2.0-or-later with the SIDWave Player Exception (`LICENSE-EXCEPTION.md`), replacing GPL-2.0-only.
