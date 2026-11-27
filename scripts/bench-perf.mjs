@@ -125,6 +125,33 @@ for (const name of names) {
   void parsed;
 }
 
+// ---- HVSC tools: Songlengths files, STIL, header editor, SIDId -------------------------------------------------
+{
+  const { writeSonglengthsEntry, songlengthsKey } = sw;
+  const songlengths = ["[Database]"];
+  for (let i = 0; i < 60000; i++) {
+    songlengths.push(`; /MUSICIANS/${String.fromCharCode(65 + (i % 26))}/Artist_${i % 500}/Tune_${i}.sid`);
+    songlengths.push(`${(Math.imul(i, 2654435761) >>> 0).toString(16).padStart(8, "0")}${(Math.imul(i, 40503) >>> 0).toString(16).padStart(8, "0")}${"0".repeat(16)}=${i % 9}:${String(i % 60).padStart(2, "0")}${i % 4 === 0 ? `.${(i * 7) % 1000}` : ""}`);
+  }
+  const songlengthsText = `${songlengths.join("\r\n")}\r\n`;
+  measure("hvsc/songlengthsScan120kLines", () => sw.parseSonglengths(songlengthsText), { warmRuns: 3 });
+  measure("hvsc/songlengthsWrite60k", () => writeSonglengthsEntry(songlengthsText, { md5: "f".repeat(32), durations: [1000], path: "/MUSICIANS/M/Artist_1/Mid.sid" }), { warmRuns: 3 });
+  const stil = ["#  STIL v83", ""];
+  for (let i = 0; i < 18000; i++) stil.push(`/MUSICIANS/${String.fromCharCode(65 + (i % 26))}/Artist_${i % 500}/Tune_${i}.sid`, "(#1)", `   NAME: Tune ${i}`, `  TITLE: Title ${i} [from Album] (0:00-1:30)`, " ARTIST: Some Artist", "");
+  const stilText = `${stil.join("\r\n")}\r\n`;
+  measure("hvsc/stilParse18k", () => sw.parseStil(stilText), { warmRuns: 3 });
+  const stilDb = sw.parseStil(stilText);
+  measure("hvsc/stilQuery", () => sw.queryStil(stilDb, "/MUSICIANS/C/Artist_2/Tune_2.sid"));
+  const payload = Uint8Array.from({ length: 20000 }, (_, i) => (Math.imul(i, 2654435761) >>> 24) & 0xff);
+  const sid = sw.writeSidFile({ magic: "PSID", version: 2, loadAddress: 0x1000, initAddress: 0x1000, playAddress: 0x1003, songs: 3, startSong: 1, speed: 0, name: "n", author: "a", released: "r", payload });
+  measure("hvsc/sidEdit", () => sw.editSidHeader(sid, { author: "Another Author", clock: "PAL" }));
+  measure("hvsc/songlengthsKey", () => songlengthsKey(sid, "md5"));
+  const cfg = [];
+  for (let i = 0; i < 750; i++) cfg.push(`Player_${i}`, `${(i * 7 % 256).toString(16).padStart(2, "0")} ${(i * 13 % 256).toString(16).padStart(2, "0")} ?? A9 ${(i % 200).toString(16).padStart(2, "0")} 8D 18 D4 END`);
+  const sididDb = sw.parseSidIdConfig(`${cfg.join("\r\n")}\r\n`);
+  measure("hvsc/sididIdentify", () => sw.identifyPlayerInData(payload, sididDb, { all: true }));
+}
+
 // ---- traces, IR, F-diff ---------------------------------------------------------------------------------------
 function syntheticTrace(seconds, seed = 1) {
   const frames = Math.floor(seconds * 50);

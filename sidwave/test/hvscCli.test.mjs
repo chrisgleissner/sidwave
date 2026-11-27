@@ -378,3 +378,29 @@ test("sid player needs a signature file, reads it from --sidid or SIDID_CFG, and
     assert.match((await run(root, ["sid", "player", "noplayer.sid", "--sidid", "sig.cfg"])).out, /no player identified/);
   } finally { done(); }
 });
+
+const HVSC = process.env.HVSC_ROOT ?? process.env.HVSC_DIR ?? "/home/chris/dev/c64/C64Music";
+const hvscPresent = fs.existsSync(path.join(HVSC, "DOCUMENTS", "Songlengths.md5")) && fs.existsSync(path.join(HVSC, "DOCUMENTS", "STIL.txt"));
+
+test("HVSC (local only): sid info over the whole collection with Songlengths and STIL, and the Songlengths file verifies", { skip: hvscPresent ? false : `no HVSC at ${HVSC}` }, async () => {
+  const started = Date.now();
+  const before = process.cpuUsage();
+  const info = await run(os.tmpdir(), ["sid", "info", HVSC, "--json"], { HVSC_ROOT: undefined });
+  const cpu = process.cpuUsage(before);
+  const seconds = (Date.now() - started) / 1000;
+  const lines = info.out.trim().split("\n");
+  const failed = lines.filter((l) => l.startsWith('{"file":') && l.includes('"error"'));
+  const withLengths = lines.filter((l) => l.includes('"songlengths":[')).length;
+  const withStil = lines.filter((l) => l.includes('"stil":{')).length;
+  console.log(`HVSC sid info: ${lines.length} files, ${failed.length} failed, ${withLengths} with Songlengths, ${withStil} with STIL, ${seconds.toFixed(1)} s wall, ${((cpu.user + cpu.system) / 1e6).toFixed(1)} s CPU`);
+  assert.equal(info.code, EXIT_OK);
+  assert.ok(lines.length > 50000);
+  assert.equal(failed.length, 0);
+  assert.ok(withLengths > 50000 && withStil > 10000);
+  assert.ok(seconds < 120, `${seconds} s`);
+  const verify = await run(os.tmpdir(), ["songlengths", "verify", path.join(HVSC, "DOCUMENTS/Songlengths.md5"), HVSC, "--unlisted", "--json"]);
+  const result = JSON.parse(verify.out).result;
+  console.log(`HVSC songlengths verify: ${result.entries} entries, ${result.ok} ok, ${result.problems} problems, ${result.unlistedFiles.length} unlisted`);
+  assert.equal(verify.code, EXIT_OK);
+  assert.equal(result.ok, result.entries);
+});

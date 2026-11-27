@@ -30,7 +30,7 @@ writeFileSync("song.sid", sid);
 
 ## SID files
 
-`sidwave/sid-file` reads and writes PSID and RSID files (versions 1 to 4): `parseSidFile`, `writeSidFile`, `subtunes`, `songSpeed`, `effectiveInitAddress` and `md5ForSonglengths`. Invalid input throws `SidFileError` with a `code`. `sidwave/songlengths` parses the HVSC Songlengths database: `parseSonglengths`, `parseSonglengthsWithPaths`, `parseDuration` and `lookupSonglength`. Both are also exported from the package root.
+`sidwave/sid-file` reads and writes PSID and RSID files (versions 1 to 4): `parseSidFile`, `writeSidFile`, `subtunes`, `songSpeed`, `effectiveInitAddress` and `md5ForSonglengths`. Invalid input throws `SidFileError` with a `code`. `sidwave/songlengths` parses the HVSC Songlengths database: `parseSonglengths`, `parseSonglengthsWithPaths`, `parseDuration` and `lookupSonglength`. Both are also exported from the package root. `sidwave/hvsc` has the header editor (`editSidHeader`), the Songlengths writer and verifier, the STIL parser and the SIDId matcher; see [doc/hvsc.md](doc/hvsc.md).
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -54,7 +54,9 @@ sidwave verify   <reference.sid|score> <candidate.sid|score> [--song <n>] [--sec
 sidwave render   <file.sid|score> [-o <out.wav>] [--song <n>] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite]
 sidwave trace    <file.sid|score> [-o <out>] [--format csv|jsonl] [--song <n>] [--seconds <s>]
 sidwave reconstruct <file.sid> [--song <n>] [--seconds <s>] [-o <score.yaml>] [--json]
-sidwave sid-info <file.sid> [--songlengths <Songlengths.md5>] [--json]
+sidwave sid info|edit|player <file.sid|dir> [options]      (sid-info is the old name of "sid info")
+sidwave songlengths lookup|verify|write ...
+sidwave stil parse|query ...
 sidwave --help | --version
 ```
 
@@ -66,7 +68,7 @@ sidwave --help | --version
 - `examples` lists the bundled example scores. `examples <name>` prints one to standard output, or with `-o <dir>` writes `<dir>/<name>.yaml`; an existing file is only replaced with `--force`.
 - `verify` compiles a score argument to a PSID, then compares reference and candidate at the levels described under [Verify](#verify). `--level` is the weakest level that counts as a pass (default `A1`); the levels up to it are evaluated. The output names the highest level reached, the status of each level, the first difference and the horizon. The horizon is `--seconds`, else one pass of a score, else the songlengths entry, else 30 s, and at most 180 s. A1 uses the frozen rule file in `data/verify/a1-rules.json`, or the file given with `--a1-rules`.
 - `render` writes 16-bit mono PCM as a WAV file (48 kHz by default, reSIDfp by default). `trace` writes the SID register writes as CSV (`sid,address,value,cycle`) or JSON lines, to standard output or `-o`. `trace --json` needs `-o`, because standard output carries the trace otherwise.
-- `sid-info` prints the PSID/RSID header; with `--songlengths` it adds the length of each subtune.
+- `sid info` prints the PSID/RSID header, the Songlengths entry and the STIL entry (`sid-info` is the old name); `sid edit` changes header fields and leaves every other byte alone; `sid player` identifies the player with SIDId signatures; `songlengths` looks up, verifies and edits Songlengths files; `stil` parses and queries STIL.txt. They are described in [doc/hvsc.md](doc/hvsc.md).
 - `reconstruct` recovers a SIDWave score from a SID tune. The tune is traced on SIDLite for `--seconds` (default 180, always reported), the recovered score is compiled and traced again, and the two traces are compared call by call (F-diff). The score goes to `-o` or standard output; `--json` prints the envelope with `result: { file, output, score, report }` (horizon, call rate, unsupported features, F-diff summary, language-extension candidates with reproducers). `--song` is the 1-based PSID subtune. Exit 0 when the strict F-diff shows no difference (`report.strictExact`: register state, in-call control write order and call timing, standard alignment, score compiles); otherwise exit 1 with `ok: false` and the result. `report.registerStateExact` is a secondary, weaker value: it ignores control-write order inside a call (a test-bit pulse `$09` then `$41` equals `$41` alone), which registers a call writes, and call timing; it is not audio equality. Unreadable or invalid input exits 3. Library: `reconstructSid` from `sidwave/reconstruct`.
 - `--allow-dir <dir>` (repeatable) permits `file:` sample sources below `<dir>`. Without it they must lie below the current directory (symbolic links are resolved first). The command never uses the network.
 - Run options of `verify`, `render` and `trace`: `--progress` writes progress to standard error (never standard output), `--max-seconds`, `--max-records` and `--max-bytes` bound the audio length, the trace size and the input and output size, `--roms <dir>` supplies `kernal.rom`, `basic.rom` and `chargen.rom`, `--clock PAL|NTSC` overrides the header (and `--model 6581|8580` for `render`). Ctrl-C (SIGINT) aborts the run through an `AbortSignal` that is passed to the library; a second Ctrl-C ends the process at once.
