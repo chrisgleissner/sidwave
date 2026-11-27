@@ -1114,6 +1114,8 @@ export interface Arrangement {
   chips?: ChipArrangement[];
   turbo?: boolean;
   softVolume?: boolean;
+  /** SIDWave 1.5 `player.idle_writes: false`: a voice that has not played a note writes no register. */
+  idleSilent?: boolean;
   /** SIDWave 1.5 `tuning`: the 96 register values C0..B7 of the document's clock; absent without a tuning. */
   noteTable?: number[];
   clock?: TimelineClock;
@@ -1323,6 +1325,7 @@ function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrange
     }),
     turbo: doc.cpu === "turbo",
     softVolume: isModern(doc) && doc.player?.softStart !== false,
+    ...(doc.player?.idleWrites === false ? { idleSilent: true } : {}),
     ...(doc.tuning && (doc.tuning.cents || doc.tuning.registers.length) ? { noteTable: noteTableOf(doc) } : {}),
   };
 }
@@ -3916,6 +3919,9 @@ c_ret:
   sta g_sres
   jmp v_read
 `;
+  if (arr.idleSilent) {
+    playerCode = playerCode.replace("  ldy voff,x\n  lda f_lo\n  sta $D400,y", "  lda v_inst,x\n  beq vr_after_write\n  ldy voff,x\n  lda f_lo\n  sta $D400,y");
+  }
   if (arr.chips) {
     playerCode = omitUnusedVoiceEffects(playerCode, insts, hasPortamento);
     if (hasFade) playerCode = addVibratoFade(playerCode);

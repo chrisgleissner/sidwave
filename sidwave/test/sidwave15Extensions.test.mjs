@@ -151,3 +151,25 @@ timeline:
   const calls = (await writes(body(8, "1.5"), 1)).filter((w) => w.reg === 4).length;
   assert.ok(calls > 8 * 40, `eight player calls per frame: ${calls} control writes in 1 s`);
 });
+
+test("player.idle_writes: false keeps a voice that has not played a note silent on the chip", async () => {
+  const two = (extra) => `sidwave: "1.5"
+title: T
+tempo: 120
+${extra}voices:
+  - { id: 1, instrument: lead, patterns: { a: { length: 1, bars: 1, groove: "A4 - C5 -" } } }
+  - { id: 2, instrument: lead, patterns: { r: { length: 1, bars: 1, groove: "- - - -" }, a: { length: 1, bars: 1, groove: "A3 - C4 -" } } }
+instruments:
+  lead: { waveform: pulse, adsr: [0, 4, 12, 3] }
+timeline:
+  - { section: Intro, bars: 1, layers: { v1: a, v2: r } }
+  - { section: Main, bars: 1, layers: { v1: a, v2: a } }
+`;
+  const voice2Writes = async (text) => (await writes(text, 1)).filter((w) => w.reg >= 7 && w.reg <= 13 && w.cycle < 700_000).length;
+  const normal = await voice2Writes(two(""));
+  const idle = await voice2Writes(two("player: { idle_writes: false }\n"));
+  assert.ok(normal > 0, "by default an idle voice writes its registers");
+  assert.ok(idle < normal, `idle voice writes: ${idle} instead of ${normal}`);
+  assert.throws(() => parseSidwave(two("player: { idle_writes: 1 }\n")), /idle_writes/);
+  assert.throws(() => parseSidwave(two("player: { idle_writes: false }\n").replace('"1.5"', '"1.4"')), /player/);
+});

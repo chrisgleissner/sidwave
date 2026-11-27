@@ -1335,16 +1335,19 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     return [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 0;
   });
   // SIDWave 1.5 is declared only when the score needs it: a speed above 4, or a player without the soft-start volume ramp.
+  // A voice that is silent at the start and has not written its frequency register yet: the player is told to write nothing for it until its first note.
+  const lateVoices = used.filter((t, i) => (segsByTrack[i]![0]?.start ?? 0) > 0);
+  const idleOff = lateVoices.length > 0 && lateVoices.every((t) => t.freq[0] === 0);
   const useTable = tune.override.size > 0;
   const usesWide = Object.values(instruments).some((y) => {
     const t = (y as { pulsetable?: { wrap?: boolean; steps: Array<{ set?: number }> } }).pulsetable;
     return !!t && (t.wrap === true || t.steps.some((st) => st.set === 0));
   });
   const usesReg = Object.values(instruments).some((y) => ((y as { wavetable?: Array<Record<string, unknown>> }).wavetable ?? []).some((step) => step.reg !== undefined));
-  const v15 = speed > 4 || softStartOff || useTable || usesReg || usesWide;
+  const v15 = speed > 4 || softStartOff || idleOff || useTable || usesReg || usesWide;
   const build = (layout: Layout): Record<string, unknown> => ({
     sidwave: v15 ? "1.5" : "1.4",
-    ...(softStartOff ? { player: { soft_start: false } } : {}),
+    ...(softStartOff || idleOff ? { player: { ...(softStartOff ? { soft_start: false } : {}), ...(idleOff ? { idle_writes: false } : {}) } } : {}),
     ...(useTable ? { tuning: { ...(tune.cents ? { cents: tune.cents } : {}), registers: Object.fromEntries([...tune.override].sort((a, b) => a[0] - b[0]).map(([midi, reg]) => [midiToNoteName(midi), reg])) } } : {}),
     title: options.title ?? "Reconstructed",
     tempo,

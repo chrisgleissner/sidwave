@@ -296,7 +296,7 @@ export interface ParsedSong {
 export interface ParsedSidwave {
   version: "1.0" | "1.1" | "1.2" | "1.3" | "1.4" | "1.5";
   /** SIDWave 1.5: player options; absent when the document sets none. */
-  player?: { softStart: boolean };
+  player?: { softStart: boolean; idleWrites: boolean };
   /** SIDWave 1.5: the note-to-register table of the document's clock: a shift of every note in cents and exact register values for single notes (MIDI note to register). */
   tuning?: { cents: number; registers: Array<[number, number]> };
   song: Required<Pick<SidwaveSongMeta, "title" | "tempo" | "mode">> & {
@@ -1564,10 +1564,11 @@ function parseTuning(raw: unknown): { cents: number; registers: Array<[number, n
 }
 
 /** SIDWave 1.5: parses `player`, the player options. `soft_start: false` removes the volume ramp that the player runs over its first calls (default true). */
-function parsePlayer(raw: unknown): { softStart: boolean } {
-  const value = requireObject(raw, "$.player", ["soft_start"]);
+function parsePlayer(raw: unknown): { softStart: boolean; idleWrites: boolean } {
+  const value = requireObject(raw, "$.player", ["soft_start", "idle_writes"]);
+  if (value.idle_writes !== undefined && typeof value.idle_writes !== "boolean") throw new SidwaveValidationError("$.player.idle_writes", "expected true or false");
   if (value.soft_start !== undefined && typeof value.soft_start !== "boolean") throw new SidwaveValidationError("$.player.soft_start", "expected true or false");
-  return { softStart: value.soft_start !== false };
+  return { softStart: value.soft_start !== false, idleWrites: value.idle_writes !== false };
 }
 
 /**
