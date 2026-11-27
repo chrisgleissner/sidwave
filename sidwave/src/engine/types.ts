@@ -24,6 +24,13 @@ export interface RenderRequest {
   signal?: AbortSignal;
   onProgress?: (fraction: number) => void;
   maxSeconds?: number;
+  /**
+   * Streaming: receives the PCM in order, in slices of about 20 ms, as it is rendered. The engine waits for a returned
+   * promise before it renders on, so a slow consumer paces the render. When set, the samples are not accumulated and
+   * the result carries an empty `samples` array. An error thrown by the callback aborts the render and propagates
+   * unchanged.
+   */
+  onSamples?: (samples: Int16Array) => void | Promise<void>;
 }
 
 export interface RenderResult {

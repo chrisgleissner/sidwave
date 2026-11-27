@@ -109,6 +109,10 @@
       "types": "./dist/interchange/index.d.ts",
       "default": "./dist/interchange/index.js"
     },
+    "./play": {
+      "types": "./dist/play/index.d.ts",
+      "default": "./dist/play/index.js"
+    },
     "./analyze": {
       "types": "./dist/analyze/index.d.ts",
       "default": "./dist/analyze/index.js"
