@@ -16,6 +16,7 @@ export * from "./sidwaveLibs.js";
 export * from "./sidFile.js";
 export * from "./songlengths.js";
 export * from "./audio/generateSidwave.js";
+export * from "./compose/index.js";
 export * from "./audio/sidwaveReference.js";
 export * from "./audio/sidwaveSimilarity.js";
 export * from "./audio/sidwaveFidelity.js";
