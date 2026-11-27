@@ -107,6 +107,12 @@ function toPsid(doc: ParsedSidwave): Uint8Array {
   return new Uint8Array(compileSidwaveToSid(doc, prg.prg, { initAddress: prg.initAddress, playAddress: prg.playAddress }).sid);
 }
 
+/** The voice groups of the stems in output order, without rendering: each voice with the voices it copies or follows. */
+export function stemVoiceGroups(input: ParsedSidwave, song = 0): number[][] {
+  const doc = input.songs ? songDoc(input, song) : input;
+  return doc.voices.map((voice) => [...dependencies(doc, voice.id)].sort((a, b) => a - b));
+}
+
 /** Renders the mix and one stem per voice. Throws for scores that cannot be a PSID (digi samples, more than 3 SIDs). */
 export async function renderStems(input: ParsedSidwave, options: StemOptions = {}): Promise<StemResult> {
   const doc = input.songs ? songDoc(input, options.song ?? 0) : input;

@@ -294,3 +294,45 @@ test("SMF format 2 is rejected with a MidiError", () => {
   assert.throws(() => parseSmf(bytes), (e) => e instanceof MidiError && /format 2/.test(e.message));
   assert.throws(() => importMidi(bytes), (e) => e instanceof MidiImportError && /format 2/.test(e.message));
 });
+
+test("a file with 100000 notes, tempo events and pitch bends imports in bounded CPU time", () => {
+  const N = 100_000;
+  const events = [[0, { type: "trackName", text: "Big" }]];
+  const lead = [[0, { type: "trackName", text: "Lead" }]];
+  for (let i = 0; i < N; i++) {
+    events.push([i * 4, { type: "setTempo", microsecondsPerBeat: 400_000 + (i % 100) * 1000 }]);
+    const start = i * 4;
+    lead.push([start, { type: "noteOn", channel: 0, noteNumber: 48 + (i % 24), velocity: 90 }]);
+    lead.push([start + 1, { type: "pitchBend", channel: 0, value: 8192 + ((i % 7) - 3) * 500 }]);
+    lead.push([start + 3, { type: "noteOff", channel: 0, noteNumber: 48 + (i % 24), velocity: 0 }]);
+  }
+  const track = (list) => {
+    list.sort((a, b) => a[0] - b[0]);
+    let last = 0;
+    return [...list.map(([tick, e]) => { const r = { ...e, deltaTime: tick - last }; last = tick; return r; }), { type: "endOfTrack", deltaTime: 0 }];
+  };
+  const bytes = writeMidi({ header: { format: 1, numTracks: 2, ticksPerBeat: 480 }, tracks: [track(events), track(lead)] });
+  const before = process.cpuUsage();
+  const result = importMidi(Uint8Array.from(bytes), { validate: false });
+  const used = process.cpuUsage(before);
+  const cpuSeconds = (used.user + used.system) / 1e6;
+  assert.ok(result.yaml.length > 0);
+  assert.ok(cpuSeconds < 10, `import took ${cpuSeconds} s of CPU time`);
+});
+
+test("import -o - with --json is a usage error", () => {
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-midi-json-")));
+  try {
+    const run = (...args) => {
+      const out = [], err = [];
+      const code = runCli(args, { cwd: dir, out: (t) => out.push(t), err: (t) => err.push(t), outBytes: () => {} });
+      return { code, out: out.join(""), err: err.join("") };
+    };
+    fs.writeFileSync(path.join(dir, "song.yaml"), readExampleScore("fuer_elise"));
+    assert.equal(run("export", "song.yaml", "-o", "song.mid").code, 0);
+    const refused = run("import", "song.mid", "-o", "-", "--json");
+    assert.equal(refused.code, 2, refused.err);
+    assert.ok(!refused.out.includes("version:") && !refused.out.includes("sidwave: 1."), "no YAML on stdout");
+    assert.equal(run("import", "song.mid", "-o", "-").code, 0);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

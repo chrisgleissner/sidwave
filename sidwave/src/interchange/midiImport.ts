@@ -84,6 +84,14 @@ function normaliseSignature(numerator: number, denominator: number): { text: str
   throw new MidiImportError(`the time signature ${text} (${beats} quarter notes per bar) has no SIDWave equivalent; supported: ${[...SUPPORTED].join(", ")}`);
 }
 
+/** Index of the last element with `tick <= t` in an array sorted by tick, or -1. */
+function lastAtOrBefore(list: ReadonlyArray<{ tick: number }>, t: number): number {
+  let lo = 0, hi = list.length;
+  while (lo < hi) { const mid = (lo + hi) >>> 1; if (list[mid]!.tick <= t) lo = mid + 1; else hi = mid; }
+  return lo - 1;
+}
+
+
 /** Imports a Standard MIDI File as SIDWave text. See doc/interchange.md for the allocation, quantisation and loss rules. */
 export function importMidi(bytes: Uint8Array, options: MidiImportOptions = {}): MidiImportResult {
   const grid = options.grid ?? 0.25;
@@ -111,9 +119,8 @@ export function importMidi(bytes: Uint8Array, options: MidiImportOptions = {}): 
     .sort((a, b) => a.tick - b.tick);
   if (tempos.length === 0) warnings.push("The file has no tempo event; 120 BPM is assumed.");
   const microsecondsAt = (tick: number): number => {
-    let value = 500_000;
-    for (const tempo of tempos) { if (tempo.tick <= tick) value = tempo.microsecondsPerQuarter; else break; }
-    return value;
+    const i = lastAtOrBefore(tempos, tick);
+    return i < 0 ? 500_000 : tempos[i]!.microsecondsPerQuarter;
   };
 
   // Parts: notes per (track, channel).
@@ -329,9 +336,10 @@ export function importMidi(bytes: Uint8Array, options: MidiImportOptions = {}): 
         if (pitch !== original) report.octaveShifted++;
         // Pitch bend: the state at the note start sets the written pitch; a later net change becomes a SIDWave bend.
         let bend: { to: number; frames: number } | undefined;
-        const range = (tick: number) => { let r = 2; for (const ch of p.rangeChanges) { if (ch.tick <= tick) r = ch.semitones; else break; } return r; };
-        const stateAt = (tick: number) => { let v = 8192; for (const b of p.bends) { if (b.tick <= tick) v = b.value; else break; } return (v - 8192) / 8192 * range(tick); };
-        const inside = p.bends.filter((b) => b.tick > n.startTick && b.tick < n.endTick);
+        const range = (tick: number) => { const i = lastAtOrBefore(p.rangeChanges, tick); return i < 0 ? 2 : p.rangeChanges[i]!.semitones; };
+        const stateAt = (tick: number) => { const i = lastAtOrBefore(p.bends, tick); return ((i < 0 ? 8192 : p.bends[i]!.value) - 8192) / 8192 * range(tick); };
+        // Bends are in tick order, so the ones inside the note are a contiguous slice found by binary search.
+        const inside = p.bends.slice(lastAtOrBefore(p.bends, n.startTick) + 1, lastAtOrBefore(p.bends, n.endTick - 1) + 1);
         const begin = stateAt(n.startTick);
         if (bendDefault && (inside.length || Math.abs(begin) >= 0.5) && !p.drum) {
           const startShift = Math.round(begin);

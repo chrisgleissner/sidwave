@@ -154,3 +154,47 @@ test("the funk bass example is reported as non-additive (it uses the filter)", a
   assert.equal(result.additive, false);
   assert.ok(result.coupling.some((c) => c.kind === "filter"));
 });
+
+test("render --stems checks every output size before it writes a file, and every target name before it renders", async () => {
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-stems-fix-")));
+  try {
+    const echo = { ...PLAIN, voices: [...PLAIN.voices.slice(0, 2), { id: 3, echo: { voice: 1, delay: 4, volume: 0.5 } }], timeline: [{ section: "x", bars: 4, layers: { v1: "a", v2: "r" } }] };
+    fs.writeFileSync(path.join(dir, "plain.yaml"), yaml.stringify(PLAIN));
+    fs.writeFileSync(path.join(dir, "echo.yaml"), yaml.stringify(echo));
+    const run = async (...args) => {
+      const out = [], err = [];
+      const code = await runCli(["render", ...args], { cwd: dir, out: (t) => out.push(t), err: (t) => err.push(t), outBytes: () => {} });
+      return { code, out: out.join(""), err: err.join("") };
+    };
+    // A short render makes the WAV files smaller than the manifest, so only the last file exceeds the limit.
+    const short = ["--seconds", "0.02", "--sample-rate", "8000", "--engine", "sidlite"];
+    const probe = await run("plain.yaml", "--stems", "-o", "probe", ...short);
+    assert.equal(probe.code, 0, probe.err);
+    const wavSize = fs.statSync(path.join(dir, "probe", "plain.mix.wav")).size;
+    const manifestSize = fs.statSync(path.join(dir, "probe", "plain.stems.json")).size;
+    assert.ok(manifestSize > wavSize, "the premise of the test: the manifest is the largest file");
+    const refused = await run("plain.yaml", "--stems", "-o", "limited", ...short, "--max-bytes", String(wavSize));
+    assert.equal(refused.code, 5, refused.err);
+    assert.equal(fs.existsSync(path.join(dir, "limited")), false, "no directory and no file after a size refusal");
+    // The echo voice is rendered with its source: its file is named plain-style v1+v3.
+    fs.mkdirSync(path.join(dir, "taken"));
+    fs.writeFileSync(path.join(dir, "taken", "echo.v1+v3.wav"), "x");
+    let rendered = 0;
+    const createEngine = () => ({ render: async () => { rendered++; throw new Error("rendered"); } });
+    const out = [], err = [];
+    const code = await runCli(["render", "echo.yaml", "--stems", "-o", "taken", "--seconds", "1"], { cwd: dir, out: (t) => out.push(t), err: (t) => err.push(t), outBytes: () => {}, createEngine });
+    assert.equal(code, 2, err.join(""));
+    assert.equal(rendered, 0, "the existing target is found before any rendering");
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("render --stems --song on a score without songs is a usage error", async () => {
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-stems-song-")));
+  try {
+    fs.writeFileSync(path.join(dir, "plain.yaml"), yaml.stringify(PLAIN));
+    const err = [];
+    const code = await runCli(["render", "plain.yaml", "--stems", "--song", "1", "-o", "o", "--seconds", "1", "--engine", "sidlite"], { cwd: dir, out: () => {}, err: (t) => err.push(t), outBytes: () => {} });
+    assert.equal(code, 2, err.join(""));
+    assert.equal(fs.existsSync(path.join(dir, "o")), false);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

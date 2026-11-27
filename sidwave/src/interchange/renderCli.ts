@@ -12,7 +12,7 @@ import { parseSidwave } from "../sidwave.js";
 import { confinedReadOptions } from "../sidwaveOps.js";
 import { readBounded } from "./cli.js";
 import { StemsRefusedError } from "./errors.js";
-import { renderStems, STEM_ENERGY_TOLERANCE } from "./stems.js";
+import { renderStems, stemVoiceGroups, STEM_ENERGY_TOLERANCE } from "./stems.js";
 import { writeWav } from "./wav.js";
 
 /** What the stem renderer reads from the parsed command line of `render`. */
@@ -39,6 +39,16 @@ export async function renderStemsCommand(io: CliIo, input: StemsCommandInput): P
   const { bytes } = readBounded(io, file);
   const stem = basename(file, extname(file)).replace(/\.sidwave$/i, "");
   const doc = withFile(file, () => parseSidwave(bytes.toString("utf8"), confinedReadOptions(io.cwd, input.allowDirs)));
+  if (input.song !== undefined && !doc.songs) throw new UsageError("--song needs a score with songs; this score has none");
+  const dir = input.output ?? `${stem}-stems`;
+  // Target names follow from the voices and their dependencies, so existence is checked before any rendering.
+  const targets = [
+    join(dir, `${stem}.mix.wav`), ...stemVoiceGroups(doc, (input.song ?? 1) - 1).map((g) => join(dir, `${stem}.v${g.join("+v")}.wav`)), join(dir, `${stem}.stems.json`),
+  ];
+  if (!input.force) {
+    const taken = targets.map((t) => resolve(io.cwd, t)).find((t) => existsSync(t));
+    if (taken) throw new UsageError(`${taken} exists; use --force to overwrite it`);
+  }
   const emulation = input.engine ?? "residfp";
   const engine = io.createEngine ? io.createEngine(emulation) : createLibsidplayfpEngine({ emulation });
   let result;
@@ -56,29 +66,11 @@ export async function renderStemsCommand(io: CliIo, input: StemsCommandInput): P
     if (error instanceof RangeError) throw new UsageError(error.message);
     throw error;
   }
-  const dir = input.output ?? `${stem}-stems`;
-  const targets = [
-    join(dir, `${stem}.mix.wav`), ...result.stems.map((s) => join(dir, `${stem}.v${s.voices.join("+v")}.wav`)), join(dir, `${stem}.stems.json`),
+  const entries: Array<{ kind: string; target: string; data: Uint8Array | string; voices?: number[] }> = [
+    { kind: "mix", target: resolve(io.cwd, targets[0]!), data: writeWav(result.mix, result.sampleRate) },
+    ...result.stems.map((s, i) => ({ kind: "stem", target: resolve(io.cwd, targets[i + 1]!), data: writeWav(s.samples, result.sampleRate), voices: s.voices })),
   ];
-  // Check every target first so that a refusal leaves no partial output.
-  if (!input.force) {
-    const taken = targets.map((t) => resolve(io.cwd, t)).find((t) => existsSync(t));
-    if (taken) throw new UsageError(`${taken} exists; use --force to overwrite it`);
-  }
-  const files: Array<{ kind: string; path: string; bytes: number; voices?: number[] }> = [];
-  const put = (path: string, data: Uint8Array | string, kind: string, voices?: number[]) => {
-    const target = resolve(io.cwd, path);
-    if (input.maxBytes !== undefined && data.length > input.maxBytes) throw new SidwaveOperationError("limit_exceeded", `${target} would have ${data.length} bytes; the limit is ${input.maxBytes}`);
-    try {
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, data);
-    } catch (error) {
-      throw new SidwaveOperationError("input", `cannot write ${target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: target });
-    }
-    files.push({ kind, path: target, bytes: data.length, ...(voices ? { voices } : {}) });
-  };
-  put(targets[0]!, writeWav(result.mix, result.sampleRate), "mix");
-  result.stems.forEach((s, i) => put(targets[i + 1]!, writeWav(s.samples, result.sampleRate), "stem", s.voices));
+  const files = entries.map((e) => ({ kind: e.kind, path: e.target, bytes: e.data.length, ...(e.voices ? { voices: e.voices } : {}) }));
   const ratio = result.sumError.energyRatio.toFixed(3);
   const manifest = {
     score: file, sampleRate: result.sampleRate, seconds: result.seconds, engine: result.engine,
@@ -90,7 +82,23 @@ export async function renderStemsCommand(io: CliIo, input: StemsCommandInput): P
         : `NON-ADDITIVE: the measured energy ratio ${ratio} is outside the tolerance of ${STEM_ENERGY_TOLERANCE * 100}%.`,
     coupling: result.coupling, sumError: result.sumError, files: [...files],
   };
-  put(targets[targets.length - 1]!, `${JSON.stringify(manifest, null, 2)}\n`, "manifest");
+  const manifestTarget = resolve(io.cwd, targets[targets.length - 1]!);
+  entries.push({ kind: "manifest", target: manifestTarget, data: `${JSON.stringify(manifest, null, 2)}\n` });
+  // Every size is known before the first write, so a --max-bytes refusal leaves no partial output.
+  if (input.maxBytes !== undefined) {
+    for (const e of entries) {
+      if (e.data.length > input.maxBytes) throw new SidwaveOperationError("limit_exceeded", `${e.target} would have ${e.data.length} bytes; the limit is ${input.maxBytes}`);
+    }
+  }
+  for (const e of entries) {
+    try {
+      mkdirSync(dirname(e.target), { recursive: true });
+      writeFileSync(e.target, e.data);
+    } catch (error) {
+      throw new SidwaveOperationError("input", `cannot write ${e.target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: e.target });
+    }
+  }
+  files.push({ kind: "manifest", path: manifestTarget, bytes: entries[entries.length - 1]!.data.length });
   const summary = { file, directory: resolve(io.cwd, dir), additive: result.additive, energyRatio: result.sumError.energyRatio,
     energyWithinTolerance: result.energyWithinTolerance, coupling: result.coupling, sumError: result.sumError, files };
   io.out(input.json ? `${JSON.stringify(envelope("render", true, { result: summary }), null, 2)}\n`

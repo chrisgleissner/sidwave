@@ -173,6 +173,9 @@ function importCommand(args: string[], io: CliIo): number {
   const { bytes, path } = readBounded(io, file);
   const format = (a.flags.get("--format") as string | undefined) ?? detect(file, bytes);
   if (format === undefined) throw new UsageError(`cannot tell the format of ${file}; pass --format midi, musicxml, goattracker or furnace`);
+  if (a.flags.get("-o") === "-" || a.flags.get("--output") === "-") {
+    if (a.flags.has("--json")) throw new UsageError("import -o - writes the YAML to stdout; --json cannot be combined with it");
+  }
   const handler = importers.get(format);
   if (!handler) throw new UsageError(`unknown or unavailable import format "${format}"`);
   const output = (a.flags.get("-o") ?? a.flags.get("--output")) as string | undefined ?? `${stem(file)}.yaml`;
