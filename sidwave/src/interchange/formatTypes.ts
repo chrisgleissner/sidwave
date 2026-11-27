@@ -82,6 +82,12 @@ export interface FormatDefinition {
   songs?: boolean;
   /** Source is a recovered approximation and slow (needs the engine). */
   readIsApproximate?: boolean;
+  /** The notes of a file of this format, read independently of the importer (used by `--verify` for the source-vs-output metric). Voice numbers are the source's own parts. */
+  sourceNotes?(bytes: Uint8Array): Array<{ time: number; end: number; pitch: number; voice: number }>;
+  /** Reading quantises note times to a grid (MIDI, MusicXML): `--verify` widens its onset tolerance to half the grid. */
+  readQuantises?: boolean;
+  /** The writer renders audio or traces with the engine. */
+  writeNeedsEngine?: boolean;
   write?(ctx: WriteContext): WriteOutput | Promise<WriteOutput>;
   /** Plain-language facts for `sidwave info`. Must not throw for valid files; may throw typed errors for broken ones. */
   describe?(bytes: Uint8Array): Record<string, unknown>;

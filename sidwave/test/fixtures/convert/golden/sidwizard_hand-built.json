@@ -1,0 +1,213 @@
+{
+ "sidwizard:hand-built -> sidwave": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwizard:hand-built -> sid": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwizard:hand-built -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "sidwizard:hand-built -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "sidwizard:hand-built -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwizard:hand-built -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwizard:hand-built -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "sidwizard:hand-built -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sidwizard:hand-built -> sidwizard": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Instrument i1: wavetable is not exported. | Instrument i2: wavetable is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument i2: pulse table (the first pulse width is written) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
+   }
+  ]
+ }
+}

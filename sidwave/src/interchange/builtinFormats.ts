@@ -7,7 +7,8 @@
 import { constants, inflateSync } from "node:zlib";
 import { createLibsidplayfpEngine } from "../engine/libsidplayfp.js";
 import { parseSidwave } from "../sidwave.js";
-import { reconstructSid } from "../reconstruct/reconstruct.js";
+import { sidwaveFrameRate } from "../sidwaveCompiler.js";
+import { reconstructSid, type ReconstructReport } from "../reconstruct/reconstruct.js";
 import { parseSidFile } from "../sidFile.js";
 import { compileSidwaveBytes, describeSidwave } from "../sidwaveOps.js";
 import { InterchangeUsageError } from "./errors.js";
@@ -88,8 +89,36 @@ export const EVENTS: FormatDefinition = {
   describe: (bytes) => { const e = JSON.parse(Buffer.from(bytes).toString("utf8")) as { title?: string; durationSeconds?: number; voices?: unknown[] }; return { title: e.title, seconds: e.durationSeconds, voices: e.voices?.length }; },
 };
 
+/** The notes of a Standard MIDI File with their times in seconds (tempo map applied), independent of the importer. */
+function midiNotes(bytes: Uint8Array): Array<{ time: number; end: number; pitch: number; voice: number }> {
+  const smf = parseSmf(bytes);
+  const tempos: Array<{ tick: number; us: number }> = [{ tick: 0, us: 500_000 }];
+  for (const track of smf.tracks) for (const e of track) if (e.type === "tempo") tempos.push({ tick: e.tick, us: e.microsecondsPerQuarter });
+  tempos.sort((a, b) => a.tick - b.tick);
+  const marks: Array<{ tick: number; seconds: number; us: number }> = [];
+  let seconds = 0, last = tempos[0]!;
+  for (const t of tempos) { seconds += (t.tick - last.tick) * last.us / 1e6 / smf.division; marks.push({ tick: t.tick, seconds, us: t.us }); last = t; }
+  const toSeconds = (tick: number): number => {
+    let m = marks[0]!;
+    for (const c of marks) { if (c.tick <= tick) m = c; else break; }
+    return m.seconds + (tick - m.tick) * m.us / 1e6 / smf.division;
+  };
+  const notes: Array<{ time: number; end: number; pitch: number; voice: number }> = [];
+  smf.tracks.forEach((track, ti) => {
+    const open = new Map<string, number[]>();
+    for (const e of track) {
+      if (e.type !== "noteOn" && e.type !== "noteOff") continue;
+      const key = `${e.channel}:${e.note}`;
+      if (e.type === "noteOn" && e.velocity > 0) { const q = open.get(key) ?? open.set(key, []).get(key)!; q.push(e.tick); continue; }
+      const start = open.get(key)?.shift();
+      if (start !== undefined) notes.push({ time: toSeconds(start), end: toSeconds(e.tick), pitch: e.note, voice: ti * 16 + e.channel });
+    }
+  });
+  return notes.sort((a, b) => a.time - b.time);
+}
+
 export const MIDI: FormatDefinition = {
-  id: "midi", name: "Standard MIDI File", extensions: [".mid", ".midi", ".smf"], aliases: ["mid", "smf"],
+  readQuantises: true, id: "midi", name: "Standard MIDI File", extensions: [".mid", ".midi", ".smf"], aliases: ["mid", "smf"],
   magic: (bytes) => (startsWith(bytes, "MThd") ? 1 : 0),
   detection: "the header chunk MThd",
   caps: { kind: "notation", tempo: "map", instruments: "program", expression: "none", loop: false, metadata: true },
@@ -100,11 +129,12 @@ export const MIDI: FormatDefinition = {
     const out = fromExport(result, { report: { ppq: result.ppq, tracks: result.tracks } });
     return { bytes: result.bytes, losses: out.losses, report: out.report };
   },
+  sourceNotes: (bytes) => midiNotes(bytes),
   describe: (bytes) => { const smf = parseSmf(bytes); return { format: smf.format, ticksPerQuarter: smf.division, tracks: smf.tracks.length, events: smf.tracks.reduce((s, t) => s + t.length, 0) }; },
 };
 
 export const MUSICXML: FormatDefinition = {
-  id: "musicxml", name: "MusicXML", extensions: [".musicxml", ".xml", ".mxl"], readOnlyExtensions: [".mxl"], aliases: ["xml"],
+  readQuantises: true, id: "musicxml", name: "MusicXML", extensions: [".musicxml", ".xml", ".mxl"], readOnlyExtensions: [".mxl"], aliases: ["xml"],
   magic: (bytes) => {
     const text = head(bytes, 4096);
     if (/<score-(partwise|timewise)\b/.test(text)) return 1;
@@ -135,7 +165,7 @@ export const GOATTRACKER: FormatDefinition = {
   read: (bytes, ctx) => fromImport(rangeToUsage(() => importGoatTracker(bytes, { ...importOptions(ctx), ...(ctx.song === undefined ? {} : { song: ctx.song }) }))),
   write: ({ doc, plan }) => {
     const result = rangeToUsage(() => exportGoatTracker(doc, plan.exportOptions));
-    const out = fromExport(result, { report: { ticksPerRow: result.ticksPerRow, rows: result.rows, patterns: result.patterns, instruments: result.instruments, voices: result.voices, maxTimingErrorCalls: result.maxTimingErrorCalls } });
+    const out = fromExport(result, { report: { ticksPerRow: result.ticksPerRow, rowSeconds: result.ticksPerRow / sidwaveFrameRate(doc.song.mode), rows: result.rows, patterns: result.patterns, instruments: result.instruments, voices: result.voices, maxTimingErrorCalls: result.maxTimingErrorCalls } });
     return { bytes: result.bytes, losses: out.losses, report: out.report };
   },
   describe: (bytes) => { const s = parseGoatTracker(bytes); return { version: s.family, magic: s.magic, title: s.name, author: s.author, songs: s.songs.length }; },
@@ -162,14 +192,14 @@ export const FURNACE: FormatDefinition = {
   read: (bytes, ctx) => fromImport(rangeToUsage(() => importFurnace(bytes, importOptions(ctx)))),
   write: ({ doc, plan }) => {
     const result = rangeToUsage(() => exportFurnace(doc, plan.exportOptions));
-    const out = fromExport(result, { report: { ticksPerRow: result.ticksPerRow, rows: result.rows, voices: result.voices } });
+    const out = fromExport(result, { report: { ticksPerRow: result.ticksPerRow, rowSeconds: result.ticksPerRow / sidwaveFrameRate(doc.song.mode), rows: result.rows, voices: result.voices } });
     return { bytes: result.bytes, losses: out.losses, report: out.report };
   },
   describe: (bytes) => { const s = parseFurnace(bytes); return { version: s.version, title: s.name, author: s.author, chips: s.chips, channels: s.channels, subsongs: s.subsongs }; },
 };
 
 export const WAV: FormatDefinition = {
-  id: "wav", name: "WAV audio", extensions: [".wav"], aliases: ["wave"],
+  writeNeedsEngine: true, id: "wav", name: "WAV audio", extensions: [".wav"], aliases: ["wave"],
   magic: (bytes) => (startsWith(bytes, "RIFF") && head(bytes, 12).slice(8) === "WAVE" ? 1 : 0),
   detection: "RIFF header with WAVE",
   caps: { kind: "audio", tempo: "none", instruments: "none", expression: "exact", loop: false, metadata: false },
@@ -202,6 +232,19 @@ export const PRG: FormatDefinition = {
   },
 };
 
+/** Losses of a reconstruct (from a PSID or from an imported trace), as structured losses of the read stage. */
+export function reconstructLosses(report: ReconstructReport, what: string): Loss[] {
+  const losses: Loss[] = [
+    { stage: "read", code: "reconstruct.horizon", severity: "approx", count: report.horizon.calls, message: `Only the first ${report.horizon.seconds} s (${report.horizon.calls} player calls) of ${what} were analysed.` },
+  ];
+  for (const u of report.unsupported) losses.push({ stage: "read", code: `reconstruct.${u.kind}`, severity: "lost", count: 1, message: u.detail });
+  if (report.languageExtensions.length) losses.push({ stage: "read", code: "reconstruct.extensions", severity: "info", count: report.languageExtensions.length, message: `${report.languageExtensions.length} constructs of the tune have no SIDWave equivalent and were approximated.` });
+  if (!report.strictExact) {
+    losses.push({ stage: "read", code: "reconstruct.fdiff", severity: "approx", count: report.fdiff.differingCalls, message: `F-diff: the recovered score differs from the tune in ${report.fdiff.differingCalls} register-class differences over ${report.fdiff.comparedCalls} compared player calls (a call can differ in several classes).` });
+  }
+  return losses;
+}
+
 export const SID: FormatDefinition = {
   songs: true, id: "sid", name: "PSID/RSID tune", extensions: [".sid"], aliases: ["psid", "rsid"],
   magic: (bytes) => ((startsWith(bytes, "PSID") || startsWith(bytes, "RSID")) && bytes.length >= 0x76 ? 1 : 0),
@@ -224,14 +267,7 @@ export const SID: FormatDefinition = {
       throw error;
     }
     const { score, report } = recovered;
-    const losses: Loss[] = [
-      { stage: "read", code: "reconstruct.horizon", severity: "approx", count: report.horizon.calls, message: `Only the first ${report.horizon.seconds} s (${report.horizon.calls} player calls) of subtune ${song} were analysed.` },
-    ];
-    for (const u of report.unsupported) losses.push({ stage: "read", code: `reconstruct.${u.kind}`, severity: "lost", count: 1, message: u.detail });
-    if (report.languageExtensions.length) losses.push({ stage: "read", code: "reconstruct.extensions", severity: "info", count: report.languageExtensions.length, message: `${report.languageExtensions.length} constructs of the tune have no SIDWave equivalent and were approximated.` });
-    if (!report.strictExact) {
-      losses.push({ stage: "read", code: "reconstruct.fdiff", severity: "approx", count: report.fdiff.differingCalls, message: `F-diff: the recovered score differs from the tune in ${report.fdiff.differingCalls} register-class differences over ${report.fdiff.comparedCalls} compared player calls (a call can differ in several classes).` });
-    }
+    const losses = reconstructLosses(report, `subtune ${song}`);
     return { yaml: score, losses, report, approximate: true, fdiff: { equal: report.strictExact, differingCalls: report.fdiff.differingCalls, comparedCalls: report.fdiff.comparedCalls } };
   },
   write: ({ doc, song }) => {

@@ -2,17 +2,36 @@
 // Copyright (C) 2025-2026 Christian Gleissner
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 // The format registry of `sidwave convert`: one entry per format, detection by content, lookup by name or extension.
-// To add a format see formatsExtra.ts (one new file and one line there).
+// To add a format create one file in interchange/formats/ (see doc/interchange.md).
 
 import { extname } from "node:path";
 import { BUILTIN_FORMATS } from "./builtinFormats.js";
-import { EXTRA_FORMATS } from "./formatsExtra.js";
+import { existsSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { FormatCaps, FormatDefinition } from "./formatTypes.js";
 import { UsageError } from "../cliCore.js";
 
 export type { FormatDefinition, FormatCaps, ReadContext, ReadOutput, WriteContext, WriteOutput } from "./formatTypes.js";
 
-const formats: FormatDefinition[] = [...BUILTIN_FORMATS, ...EXTRA_FORMATS];
+const isDefinition = (v: unknown): v is FormatDefinition => typeof v === "object" && v !== null && typeof (v as FormatDefinition).id === "string" && typeof (v as FormatDefinition).magic === "function" && Array.isArray((v as FormatDefinition).extensions);
+
+/**
+ * Every module in interchange/formats/ is loaded and each FormatDefinition it exports is registered, after the built-in
+ * formats and in file name order. Adding a format is therefore one new file and no edit of an existing file.
+ */
+async function loadExtraFormats(): Promise<FormatDefinition[]> {
+  const dir = new URL("./formats/", import.meta.url);
+  if (!existsSync(fileURLToPath(dir))) return [];
+  const files = readdirSync(fileURLToPath(dir)).filter((f) => /\.(js|ts)$/.test(f) && !f.endsWith(".d.ts")).sort();
+  const found: FormatDefinition[] = [];
+  for (const file of files) {
+    const module = (await import(new URL(file, dir).href)) as Record<string, unknown>;
+    for (const value of Object.values(module)) if (isDefinition(value)) found.push(value);
+  }
+  return found;
+}
+
+const formats: FormatDefinition[] = [...BUILTIN_FORMATS, ...(await loadExtraFormats())];
 const seen = new Set<string>();
 for (const f of formats) {
   if (seen.has(f.id)) throw new Error(`duplicate format id ${f.id}`);
@@ -32,13 +51,15 @@ export interface FormatInfo {
   lossSummary: string;
   /** Reading is an approximate recovery (slow). */
   readApproximate: boolean;
+  /** Writing renders audio or traces with the engine. */
+  writeNeedsEngine: boolean;
 }
 
 /** All registered formats, in registry order. */
 export function listFormats(): FormatInfo[] {
   return formats.map((f) => ({
     id: f.id, name: f.name, extensions: [...f.extensions], aliases: [...(f.aliases ?? [])], read: f.read !== undefined, write: f.write !== undefined,
-    detection: f.detection, kind: f.caps.kind, caps: f.caps, lossSummary: f.lossSummary, readApproximate: f.readIsApproximate === true,
+    detection: f.detection, kind: f.caps.kind, caps: f.caps, lossSummary: f.lossSummary, readApproximate: f.readIsApproximate === true, writeNeedsEngine: f.writeNeedsEngine === true,
   }));
 }
 

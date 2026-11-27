@@ -1,10 +1,12 @@
-// The conversion test matrix: every importer x exporter pair on committed fixtures. Shared by
-// test/convertMatrix.test.mjs and scripts/regenerate-convert-golden.mjs, so both enumerate the same cases.
+// The conversion test matrix: every importer x exporter pair on committed fixtures. The formats come from the registry
+// (src/interchange/registry.ts): a format that can be read needs a fixture entry below, and every format that can be
+// written is a target. Shared by test/convertMatrix.test.mjs and scripts/regenerate-convert-golden.mjs.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { classifyError } from "../../src/cliCore.ts";
 import { convert } from "../../src/interchange/convert.ts";
+import { listFormats } from "../../src/interchange/registry.ts";
 import { parseSidwave } from "../../src/sidwave.ts";
 import { compileSidwaveBytes } from "../../src/sidwaveOps.ts";
 import { gts } from "./gtFixtures.mjs";
@@ -12,46 +14,63 @@ import { fur228 } from "./furFixtures.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const FIXTURE_DIR = path.join(root, "test/fixtures/convert");
-export const GOLDEN_FILE = path.join(FIXTURE_DIR, "golden-losses.json");
+export const GOLDEN_DIR = path.join(FIXTURE_DIR, "golden");
 
 const read = (file) => fs.readFileSync(path.join(root, file));
+const generated = (name) => fs.readFileSync(path.join(FIXTURE_DIR, name));
 
-const SCORES = [
-  ["fuer-elise", "test/fixtures/sidwave-1.0/fuer-elise.yaml"],
-  ["chiptune-drive", "test/fixtures/sidwave-1.1/chiptune_drive.yaml"],
-  ["chamber-waltz", "test/fixtures/sidwave-1.2/chamber_waltz.yaml"],
-  ["title-fanfare", "test/fixtures/sidwave-1.2/title_fanfare.yaml"],
-  ["digi-groove", "test/fixtures/sidwave-1.2/digi_groove.yaml"],
-];
-const BINARY = [
-  ["midi", ".mid", ["fuer-elise", "chiptune-drive", "chamber-waltz", "title-fanfare"]],
-  ["musicxml", ".musicxml", ["fuer-elise", "chiptune-drive", "title-fanfare"]],
-  ["goattracker", ".sng", ["fuer-elise", "chiptune-drive"]],
-  ["furnace", ".fur", ["fuer-elise", "chiptune-drive"]],
-];
+/**
+ * Fixtures per readable format: [name, loader]. Binary fixtures in test/fixtures/convert are generated from the scores by
+ * scripts/make-convert-fixtures.mjs; the others are committed or built by the test helpers. The first entry of a format
+ * is the one that also runs the targets that need the engine.
+ */
+const FIXTURES = {
+  sidwave: [
+    ["fuer-elise", () => read("test/fixtures/sidwave-1.0/fuer-elise.yaml")],
+    ["chiptune-drive", () => read("test/fixtures/sidwave-1.1/chiptune_drive.yaml")],
+    ["chamber-waltz", () => read("test/fixtures/sidwave-1.2/chamber_waltz.yaml")],
+    ["title-fanfare", () => read("test/fixtures/sidwave-1.2/title_fanfare.yaml")],
+    ["digi-groove", () => read("test/fixtures/sidwave-1.2/digi_groove.yaml")],
+  ],
+  midi: ["fuer-elise", "chiptune-drive", "chamber-waltz", "title-fanfare"].map((n) => [n, () => generated(`${n}.mid`)]),
+  musicxml: ["fuer-elise", "chiptune-drive", "title-fanfare"].map((n) => [n, () => generated(`${n}.musicxml`)]),
+  goattracker: [...["fuer-elise", "chiptune-drive"].map((n) => [n, () => generated(`${n}.sng`)]), ["hand-authored", () => Buffer.from(gts())]],
+  furnace: [...["fuer-elise", "chiptune-drive"].map((n) => [n, () => generated(`${n}.fur`)]), ["hand-authored", () => Buffer.from(fur228())]],
+  sidwizard: [["fuer-elise", () => generated("fuer-elise.swm")], ["hand-built", () => read("test/fixtures/sidwizard/hand-built.swm")]],
+  sid: [["fuer-elise", () => Buffer.from(compileSidwaveBytes(parseSidwave(read("test/fixtures/sidwave-1.0/fuer-elise.yaml").toString("utf8")), { format: "sid" }).bytes)]],
+  "vice-dump": [["fur-elise", () => read("test/fixtures/traces/fur-elise.vice-dump.txt")]],
+  siddump: [["fur-elise", () => read("test/fixtures/traces/fur-elise.siddump.txt")]],
+};
+const EXTENSION = { sidwave: ".yaml", midi: ".mid", musicxml: ".musicxml", goattracker: ".sng", furnace: ".fur", sidwizard: ".swm", sid: ".sid", "vice-dump": ".dump", siddump: ".siddump" };
 
-/** Targets run for every input. WAV needs the audio engine and is run for one fixture per input format. */
-export const TARGETS = ["sidwave", "midi", "musicxml", "goattracker", "furnace", "prg", "sid", "events"];
-/** Targets that can be read back, so the quality of a conversion can be measured. */
-export const READABLE_TARGETS = ["sidwave", "midi", "musicxml", "goattracker", "furnace"];
+export const FORMATS = listFormats();
+/** Formats with a reader. Their fixtures are the inputs of the matrix. */
+export const READABLE_FORMATS = FORMATS.filter((f) => f.read).map((f) => f.id);
+/** Formats that can be written; every one is a target for every input. */
+export const WRITABLE_FORMATS = FORMATS.filter((f) => f.write).map((f) => f.id);
+/** Targets that can be read back exactly, so the quality of a conversion can be measured. */
+export const READABLE_TARGETS = FORMATS.filter((f) => f.read && f.write && !f.readApproximate).map((f) => f.id);
+/** Readable formats that have no fixture in this file: the matrix test fails on them. */
+export const MISSING_FIXTURES = READABLE_FORMATS.filter((id) => !FIXTURES[id]);
+/** Targets that render audio or traces with the engine. */
+export const ENGINE_TARGETS = FORMATS.filter((f) => f.write && f.writeNeedsEngine).map((f) => f.id);
+/** Formats whose reader needs the engine (a reconstruct). */
+export const ENGINE_SOURCES = FORMATS.filter((f) => f.readApproximate).map((f) => f.id);
 
-/** All inputs: { id, format, name, bytes, wav, sid }. `sid` inputs are read by reconstruct and need the engine. */
+/** All inputs: { id, format, name, bytes, first, engine }. `engine` inputs are read by reconstruct. */
 export function inputs() {
   const list = [];
-  for (const [id, file] of SCORES) list.push({ id: `sidwave:${id}`, format: "sidwave", name: `${id}.yaml`, bytes: read(file), wav: id === "fuer-elise" });
-  for (const [format, ext, ids] of BINARY) {
-    for (const id of ids) list.push({ id: `${format}:${id}`, format, name: `${id}${ext}`, bytes: fs.readFileSync(path.join(FIXTURE_DIR, `${id}${ext}`)), wav: id === "fuer-elise" });
+  for (const format of READABLE_FORMATS) {
+    (FIXTURES[format] ?? []).forEach(([name, load], index) => {
+      list.push({ id: `${format}:${name}`, format, name: `${name}${EXTENSION[format] ?? ""}`, bytes: load(), first: index === 0, engine: ENGINE_SOURCES.includes(format) });
+    });
   }
-  list.push({ id: "goattracker:hand-authored", format: "goattracker", name: "hand.sng", bytes: Buffer.from(gts()), wav: false });
-  list.push({ id: "furnace:hand-authored", format: "furnace", name: "hand.fur", bytes: Buffer.from(fur228()), wav: false });
-  const sid = compileSidwaveBytes(parseSidwave(read("test/fixtures/sidwave-1.0/fuer-elise.yaml").toString("utf8")), { format: "sid" }).bytes;
-  list.push({ id: "sid:fuer-elise", format: "sid", name: "fuer-elise.sid", bytes: Buffer.from(sid), wav: true, sid: true });
   return list;
 }
 
 /** Options of one conversion in the matrix. Short horizons keep the engine-based cases fast. */
 export function caseOptions(input, target) {
-  return { inputName: input.name, to: target, ...(input.sid ? { seconds: 4 } : {}), ...(target === "wav" ? { seconds: 1 } : {}) };
+  return { inputName: input.name, to: target, ...(input.engine ? { seconds: 4 } : {}), ...(ENGINE_TARGETS.includes(target) ? { seconds: 1 } : {}) };
 }
 
 /** Runs one conversion; the result is what the golden file stores. Never throws. */
@@ -66,13 +85,18 @@ export async function runCase(input, target, extra = {}) {
 }
 
 export const caseKey = (input, target) => `${input.id} -> ${target}`;
+export const goldenFile = (input) => path.join(GOLDEN_DIR, `${input.id.replace(/[^a-z0-9.-]+/gi, "_")}.json`);
 
+/** Every case of the matrix. Engine inputs and engine targets are left out without the engine. */
 export function caseList({ withEngine }) {
   const cases = [];
   for (const input of inputs()) {
-    if (input.sid && !withEngine) continue;
-    for (const target of TARGETS) if (!(input.format === target && target === "sid")) cases.push({ input, target });
-    if (input.wav && withEngine) cases.push({ input, target: "wav" });
+    if (input.engine && !withEngine) continue;
+    for (const target of WRITABLE_FORMATS) {
+      if (input.format === target && (ENGINE_SOURCES.includes(target) || target === "sid")) continue;
+      if (ENGINE_TARGETS.includes(target) && !(withEngine && input.first)) continue;
+      cases.push({ input, target });
+    }
   }
   return cases;
 }

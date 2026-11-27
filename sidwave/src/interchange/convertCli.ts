@@ -82,7 +82,7 @@ const short = (text: string, n = 150): string => (text.length > n ? `${text.slic
 
 function lossLines(losses: readonly Loss[]): string[] {
   const rank = { lost: 0, approx: 1, info: 2 } as const;
-  return [...losses].sort((a, b) => rank[a.severity] - rank[b.severity]).map((l) => `  ${l.severity.padEnd(6)} ${l.code.padEnd(20)} ${String(l.count).padStart(4)}  ${short(l.message.split(" | ")[0]!)}`);
+  return [...losses].sort((a, b) => rank[a.severity] - rank[b.severity]).map((l) => `  ${l.severity.padEnd(6)} ${l.code.padEnd(22)} ${(l.count > 1 ? String(l.count) : "").padStart(4)}  ${short(l.message.split(" | ")[0]!)}`);
 }
 
 function severityCounts(losses: readonly Loss[]): string {
@@ -96,6 +96,14 @@ function checkOverwrite(io: CliIo, target: string, force: boolean): void {
 }
 
 async function convertCommand(args: string[], io: CliIo): Promise<number> {
+  try { return await convertCommandInner(args, io); } catch (error) {
+    // Every usage error of convert points to its help.
+    if (error instanceof UsageError && !/--help/.test(error.message)) throw new UsageError(`${error.message} (see "sidwave convert --help")`);
+    throw error;
+  }
+}
+
+async function convertCommandInner(args: string[], io: CliIo): Promise<number> {
   if (wantsHelp(args)) { io.out(CONVERT_DETAIL); return EXIT_OK; }
   const a = parseFlags(args, VALUED, BARE);
   if (a.positional.length < 1 || a.positional.length > 2) throw new UsageError("convert needs an input file and optionally an output file: sidwave convert <in> [<out>] [--to <format>]");
@@ -158,9 +166,9 @@ async function convertCommand(args: string[], io: CliIo): Promise<number> {
       const plan = { dryRun: true, traced: false, from: probe.format.id, to: target.id, detected: { format: probe.format.id, by: probe.viaFrom ? "--from" : probe.detection.best?.by, candidates: probe.detection.candidates, warnings: probe.detection.warnings },
         chain: [`read:${probe.format.id}`, "normalise", `plan:${target.id}`, `write:${target.id}`],
         expectedLosses: [{ stage: "read", code: "reconstruct.approximate", severity: "approx", count: 1, message: "Reading a .sid recovers the score by tracing the tune: approximate, slow, limited to the horizon. The F-diff of the recovered score is part of the real report." }],
-        output: outputPath ?? null };
+        output: outputPath === undefined ? null : resolve(io.cwd, outputPath) };
       io.out(json ? `${JSON.stringify(envelope("convert", true, { result: plan }), null, 2)}\n`
-        : `dry run: ${file} is ${probe.format.id} (${probe.viaFrom ? "--from" : probe.detection.best?.by}); chain ${plan.chain.join(" > ")}\n  approx reconstruct.approximate  reading a .sid is approximate and slower (not run in a dry run)\n`);
+        : `dry run: ${file} is ${probe.format.id} (${probe.viaFrom ? "--from" : probe.detection.best?.by}); would write ${plan.output ?? "standard output"}\nchain: ${plan.chain.join(" > ")}\n  approx reconstruct.approximate         reading a .sid or a trace is approximate and slower (not run in a dry run)\n`);
       return EXIT_OK;
     }
   }
@@ -182,7 +190,7 @@ async function convertCommand(args: string[], io: CliIo): Promise<number> {
     }
   }
   const summary = {
-    dryRun, ...(strictFailed ? { strictFailed: true, note: "--strict: a loss with severity lost was found; nothing was written" } : {}),
+    dryRun, ...(dryRun ? { wouldWrite: outputPath === undefined ? null : resolve(io.cwd, outputPath) } : {}), ...(strictFailed ? { strictFailed: true, note: "--strict: a loss with severity lost was found; nothing was written" } : {}),
     from: result.from, to: result.to, detected: result.detected, chain: result.chain, losses: result.losses, severity: result.severity,
     ...(result.metrics ? { metrics: result.metrics } : {}), notices: result.notices, plan: result.plan, outputs, defaults: result.defaults, timings: result.timings,
     reports: result.reports,
@@ -194,16 +202,16 @@ async function convertCommand(args: string[], io: CliIo): Promise<number> {
   const ok = !strictFailed;
   if (json) { io.out(`${JSON.stringify(envelope("convert", ok, { result: summary }), null, 2)}\n`); return ok ? EXIT_OK : EXIT_FAILED; }
   if (reportTarget === "-") return ok ? EXIT_OK : EXIT_FAILED;
-  const text = humanSummary(file, result, outputs, dryRun, strictFailed);
+  const text = humanSummary(file, result, outputs, dryRun, strictFailed, outputPath === undefined ? undefined : resolve(io.cwd, outputPath));
   // With the converted bytes on standard output the summary goes to standard error so the two never mix.
   if (toStdout) io.err(text); else io.out(text);
   return ok ? EXIT_OK : EXIT_FAILED;
 }
 
-function humanSummary(file: string, result: ConvertResult, outputs: Array<{ kind: string; path: string | null; bytes: number }>, dryRun: boolean, strictFailed: boolean): string {
+function humanSummary(file: string, result: ConvertResult, outputs: Array<{ kind: string; path: string | null; bytes: number }>, dryRun: boolean, strictFailed: boolean, wouldWrite?: string): string {
   const lines: string[] = [];
   const how = result.detected.viaFrom ? "from --from" : `detected by ${result.detected.by}, confidence ${result.detected.confidence}`;
-  const where = dryRun ? "dry run, nothing written" : outputs.filter((o) => o.kind !== "report").map((o) => `${o.kind} ${o.path ?? "standard output"} (${o.bytes} bytes)`).join(", ");
+  const where = dryRun ? `dry run, would write ${wouldWrite ?? "standard output"}; nothing written` : outputs.filter((o) => o.kind !== "report").map((o) => `${o.kind} ${o.path ?? "standard output"} (${o.bytes} bytes)`).join(", ");
   lines.push(`${file}: ${result.from} (${how}) -> ${result.to}; ${where || "nothing written"}`);
   lines.push(`chain: ${result.chain.join(" > ")}`);
   if (result.plan.dropped.length) lines.push(`voices dropped: ${result.plan.dropped.map((id) => `v${id}`).join(", ")}`);
@@ -211,9 +219,13 @@ function humanSummary(file: string, result: ConvertResult, outputs: Array<{ kind
   else lines.push("losses: none");
   const m = result.metrics;
   if (m) {
-    lines.push(m.available
-      ? `quality: note F1 ${m.noteF1} (precision ${m.precision}, recall ${m.recall}), onset error mean ${m.onsetError?.meanMs} ms max ${m.onsetError?.maxMs} ms, octave shifts ${m.octaveShifted}, voices dropped ${m.voicesDropped}, instruments mapped ${m.instruments?.mapped}/${m.instruments?.used}${m.fdiff ? `, F-diff ${m.fdiff.differingCalls} register-class differences over ${m.fdiff.comparedCalls} calls` : ""}`
-      : `quality: not measured (${m.reason})`);
+    if (!m.available) lines.push(`quality: not measured (${m.reason})`);
+    else {
+      lines.push(`quality (reference: the score after the import, all voices): note F1 ${m.noteF1} (precision ${m.precision}, recall ${m.recall}), pitch only ${m.noteF1PitchOnly}, drum identity ${m.drumIdentity}`);
+      lines.push(`  onset error mean ${m.onsetError?.meanMs} ms, max ${m.onsetError?.maxMs} ms (tolerance ${m.onsetToleranceMs} ms); duration overlap ${m.durationOverlap}; voice agreement ${m.voiceAgreement}; octave shifts ${m.octaveShifted}; voices dropped ${m.voicesDropped}; instruments mapped ${m.instruments?.mapped}/${m.instruments?.used}; length ${m.durationSeconds?.reference} s -> ${m.durationSeconds?.output} s`);
+      if (m.sourceVsOutput) lines.push(`  against the ${m.sourceVsOutput.source}: F1 ${m.sourceVsOutput.noteF1PitchOnly} (precision ${m.sourceVsOutput.precision}, recall ${m.sourceVsOutput.recall}), duration overlap ${m.sourceVsOutput.durationOverlap}`);
+      if (m.fdiff) lines.push(`  F-diff ${m.fdiff.differingCalls} register-class differences over ${m.fdiff.comparedCalls} calls`);
+    }
   }
   if (strictFailed) lines.push("--strict: a loss with severity lost was found; nothing was written");
   return `${lines.join("\n")}\n`;
@@ -245,7 +257,7 @@ function infoCommand(args: string[], io: CliIo): number {
   const detection = detectFormat(bytes, file);
   const format = from !== undefined ? findFormat(from) : detection.best ? formatDefinitions().find((f) => f.id === detection.best!.id) : undefined;
   if (from !== undefined && !format) throw new InterchangeUsageError(`unknown format "${from}" for --from; run "sidwave formats"`);
-  if (!format) throw new InterchangeUsageError(ambiguityMessage(file, detection));
+  if (!format) throw new InterchangeUsageError(ambiguityMessage(file, detection, bytes.length));
   let details: Record<string, unknown> = {};
   try { details = format.describe ? format.describe(bytes) : {}; } catch (error) {
     if (error instanceof RangeError || error instanceof SyntaxError) throw new InterchangeUsageError(`${file} is not a valid ${format.id} file: ${error.message}`);

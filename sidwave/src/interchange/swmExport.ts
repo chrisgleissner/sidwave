@@ -6,7 +6,7 @@
 // tempo. Everything else is listed in the result's `losses`. Mapping: doc/interchange.md.
 
 import type { ParsedSidwave } from "../sidwave.js";
-import { exportEvents, type ExportedInstrument } from "./events.js";
+import { exportEvents, type ExportedInstrument, type ExportedScore } from "./events.js";
 import { SWM_WRITE_MAX_INSTRUMENTS, SWM_WRITE_MAX_PATTERNS, defaultSwmHeader, SwmError, SWM_NOTEFX, writeSwm, writeSwi, type SwmInstrument, type SwmModule, type SwmPattern, type SwmRow } from "./swm.js";
 
 export interface SwmExportOptions {
@@ -14,6 +14,9 @@ export interface SwmExportOptions {
   song?: number;
   /** Rows per pattern: 16, 32 or 64. Default 32. */
   patternRows?: number;
+  /** Voices chosen by the convert hub's ScorePlan, and its event export of the song. */
+  voiceIds?: readonly number[];
+  source?: ExportedScore;
 }
 
 export interface SwmExportResult {
@@ -49,7 +52,7 @@ export function swmInstrumentFor(inst: ExportedInstrument, name: string): SwmIns
 }
 
 export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): SwmExportResult {
-  const ev = exportEvents(doc, { ...(options.song === undefined ? {} : { song: options.song }) });
+  const ev = exportEvents(doc, { ...(options.song === undefined ? {} : { song: options.song }), ...(options.voiceIds ? { voiceIds: options.voiceIds } : {}), ...(options.source ? { source: options.source } : {}) });
   const losses: string[] = [];
   const frameRate = ev.mode === "PAL" ? 985_248 / 19_656 : 1_022_727 / 17_095;
   const speed = Math.round(ev.callRate / frameRate);
@@ -57,7 +60,7 @@ export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): S
   const pitched = ev.voices.filter((v) => v.kind === "pitched" && v.notes.length > 0);
   const dropped = ev.voices.filter((v) => v.kind === "drums" && v.notes.length > 0);
   if (dropped.length) losses.push(`Drum voices (${dropped.map((v) => `v${v.id}`).join(", ")}) are not exported: SID-Wizard drums are instruments, which this export does not build from SIDWave kits.`);
-  const voices = pitched.filter((v) => v.sid === 0).slice(0, 3);
+  const voices = options.voiceIds ? pitched.slice(0, 3) : pitched.filter((v) => v.sid === 0).slice(0, 3);
   const others = pitched.filter((v) => !voices.includes(v));
   if (others.length) losses.push(`Voices ${others.map((v) => `v${v.id}`).join(", ")} are not exported: an SWM module has three tracks (one SID).`);
   if (voices.length === 0) throw new SwmError("the score has no pitched voice on the first SID to export");

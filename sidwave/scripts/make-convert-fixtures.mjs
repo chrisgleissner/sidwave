@@ -12,14 +12,14 @@ const out = path.join(root, "test/fixtures/convert");
 fs.mkdirSync(out, { recursive: true });
 
 const SOURCES = [
-  ["fuer-elise", "test/fixtures/sidwave-1.0/fuer-elise.yaml", ["midi", "musicxml", "goattracker", "furnace"]],
+  ["fuer-elise", "test/fixtures/sidwave-1.0/fuer-elise.yaml", ["midi", "musicxml", "goattracker", "furnace", "sidwizard"]],
   ["chiptune-drive", "test/fixtures/sidwave-1.1/chiptune_drive.yaml", ["midi", "musicxml", "goattracker", "furnace"]],
   // 22 tempo changes: the tempo map of MIDI.
   ["chamber-waltz", "test/fixtures/sidwave-1.2/chamber_waltz.yaml", ["midi"]],
   // Five voices on two SIDs: voice reduction.
   ["title-fanfare", "test/fixtures/sidwave-1.2/title_fanfare.yaml", ["midi", "musicxml"]],
 ];
-const EXT = { midi: ".mid", musicxml: ".musicxml", goattracker: ".sng", furnace: ".fur" };
+const EXT = { midi: ".mid", musicxml: ".musicxml", goattracker: ".sng", furnace: ".fur", sidwizard: ".swm" };
 
 for (const [name, file, targets] of SOURCES) {
   const bytes = fs.readFileSync(path.join(root, file));

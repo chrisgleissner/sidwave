@@ -63,6 +63,17 @@ const RULES: Array<[RegExp, string, LossSeverity]> = [
   [/instrument \d+:|^instrument .* not a c64 instrument|macro \d+/i, "instrument.simplified", "approx"],
   [/master volume|tick-0 waveform|exact frame timing/i, "timing.approximated", "approx"],
   [/volume column/i, "volume.dropped", "lost"],
+  [/^Rows are one player call long/i, "rows.one-call", "info"],
+  [/^Drum voices .* are not exported/i, "notes.drums", "lost"],
+  [/an SWM module has three tracks/i, "voices.dropped", "lost"],
+  [/^Instrument .+?: filter is not exported/i, "filter.dropped", "lost"],
+  [/^Instrument .+?: wavetable is not exported/i, "wavetable.dropped", "lost"],
+  [/^Instrument .+?: vibrato is not exported/i, "vibrato.dropped", "lost"],
+  [/^Instrument .+?: pulse table/i, "pulse.modulation", "approx"],
+  [/notes carry bends, chord arpeggios, legato/i, "glide.dropped", "lost"],
+  [/^Velocity, voice and section levels/i, "expression.dropped", "approx"],
+  [/^[A-Z][A-Z0-9]+(-[A-Z0-9]+)*: /, "compile.advisory", "info"],
+  [/rows are \d+ to \d+ calls long/i, "rows.merged", "approx"],
   [/^gts[!2345]|conversion|converted/i, "format.upgraded", "info"],
   [/tempo.*(note|rows)/i, "tempo.quantised", "approx"],
 ];
@@ -70,7 +81,7 @@ const RULES: Array<[RegExp, string, LossSeverity]> = [
 /** Severity and code of one sentence reported by an importer or exporter. */
 export function classifyLossText(text: string): { code: string; severity: LossSeverity } {
   for (const [pattern, code, severity] of RULES) if (pattern.test(text)) return { code, severity };
-  return { code: "note", severity: "info" };
+  return { code: "note", severity: "approx" };
 }
 
 /** Wraps the sentences of an importer or exporter as structured losses of one stage. */

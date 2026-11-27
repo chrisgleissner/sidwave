@@ -226,7 +226,6 @@ export function importGoatTracker(bytes: Uint8Array, options: GoatTrackerImportO
     for (const note of converted.notes) losses.push(`Instrument ${number}: ${note}`);
   }
   if (instReports.length > 63) throw new GoatTrackerError(`the song uses ${instReports.length} instruments; SIDWave allows 63`);
-  losses.push("Master volume, tick-0 waveform (the first frame of a note) and the exact frame timing inside a row are approximated; GoatTracker's filter is global while SIDWave routes the voice of the instrument that starts the table.");
 
   const title = options.title ?? (song.name || "Imported GoatTracker song");
   const yaml = buildGridScore({

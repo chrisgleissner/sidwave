@@ -324,7 +324,9 @@ export function importMusicXml(bytes: Uint8Array, options: MusicXmlImportOptions
   if (skipped.graceNotes) losses.push(`${skipped.graceNotes} grace notes are not imported.`);
   if (skipped.cueNotes) losses.push(`${skipped.cueNotes} cue notes are not imported.`);
   if (skipped.repeats) losses.push("Repeat signs and endings are not expanded; the measures play once as written.");
-  losses.push("Dynamics marks, articulations, slurs, ornaments, lyrics, key signatures and clefs are not imported; a note's `dynamics` attribute sets its level (velocity = 0.9 x dynamics, 127 without the attribute).");
+  const markup = Buffer.from(bytes).toString("latin1");
+  const unreadMarks = (markup.match(/<(?:dynamics|articulations|slur|ornaments|lyric|technical|fermata)\b/g) ?? []).length;
+  if (unreadMarks) losses.push(`${unreadMarks} notation marks (dynamics marks, articulations, slurs, ornaments, lyrics, fermatas) are not imported; a note's \`dynamics\` attribute sets its level.`);
   const title = options.title ?? (childText(child(root, "work") ?? root, "work-title") || childText(root, "movement-title") || "Imported MusicXML");
   const composer = childrenOf(child(root, "identification") ?? root, "creator").find((c) => c.attrs.type === "composer")?.text.trim();
   let yaml: string;

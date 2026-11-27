@@ -53,8 +53,8 @@ test("the default output is <stem>.<ext>; an existing file is never overwritten 
 
 test("--json prints the envelope with chain, detection, losses, defaults and timings", async () => {
   const dir = tmp();
-  copy(dir, fix("chiptune-drive.sng"));
-  const result = await run(["convert", "chiptune-drive.sng", "out.musicxml", "--json", "--verify"], dir);
+  copy(dir, fix("fuer-elise.sng"));
+  const result = await run(["convert", "fuer-elise.sng", "out.musicxml", "--json", "--verify"], dir);
   assert.equal(result.code, 0, result.err);
   const parsed = JSON.parse(result.out);
   assert.equal(parsed.ok, true);
@@ -80,7 +80,14 @@ test("an input that cannot be classified exits 3 with the candidates and the exa
   fs.writeFileSync(path.join(dir, "tune.prg"), Buffer.from([1, 8, 0, 0]));
   const prg = await run(["convert", "tune.prg", "out.mid"], dir);
   assert.equal(prg.code, 3);
-  assert.match(prg.err, /Pass --from prg/);
+  assert.match(prg.err, /Pass --from prg to read it as prg anyway/);
+  assert.doesNotMatch(prg.err, /with confidence/);
+  fs.writeFileSync(path.join(dir, "empty.mid"), Buffer.alloc(0));
+  const empty = await run(["convert", "empty.mid", "out.mid"], dir);
+  assert.equal(empty.code, 3);
+  assert.match(empty.err, /empty\.mid is empty for midi/);
+  fs.writeFileSync(path.join(dir, "short.mid"), Buffer.from("MT"));
+  assert.match((await run(["convert", "short.mid", "out.mid"], dir)).err, /too short \(2 bytes\) for midi/);
   // --from skips detection; the importer then reports what is wrong with the content.
   const forced = await run(["convert", "mystery.bin", "out.mid", "--from", "midi"], dir);
   assert.equal(forced.code, 3);
@@ -118,7 +125,7 @@ test("--dry-run writes nothing; --strict exits 1 on a lost loss and writes nothi
   const dry = await run(["convert", "fuer-elise.sng", "out.mid", "--dry-run"], dir);
   assert.equal(dry.code, 0);
   assert.equal(fs.existsSync(path.join(dir, "out.mid")), false);
-  assert.match(dry.out, /dry run, nothing written/);
+  assert.match(dry.out, /dry run, would write .*out\.mid; nothing written/);
   // Five voices to GoatTracker: two voices are lost.
   const five = copy(dir, score("sidwave-1.2/title_fanfare.yaml"), "fanfare.yaml");
   assert.ok(fs.existsSync(five));
@@ -187,7 +194,12 @@ test("usage errors exit 2 and unreadable input exits 3", async () => {
   assert.equal((await run(["convert", "fuer-elise.mid", "--to", "nonsense"], dir)).code, 2);
   assert.equal((await run(["convert", "fuer-elise.mid", "--to", "midi", "--song", "x"], dir)).code, 2);
   assert.equal((await run(["convert", "fuer-elise.mid", "--to", "midi", "--mode", "SECAM"], dir)).code, 2);
-  assert.equal((await run(["convert", "missing.mid", "--to", "sidwave"], dir)).code, 3);
+  const missing = await run(["convert", "missing.mid", "--to", "sidwave"], dir);
+  assert.equal(missing.code, 3);
+  assert.match(missing.err, /cannot read missing\.mid: the file does not exist/);
+  fs.mkdirSync(path.join(dir, "folder.mid"));
+  assert.match((await run(["convert", "folder.mid", "--to", "sidwave"], dir)).err, /cannot read folder\.mid: it is a directory, not a file/);
+  assert.match((await run(["convert"], dir)).err, /see "sidwave convert --help"/);
   const song = await run(["convert", "fuer-elise.mid", "--to", "sid", "--song", "2"], dir);
   assert.equal(song.code, 2);
   assert.match(song.err, /holds one song/);
@@ -283,4 +295,30 @@ timeline:
     assert.ok(ramp, `${to}: no tempo.ramp loss in ${JSON.stringify(result.losses.map((l) => l.code))}`);
     assert.equal(ramp.severity, "approx");
   }
+});
+
+test("a plain MIDI, MusicXML or tracker file passes --strict: static sentences are not reported as lost", async () => {
+  const dir = tmp();
+  for (const [file, to] of [["fuer-elise.mid", "out.sng"], ["fuer-elise.mid", "out.musicxml"], ["fuer-elise.musicxml", "out.mid"], ["fuer-elise.fur", "out.mid"], ["fuer-elise.sng", "out.mid"], ["fuer-elise.swm", "out.mid"], ["fuer-elise.mid", "out.fur"]]) {
+    copy(dir, fix(file));
+    const result = await run(["convert", file, to, "--strict", "--force"], dir);
+    assert.equal(result.code, 0, `${file} -> ${to}: ${result.out}${result.err}`);
+  }
+});
+
+test("a score with speed 2 keeps its note times in GoatTracker, Furnace and SID-Wizard; only the end of the song moves to a bar line", async () => {
+  const bytes = fs.readFileSync(score("sidwave-1.1/chiptune_drive.yaml"));
+  for (const to of ["goattracker", "furnace", "midi"]) {
+    const result = await convert(bytes, { to, verify: true, inputName: "chiptune_drive.yaml" });
+    const m = result.metrics;
+    assert.equal(m.noteF1PitchOnly, 1, `${to}: ${JSON.stringify(m)}`);
+    assert.ok(m.onsetError.maxMs <= 40, `${to}: onset error ${m.onsetError.maxMs} ms`);
+    // The song length differs by the padding of the last bar, not by a tempo drift: the last note starts within a frame.
+    assert.ok(Math.abs(m.durationSeconds.output - m.durationSeconds.reference) < 0.8, `${to}: ${JSON.stringify(m.durationSeconds)}`);
+  }
+  // SID-Wizard keeps the one-call rows of a speed-2 score only by merging them to 3-frame cells when it is read back.
+  const swm = await convert(bytes, { to: "sidwizard", inputName: "chiptune_drive.yaml" });
+  assert.ok(swm.losses.some((l) => l.code === "rows.one-call"));
+  const gt = await convert(bytes, { to: "goattracker", inputName: "chiptune_drive.yaml" });
+  assert.ok(gt.losses.some((l) => l.code === "timing.multispeed" && l.severity === "approx"));
 });

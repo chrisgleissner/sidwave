@@ -91,6 +91,23 @@ for (const name of names) {
   }
 }
 
+// ---- convert hub (detect, read, plan, write, verify; no engine) -------------------------------------------------
+{
+  const { convert } = await import(`${pkg}/interchange/convert.js`);
+  const { readFileSync } = await import("node:fs");
+  const fixtures = join(root, "sidwave", "test", "fixtures", "convert");
+  const score = (n) => new TextEncoder().encode(readSidwaveExample(n));
+  const jobs = [
+    ["convert/chiptune_drive.yaml->midi", score("chiptune_drive"), "midi"],
+    ["convert/chiptune_drive.yaml->goattracker", score("chiptune_drive"), "goattracker"],
+    ["convert/chamber_waltz.mid->musicxml", readFileSync(join(fixtures, "chamber-waltz.mid")), "musicxml"],
+    ["convert/chiptune-drive.sng->midi+verify", readFileSync(join(fixtures, "chiptune-drive.sng")), "midi", true],
+  ];
+  for (const [name, bytes, to, verify] of jobs) {
+    await measureAsync(name, () => convert(bytes, { to, ...(verify ? { verify: true } : {}) }));
+  }
+}
+
 // ---- SID file, songlengths ------------------------------------------------------------------------------------
 {
   const doc = parseSidwave(readSidwaveExample("chiptune_drive"));

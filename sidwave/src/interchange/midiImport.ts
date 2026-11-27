@@ -460,7 +460,9 @@ export function importMidi(bytes: Uint8Array, options: MidiImportOptions = {}): 
       throw error;
     }
   }
-  losses.push("Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md).");
+  let unread = 0;
+  for (const track of smf.tracks) for (const e of track) if ((e.type === "controller" && ![101, 100, 6, 38].includes(e.controller)) || e.type === "other") unread++;
+  if (unread) losses.push(`${unread} MIDI events (controllers other than the pitch bend range, aftertouch, SysEx and other meta events) are not imported.`);
   if (options.bend === false) losses.push("Pitch bend import is disabled.");
   return {
     yaml: text,
