@@ -13,8 +13,8 @@ import {
 import type { SidwaveFinding } from "./sidwaveLint.js";
 import { Cpu6502 } from "./sidwaveEmulator.js";
 
-export type SidwaveSymbolFormat = "acme" | "kickass" | "ca65" | "vice" | "json";
-export const SIDWAVE_SYMBOL_FORMATS: readonly SidwaveSymbolFormat[] = ["acme", "kickass", "ca65", "vice", "json"];
+export type SidwaveSymbolFormat = "64tass" | "acme" | "kickass" | "ca65" | "vice" | "json";
+export const SIDWAVE_SYMBOL_FORMATS: readonly SidwaveSymbolFormat[] = ["64tass", "acme", "kickass", "ca65", "vice", "json"];
 
 export interface SidwaveGameOptions {
   target: "game";
@@ -32,6 +32,25 @@ export interface SidwaveGameOptions {
   loop?: boolean;
   /** Run the score on the bundled emulator and report measured cycles (default true). Without it the measured values are null. */
   measure?: boolean;
+  /** Maximum allowed play-call cycles; measured worst, or analytic upper bound without measurement. */
+  maxCycles?: number;
+}
+
+/** The play call of a game build needs more cycles than `maxCycles` allows. Classified as `limit_exceeded`. */
+export class SidwaveGameCycleLimitError extends Error {
+  /** Worst measured cycles per play call (calls with effects included); null without measurement. */
+  readonly measured: number | null;
+  readonly upperBound: number;
+  readonly limit: number;
+  constructor(measured: number | null, upperBound: number, limit: number) {
+    super(`game cycle limit ${limit} exceeded: ${measured === null
+      ? `the upper bound of a play call is ${upperBound} cycles (not measured)`
+      : `the measured worst play call takes ${measured} cycles (upper bound ${upperBound})`}`);
+    this.name = "SidwaveGameCycleLimitError";
+    this.measured = measured;
+    this.upperBound = upperBound;
+    this.limit = limit;
+  }
 }
 
 /** SIDWave 1.4, a score with effects: the play calls of a run that keeps all three voices busy with effects. */
@@ -157,6 +176,26 @@ export interface SidwaveGameBuild {
 const hex = (n: number, digits = 4) => n.toString(16).toUpperCase().padStart(digits, "0");
 const addr = (n: number) => `$${hex(n, n < 0x100 ? 2 : 4)}`;
 
+/**
+ * Makes text safe for one line of a source comment: line breaks and other control characters would end the comment,
+ * and a block comment terminator would end a comment the including file may have opened around it.
+ */
+export function commentText(text: string): string {
+  return text.replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]+/g, " ").replace(/\*\//g, "* /");
+}
+
+/** 64tass ignores the case of symbols unless run with `-C`, so two names that differ only in case cannot both exist. */
+export function assertDistinct64tassSymbols(names: readonly string[]): void {
+  const seen = new Map<string, string>();
+  for (const name of names) {
+    const first = seen.get(name.toLowerCase());
+    if (first !== undefined) {
+      throw new SidwaveValidationError("$.effects", `the symbols ${first} and ${name} differ only in letter case, which 64tass treats as one symbol; rename the effect or use another assembler`);
+    }
+    seen.set(name.toLowerCase(), name);
+  }
+}
+
 /** Entry points and contract labels exported by default, in file order. */
 function publicLabels(image: SidwaveGameImage): Array<[string, number, string]> {
   const sym = (label: string) => image.symbols.get(label)!;
@@ -217,8 +256,11 @@ function contractLines(contract: SidwaveGameContract, build: { cycles: SidwaveGa
 
 function symbolFile(format: SidwaveSymbolFormat, entries: Array<[string, number, string]>, contract: SidwaveGameContract,
   build: { cycles: SidwaveGameCycles }): string {
-  const comments = (token: string) => contractLines(contract, build).map((line) => `${token} ${line}`);
+  const comments = (token: string) => contractLines(contract, build).map((line) => `${token} ${commentText(line)}`);
   switch (format) {
+    case "64tass":
+      assertDistinct64tassSymbols(entries.map(([name]) => name));
+    // falls through: 64tass and ACME share the syntax of comments and constants.
     case "acme":
       return [...comments(";"), ...entries.map(([name, value, note]) => `${name} = ${addr(value)} ; ${note}`)].join("\n") + "\n";
     case "kickass":
@@ -317,6 +359,9 @@ export function compileSidwave(doc: ParsedSidwave, options: SidwaveGameOptions):
   if ((options as { target?: string }).target !== "game") {
     throw new SidwaveValidationError("$.target", `only the "game" target is available here (use compileSidwaveToPrg for a PRG)`);
   }
+  if (options.maxCycles !== undefined && (!Number.isSafeInteger(options.maxCycles) || options.maxCycles < 0)) {
+    throw new SidwaveValidationError("$.maxCycles", "maxCycles must be a nonnegative safe integer");
+  }
   for (const format of options.symbols ?? []) {
     if (!SIDWAVE_SYMBOL_FORMATS.includes(format)) {
       throw new SidwaveValidationError("$.symbols", `unknown symbol format "${format}"; use ${SIDWAVE_SYMBOL_FORMATS.join(", ")}`);
@@ -354,6 +399,12 @@ export function compileSidwave(doc: ParsedSidwave, options: SidwaveGameOptions):
       calls: measured?.songs?.[k]!.calls ?? 0, estimatedWorst: song.worstCaseCycles,
     })) } : {}),
   };
+  if (options.maxCycles !== undefined) {
+    const measuredPlayWorst = measured ? Math.max(measured.worst, measured.effects?.worst ?? 0) : null;
+    if ((measuredPlayWorst ?? cycles.estimatedWorst) > options.maxCycles) {
+      throw new SidwaveGameCycleLimitError(measuredPlayWorst, cycles.estimatedWorst, options.maxCycles);
+    }
+  }
   const entryPoints = {
     init: image.origin + SIDWAVE_GAME_ENTRY.init, play: image.origin + SIDWAVE_GAME_ENTRY.play,
     stop: image.origin + SIDWAVE_GAME_ENTRY.stop, sfx: image.origin + SIDWAVE_GAME_ENTRY.sfx,
@@ -500,3 +551,5 @@ export function sidwaveGamePsid(doc: ParsedSidwave, build: SidwaveGameBuild): Bu
   const relocation = freePageRange([[low, high + start.length]]);
   return compileSidwaveToSid(doc, body, { initAddress: high, playAddress: image.origin + SIDWAVE_GAME_ENTRY.play, relocation }).sid;
 }
+
+export * from "./sidwaveGameDeveloper.js";

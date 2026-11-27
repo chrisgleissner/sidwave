@@ -6,6 +6,7 @@ import { SidFileError } from "./sidFile.js";
 import { SonglengthsError } from "./songlengths.js";
 import { HvscError } from "./hvsc.js";
 import { SidwaveValidationError } from "./sidwave.js";
+import { SidwaveGameCycleLimitError } from "./sidwaveGame.js";
 import { InterchangeLimitError, InterchangeUsageError } from "./interchange/errors.js";
 import { MidiError } from "./interchange/smf.js";
 import { MidiImportError } from "./interchange/midiImport.js";
@@ -74,6 +75,7 @@ export function classifyError(error: unknown): ErrorReport {
   if (error instanceof SidwaveValidationError) return { category: "validation", message: error.message, details: { path: error.path } };
   if (error instanceof RetargetError) return { category: "validation", message: error.message, details: { code: error.code } };
   if (error instanceof InterchangeLimitError) return { category: "limit_exceeded", message: error.message, details: {} };
+  if (error instanceof SidwaveGameCycleLimitError) return { category: "limit_exceeded", message: error.message, details: { measured: error.measured, upperBound: error.upperBound, limit: error.limit } };
   if (error instanceof MidiError || error instanceof MidiImportError || error instanceof InterchangeUsageError) return { category: "input", message: error.message, details: {} };
   if (error instanceof SidFileError) return { category: "input", message: error.message, details: { code: error.code } };
   if (error instanceof HvscError) return { category: error.category, message: error.message, details: { code: error.code } };
