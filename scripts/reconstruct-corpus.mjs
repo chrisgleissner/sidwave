@@ -163,6 +163,7 @@ async function runOne(tune) {
     strictExact: report.strictExact,
     registerStateExact: report.registerStateExact,
     compileOk: report.compile?.ok === true,
+    ...(report.compile?.cycleBudgetExceeded ? { cycleBudgetExceeded: report.compile.cycleBudgetExceeded } : {}),
     ...(report.compile?.ok ? {} : { compileError: report.compile?.error }),
     calls: report.horizon.calls,
     callRate: report.callRate,

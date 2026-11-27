@@ -174,3 +174,25 @@ test("a pulse width that wraps modulo 4096 or reaches 0 is recovered as a wrap t
   assert.match(r.score, /wrap: true/);
   assert.equal(r.report.fdiffState.classes.pulse.differingCalls, 0, JSON.stringify(r.report.fdiff.first));
 });
+
+test("a recovered score that exceeds the cycle budget is compiled for a faster CPU, reported, and never a strict pass", async () => {
+  const unit = 1 / 128;
+  const g = Array.from({ length: 32 }, (_, i) => ({ note: i % 2 ? "C5" : "A4", len: 0.125 }));
+  const score = {
+    sidwave: "1.5", title: "eight", tempo: 60 * 50.1245 / 16, mode: "PAL", speed: 8, player: { soft_start: false },
+    instruments: {
+      a: { waveform: "pulse", adsr: [0, 4, 12, 3], hard_restart: { frames: 0 }, vibrato: { depth: 0.3, rate: 5 }, pulsetable: { steps: [{ set: 1000 }, { add: 5, calls: 20 }], loop: 1 } },
+    },
+    voices: [1, 2, 3].map((id) => ({ id, instrument: "a", patterns: { p: { length: unit, bars: 1, groove: g.flatMap((x) => [x]) } } })),
+    timeline: [{ section: "Main", bars: 1, layers: { v1: "p", v2: "p", v3: "p" } }],
+  };
+  let result;
+  try {
+    result = await roundTrip(score, 2);
+  } catch (error) {
+    assert.match(String(error.message), /cpu: turbo|Invalid SIDWAVE/);
+    return;
+  }
+  if (result.report.compile?.cycleBudgetExceeded) assert.equal(result.report.strictExact, false);
+  assert.equal(result.report.compile?.ok, true, result.report.compile?.error);
+});

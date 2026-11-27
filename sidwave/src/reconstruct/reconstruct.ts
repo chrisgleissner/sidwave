@@ -65,7 +65,7 @@ export interface ReconstructReport {
   registerStateExact: boolean;
   languageExtensions: LanguageExtension[];
   recovery: Pick<RecoveredScore, "speed" | "tempo" | "firstCall" | "rows" | "tuningCents" | "noteCount" | "phantomNotes" | "instrumentCount" | "patternCount" | "structure" | "tuningEvidence" | "languageVersion" | "softStartOff">;
-  compile?: { ok: boolean; error?: string };
+  compile?: { ok: boolean; error?: string; /** The compiler's message when the recovered score needs more cycles per call than 1 MHz allows; the score was then compiled with `cpu: turbo`. */ cycleBudgetExceeded?: string };
 }
 
 /** Wall time (ms) and process CPU time (ms) of the phases of reconstructSid. CPU time covers the whole process, so concurrent work in the same process is included. */
@@ -164,6 +164,7 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
   const t3 = performance.now();
   const timings: ReconstructTimings = { traceMs: t1 - t0, irMs: t2 - t1, recoverMs: t3 - t2, compileMs: 0, retraceMs: 0, fdiffMs: 0, totalMs: 0, totalCpuMs: 0 };
   let compiledBytes: Uint8Array | undefined;
+  let cycleBudgetExceeded: string | undefined;
   const report: ReconstructReport = {
     horizon: { seconds, cycles: trace.horizonCycles, calls: original.calls.length, clock: trace.clock, song },
     callRate: {
@@ -185,7 +186,16 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
   };
   try {
     const tc0 = performance.now();
-    const compiled = compileSidwaveBytes(parseSidwave(recovered.text), { format: "sid", loop: true });
+    let compiled;
+    try {
+      compiled = compileSidwaveBytes(parseSidwave(recovered.text), { format: "sid", loop: true });
+    } catch (error) {
+      // The player needs more cycles per call than one call period holds at 1 MHz. The score is compiled for a faster CPU
+      // (`cpu: turbo`) so that the F-diff can still show what else differs; the report says so and the result is never a strict pass at 1 MHz.
+      if (!(error instanceof Error) || !/use cpu: turbo/.test(error.message)) throw error;
+      compiled = compileSidwaveBytes(parseSidwave(`${recovered.text}\ncpu: turbo\n`), { format: "sid", loop: true });
+      cycleBudgetExceeded = error.message;
+    }
     compiledBytes = new Uint8Array(compiled.bytes);
     const tc1 = performance.now();
     const second = await options.engine.trace({ sid: compiledBytes, seconds, clock });
@@ -195,12 +205,12 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
     report.fdiff = bestFdiff(original, recompiled, recovered.firstCall);
     // When the complete F-diff is equal, the register-state F-diff (a weaker comparison of the same IRs) is equal too.
     report.fdiffState = report.fdiff.equal && report.fdiff.standardAlignment ? report.fdiff : bestFdiff(stateOnlyIr(original), stateOnlyIr(recompiled), recovered.firstCall);
-    report.compile = { ok: true };
+    report.compile = { ok: true, ...(cycleBudgetExceeded ? { cycleBudgetExceeded } : {}) };
     timings.compileMs = tc1 - tc0;
     timings.retraceMs = tc2 - tc1;
     timings.irMs += tc3 - tc2;
     timings.fdiffMs = performance.now() - tc3;
-    report.strictExact = report.fdiff.equal && report.fdiff.standardAlignment && !report.fdiff.callCountMismatch;
+    report.strictExact = report.fdiff.equal && report.fdiff.standardAlignment && !report.fdiff.callCountMismatch && !cycleBudgetExceeded;
     report.registerStateExact = report.fdiffState.standardAlignment && !report.fdiffState.callCountMismatch
       && REGISTER_CLASSES.every((c) => c === "timing" || report.fdiffState.classes[c].differingCalls === 0);
   } catch (error) {
