@@ -882,17 +882,18 @@ function normalizeInstruments(raw: unknown, path: string, modern: boolean, v13 =
     }
     if (modern && inst.hard_restart !== undefined) {
       const hp = `${ip}.hard_restart`;
-      const restart = requireObject(inst.hard_restart, hp, ["frames", "adsr", "test"]);
+      const restart = requireObject(inst.hard_restart, hp, ["frames", "adsr", "test", ...(v15 ? ["wave"] : [])]);
+      if (restart.wave !== undefined && restart.wave !== "none") throw new SidwaveValidationError(`${hp}.wave`, "expected none");
       const frames = requireNumber(restart.frames ?? 2, `${hp}.frames`, { min: 0, max: 255, integer: true });
       if (restart.test !== undefined && typeof restart.test !== "boolean") throw new SidwaveValidationError(`${hp}.test`, "expected a boolean");
-      if (!frames && (restart.test || restart.adsr !== undefined)) throw new SidwaveValidationError(hp, "zero frames disables the restart and cannot set ADSR or TEST");
+      if (!frames && (restart.test || restart.adsr !== undefined || restart.wave !== undefined)) throw new SidwaveValidationError(hp, "zero frames disables the restart and cannot set ADSR or TEST");
       let adsr = [0, 0, 0, 0];
       if (restart.adsr !== undefined) {
         if (!Array.isArray(restart.adsr) || restart.adsr.length !== 4) throw new SidwaveValidationError(`${hp}.adsr`, "expected [attack, decay, sustain, release]");
         adsr = restart.adsr.map((value: unknown, i: number) =>
           requireNumber(value, `${hp}.adsr[${i}]`, { min: 0, max: 15, integer: true }));
       }
-      inst.hard_restart = { frames, adsr, test: restart.test === true };
+      inst.hard_restart = { frames, adsr, test: restart.test === true, ...(restart.wave === "none" ? { wave: "none" } : {}) };
     }
     if (inst.pulsetable !== undefined) inst.pulsetable = normalizeRegisterTable(inst.pulsetable, inst.loop, `${ip}.pulsetable`, "set", modern, v15);
     if (inst.filtertable !== undefined) inst.filtertable = normalizeRegisterTable(inst.filtertable, inst.loop, `${ip}.filtertable`, "cutoff", modern);

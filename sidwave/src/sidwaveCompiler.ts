@@ -1092,7 +1092,7 @@ export interface Instrument {
   waveloop?: number;
   pulsetable?: SidwaveRegisterTable;
   filtertable?: SidwaveRegisterTable;
-  restart?: { frames: number; ad: number; sr: number; test: boolean };
+  restart?: { frames: number; ad: number; sr: number; test: boolean; silent?: boolean };
 }
 
 export interface ArrangedNote {
@@ -2245,6 +2245,7 @@ function buildInstrument(voice: SidwaveVoice, fx: Record<string, any>, arp: numb
       ad: ((fx.hard_restart?.adsr?.[0] ?? 0) << 4) | (fx.hard_restart?.adsr?.[1] ?? 0),
       sr: ((fx.hard_restart?.adsr?.[2] ?? 0) << 4) | (fx.hard_restart?.adsr?.[3] ?? 0),
       test: fx.hard_restart?.test ?? false,
+      ...(fx.hard_restart?.wave === "none" ? { silent: true } : {}),
     } : undefined,
   };
 }
@@ -2411,7 +2412,7 @@ function buildVoiceEvents(notes: ArrangedNote[], instruments: Instrument[], tota
       }
       if (gateOff < hr) events.push({ frame: wrap(gateOff), order: ORDER.gate, bytes: [OP.GATEOFF] });
       const bytes = !restart ? [OP.HARDRESTART] : !restart.frames
-        ? [OP.GATEOFF] : [OP.RESTART, restart.ad, restart.sr, restart.test ? 8 : 0];
+        ? [OP.GATEOFF] : [OP.RESTART, restart.ad, restart.sr, (restart.test ? 8 : 0) | (restart.silent ? RESTART_SILENT : 0)];
       events.push({ frame: wrap(hr), order: ORDER.gate, bytes });
     } else if (!continues) {
       events.push({ frame: gateOff, order: ORDER.gate, bytes: [OP.GATEOFF] });
@@ -3586,7 +3587,10 @@ va_vf_done:
   return code;
 }
 
-function customRestartCode(wave: boolean, pulse: boolean, filter: boolean): string {
+/** Bit of the control operand of OP.RESTART: drop the waveform bits during the restart. */
+const RESTART_SILENT = 0x80;
+
+function customRestartCode(wave: boolean, pulse: boolean, filter: boolean, silent: boolean): string {
   return `
 c_restart:
 ${pulse ? "  jsr pt_stop" : ""}
@@ -3598,9 +3602,17 @@ ${wave ? "  lda #0\n  sta v_wtleft,x" : ""}
   sta v_sr,x
   jsr fetch
   sta t_lo
+${silent ? `  lda t_lo
+  bpl cr_keep
+  and #$7F
+  sta t_lo
   lda v_ctrl,x
+  and #$06
+  jmp cr_set
+cr_keep:
+` : ""}  lda v_ctrl,x
   and #$F6
-  ora t_lo
+${silent ? "cr_set:\n" : ""}  ora t_lo
   sta v_ctrl,x
   jmp v_read
 `;
@@ -4014,7 +4026,8 @@ vr_wt_integer:
     playerCode = playerCode.replace("  dec v_wtleft,x\n", "  lda v_wtleft,x\n  beq va_return\n  dec v_wtleft,x\n");
   }
   if (hasRestart) {
-    playerCode += customRestartCode(Boolean(hasWavetable), Boolean(hasPulseTable), Boolean(hasFilterTable));
+    playerCode += customRestartCode(Boolean(hasWavetable), Boolean(hasPulseTable), Boolean(hasFilterTable),
+      arr.voices.some(({ events }) => events.some(({ bytes }) => bytes[0] === OP.RESTART && (bytes[3]! as number) & RESTART_SILENT)));
     if (hasWavetable) {
       playerCode = playerCode.replace("  and #$FE\n  jmp vr_wt_ctrl", `  and #$F6
   sta t_lo

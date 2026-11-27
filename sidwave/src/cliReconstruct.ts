@@ -101,7 +101,7 @@ export function plainSummary(report: ReconstructReport): string {
     ["pitch", "some pitches (slides, vibrato shapes or per-call frequencies) could not be written as notes"],
     ["instrument_budget", "the tune has more instrument variants or table steps than one SIDWave score can hold; the rarest were simplified"],
     ["global_state", "filter or volume changes outside notes are not recovered yet"],
-    ["multi_sid", "only the first SID was recovered"],
+    ["multi_sid", "only the first SID was recovered, because the SID addresses are not known"],
     ["call_rate", "the player is not called a whole number of times per frame"],
     ["call_timing", "the player's call timing is irregular"],
     ["non_periodic_writes", "part of the tune is played with sample writes outside the player calls"],

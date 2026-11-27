@@ -132,3 +132,35 @@ test("recovery keeps the modulation of a voice before its first gate as a gate-o
   assert.equal(r.report.compile.ok, true, r.report.compile.error);
   assert.equal(r.report.fdiffState.classes.pitch.differingCalls, 0, JSON.stringify(r.report.fdiffState.first));
 });
+
+test("recovery of a two-SID tune with known addresses declares sids and recovers the voices of both", { timeout: 60_000 }, async () => {
+  const score = `sidwave: "1.5"
+title: T
+tempo: 120
+player: { soft_start: false }
+sids:
+  - { id: left, address: "$D400" }
+  - { id: right, address: "$D420" }
+instruments:
+  lead: { waveform: pulse, adsr: [0, 4, 12, 3] }
+voices:
+  - { id: 1, instrument: lead, patterns: { a: { length: 1, bars: 1, groove: "A4 - C5 -" } } }
+  - { id: 4, instrument: lead, patterns: { a: { length: 1, bars: 1, groove: "E3 - G3 -" } } }
+timeline:
+  - { section: Main, bars: 1, layers: { v1: a, v4: a } }
+`;
+  const r = await roundTrip(score);
+  assert.match(r.score, /sids:/);
+  assert.match(r.score, /\$D420/);
+  assert.equal(r.report.unsupported.some((u) => u.kind === "multi_sid"), false);
+  assert.equal(r.report.fdiffState.classes.pitch.differingCalls, 0, JSON.stringify(r.report.fdiffState.first));
+  assert.equal(r.report.fdiffState.classes.gate.differingCalls, 0, JSON.stringify(r.report.fdiffState.first));
+});
+
+test("hard_restart wave none writes the test bit without waveform bits, and requires 1.5", async () => {
+  const instrument = "{ waveform: pulse, hard_restart: { frames: 1, test: true, wave: none } }";
+  assert.throws(() => parseSidwave(doc("1.4", "", instrument)), /wave/);
+  const ir = await trace(doc("1.5", "", instrument));
+  assert.ok(ir.calls.some((c) => c.sids[0].regs[4] === 0x08));
+  assert.equal(ir.calls[1].sids[0].regs[4], 0x41);
+});

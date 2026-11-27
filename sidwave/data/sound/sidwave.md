@@ -1429,6 +1429,8 @@ plays no note, and it cannot describe `$D418` at all.
 
 #### Wavetable waveform `none`
 
+`hard_restart` accepts `wave: none` too: the restart calls then hold no waveform bits (`$08` with `test`).
+
 A wavetable step with `wave: none` writes a control register without waveform bits, with the `test`, `gate`, `ring` and
 `sync` flags of the step. Many players start a note with the test bit alone (`$09`); earlier versions require a waveform
 (`$41`). The construct requires `sidwave: 1.5`.

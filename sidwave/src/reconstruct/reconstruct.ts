@@ -11,7 +11,7 @@ import { compileSidwaveBytes } from "../sidwaveOps.js";
 import { psidClock, type SidEngine } from "../engine/libsidplayfp.js";
 import { fdiff, REGISTER_CLASSES, type FDiffResult, type RegisterClass } from "./fdiff.js";
 import { buildIr, type FrameIr, type IrClock } from "./ir.js";
-import { leadingCalls, recoverScore, withGlobalTable, type LanguageExtension, type RecoveredScore, type UnsupportedFeature } from "./recover.js";
+import { leadingCalls, recoverScore, withGlobalTable, type LanguageExtension, type RecoveredScore, type RecoverOptions, type UnsupportedFeature } from "./recover.js";
 
 /** What a user needs to know about a recovered score that does not fit one call period at 1 MHz. */
 export const TURBO_MESSAGE = "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers";
@@ -208,7 +208,6 @@ export function irOfTrace(trace: { records: Float64Array; clock: IrClock; horizo
 export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructOptions): Promise<ReconstructResult> {
   const file: SidFile = parseSidFile(sidBytes);
   const song = options.song ?? file.startSong;
-  void file;
   const seconds = options.seconds ?? DEFAULT_HORIZON_SECONDS;
   const clock: IrClock = psidClock(sidBytes) ?? "PAL";
   const t0 = performance.now();
@@ -217,7 +216,13 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
   const t1 = performance.now();
   const original = irOfTrace(trace);
   const t2 = performance.now();
-  let recovered = recoverScore(original, { title: options.title });
+  const addresses = [0xd400, file.secondSidAddress, file.thirdSidAddress];
+  const sids: NonNullable<RecoverOptions["sids"]> = [];
+  for (let i = 0; i < addresses.length && addresses[i] !== undefined; i++) {
+    const model = String(file.sidModels[i]);
+    sids.push({ address: addresses[i]!, ...(model === "6581" || model === "8580" ? { model } : {}) });
+  }
+  let recovered = recoverScore(original, { title: options.title, sids });
   const t3 = performance.now();
   const timings: ReconstructTimings = { traceMs: t1 - t0, irMs: t2 - t1, recoverMs: t3 - t2, compileMs: 0, retraceMs: 0, fdiffMs: 0, totalMs: 0, totalCpuMs: 0 };
   let compiledBytes: Uint8Array | undefined;

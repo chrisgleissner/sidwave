@@ -54,7 +54,8 @@ test("sample playback and two SIDs: the trace facts that the language cannot exp
   const two = await analyzeSid(new Uint8Array(buildFixture("twoSids").sid), { engine: sharedEngine(), seconds: 3 });
   assert.equal(two.resources.memory.sidCount, 2);
   const second = two.voices.filter((v) => v.sid === 1);
-  assert.ok(second.length >= 1 && second.every((v) => v.trace.gateShare > 0 && v.role.value === "unreconstructed" && v.role.basis === "inferred"), "the voices of the second SID are traced and marked as not reconstructed");
+  assert.ok(second.some((v) => v.trace.gateShare > 0 && v.noteCount > 0), "the playing voice of the second SID is traced and reconstructed");
+  assert.ok(second.every((v) => v.role.value !== "unreconstructed"));
 });
 
 test("a reconstruction that the compiler rejects: musical facts come from the score text, marked as approximate in the limits", { timeout: 120_000 }, async () => {

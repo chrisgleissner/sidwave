@@ -376,7 +376,8 @@
       "properties": {
         "frames": { "type": "integer", "minimum": 0, "maximum": 255 },
         "adsr": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 15 }, "minItems": 4, "maxItems": 4 },
-        "test": { "type": "boolean", "default": false }
+        "test": { "type": "boolean", "default": false },
+        "wave": { "const": "none", "description": "1.5: the restart calls hold no waveform bits." }
       },
       "additionalProperties": false
     },
