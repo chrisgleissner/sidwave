@@ -280,6 +280,24 @@ export function dropBendsOnPitchTables(voices: GridVoice[], instruments: Record<
 }
 
 /**
+ * Number of legato notes whose instrument differs from the one that is sounding. A SIDWave legato note keeps the sounding
+ * instrument, so such a change (a tracker command on a continuing note) is not heard.
+ */
+export function ignoredInstrumentChanges(voices: GridVoice[]): number {
+  let ignored = 0;
+  for (const voice of voices) {
+    let sounding: string | undefined;
+    for (const c of voice.cells) {
+      if (c.kind === "rest") sounding = undefined;
+      else if (c.kind === "note") {
+        if (c.legato && sounding !== undefined) { if (c.inst !== sounding) ignored++; } else sounding = c.inst;
+      }
+    }
+  }
+  return ignored;
+}
+
+/**
  * Turns slide and portamento rates into SIDWave `bend` and `portamento` once the grid is final. A bend or glide has to reach
  * its target while the note sounds, so its length is limited to the frames of the note (ties included) minus the two frames
  * of the hard restart and two more of margin (SIDWave requires the glide to end before the note does). `frameStart[k]` is the video frame at which tick k starts. Bends on instruments whose wavetable

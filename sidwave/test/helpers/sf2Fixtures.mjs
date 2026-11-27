@@ -8,7 +8,7 @@ const TABLES = [[0x81, 0, "Commands", L.cmd, 3, 64], [0x80, 1, "Instruments", L.
  * `tracks`: three lists of [transposition, sequence] (transposition in semitones), `sequences`: { n: Sf2Event[] } as the packer takes them
  * (but already packed here as bytes), `instruments`: { n: [ad, sr, flags, filter, pulse, wave] }, other tables as { row: [cols...] } (column values per row).
  */
-export function sf2File({ tracks, sequences = {}, instruments = {}, wave = {}, pulse = {}, filter = {}, arp = {}, tempo = [5, 0x7f], cmds = {}, hr = { 0: [0x0f, 0x00] }, major = 11, minor = 0, loop = 0, tracksCount = 3, size = 0x3400 } = {}) {
+export function sf2File({ tracks, sequences = {}, instruments = {}, wave = {}, pulse = {}, filter = {}, arp = {}, tempo = [5, 0x7f], cmds = {}, hr = { 0: [0x0f, 0x00] }, major = 11, minor = 0, loop = 0, tracksCount = 3, size = 0x3400, songs = 0, columns = {} } = {}) {
   const m = new Uint8Array(0x10000);
   const ophi = L.oplo + tracksCount, seqlo = ophi + tracksCount, seqhi = seqlo + 128, ol1 = seqhi + 128, seq0 = ol1 + tracksCount * 256;
   const w = (a, v) => { m[a] = v & 255; m[a + 1] = v >> 8; };
@@ -23,7 +23,7 @@ export function sf2File({ tracks, sequences = {}, instruments = {}, wave = {}, p
   m[p] = 2; m[p + 1] = 40; w(p + 2, 0x1000); w(p + 4, 0x1003); w(p + 6, 0x1006); p += 42;
   // tables
   q = p + 2;
-  for (const [type, id, name, addr, cols, rows] of TABLES) { m[q] = type; m[q + 1] = id; m[q + 2] = 0; q = text(q + 3, name); m[q] = 1; m[q + 1] = 0; m[q + 2] = 255; m[q + 3] = 255; m[q + 4] = 255; w(q + 5, addr); w(q + 7, cols); w(q + 9, rows); m[q + 11] = 16; q += 12; }
+  for (const [type, id, name, addr, cols, rows] of TABLES) { m[q] = type; m[q + 1] = id; m[q + 2] = 0; q = text(q + 3, name); m[q] = 1; m[q + 1] = 0; m[q + 2] = 255; m[q + 3] = 255; m[q + 4] = 255; w(q + 5, addr); w(q + 7, columns[id] ?? cols); w(q + 9, rows); m[q + 11] = 16; q += 12; }
   m[q++] = 0xff; m[p] = 3; m[p + 1] = q - p - 2; p = q;
   // instrument descriptor
   m[p] = 4; m[p + 1] = 2; m[p + 2] = 1; m[p + 3] = 0; p += 4;
@@ -51,6 +51,8 @@ export function sf2File({ tracks, sequences = {}, instruments = {}, wave = {}, p
   for (const [r, row] of Object.entries(cmds)) row.forEach((v, c) => cell(L.cmd, 3, 64, Number(r), c, v));
   for (const [r, row] of Object.entries(hr)) row.forEach((v, c) => cell(L.hr, 2, 16, Number(r), c, v));
   cell(L.init, 2, 32, 0, 1, 0x0f);
+  // The editor's auxiliary data: the pointer at $0FFB, then the songs entry (type 5: song count, selected song) and the end.
+  if (songs) { w(0x0ffb, 0x1100); m.set([5, 2, 0, 2, 0, songs, 0, 0, 0, 0, 0, 0], 0x1100); }
   const end = Math.min(0x10000, L.load + size);
   const out = new Uint8Array(2 + end - L.load);
   out[0] = L.load & 255; out[1] = L.load >> 8;

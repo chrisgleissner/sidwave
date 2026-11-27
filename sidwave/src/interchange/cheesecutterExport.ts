@@ -100,9 +100,21 @@ function waveProgram(inst: ExportedInstrument, baseWave: number): { rows: Array<
   return { rows, ...(loop === undefined ? {} : { loop }), ...(restart === undefined ? {} : { restart }), lowered };
 }
 
+/** Throws unless every area the export writes lies inside the memory image of the driver. */
+function checkWritableTables(song: CtSong): void {
+  const O = CT.OFS;
+  for (const [index, length, what] of [[O.sequenceLow, 128, "sequence low byte"], [O.sequenceHigh, 128, "sequence high byte"], [O.arpeggioFirst, 512, "wave"], [O.instrumentTable, 512, "instrument"], [O.commandTable, 256, "command"],
+    [O.pulseProgram, 256, "pulse"], [O.filterProgram, 256, "filter"], [O.chordNotes, 128, "chord"], [O.chordStarts, 32, "chord index"], [O.songTable, 256, "song"],
+    [O.orderListVoice1, 1024, "track 1"], [O.orderListVoice2, 1024, "track 2"], [O.orderListVoice3, 1024, "track 3"], [O.editorActive, 1, "editor flag"]] as Array<[number, number, string]>) tableAt(song, index, length, what);
+}
+
 /** Turns the driver bytes into a song template: a parsed .ct file, or a memory image built around the raw player. */
 export function driverTemplate(driver: Uint8Array): { song: CtSong; kind: "ct-file" | "player-binary" } {
-  if (driver.length >= 3 && String.fromCharCode(driver[0]!, driver[1]!, driver[2]!) === CT.MAGIC) return { song: parseCheeseCutter(driver), kind: "ct-file" };
+  if (driver.length >= 3 && String.fromCharCode(driver[0]!, driver[1]!, driver[2]!) === CT.MAGIC) {
+    const parsed = parseCheeseCutter(driver);
+    checkWritableTables(parsed);
+    return { song: parsed, kind: "ct-file" };
+  }
   if (driver.length < 0x1000 || driver.length > CT.IMAGE) throw new CheeseCutterError(`the driver file has ${driver.length} bytes; it is neither a .ct file nor a CheeseCutter player binary`);
   if (driver[0] !== 0x00 || driver[1] !== 0x0e) throw new CheeseCutterError("the driver file is not a CheeseCutter player binary (a PRG with load address $0E00)");
   const image = new Uint8Array(CT.IMAGE);
@@ -116,9 +128,7 @@ export function driverTemplate(driver: Uint8Array): { song: CtSong; kind: "ct-fi
     orderLists: Array.from({ length: CT.SUBTUNES }, () => [emptyOrderList(), emptyOrderList(), emptyOrderList()]), trailer: new Uint8Array(0),
   };
   const O = CT.OFS;
-  for (const [index, length, what] of [[O.sequenceLow, 128, "sequence low byte"], [O.sequenceHigh, 128, "sequence high byte"], [O.arpeggioFirst, 512, "wave"], [O.instrumentTable, 512, "instrument"], [O.commandTable, 256, "command"],
-    [O.pulseProgram, 256, "pulse"], [O.filterProgram, 256, "filter"], [O.chordNotes, 128, "chord"], [O.chordStarts, 32, "chord index"], [O.songTable, 256, "songsets"],
-    [O.orderListVoice1, 1024, "track 1"], [O.orderListVoice2, 1024, "track 2"], [O.orderListVoice3, 1024, "track 3"], [O.editorActive, 1, "editor flag"]] as Array<[number, number, string]>) tableAt(song, index, length, what);
+  checkWritableTables(song);
   for (let n = 0; n < CT.SEQUENCES; n++) {
     const p = image[pointers[O.sequenceLow]! + n]! | (image[pointers[O.sequenceHigh]! + n]! << 8);
     if (p + CT.SEQ_BYTES > CT.IMAGE || p === 0) throw new CheeseCutterError("the player binary does not contain the sequence pointer tables of a CheeseCutter 2.x player");
@@ -176,7 +186,7 @@ export function exportCheeseCutter(doc: ParsedSidwave, options: CheeseCutterExpo
   // Instruments: one CheeseCutter instrument per score instrument (and drum kit entry).
   const exported = new Map(score.instruments.map((i) => [i.index, i]));
   const instMap = new Map<string, number>();
-  const wave1 = im.subarray(p[O.arpeggioFirst]!, p[O.arpeggioFirst]! + 256), wave2 = im.subarray(p[O.arpeggioSecond]!, p[O.arpeggioSecond]! + 256);
+  const offsetColumn = im.subarray(p[O.arpeggioFirst]!, p[O.arpeggioFirst]! + 256), waveColumn = im.subarray(p[O.arpeggioSecond]!, p[O.arpeggioSecond]! + 256);
   const instTable = im.subarray(p[O.instrumentTable]!, p[O.instrumentTable]! + 512);
   let wlen = 1;
   let usedFilter = false, usedVibrato = false, usedSlide = false, usedPulseTable = false, wavetableDropped = 0, negativeOffsets = 0;
@@ -206,8 +216,8 @@ export function exportCheeseCutter(doc: ParsedSidwave, options: CheeseCutterExpo
     }
     if (wlen + rows.length + 1 > 255) throw new InterchangeLimitError("the wave tables of the instruments do not fit the 255 rows of a CheeseCutter wave table");
     const start = wlen;
-    for (const [trans, w] of rows) { wave1[wlen] = trans; wave2[wlen] = w; wlen++; }
-    if (program?.loop !== undefined) { wave1[wlen] = 0x7f; wave2[wlen] = start + program.loop; } else if (arp) { wave1[wlen] = 0x7f; wave2[wlen] = start; } else { wave1[wlen] = 0x7e; wave2[wlen] = 0; }
+    for (const [trans, w] of rows) { offsetColumn[wlen] = trans; waveColumn[wlen] = w; wlen++; }
+    if (program?.loop !== undefined) { offsetColumn[wlen] = 0x7f; waveColumn[wlen] = start + program.loop; } else if (arp) { offsetColumn[wlen] = 0x7f; waveColumn[wlen] = start; } else { offsetColumn[wlen] = 0x7e; waveColumn[wlen] = 0; }
     wlen++;
     const arpDelay = arp && !program ? Math.max(0, Math.min(15, arp.callsPerStep - 1)) : 0;
     instTable[0 * CT.INSTRUMENTS + id] = ad;
@@ -304,7 +314,7 @@ export function exportCheeseCutter(doc: ParsedSidwave, options: CheeseCutterExpo
     const at = im[p[O.sequenceLow]! + n]! | (im[p[O.sequenceHigh]! + n]! << 8);
     im.set(raw, at);
   }
-  const songsets = p[O.songTable]!;
+  const songTable = p[O.songTable]!;
   const speed = rowFrames - 1;
   for (let v = 0; v < 3; v++) {
     const list = emptyOrderList();
@@ -313,10 +323,10 @@ export function exportCheeseCutter(doc: ParsedSidwave, options: CheeseCutterExpo
     list[entries.length * 2] = 0xf0; list[entries.length * 2 + 1] = 0x00;
     song.orderLists[0]![v] = list;
     im.set(list, p[O.orderListVoice1 + v]!);
-    im[songsets + v * 2] = p[O.orderListVoice1 + v]! & 255;
-    im[songsets + v * 2 + 1] = p[O.orderListVoice1 + v]! >> 8;
+    im[songTable + v * 2] = p[O.orderListVoice1 + v]! & 255;
+    im[songTable + v * 2 + 1] = p[O.orderListVoice1 + v]! >> 8;
   }
-  im[songsets + 6] = speed; im[songsets + 7] = 7;
+  im[songTable + 6] = speed; im[songTable + 7] = 7;
   im[p[O.speedTable]!] = speed;
   im[p[O.speedSettings]!] = speed;
   song.speeds[0] = speed;

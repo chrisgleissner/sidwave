@@ -8,7 +8,7 @@
 import { midiToNoteName } from "../sidwave.js";
 import { maxSidwaveMidi, sidwaveFrameRate } from "../sidwaveCompiler.js";
 import { CT, CheeseCutterError, parseCheeseCutter, subtuneCount, type CtSong } from "./cheesecutter.js";
-import { buildGridScore, needsCompile, resolveMotion, type GridBar, type GridCell, type GridVoice } from "./gridScore.js";
+import { buildGridScore, ignoredInstrumentChanges, needsCompile, resolveMotion, type GridBar, type GridCell, type GridVoice } from "./gridScore.js";
 
 export interface CheeseCutterImportOptions {
   title?: string;
@@ -45,6 +45,8 @@ export interface CheeseCutterImportResult { yaml: string; report: CheeseCutterIm
 
 const COMMAND_NAMES = ["slide up", "slide down", "vibrato", "detune", "set ADSR", "low-fidelity vibrato", "set wave", "portamento", "stop portamento"];
 const MAX_ENTRIES = 512;
+/** Instrument variants converted at most; a song with more is treated as above the 63 instruments of a score. */
+const MAX_VARIANTS = 1024;
 
 const signed8 = (v: number): number => (v < 0x80 ? v : v - 256);
 const slug = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 16);
@@ -132,7 +134,7 @@ export function convertCtInstrument(song: CtSong, number: number, multiplier: nu
   const O = CT.OFS, image = song.image;
   const inst = song.pointers[O.instrumentTable]!;
   const byte = (column: number): number => image[inst + column * CT.INSTRUMENTS + number]!;
-  const arp1 = song.pointers[O.arpeggioFirst]!, arp2 = song.pointers[O.arpeggioSecond]!;
+  const offsetColumn = song.pointers[O.arpeggioFirst]!, waveColumn = song.pointers[O.arpeggioSecond]!;
   const notes: string[] = [];
   const ad = byte(0), sr = byte(1), hrByte = byte(2), hrWave = byte(3), filterPtr = byte(4), pulsePtr = byte(5), hrSr = byte(6), wavePtr = byte(7);
   const def: Record<string, unknown> = { adsr: [ad >> 4, ad & 15, sr >> 4, sr & 15] };
@@ -155,14 +157,14 @@ export function convertCtInstrument(song: CtSong, number: number, multiplier: nu
     seen.set(stateKey, calls.length);
     if (--cnt < 0) {
       cnt = wavetime;
-      trans = image[arp1 + pos]!;
-      const w = image[arp2 + pos]!;
+      trans = image[offsetColumn + pos]!;
+      const w = image[waveColumn + pos]!;
       if (w >= 0x10) wave = w < 0xe0 ? w : w & 0x0f;
-      const next = pos < 255 ? image[arp1 + pos + 1]! : 0x7e;
+      const next = pos < 255 ? image[offsetColumn + pos + 1]! : 0x7e;
       if (next !== 0x7e) {
         pos = Math.min(255, pos + 1);
-        if (next === 0x7f) pos = image[arp2 + pos]!;
-        const w2 = image[arp2 + pos]!;
+        if (next === 0x7f) pos = image[waveColumn + pos]!;
+        const w2 = image[waveColumn + pos]!;
         if (w2 !== 0 && w2 < 0x10) cnt = w2;
       }
       if (chordPos >= 0 && chordPos < 128) {
@@ -340,9 +342,10 @@ export function importCheeseCutter(bytes: Uint8Array, options: CheeseCutterImpor
   const tickCalls = (): number => {
     if (speed >= 2) return speed + 1;
     alternating = true;
-    let v = image(chord + speedsub);
+    // The player indexes the list with an 8-bit register, so a list without an end value wraps after 256 entries.
+    let v = image((chord + speedsub) & 0xffff);
     if (v >= 0x80) { speedsub = 0; v = image(chord); }
-    speedsub++;
+    speedsub = (speedsub + 1) & 0xff;
     return Math.max(2, v) + 1;
   };
   function image(at: number): number { return song.image[at]!; }
@@ -435,10 +438,11 @@ export function importCheeseCutter(bytes: Uint8Array, options: CheeseCutterImpor
     };
     const setMotion = (type: number, row: CtRow): void => {
       const { hi, lo } = cmdParams(row.cmd);
-      if (type === 0 || type === 1) { slide = (type === 0 ? 1 : -1) * ((hi << 8) | lo) * m; }
+      if (type === 0 || type === 1) { slide = (type === 0 ? 1 : -1) * ((hi << 8) | lo) * m; porta = undefined; }
       else if (type === 7) { porta = (((hi & 15) << 8) | lo) * m; slide = undefined; }
       else if (type === 8) { porta = undefined; slide = undefined; }
-      if (type === 2 || type === 5) slide = undefined;
+      // The player holds one effect at a time, so a vibrato also ends a slide and a portamento.
+      if (type === 2 || type === 5) { slide = undefined; porta = undefined; }
     };
     const emit = (pitch: number, instrument: number): Variant => {
       const start = chord === undefined ? undefined : song.image[chordIndexAt + chord]!;
@@ -487,7 +491,7 @@ export function importCheeseCutter(bytes: Uint8Array, options: CheeseCutterImpor
         const before = `${chord}:${vib?.depth}:${vib?.rate}`;
         if (chordCmd) chord = row.cmd & 0x1f;
         if (cmd1 >= 0) { if (useVibrato && (cmd1 === 2 || cmd1 === 5)) vib = vibratoOf(row.cmd, lastPitch); else vib = undefined; }
-        if (cmd1 === 0 || cmd1 === 1 || cmd1 === 7 || cmd1 === 8) setMotion(cmd1, row);
+        if (cmd1 === 0 || cmd1 === 1 || cmd1 === 7 || cmd1 === 8 || (useVibrato && (cmd1 === 2 || cmd1 === 5))) setMotion(cmd1, row);
         const hold: Partial<GridCell> = cmd1 === 0 || cmd1 === 1 ? motion(tick, lastPitch, -1) : {};
         if (before !== `${chord}:${vib?.depth}:${vib?.rate}` || hold.slideRate !== undefined) {
           cells[tick] = { kind: "note", pitch: lastPitch, level: 15, inst: emit(lastPitch, lastInstrument).name, legato: true, ...hold };
@@ -507,28 +511,35 @@ export function importCheeseCutter(bytes: Uint8Array, options: CheeseCutterImpor
   const defs: Record<string, Record<string, unknown>> = {};
   const renames = new Map<string, string>();
   const instReports: CheeseCutterImportReport["instruments"] = [];
-  for (const v of [...variants.values()].sort((a, b) => a.inst - b.inst || (a.chord ?? -1) - (b.chord ?? -1))) {
+  const byContent = new Map<string, string>();
+  // A song with more variants than can be converted in a short time counts as above the limit.
+  let overLimit = variants.size > MAX_VARIANTS;
+  for (const v of overLimit ? [] : [...variants.values()].sort((a, b) => a.inst - b.inst || (a.chord ?? -1) - (b.chord ?? -1))) {
     if (v.inst >= CT.INSTRUMENTS) throw new CheeseCutterError(`instrument ${v.inst} is above the limit of ${CT.INSTRUMENTS - 1}`);
     const converted = convertCtInstrument(song, v.inst, m, { low: v.low, high: v.high }, maxMidi, v.chord, v.vib);
     const json = JSON.stringify(converted.def);
-    const same = [...Object.entries(defs)].find(([, d]) => JSON.stringify(d) === json);
-    if (same) { renames.set(v.name, same[0]); continue; }
+    const same = byContent.get(json);
+    if (same !== undefined) { renames.set(v.name, same); continue; }
+    byContent.set(json, v.name);
     defs[v.name] = converted.def;
     instReports.push({ number: v.inst, name: song.instrumentNames[v.inst] ?? "", sidwave: v.name, notes: v.uses, approximations: converted.notes });
     for (const note of converted.notes) losses.push(`Instrument ${v.inst}: ${note}`);
+    if (instReports.length > 63) { overLimit = true; break; }
   }
-  if (instReports.length > 63) {
+  if (overLimit) {
     if (options.vibrato !== false && [...variants.values()].some((x) => x.vib)) {
       const again = importCheeseCutter(bytes, { ...options, vibrato: false });
       again.report.losses.unshift("Vibrato commands are not imported: the vibrato variants of the instruments exceed the 63 instruments SIDWave allows in one score.");
       return again;
     }
-    throw new CheeseCutterError(`the song uses ${instReports.length} instruments; SIDWave allows 63`);
+    throw new CheeseCutterError("the song uses more than 63 instruments (counting chord and vibrato variants); SIDWave allows 63");
   }
   losses.push("The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated.");
 
   if (renames.size) for (const voice of voices) for (const cell of voice.cells) if (cell.inst && renames.has(cell.inst)) cell.inst = renames.get(cell.inst)!;
   const resolved = resolveMotion(voices, frameStart, defs, mode, maxMidi);
+  const ignored = ignoredInstrumentChanges(voices);
+  if (ignored) losses.push(`${ignored} change(s) of chord or vibrato on a continuing note are not heard: a SIDWave legato note keeps its instrument.`);
   if (resolved.pitchedBends) losses.push(`${resolved.pitchedBends} slide(s) are not imported because SIDWave cannot bend a note of an instrument whose wavetable sets pitches.`);
   if (resolved.tooSmall) losses.push(`${resolved.tooSmall} slide(s) move the pitch by less than half a semitone and are not imported.`);
   const title = options.title ?? (song.title || "Imported CheeseCutter song");

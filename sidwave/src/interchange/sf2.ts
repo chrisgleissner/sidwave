@@ -145,8 +145,41 @@ export function sequenceAddress(song: Sf2Song, n: number): number {
 
 export function tableOf(song: Sf2Song, id: number): Sf2Table | undefined { return song.tables.find((t) => t.id === id); }
 
-/** One cell of a table (column-major tables store each column as a run of `rows` bytes). */
+/** Columns that the driver 11 importer and exporter read or write in each table, by table id. */
+const DRIVER11_COLUMNS: Array<[number, number]> = [[SF2.TABLE.Commands, 3], [SF2.TABLE.Instruments, 6], [SF2.TABLE.Wave, 2], [SF2.TABLE.Pulse, 3], [SF2.TABLE.Filter, 3], [SF2.TABLE.HR, 2], [SF2.TABLE.Arp, 1], [SF2.TABLE.Tempo, 1], [SF2.TABLE.Init, 2]];
+
+/** Throws unless every table of driver 11 exists and has the columns that driver 11 defines. */
+export function requireDriver11Layout(song: Sf2Song): void {
+  for (const [id, columns] of DRIVER11_COLUMNS) {
+    const table = tableOf(song, id);
+    if (!table) throw new Sf2Error(`the driver lacks one of the tables of driver 11 (wave, pulse, filter, HR, arpeggio, tempo, init): table ${id} is missing`);
+    if (table.columns < columns) throw new Sf2Error(`table ${id} (${table.name}) has ${table.columns} column(s); driver 11 needs ${columns}`);
+  }
+}
+
+/**
+ * Number of songs in the file, from the editor's auxiliary data (the pointer at $0FFB; entries of type, version, size and
+ * data, ended by type 0; type 5 starts with the song count). 1 when the file has no such data. A driver plays one song at a
+ * time: the order list pointers of the file select the song that was current when it was saved.
+ */
+export function songCount(song: Sf2Song): number {
+  const at = 0x0ffb;
+  if (song.loadAddress > at || song.end < at + 2) return 1;
+  const word = (a: number): number => song.image[a]! | (song.image[a + 1]! << 8);
+  let p = word(at);
+  if (p <= song.loadAddress) return 1;
+  for (let guard = 0; guard < 16 && p + 6 <= song.end; guard++) {
+    const type = song.image[p]!;
+    if (type === 0) break;
+    if (type === 5) return Math.max(1, song.image[p + 5]!);
+    p += 5 + word(p + 3);
+  }
+  return 1;
+}
+
+/** One cell of a table (column-major tables store each column as a run of `rows` bytes). A cell outside the table reads as 0. */
 export function cell(song: Sf2Song, table: Sf2Table, row: number, column: number): number {
+  if (row >= table.rows || column >= table.columns) return 0;
   const at = table.layout === 1 ? table.address + column * table.rows + row : table.address + row * table.columns + column;
   return song.image[at]!;
 }

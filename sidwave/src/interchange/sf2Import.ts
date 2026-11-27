@@ -7,8 +7,8 @@
 
 import { midiToNoteName } from "../sidwave.js";
 import { maxSidwaveMidi, sidwaveFrameRate } from "../sidwaveCompiler.js";
-import { SF2, Sf2Error, cell, parseSf2, readOrderList, readSequence, tableOf, type Sf2Event, type Sf2Song } from "./sf2.js";
-import { buildGridScore, needsCompile, resolveMotion, type GridBar, type GridCell, type GridVoice } from "./gridScore.js";
+import { SF2, Sf2Error, cell, parseSf2, readOrderList, readSequence, requireDriver11Layout, songCount, tableOf, type Sf2Event, type Sf2Song } from "./sf2.js";
+import { buildGridScore, ignoredInstrumentChanges, needsCompile, resolveMotion, type GridBar, type GridCell, type GridVoice } from "./gridScore.js";
 
 export interface Sf2ImportOptions {
   title?: string;
@@ -206,6 +206,22 @@ export function convertSf2Instrument(song: Sf2Song, number: number, variant: Sf2
   return { def, notes };
 }
 
+/** Instrument variants converted at most; a song with more is treated as above the 63 instruments of a score. */
+export const MAX_VARIANTS = 1024;
+
+/** Frequency ratio of one semitone, minus one. */
+export const SEMITONE_STEP = 2 ** (1 / 12) - 1;
+
+/**
+ * The vibrato of command T1 XX YY as measured in driver 11: a triangle that moves XX + 1 frames in each direction, by the
+ * frequency distance to the next semitone divided by 2^YY per frame. Undefined when it is under 0.015 semitones.
+ */
+export function sf2Vibrato(xx: number, yy: number, fps: number): { depth: number; rate: number } | undefined {
+  const depth = 12 * Math.log2(1 + ((xx + 1) * SEMITONE_STEP) / 2 ** (yy + 1));
+  if (depth < 0.015) return undefined;
+  return { depth: Math.max(0.03, Math.min(6, Math.round(depth * 100) / 100)), rate: Math.max(0.2, Math.min(12, Math.round((fps / (2 * (xx + 1))) * 100) / 100)) };
+}
+
 /** The `sids` list of a multi-SID score: $D400, $D420, ... in the order of the driver's tracks, three per SID. */
 const sidList = (count: number): Array<{ id: string; address: string }> => Array.from({ length: count }, (_, n) => ({ id: `sid${n + 1}`, address: `$D${(0x400 + n * 0x20).toString(16).toUpperCase()}` }));
 
@@ -218,17 +234,19 @@ export function importSf2(bytes: Uint8Array, options: Sf2ImportOptions = {}): Sf
   const mode = options.mode ?? "PAL";
   const fps = sidwaveFrameRate(mode);
   const maxRows = options.maxRows ?? 100_000;
-  const t = driver11Tables(song);
-  if (!t.wave || !t.pulse || !t.filter || !t.hr || !t.tempo || !t.init || !t.arp) throw new Sf2Error("the driver lacks one of the tables of driver 11 (wave, pulse, filter, HR, arpeggio, tempo, init)");
-  // Tracks 1-3 play SID 1, 4-6 SID 2 and so on (the 2, 3 and 4-SID drivers have 6, 9 and 12 tracks). Several songs in one
-  // file (extra init table rows) are not read: no driver 11 file with more than one song is available to verify the layout.
+  requireDriver11Layout(song);
+  const t = driver11Tables(song) as { [K in keyof ReturnType<typeof driver11Tables>]: NonNullable<ReturnType<typeof driver11Tables>[K]> };
+  // Tracks 1-3 play SID 1, 4-6 SID 2 and so on (the 2, 3 and 4-SID drivers have 6, 9 and 12 tracks). Of a file with several
+  // songs only the one its order list pointers select (the song that was current when it was saved) is read.
   const songs = 1;
+  const fileSongs = songCount(song);
   if (song.music.tracks % 3 !== 0) throw new Sf2Error(`the song has ${song.music.tracks} tracks; the importer needs a multiple of three (three tracks per SID)`);
   const sidCount = song.music.tracks / 3;
   const songNumber = options.song ?? 1;
   if (!Number.isInteger(songNumber) || songNumber < 1) throw new RangeError("song must be a positive integer");
-  if (songNumber > songs) throw new RangeError(`song ${songNumber} does not exist; the file has ${songs}`);
+  if (songNumber > songs) throw new RangeError(fileSongs > 1 ? `song ${songNumber} cannot be selected: the file has ${fileSongs} songs and only the one that was current when it was saved can be imported (as song 1)` : `song ${songNumber} does not exist; the file has ${songs}`);
   const warnings: string[] = [], losses: string[] = [];
+  if (fileSongs > 1) losses.push(`The file holds ${fileSongs} songs; only the one that was current when it was saved is imported. The other ${fileSongs - 1} are not imported (select each in SID Factory II and save, then import).`);
   const commands = new Map<string, number>();
   const count = (name: string): void => { commands.set(name, (commands.get(name) ?? 0) + 1); };
 
@@ -303,12 +321,7 @@ export function importSf2(bytes: Uint8Array, options: Sf2ImportOptions = {}): Sf
     return x;
   };
   const cmdOf = (index: number): { type: number; xx: number; yy: number } => ({ type: cell(song, t.cmd!, index, 0), xx: cell(song, t.cmd!, index, 1), yy: cell(song, t.cmd!, index, 2) });
-  const vibratoOf = (xx: number, yy: number): { depth: number; rate: number } | undefined => {
-    // XX is the frequency (calls per half swing), YY the amplitude divider: a smaller value is a stronger vibrato.
-    if (xx < 1) return undefined;
-    const depth = 0.5 * Math.min(12, 8 / (1 + yy));
-    return { depth: Math.max(0.03, Math.min(6, Math.round(depth * 100) / 100)), rate: Math.max(0.2, Math.min(12, Math.round((fps / (2 * xx)) * 100) / 100)) };
-  };
+  const vibratoOf = (xx: number, yy: number): { depth: number; rate: number } | undefined => sf2Vibrato(xx, yy, fps);
   const frameStart: number[] = [0];
   for (const f of framesPerTick) frameStart.push(frameStart[frameStart.length - 1]! + f);
   const voices: GridVoice[] = [];
@@ -319,17 +332,28 @@ export function importSf2(bytes: Uint8Array, options: Sf2ImportOptions = {}): Sf
     let arp: Sf2Variant["arp"], vib: Sf2Variant["vibrato"], wave: number | undefined, local: [number, number] | undefined;
     let slide: number | undefined, porta: number | undefined;
     /** Slide or portamento of the note started at `pitch`; resolved to SIDWave `bend` and `portamento` when the grid is final. */
-    const motion = (_tick: number, pitch: number, from: number): Partial<GridCell> => {
+    const motion = (pitch: number, from: number): Partial<GridCell> => {
       if (porta !== undefined && from >= 0 && from !== pitch) return { portaRate: porta, portaFrom: from };
       if (slide !== undefined) return { slideRate: slide };
       return {};
     };
-    const setMotion = (c: { type: number; xx: number; yy: number }): void => {
+    /**
+     * Applies a command to the state of the track. The driver holds one pitch effect at a time: slide (T0), vibrato (T1),
+     * portamento (T2) and arpeggio (T3) replace each other. T8 sets the ADSR and Tb the wave program of the note.
+     */
+    const apply = (c: { type: number; xx: number; yy: number }): void => {
       const value = (c.xx << 8) | c.yy;
+      if (c.type <= 3) { slide = undefined; vib = undefined; porta = undefined; arp = undefined; }
       if (c.type === 0) slide = value >= 0x8000 ? value - 0x10000 : value;
-      else if (c.type === 2) { porta = value >= 0x8000 || value === 0 ? undefined : value; slide = undefined; }
-      else if (c.type === 1) slide = undefined;
+      else if (c.type === 1 && options.vibrato !== false) vib = vibratoOf(c.xx, c.yy);
+      else if (c.type === 2) porta = value >= 0x8000 || value === 0 ? undefined : value;
+      else if (c.type === 3 && options.arpeggios !== false) arp = { start: c.yy, speed: c.xx };
+      else if (c.type === 0xb) wave = c.yy;
+      else if (c.type === 8 && options.localAdsr !== false) local = [c.xx, c.yy];
     };
+    /** The part of the state that selects the instrument variant. */
+    const effectKey = (): string => JSON.stringify([arp, vib, wave, local]);
+    const current = (instrument: number): Sf2Variant => ({ instrument, ...(local ? { adsr: local } : {}), ...(arp ? { arp } : {}), ...(vib ? { vibrato: vib } : {}), ...(wave !== undefined ? { wave } : {}) });
     for (const { tick, ev, trans, instrument } of placed[v]!) {
       if (tick >= totalCells) break;
       const cmd = ev.command !== 0x80 ? cmdOf(ev.command) : undefined;
@@ -337,44 +361,40 @@ export function importSf2(bytes: Uint8Array, options: Sf2ImportOptions = {}): Sf
         const imported = cmd.type === 0 || cmd.type === 2 || (cmd.type === 8 && options.localAdsr !== false) || (cmd.type === 1 && options.vibrato !== false) || (cmd.type === 3 && options.arpeggios !== false) || cmd.type === 0xb;
         if (!imported) count(COMMAND_NAMES[cmd.type] ?? `command ${cmd.type}`);
       }
-      const apply = (pitch: number): boolean => {
-        if (!cmd) return false;
-        if (cmd.type === 1 && options.vibrato !== false) { vib = vibratoOf(cmd.xx, cmd.yy); return true; }
-        if (cmd.type === 3 && options.arpeggios !== false) { arp = { start: cmd.yy, speed: cmd.xx }; return true; }
-        if (cmd.type === 0xb) { wave = cmd.yy; return true; }
-        if (cmd.type === 8 && options.localAdsr !== false) { local = [cmd.xx, cmd.yy]; return true; }
-        void pitch;
-        return false;
-      };
       if (ev.note >= 1 && ev.note <= 0x6f) {
-        if (ev.instrument !== 0x80 && ev.instrument !== 0x90) wave = undefined;
-        if (!ev.tied || !sounding) local = undefined;
         let pitch = 12 + ev.note + trans;
         const original = pitch;
         while (pitch < 12) pitch += 12;
         while (pitch > maxMidi) pitch -= 12;
         if (pitch !== original) shifted++;
-        slide = undefined;
-        const changed = apply(pitch);
-        if (cmd) setMotion(cmd);
+        const tied = ev.tied && sounding;
+        const before = effectKey();
+        // As measured in the driver: a note of a new pitch (tied or not) ends a slide and a vibrato; a note that is not tied
+        // also ends the local ADSR and the wave program, and one that sets an instrument ends arpeggio and portamento.
+        if (!tied || pitch !== lastPitch) { slide = undefined; vib = undefined; }
+        if (!tied) {
+          wave = undefined; local = undefined;
+          if (ev.instrument !== 0x80 && ev.instrument !== 0x90) { arp = undefined; porta = undefined; }
+        }
+        if (cmd) apply(cmd);
         const moving = porta !== undefined || slide !== undefined;
-        if (ev.tied && sounding && pitch === lastPitch && !changed && !cmd) cells[tick] = { kind: "tie" };
+        if (tied && pitch === lastPitch && effectKey() === before && !cmd) cells[tick] = { kind: "tie" };
         else {
-          const legato = ev.tied && sounding;
-          if (legato) legatoNotes++;
-          const variant = variantOf({ instrument, ...(local ? { adsr: local } : {}), ...(arp ? { arp } : {}), ...(vib ? { vibrato: vib } : {}), ...(wave !== undefined ? { wave } : {}) }, pitch);
-          cells[tick] = { kind: "note", pitch, level: 15, inst: variant.name, ...(legato ? { legato: true } : {}), ...(moving ? motion(tick, pitch, lastPitch) : {}) };
+          if (tied) legatoNotes++;
+          cells[tick] = { kind: "note", pitch, level: 15, inst: variantOf(current(instrument), pitch).name, ...(tied ? { legato: true } : {}), ...(moving ? motion(pitch, lastPitch) : {}) };
           notes++;
         }
         sounding = true; lastPitch = pitch; lastInstrument = instrument;
       } else if (ev.note === 0) sounding = false;
       else if (ev.note === 0x7e) {
-        if (sounding && cmd && (cmd.type === 0 || cmd.type === 2 || cmd.type === 1)) setMotion(cmd);
-        const hold: Partial<GridCell> = sounding && cmd && cmd.type === 0 ? motion(tick, lastPitch, -1) : {};
-        if (sounding && cmd && (apply(lastPitch) || hold.slideRate !== undefined)) {
-          const variant = variantOf({ instrument: lastInstrument, ...(local ? { adsr: local } : {}), ...(arp ? { arp } : {}), ...(vib ? { vibrato: vib } : {}), ...(wave !== undefined ? { wave } : {}) }, lastPitch);
-          cells[tick] = { kind: "note", pitch: lastPitch, level: 15, inst: variant.name, legato: true, ...hold };
-          legatoNotes++;
+        const before = effectKey();
+        if (cmd) apply(cmd);
+        if (sounding && cmd) {
+          const hold: Partial<GridCell> = cmd.type === 0 ? motion(lastPitch, -1) : {};
+          if (effectKey() !== before || hold.slideRate !== undefined) {
+            cells[tick] = { kind: "note", pitch: lastPitch, level: 15, inst: variantOf(current(lastInstrument), lastPitch).name, legato: true, ...hold };
+            legatoNotes++;
+          } else cells[tick] = { kind: "tie" };
         } else if (sounding) cells[tick] = { kind: "tie" };
       }
     }
@@ -388,36 +408,43 @@ export function importSf2(bytes: Uint8Array, options: Sf2ImportOptions = {}): Sf
   const defs: Record<string, Record<string, unknown>> = {};
   const renames = new Map<string, string>();
   const instReports: Sf2ImportReport["instruments"] = [];
-  for (const x of [...variants.values()].sort((a, b) => a.instrument - b.instrument || a.name.localeCompare(b.name))) {
+  const byContent = new Map<string, string>();
+  // A song with more variants than can be converted in a short time counts as above the limit.
+  let overLimit = variants.size > MAX_VARIANTS;
+  for (const x of overLimit ? [] : [...variants.values()].sort((a, b) => a.instrument - b.instrument || a.name.localeCompare(b.name))) {
     if (x.instrument >= (t.instr!.rows)) throw new Sf2Error(`instrument ${x.instrument} is above the number of instruments (${t.instr!.rows})`);
     const converted = convertSf2Instrument(song, x.instrument, x, { low: x.low, high: x.high }, maxMidi, fps, options.softRestart === true, options.pulseTables === false, options.filterTables === false);
     const json = JSON.stringify(converted.def);
-    const same = Object.entries(defs).find(([, d]) => JSON.stringify(d) === json);
-    if (same) { renames.set(x.name, same[0]); continue; }
+    const same = byContent.get(json);
+    if (same !== undefined) { renames.set(x.name, same); continue; }
+    byContent.set(json, x.name);
     defs[x.name] = converted.def;
     instReports.push({ number: x.instrument, sidwave: x.name, notes: x.uses, approximations: converted.notes });
     for (const note of converted.notes) losses.push(`Instrument ${x.instrument}: ${note}`);
+    if (instReports.length > 63) { overLimit = true; break; }
   }
-  if (instReports.length > 63) {
+  if (overLimit) {
     if (options.localAdsr !== false && [...variants.values()].some((x) => x.adsr)) {
       const again = importSf2(bytes, { ...options, localAdsr: false });
-      again.report.losses.unshift(`Set-local-ADSR commands are not imported: with them the song needs ${instReports.length} instruments and SIDWave allows 63.`);
+      again.report.losses.unshift("Set-local-ADSR commands are not imported: with them the song needs more than the 63 instruments SIDWave allows.");
       return again;
     }
     if (options.arpeggios !== false && [...variants.values()].some((x) => x.arp)) {
       const again = importSf2(bytes, { ...options, arpeggios: false });
-      again.report.losses.unshift(`Arpeggio commands are not imported: with them the song needs ${instReports.length} instruments and SIDWave allows 63.`);
+      again.report.losses.unshift("Arpeggio commands are not imported: with them the song needs more than the 63 instruments SIDWave allows.");
       return again;
     }
     if (options.vibrato !== false && [...variants.values()].some((x) => x.vibrato)) {
       const again = importSf2(bytes, { ...options, vibrato: false });
-      again.report.losses.unshift(`Vibrato commands are not imported: with them the song needs ${instReports.length} instruments and SIDWave allows 63.`);
+      again.report.losses.unshift("Vibrato commands are not imported: with them the song needs more than the 63 instruments SIDWave allows.");
       return again;
     }
-    throw new Sf2Error(`the song uses ${instReports.length} instruments (counting effect variants); SIDWave allows 63`);
+    throw new Sf2Error("the song uses more than 63 instruments (counting effect variants); SIDWave allows 63");
   }
   if (renames.size) for (const voice of voices) for (const c of voice.cells) if (c.inst && renames.has(c.inst)) c.inst = renames.get(c.inst)!;
   const resolved = resolveMotion(voices, frameStart, defs, mode, maxMidi);
+  const ignored = ignoredInstrumentChanges(voices);
+  if (ignored) losses.push(`${ignored} change(s) of arpeggio, vibrato, wave program or ADSR on a continuing note are not heard: a SIDWave legato note keeps its instrument.`);
   if (resolved.pitchedBends) losses.push(`${resolved.pitchedBends} slide(s) are not imported because SIDWave cannot bend a note of an instrument whose wavetable sets pitches.`);
   if (resolved.tooSmall) losses.push(`${resolved.tooSmall} slide(s) move the pitch by less than half a semitone and are not imported.`);
   losses.push("The first frame of a note, main volume and the global filter are approximated.");

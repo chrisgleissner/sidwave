@@ -96,6 +96,23 @@ test("the speed list of the chord table is used when the song speed is below two
   assert.deepEqual(result.report.tempo.framesPerTickRange, [6, 8]);
 });
 
+test("the speed list wraps after 256 entries, as the 8-bit index of the player does", () => {
+  // No end value in the first 256 entries; the bytes behind them must not be read.
+  const chord = Uint8Array.from({ length: 512 }, (_, i) => (i === 0x80 || i === 0x81 ? 0 : i < 256 ? 7 : 40));
+  chord.fill(7, 0x80, 0x82);
+  const rows = Array.from({ length: 64 }, () => ({ note: 36, inst: 0 }));
+  const bytes = ctFile(ctInflated({ speed: 0, chord, chordIndex: [], orders: [orderList(Array.from({ length: 8 }, () => [0, 1])), orderList([]), orderList([])], sequences: { 1: rowsToSequence(rows) }, instruments: { 0: [0, 0xf0, 0x80, 0x41, 0, 0, 0, 1] }, wave: [[0, 0x41], [0x7e, 0]] }));
+  const result = importCheeseCutter(bytes, { validate: false });
+  assert.equal(result.report.ticks, 512);
+  assert.deepEqual(result.report.tempo.framesPerTickRange, [8, 8]);
+});
+
+test("a driver .ct whose order list pointer leaves the image is a typed error", () => {
+  const bad = smallSong(); bad[0xfa0 + 19 * 2] = 0xf0; bad[0xfa0 + 19 * 2 + 1] = 0xff;
+  const doc = parseSidwave(importCheeseCutter(ctFile(smallSong())).yaml);
+  assert.throws(() => exportCheeseCutter(doc, { driver: ctFile(bad) }), (e) => e instanceof CheeseCutterError && /track 1/.test(e.message));
+});
+
 test("container errors say what is wrong", () => {
   const good = ctFile(smallSong());
   assert.throws(() => parseCheeseCutter(Buffer.from("XYZ1234")), /magic CC2/);

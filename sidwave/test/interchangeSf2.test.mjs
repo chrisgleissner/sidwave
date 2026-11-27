@@ -9,7 +9,7 @@ import { parseSidwave } from "../src/sidwave.js";
 import { compileSidwaveToPrg } from "../src/sidwaveCompiler.js";
 import { exportEvents } from "../src/interchange/events.js";
 import { Sf2Error, packSequence, parseSf2, readOrderList, readSequence } from "../src/interchange/sf2.js";
-import { importSf2 } from "../src/interchange/sf2Import.js";
+import { importSf2, sf2Vibrato } from "../src/interchange/sf2Import.js";
 import { exportSf2 } from "../src/interchange/sf2Export.js";
 import { InterchangeInputError } from "../src/interchange/errors.js";
 import { runCli } from "../src/cli.js";
@@ -164,6 +164,9 @@ test("the command line imports by id or extension and exports with --driver", as
     assert.equal((await run("import", "bad.sf2", "--json")).code, 3);
     const other = await run("import", "a.sf2", "--song", "4", "-o", "x.yaml");
     assert.notEqual(other.code, 0);
+    const missing = await run("convert", "a.sf2", "x.mid", "--song", "4");
+    assert.equal(missing.code, 3, missing.err);
+    assert.match(missing.err, /song 4 does not exist/);
     assert.match((await run("--help")).out, /SID Factory II/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
@@ -232,6 +235,151 @@ test("export merges effect variants of an instrument into driver instruments and
   assert.equal(new Set(exportEvents(parseSidwave(importSf2(result.bytes).yaml)).instruments.map((i) => i.adsr.join(","))).size, 40);
 });
 
+/** The instrument name of every note of voice 1, in order. */
+const noteInstruments = (text) => {
+  const e = exportEvents(parseSidwave(text));
+  const names = new Map(e.instruments.map((i) => [i.index, i.name]));
+  return e.voices[0].notes.map((n) => names.get(n.instrument));
+};
+
+test("a pitch effect ends where the driver ends it: vibrato at the next note, arpeggio at an instrument or another effect", () => {
+  const H = [null, 0x7e];
+  // Commands: 1 vibrato, 2 arpeggio, 3 slide (zero speed), 4 wave program.
+  const seq = seqBytes([
+    [0, 0x30, 1], H, [null, 0x30], H,                    // vibrato, then a plain note: no vibrato
+    [0, 0x30, 1], H, [null, 0x32, null, true], H,        // vibrato, then a tied note of another pitch: no vibrato
+    [0, 0x30, 2], H, [null, 0x30], H, [0, 0x30], H,      // arpeggio stays on a plain note and ends at an instrument
+    [0, 0x30, 2], H, [null, 0x30, 3], H, [null, 0x30], H, // arpeggio ends at a slide command
+    [0, 0x30, 4], H, [null, 0x30], H,                    // the wave program lasts for its note
+  ]);
+  const result = importSf2(sf2File({
+    tracks: [[[0, 1]], [[0, 0]], [[0, 0]]], sequences: { 1: seq }, instruments: { 0: [0, 0xf0, 0x80, 0, 0, 0] },
+    wave: { 0: [0x41, 0], 1: [0x7f, 0], 2: [0x21, 0], 3: [0x7f, 2] }, cmds: { 1: [1, 4, 2], 2: [3, 0, 0], 3: [0, 0, 0], 4: [0x0b, 0, 2] }, arp: { 0: 0, 1: 4, 2: 7, 3: 0x70 },
+  }));
+  const names = noteInstruments(result.yaml);
+  const kind = names.map((n) => (/_v\d/.test(n) ? "vib" : /_a0s0/.test(n) ? "arp" : /_w2/.test(n) ? "wave" : "plain"));
+  // The fourth note is tied: the importer drops the vibrato there, but a SIDWave legato note keeps its instrument and the
+  // report says so.
+  assert.deepEqual(kind, ["vib", "plain", "vib", "vib", "arp", "arp", "plain", "arp", "plain", "plain", "wave", "plain"]);
+  assert.ok(result.report.losses.some((l) => /^1 change\(s\) of arpeggio.* not heard/.test(l)), JSON.stringify(result.report.losses));
+});
+
+test("vibrato depth and rate follow the counters of the driver", () => {
+  // Measured in driver 11 at XX=4, YY=2: five frames up and five down, 65 register units per frame at C-4.
+  const v = sf2Vibrato(4, 2, 50.1245);
+  assert.ok(Math.abs(v.rate - 5.01) < 0.02, `${v.rate}`);
+  assert.ok(Math.abs(v.depth - 0.63) < 0.02, `${v.depth}`);
+  assert.equal(sf2Vibrato(4, 12, 50.1245), undefined);
+  assert.ok(sf2Vibrato(0, 0, 50.1245).rate === 12);
+});
+
+test("export writes the effect command on every note that has the effect, because the instrument of the next note ends it", () => {
+  const text = yaml.stringify({
+    sidwave: 1.3, title: "Fx", tempo: 125.3114,
+    instruments: { lead: { waveform: "pulse", adsr: [0, 4, 8, 3] }, vib: { waveform: "sawtooth", adsr: [0, 5, 9, 3], vibrato: { depth: 0.63, rate: 5.01 } } },
+    voices: [{ id: 1, instrument: "lead", patterns: { a: { type: "arpeggio", notes: ["C4", "E4", "G4"], frame_rate: 2, length: 4 } } },
+      { id: 2, instrument: "vib", patterns: { b: { length: 1, bars: 1, groove: ["C3", "D3", { note: "E3", inst: "lead" }, "F3"] } } }],
+    timeline: [{ section: "one", bars: 2, layers: { v1: "a", v2: "b" } }],
+  });
+  // A driver whose order list pointers select another song than the first.
+  const driver = smallSf2({ songs: 2 });
+  for (let t = 0; t < 3; t++) driver[2 + L.oplo + t - L.load] += 0x40;
+  const result = exportSf2(parseSidwave(text), { driver });
+  const song = parseSf2(result.bytes);
+  const commandsOf = (track) => readOrderList(song, track).entries.flatMap((e) => readSequence(song, e.sequence)).filter((e) => e.note > 0 && e.note < 0x7e).map((e) => {
+    if (e.command === 0x80) return "none";
+    return ["slide", "vib", "porta", "arp"][song.image[L.cmd + e.command]];
+  });
+  assert.ok(commandsOf(0).length >= 2);
+  assert.deepEqual([...new Set(commandsOf(0))], ["arp"]);
+  assert.deepEqual(commandsOf(1), ["vib", "vib", "none", "vib", "vib", "vib", "none", "vib"]);
+  for (let t = 0; t < 3; t++) assert.equal(song.image[L.oplo + t] | (song.image[L.ophi + t] << 8), L.ol1 + t * 256);
+  assert.equal(song.image[0x0ffb] | (song.image[0x0ffc] << 8), 0);
+});
+
+test("export writes the wavetable of an instrument as wave table rows and a test-bit first step as the oscillator reset", () => {
+  const text = yaml.stringify({
+    sidwave: 1.3, title: "Wave", tempo: 125.3114,
+    instruments: { drum: { waveform: "pulse", adsr: [0, 4, 8, 3], wavetable: [{ wave: "noise", note: "C6", frames: 2 }, { wave: "tri", note: "+12", frames: 3 }, { wave: "pulse", note: "+0" }] }, reset: { waveform: "saw", adsr: [0, 4, 8, 3], wavetable: [{ test: true, frames: 1 }, { wave: "saw", note: "+7", frames: 1 }, { wave: "saw" }] } },
+    voices: [{ id: 1, instrument: "drum", patterns: { a: { length: 1, bars: 1, groove: ["C4", "C4", { note: "C4", inst: "reset" }, "C4"] } } }],
+    timeline: [{ section: "one", bars: 1, layers: { v1: "a" } }],
+  });
+  const result = exportSf2(parseSidwave(text), { driver: smallSf2() });
+  assert.ok(!result.losses.some((l) => /wavetable steps/.test(l)), JSON.stringify(result.losses));
+  const song = parseSf2(result.bytes);
+  const instrument = (n) => ({ flags: song.image[L.instr + 2 * 32 + n], start: song.image[L.instr + 5 * 32 + n] });
+  const row = (r) => [song.image[L.wave + r], song.image[L.wave + 256 + r]];
+  const drum = instrument(0).start;
+  // Two noise frames at the absolute C6, three triangle frames an octave up, then the held pulse row and a jump to it.
+  assert.deepEqual(Array.from({ length: 7 }, (_, i) => row(drum + i)), [[0x81, 0xc8], [0x81, 0xc8], [0x11, 12], [0x11, 12], [0x11, 12], [0x41, 0], [0x7f, drum + 5]]);
+  const reset = instrument(1);
+  assert.equal(reset.flags & 0x10, 0x10);
+  assert.deepEqual(Array.from({ length: 3 }, (_, i) => row(reset.start + i)), [[0x21, 7], [0x21, 0], [0x7f, reset.start + 1]]);
+  const back = importSf2(result.bytes);
+  assert.deepEqual(yaml.parse(back.yaml).instruments.i00.wavetable, yaml.parse(importSf2(exportSf2(parseSidwave(back.yaml), { driver: smallSf2() }).bytes).yaml).instruments.i00.wavetable);
+});
+
+test("a file with several songs says that only one is imported", () => {
+  const result = importSf2(smallSf2({ songs: 3 }));
+  assert.ok(result.report.losses.some((l) => /holds 3 songs/.test(l)), JSON.stringify(result.report.losses));
+  assert.throws(() => importSf2(smallSf2({ songs: 3 }), { song: 2 }), /has 3 songs and only the one/);
+  assert.ok(!importSf2(smallSf2({ songs: 1 })).report.losses.some((l) => /songs/.test(l)));
+});
+
+test("a driver table with too few columns is a typed error on import and export", () => {
+  const narrow = smallSf2({ columns: { 1: 1 } });
+  assert.throws(() => importSf2(narrow), (e) => e instanceof Sf2Error && /table 1 .*1 column/.test(e.message));
+  assert.throws(() => exportSf2(parseSidwave(yaml.stringify(SCORE)), { driver: narrow }), (e) => e instanceof Sf2Error && /column/.test(e.message));
+});
+
+test("a song with thousands of effect variants is imported in bounded time", () => {
+  // 32 instruments combined with 64 local ADSR commands: 2048 variants.
+  const sequences = {};
+  for (let n = 0; n < 32; n++) sequences[n + 1] = seqBytes(Array.from({ length: 64 }, (_, c) => [n, 0x30, c]));
+  const bytes = sf2File({
+    tracks: [Array.from({ length: 32 }, (_, n) => [0, n + 1]), [[0, 0]], [[0, 0]]], sequences, size: 0x7000,
+    instruments: Object.fromEntries(Array.from({ length: 32 }, (_, i) => [i, [i, 0xf0, 0, 0, 0, 0]])), wave: { 0: [0x41, 0], 1: [0x7f, 0] },
+    cmds: Object.fromEntries(Array.from({ length: 64 }, (_, c) => [c, [8, c, c]])),
+  });
+  const t0 = process.cpuUsage();
+  const result = importSf2(bytes, { validate: false });
+  const u = process.cpuUsage(t0), seconds = (u.user + u.system) / 1e6;
+  console.log(`# cpu sf2 import with 2048 variants: ${seconds.toFixed(3)} s`);
+  assert.ok(result.report.losses.some((l) => /local-ADSR commands are not imported/.test(l)), JSON.stringify(result.report.losses.slice(0, 3)));
+  assert.ok(seconds < 3, `${seconds} s`);
+  // 2048 different wave programs cannot be reduced: a typed error, without converting all of them.
+  const waves = sf2File({
+    tracks: [Array.from({ length: 32 }, (_, n) => [0, n + 1]), [[0, 0]], [[0, 0]]], sequences, size: 0x7000,
+    instruments: Object.fromEntries(Array.from({ length: 32 }, (_, i) => [i, [i, 0xf0, 0, 0, 0, 0]])),
+    wave: Object.fromEntries(Array.from({ length: 256 }, (_, i) => [i, i % 2 ? [0x41, i] : [0x21, i]])),
+    cmds: Object.fromEntries(Array.from({ length: 64 }, (_, c) => [c, [0x0b, 0, 2 * c]])),
+  });
+  const t1 = process.cpuUsage();
+  assert.throws(() => importSf2(waves, { validate: false }), (e) => e instanceof Sf2Error && /more than 63 instruments/.test(e.message));
+  const w = process.cpuUsage(t1);
+  assert.ok((w.user + w.system) / 1e6 < 3, `${(w.user + w.system) / 1e6} s`);
+});
+
+test("the command line does not overwrite the driver with the output", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-sf2drv-"));
+  try {
+    const run = async (...args) => {
+      const err = [];
+      const code = await runCli(args, { cwd: dir, out: () => {}, err: (t) => err.push(t), outBytes: () => {} });
+      return { code, err: err.join("") };
+    };
+    fs.writeFileSync(path.join(dir, "tune.sf2"), smallSf2());
+    fs.writeFileSync(path.join(dir, "tune.yaml"), yaml.stringify(SCORE));
+    // The default output name of tune.yaml is tune.sf2.
+    for (const args of [["export", "tune.yaml", "--format", "sf2", "--driver", "tune.sf2"], ["export", "tune.yaml", "-o", "tune.sf2", "--driver", "tune.sf2"], ["convert", "tune.yaml", "tune.sf2", "--driver", "tune.sf2", "--force"]]) {
+      const r = await run(...args);
+      assert.equal(r.code, 2, r.err);
+      assert.match(r.err, /is the driver file/);
+      assert.deepEqual(fs.readFileSync(path.join(dir, "tune.sf2")), smallSf2());
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 // ---- differential against the real driver ------------------------------------------------------------------------
 const MUSIC = path.join(homeDirectory(), ".c64bridge/sidwave-standalone/research-src/Chordian_sidfactory2/SIDFactoryII/music");
 const listSf2 = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? listSf2(path.join(dir, e.name)) : e.name.endsWith(".sf2") ? [path.join(dir, e.name)] : []));
@@ -270,6 +418,22 @@ test("differential: the exported song in the driver against the compiled score",
   assert.ok(Math.abs(diff.agree.bestShift - STARTUP_CALLS) <= 1);
   assert.ok(diff.agree.gate[0] >= 0.8 && diff.agree.gate[1] >= 0.8, fmt(diff.agree.gate));
   assert.ok(diff.agree.pitch[0] >= 0.9 && diff.agree.pitch[1] >= 0.9, fmt(diff.agree.pitch));
+});
+
+test("differential: each driver 11 example song exported with itself as driver, in its driver, against the imported score", { skip: reason }, async () => {
+  const rows = [];
+  for (const file of listSf2(MUSIC).sort()) {
+    const bytes = fs.readFileSync(file);
+    if (parseSf2(bytes).driver.major !== 11) continue;
+    let first;
+    try { first = importSf2(bytes); } catch { continue; }
+    const exported = exportSf2(parseSidwave(first.yaml), { driver: bytes });
+    const diff = await compareSids(compileScoreToSid(first.yaml), psidFromSf2(exported.bytes, 0), 8, STARTUP_CALLS);
+    console.log(`# export of ${path.basename(file)}: gate ${fmt(diff.agree.gate)}, note ${fmt(diff.agree.pitch)} (of ${diff.agree.both.join('/')} calls with both gates on), best shift ${diff.agree.bestShift}`);
+    rows.push({ name: path.basename(file), gate: diff.agree.gate, note: diff.agree.pitch, both: diff.agree.both });
+  }
+  const summary = assertQuality(rows, { songs: 45, gateVoice: 0, gateSong: 0, gateMedian: 0, noteSong: 0, noteMedian: 0 });
+  console.log(`# sf2 export quality: ${rows.length} songs, gate median ${summary.gateMedian.toFixed(3)}, note median ${summary.noteMedian.toFixed(3)} over ${summary.noteVoices} voices`);
 });
 
 // ---- multi-SID drivers (local checkout) --------------------------------------------------------------------------

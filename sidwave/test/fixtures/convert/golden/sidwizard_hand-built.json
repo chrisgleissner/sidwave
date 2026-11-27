@@ -243,13 +243,6 @@
    },
    {
     "stage": "write",
-    "code": "wavetable.dropped",
-    "severity": "lost",
-    "count": 1,
-    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
-   },
-   {
-    "stage": "write",
     "code": "instrument.simplified",
     "severity": "approx",
     "count": 1,

@@ -33,7 +33,7 @@ export const CT = {
     chordNotes: 30, chordStarts: 32,
   },
   TITLE: 65536 + 256 + 5,
-  INSNAMES: 65536 + 256 + 5 + 160,
+  INSTRUMENT_NAMES: 65536 + 256 + 5 + 160,
   SUBTUNE_DATA: 65536 + 256 + 5 + 160 + 2048,
   /** Smallest inflated size that holds every field the loader reads. */
   MIN_INFLATED: 65536 + 256 + 5 + 160 + 2048 + 32 * 3 * 1024,
@@ -106,7 +106,7 @@ export function parseCheeseCutter(bytes: Uint8Array): CtSong {
   const pointers: number[] = [];
   for (let i = 0; i < CT.PTR_COUNT; i++) pointers.push(image[CT.PTR_TABLE + i * 2]! | (image[CT.PTR_TABLE + i * 2 + 1]! << 8));
   const instrumentNames: string[] = [];
-  for (let i = 0; i < CT.INSTRUMENTS; i++) instrumentNames.push(text(d.subarray(CT.INSNAMES + i * 32, CT.INSNAMES + i * 32 + 32)));
+  for (let i = 0; i < CT.INSTRUMENTS; i++) instrumentNames.push(text(d.subarray(CT.INSTRUMENT_NAMES + i * 32, CT.INSTRUMENT_NAMES + i * 32 + 32)));
   const orderLists: Uint8Array[][] = [];
   for (let s = 0; s < CT.SUBTUNES; s++) {
     const voices: Uint8Array[] = [];
@@ -151,7 +151,7 @@ export function writeCheeseCutter(song: CtSong): Uint8Array {
   d[o++] = song.highlight; d[o++] = song.highlightOffset;
   d.set(pad(song.title, 32), CT.TITLE); d.set(pad(song.author, 32), CT.TITLE + 32);
   d.set(pad(song.release, 32), CT.TITLE + 64); d.set(pad(song.message, 32), CT.TITLE + 96);
-  for (let i = 0; i < CT.INSTRUMENTS; i++) d.set(pad(song.instrumentNames[i] ?? "", 32), CT.INSNAMES + i * 32);
+  for (let i = 0; i < CT.INSTRUMENTS; i++) d.set(pad(song.instrumentNames[i] ?? "", 32), CT.INSTRUMENT_NAMES + i * 32);
   for (let s = 0; s < CT.SUBTUNES; s++) for (let v = 0; v < 3; v++) d.set(song.orderLists[s]![v]!, CT.SUBTUNE_DATA + (s * 3 + v) * CT.TRACK_BYTES);
   return Buffer.concat([Buffer.from(CT.MAGIC, "latin1"), deflateSync(d, { level: 9 })]);
 }

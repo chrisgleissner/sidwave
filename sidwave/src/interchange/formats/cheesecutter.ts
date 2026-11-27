@@ -21,7 +21,11 @@ export const CHEESECUTTER: FormatDefinition = {
   // `ctx.validate` is not passed on: the importer finds from its own score check which parts SIDWave cannot hold and imports
   // again without them, so without the check it could return a score that SIDWave rejects.
   read: (bytes, ctx) => {
-    const result = importCheeseCutter(bytes, { ...(ctx.song === undefined ? {} : { song: ctx.song }), ...(ctx.title === undefined ? {} : { title: ctx.title }), ...(ctx.mode ? { mode: ctx.mode } : {}) });
+    let result;
+    try { result = importCheeseCutter(bytes, { ...(ctx.song === undefined ? {} : { song: ctx.song }), ...(ctx.title === undefined ? {} : { title: ctx.title }), ...(ctx.mode ? { mode: ctx.mode } : {}) }); } catch (error) {
+      if (error instanceof RangeError) throw new InterchangeUsageError(error.message);
+      throw error;
+    }
     return { yaml: result.yaml, report: result.report, losses: [...lossesFromText("read", result.report.losses), ...warningLosses("read", result.report.warnings)] };
   },
   write: ({ doc, plan, driver }) => {

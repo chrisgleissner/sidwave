@@ -76,6 +76,8 @@ const RULES: Array<[RegExp, string, LossSeverity]> = [
   [/^Command ".*" .*not imported/i, "command.dropped", "lost"],
   [/effect command\(s\).* dropped|commands are not imported/i, "command.dropped", "lost"],
   [/first frame of a note/i, "timing.approximated", "approx"],
+  [/on a continuing note are not heard/i, "effects.legato", "lost"],
+  [/^The file holds \d+ songs/i, "songs.dropped", "lost"],
   [/pulse width modulation is described/i, "pulse.modulation", "info"],
   [/vibrato is not exported/i, "vibrato.dropped", "lost"],
   [/instrument slides are not exported/i, "slide.dropped", "lost"],

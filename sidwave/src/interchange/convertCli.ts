@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { EXIT_FAILED, EXIT_OK, UsageError, envelope, type CliIo } from "../cliCore.js";
 import { confinedReadOptions } from "../sidwaveOps.js";
-import { parseFlags, numberFlag, readBounded, writeOutput, type InterchangeArgs } from "./cli.js";
+import { parseFlags, numberFlag, readBounded, writeOutput, type InterchangeArgs, refuseDriverAsOutput } from "./cli.js";
 import { ambiguityMessage, convert, inputFormat, type ConvertResult } from "./convert.js";
 import { InterchangeUsageError } from "./errors.js";
 import { detectFormat, findFormat, formatDefinitions, listFormats, resolveTarget } from "./registry.js";
@@ -150,6 +150,7 @@ async function convertCommandInner(args: string[], io: CliIo): Promise<number> {
   const outputPath = toStdout ? undefined : outputName ?? `${stem(file)}${target.extensions[0]!}`;
   // Check every output before the chain runs, so a refusal leaves nothing partial and wastes no time.
   if (!dryRun) {
+    if (outputPath !== undefined && typeof driverFile === "string") refuseDriverAsOutput(io, driverFile, outputPath);
     if (outputPath !== undefined) { checkOverwrite(io, outputPath, force); if (resolve(io.cwd, outputPath) === path) throw new UsageError("the output file is the input file; refusing to overwrite it"); }
     if (keepScore !== undefined) checkOverwrite(io, keepScore, force);
   }

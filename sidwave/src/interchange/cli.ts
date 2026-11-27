@@ -94,6 +94,11 @@ function sameFile(a: string, b: string): boolean {
   return real(a) === real(b);
 }
 
+/** The driver of a CheeseCutter or SID Factory II output is usually a song of the user: it is never overwritten. */
+export function refuseDriverAsOutput(io: CliIo, driver: string, target: string): void {
+  if (sameFile(resolve(io.cwd, target), resolve(io.cwd, driver))) throw new UsageError(`the output file ${target} is the driver file; refusing to overwrite it. Pass -o <file> with another name`);
+}
+
 export function writeOutput(io: CliIo, input: string, target: string, bytes: Uint8Array | string): string {
   const path = resolve(io.cwd, target);
   if (sameFile(path, input)) throw new UsageError("the output file is the input file; refusing to overwrite it");
@@ -204,6 +209,7 @@ function exportCommand(args: string[], io: CliIo): number | Promise<number> {
       const target = output ?? `${stem(file)}.ct`;
       for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
       if (target === "-") { io.outBytes(result.bytes); return 0; }
+      refuseDriverAsOutput(io, driverFile, target);
       const written = writeOutput(io, path, target, result.bytes);
       const { bytes: _bytes, ...info } = result;
       return done({ file, format, output: written, bytes: result.bytes.length, ...info }, `${written}: CheeseCutter song, ${result.voices} voices, ${result.rows} rows, ${result.framesPerRow} frames per row`);
@@ -216,6 +222,7 @@ function exportCommand(args: string[], io: CliIo): number | Promise<number> {
       const target = output ?? `${stem(file)}.sf2`;
       for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
       if (target === "-") { io.outBytes(result.bytes); return 0; }
+      refuseDriverAsOutput(io, driverFile, target);
       const written = writeOutput(io, path, target, result.bytes);
       const { bytes: _bytes, ...info } = result;
       return done({ file, format, output: written, bytes: result.bytes.length, ...info }, `${written}: SID Factory II song (driver ${result.driver}), ${result.voices} tracks, ${result.rows} rows, ${result.framesPerRow} frames per row`);
