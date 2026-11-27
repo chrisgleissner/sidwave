@@ -112,7 +112,8 @@ export function verifySonglengths(text: string, root: string, options: Songlengt
   for (const entry of entries) {
     done++;
     if (options.onProgress && done % 2000 === 0) options.onProgress(done, entries.length);
-    if (entry.path === "") { report.noPath.push({ md5: entry.md5, line: entry.line }); continue; }
+    // An entry belongs to the path of the comment line directly above it; with another line between, it has no path.
+    if (entry.path === "" || entry.commentStart < 0) { report.noPath.push({ md5: entry.md5, line: entry.line }); continue; }
     listed.add(entry.path);
     const file = fileOfHvscPath(root, entry.path);
     if (!existsSync(file)) { report.missing.push({ path: entry.path, md5: entry.md5, line: entry.line }); continue; }

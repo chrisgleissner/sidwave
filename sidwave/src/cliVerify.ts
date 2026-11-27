@@ -7,13 +7,13 @@ import { basename, dirname, extname, resolve } from "node:path";
 import { EXIT_FAILED, EXIT_OK, SidwaveOperationError, UsageError, envelope, type CliIo } from "./cliCore.js";
 import type { SidClock, SidEmulation } from "./engine/types.js";
 import {
-  VERIFY_LEVELS, defaultHorizon, loadRoms, loadTune, readInput, readSonglengths, renderTune, sidInfo, traceTune, verifyTunes,
+  VERIFY_LEVELS, defaultHorizon, loadRoms, loadTune, readInput, readSonglengths, renderTune, traceTune, verifyTunes,
   type LoadedTune, type RunControl, type TraceFormat, type VerifyLevel, type VerifyReport,
 } from "./sidwaveTools.js";
 import { renderStemsCommand } from "./interchange/renderCli.js";
 import { parseA1Rules } from "./verify/a1.js";
 
-/** Flags of verify, render, trace and sid-info. The parser in cli.ts hands every flag to takeRunFlag first. */
+/** Flags of verify, render and trace. The parser in cli.ts hands every flag to takeRunFlag first. */
 export interface RunFlags {
   song?: number;
   seconds?: number;
@@ -90,7 +90,6 @@ export const RUN_HELP = {
   sidwave render   <file.sid|score> [-o <out.wav>] [--song <n>] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite] [run options]
   sidwave render   <score> --stems [-o <dir>] [--force] [--song <n>] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite] [--model 6581|8580]
   sidwave trace    <file.sid|score> [-o <out>] [--format csv|jsonl] [--song <n>] [--seconds <s>] [run options]
-  sidwave sid-info <file.sid> [--songlengths <Songlengths.md5>] [--json]
 `,
   commands: `  verify     Compare a candidate with a reference at increasing levels: T0 (identical register writes per player
              call), T1 (same writes within --tolerance-cycles), A0 (identical SIDLite PCM) and A1 (calibrated
@@ -102,7 +101,6 @@ export const RUN_HELP = {
              --stems (scores only) write the mix, one WAV per voice and a manifest into the directory -o (default
              <name>-stems); --sample-rate and --emulation are aliases of --rate and --engine. See doc/interchange.md.
   trace      Write the SID register writes as CSV (sid,address,value,cycle) or JSON lines to standard output, or to -o.
-  sid-info   Print the header of a SID file; with --songlengths also the length of each subtune.
 `,
   options: `  Run options (verify, render, trace): --progress (progress on standard error), --max-seconds <s>,
                       --max-records <n>, --max-bytes <n> (input and output size), --roms <dir> (kernal.rom, basic.rom,
@@ -311,28 +309,7 @@ async function traceCommand(io: CliIo, options: CommandOptions): Promise<number>
   return EXIT_OK;
 }
 
-function sidInfoCommand(io: CliIo, options: CommandOptions): number {
-  common("sid-info", options);
-  reject(options, "sid-info", ["song", "seconds", "level", "toleranceCycles", "progress", "maxSeconds", "maxRecords", "rate", "model", "engine", "clock", "roms", "a1Rules", "stems"]);
-  const file = singleInput(options, "sid-info");
-  const bytes = readInput(file, { cwd: io.cwd, ...(options.run.maxBytes === undefined ? {} : { maxBytes: options.run.maxBytes }) });
-  const songlengths = options.run.songlengths ? readSonglengths(options.run.songlengths, { cwd: io.cwd }) : undefined;
-  const info = sidInfo(bytes, songlengths ? { songlengths } : {});
-  const hex = (n: number) => `$${n.toString(16).toUpperCase().padStart(4, "0")}`;
-  const text = [
-    `${file}: ${info.magic} v${info.version}, ${info.songs} song${info.songs === 1 ? "" : "s"}, start song ${info.startSong}`,
-    `name: ${info.name}`, `author: ${info.author}`, `released: ${info.released}`,
-    `load ${hex(info.loadAddress)}, init ${hex(info.initAddress)}, play ${hex(info.playAddress)}`,
-    `clock ${info.clock}, SID models ${info.sidModels.join("/")}, speed ${info.speeds.join(",")}`,
-    `md5 ${info.md5}`,
-    ...(info.songlengths ? [`song lengths: ${info.songlengths.map((s) => (s === null ? "unknown" : `${s}s`)).join(", ")}`] : []),
-    ...info.warnings.map((w) => `warning: ${w}`),
-  ].join("\n");
-  io.out(options.json ? `${JSON.stringify(envelope("sid-info", true, { result: { file, ...info } }), null, 2)}\n` : `${text}\n`);
-  return EXIT_OK;
-}
-
 export const RUN_COMMANDS: Record<string, (io: CliIo, options: any) => number | Promise<number>> = {
-  verify: verifyCommand, render: renderCommand, trace: traceCommand, "sid-info": sidInfoCommand,
+  verify: verifyCommand, render: renderCommand, trace: traceCommand,
 };
 

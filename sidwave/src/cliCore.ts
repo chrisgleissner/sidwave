@@ -4,6 +4,7 @@
 
 import { SidFileError } from "./sidFile.js";
 import { SonglengthsError } from "./songlengths.js";
+import { HvscError } from "./hvsc.js";
 import { SidwaveValidationError } from "./sidwave.js";
 import { InterchangeUsageError } from "./interchange/errors.js";
 import { MidiError } from "./interchange/smf.js";
@@ -74,6 +75,7 @@ export function classifyError(error: unknown): ErrorReport {
   if (error instanceof RetargetError) return { category: "validation", message: error.message, details: { code: error.code } };
   if (error instanceof MidiError || error instanceof MidiImportError || error instanceof InterchangeUsageError) return { category: "input", message: error.message, details: {} };
   if (error instanceof SidFileError) return { category: "input", message: error.message, details: { code: error.code } };
+  if (error instanceof HvscError) return { category: error.category, message: error.message, details: { code: error.code } };
   if (error instanceof SonglengthsError) return { category: "input", message: error.message, details: { code: error.code } };
   if (error instanceof A1Error) return { category: error.code === "invalid_input" ? "usage" : "input", message: error.message, details: { code: error.code } };
   if (error instanceof SidEngineError) {

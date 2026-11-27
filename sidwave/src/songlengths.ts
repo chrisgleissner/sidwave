@@ -58,7 +58,8 @@ export interface SonglengthsRawEntry {
   line: number;
 }
 
-const isHex = (c: number): boolean => (c >= 48 && c <= 57) || (c >= 97 && c <= 102) || (c >= 65 && c <= 70);
+const LOWER_KEY = /[0-9a-f]{32}=/y;
+const ANY_KEY = /[0-9a-fA-F]{32}=/y;
 
 /**
  * Parses one duration token `text.slice(start, end)` without allocating: the grammar of parseDuration, that is
@@ -141,15 +142,15 @@ export function scanSonglengths(text: string, onEntry: (entry: SonglengthsRawEnt
       }
       continue;
     }
-    if (e - s < 33 || text.charCodeAt(s + 32) !== 61) continue;
+    if (e - s < 33) continue;
+    // 32 hex digits and "=": a sticky regular expression runs as native code, which is faster than a loop here.
+    LOWER_KEY.lastIndex = s;
     let upper = false;
-    let valid = true;
-    for (let k = s; k < s + 32; k++) {
-      const c = text.charCodeAt(k);
-      if (!isHex(c)) { valid = false; break; }
-      if (c < 97 && c > 57) upper = true;
+    if (!LOWER_KEY.test(text)) {
+      ANY_KEY.lastIndex = s;
+      if (!ANY_KEY.test(text)) continue;
+      upper = true;
     }
-    if (!valid) continue;
     const md5 = upper ? text.slice(s, s + 32).toLowerCase() : text.slice(s, s + 32);
     const durations: number[] = [];
     let i = s + 33;

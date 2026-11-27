@@ -19,6 +19,9 @@ import { CONVERT_HELP, HUB_COMMANDS } from "./interchange/convertCli.js";
 
 const INTERCHANGE_COMMANDS = { ...BASE_INTERCHANGE_COMMANDS, ...HUB_COMMANDS };
 import { runCompleteCli } from "./cliComplete.js";
+import { runSidCli, sidInfoCommand } from "./cliSid.js";
+import { runSonglengthsCli } from "./cliSonglengths.js";
+import { runStilCli } from "./cliStil.js";
 import { isTraceInput, reconstructFromTraceCommand } from "./interchange/traceCli.js";
 import { RUN_COMMANDS, RUN_HELP, flagName, takeRunFlag, type RunFlags } from "./cliVerify.js";
 import {
@@ -42,6 +45,9 @@ Usage:
   sidwave retarget <file> [--clock pal|ntsc] [--model 6581|8580] [--sids <n>] [--budget-cycles <n>] [--budget-bytes <n>]
                           [--allow-changes] [-o <out>] [--force] [--json]   (see "sidwave retarget --help")
   sidwave complete <score> --op continue|harmonise|accompany|fill-section [options]   (see "sidwave complete --help")
+  sidwave sid info|edit|player <file.sid|dir> [options]   (SID headers, HVSC tools; see "sidwave sid --help"; "sid-info" is the old name of "sid info")
+  sidwave songlengths lookup|verify|write ...             (see "sidwave songlengths --help")
+  sidwave stil parse|query ...                            (see "sidwave stil --help")
 ${INTERCHANGE_HELP}${CONVERT_HELP}${RUN_HELP.usage}${RECONSTRUCT_USAGE}${ANALYZE_USAGE}  sidwave --help | --version
 
 Commands:
@@ -400,13 +406,14 @@ function fail(io: CliIo, json: boolean, command: string, error: unknown): number
 
 /**
  * Runs the command line. `args` excludes the node binary and script path. The commands validate, compile, lint,
- * examples and sid-info finish synchronously; verify, render and trace return a promise.
+ * examples, sid, songlengths and stil finish synchronously; verify, render and trace return a promise.
  */
 export function runCli(args: string[], io: CliIo): number | Promise<number> {
   const json = args.includes("--json");
   const [first, ...rest] = args;
   const interchange = first !== undefined && Object.prototype.hasOwnProperty.call(INTERCHANGE_COMMANDS, first) ? INTERCHANGE_COMMANDS[first] : undefined;
-  const name = first !== undefined && (first === "retarget" || interchange || Object.prototype.hasOwnProperty.call(COMMANDS, first)) ? first : "sidwave";
+  const hvsc = first === "sid" || first === "sid-info" || first === "songlengths" || first === "stil";
+  const name = first !== undefined && (first === "retarget" || hvsc || interchange || Object.prototype.hasOwnProperty.call(COMMANDS, first)) ? first : "sidwave";
   try {
     if (first === undefined) { io.err(HELP); return EXIT_USAGE; }
     if (first === "-h" || first === "--help" || first === "help") { io.out(HELP); return EXIT_OK; }
@@ -414,6 +421,10 @@ export function runCli(args: string[], io: CliIo): number | Promise<number> {
     if (first === "retarget") return runRetarget(io, rest);
     if (interchange) { const outcome = interchange(rest, io); return outcome instanceof Promise ? outcome.catch((error: unknown) => fail(io, json, name, error)) : outcome; }
     if (first === "complete") return runCompleteCli(rest, io);
+    if (first === "sid") return runSidCli(rest, io);
+    if (first === "sid-info") return rest.includes("-h") || rest.includes("--help") ? runSidCli(["info", "--help"], io) : sidInfoCommand(io, rest, "sid-info");
+    if (first === "songlengths") return runSonglengthsCli(rest, io);
+    if (first === "stil") return runStilCli(rest, io);
     if (first === "reconstruct" && (rest.some((arg) => arg === "--from" || arg.startsWith("--from=")) || isTraceInput(rest, io.cwd))) return reconstructFromTraceCommand(rest, io).catch((error: unknown) => fail(io, json, name, error));
     const command = name === "sidwave" ? undefined : COMMANDS[name];
     if (!command) throw new UsageError(`unknown command "${first}"`);
