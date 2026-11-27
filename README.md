@@ -116,6 +116,14 @@ sidwave compile song.sidwave.yaml
 
 ### 3. Play
 
+```sh
+sidwave play song.sidwave.yaml                  # through the audio player of your system
+sidwave watch song.sidwave.yaml                 # restart on every save, errors with line and column
+sidwave play song.sidwave.yaml --target vice    # through VICE
+```
+
+`play` and `watch` are described in the [package README](sidwave/README.md#playing-and-watching). To use the compiled files elsewhere:
+
 - **VICE**: open the PRG with `x64sc song.prg` (autostart), or attach it from the emulator's menu. VICE needs a normal C64 setup with ROMs.
 - **sidplayfp**: play the PSID, for example `sidplayfp song.sid`. sidplayfp emulates the SID and CPU only, not the C64's analogue audio path, so it sounds close to a real machine but not identical.
 - **Real hardware**: copy the PRG to a disk image, SD card or other storage the machine can read, then `LOAD` and `RUN` it. On an Ultimate 64 or C64 Ultimate you can also run the PRG from the file browser or through c64bridge. Pitch and tempo are correct on PAL and NTSC machines because the PRG detects the video standard.

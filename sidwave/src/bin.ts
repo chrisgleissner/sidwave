@@ -36,6 +36,8 @@ const FAST: Record<string, () => Promise<Runner>> = {
   merge: async () => (await import("./cliMerge.js")).runMergeCli,
   transform: async () => (await import("./cliTransform.js")).runTransformCli,
   generate: async () => (await import("./cliGenerate.js")).runGenerateCli,
+  play: async () => (await import("./cliPlay.js")).runPlayCli,
+  watch: async () => (await import("./cliPlay.js")).runWatchCli,
 };
 
 const args = process.argv.slice(2);

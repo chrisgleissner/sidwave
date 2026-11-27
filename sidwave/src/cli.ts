@@ -26,6 +26,7 @@ import { runStilCli } from "./cliStil.js";
 import { isTraceInput, reconstructFromTraceCommand } from "./interchange/traceCli.js";
 import { AUTHORING_COMMANDS, AUTHORING_USAGE } from "./cliAuthoringCommands.js";
 import { unknownCommandMessage } from "./cliAuthoring.js";
+import { PLAY_USAGE, runPlayCli, runWatchCli } from "./cliPlay.js";
 import { RUN_COMMANDS, RUN_HELP, flagName, takeRunFlag, type RunFlags } from "./cliVerify.js";
 import {
   compileSidwaveBytes, confinedReadOptions, describeSidwave, isExampleName, lintSidwave, listSidwaveExamples,
@@ -52,7 +53,7 @@ Usage:
   sidwave sid info|edit|player <file.sid|dir> [options]   (SID headers, HVSC tools; see "sidwave sid --help"; "sid-info" is the old name of "sid info")
   sidwave songlengths lookup|verify|write ...             (see "sidwave songlengths --help")
   sidwave stil parse|query ...                            (see "sidwave stil --help")
-${AUTHORING_USAGE}${INTERCHANGE_HELP}${CONVERT_HELP}${RUN_HELP.usage}${RECONSTRUCT_USAGE}${ANALYZE_USAGE}  sidwave --help | --version
+${AUTHORING_USAGE}${INTERCHANGE_HELP}${CONVERT_HELP}${RUN_HELP.usage}${PLAY_USAGE}${RECONSTRUCT_USAGE}${ANALYZE_USAGE}  sidwave --help | --version
 
 Commands:
   validate   Parse a score. Exit 0 when it is valid, 3 with the path of the first error otherwise.
@@ -461,8 +462,10 @@ export function runCli(args: string[], io: CliIo): number | Promise<number> {
     if (first === "stil") return runStilCli(rest, io);
     if (first === "reconstruct" && (rest.some((arg) => arg === "--from" || arg.startsWith("--from=")) || isTraceInput(rest, io.cwd))) return reconstructFromTraceCommand(rest, io).catch((error: unknown) => fail(io, json, name, error));
     if (authoring) return authoring(rest, io);
+    if (first === "play") return runPlayCli(rest, io);
+    if (first === "watch") return runWatchCli(rest, io);
     const command = name === "sidwave" ? undefined : COMMANDS[name];
-    if (!command) throw new UsageError(unknownCommandMessage(first, [...Object.keys(COMMANDS), ...Object.keys(INTERCHANGE_COMMANDS), ...Object.keys(AUTHORING_COMMANDS), "retarget", "complete", "sid", "songlengths", "stil"]));
+    if (!command) throw new UsageError(unknownCommandMessage(first, [...Object.keys(COMMANDS), ...Object.keys(INTERCHANGE_COMMANDS), ...Object.keys(AUTHORING_COMMANDS), "retarget", "complete", "sid", "songlengths", "stil", "play", "watch"]));
     const options = parseArgs(rest, name);
     if (options.help) { io.out(HELP); return EXIT_OK; }
     if (options.version) { io.out(`${packageVersion()}\n`); return EXIT_OK; }

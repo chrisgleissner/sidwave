@@ -241,8 +241,19 @@ export function createLibsidplayfpEngine({
         if (!chunk) throw new SidLoadError(ctx.getLastError() || "libsidplayfp render failed");
         const copy = chunk.slice();
         const needed = Math.min(copy.length, wantSamples - sampleCount);
-        if (needed) pcm.push(copy.subarray(0, needed));
         sampleCount += needed;
+        if (needed) {
+          const part = copy.subarray(0, needed);
+          if (!req.onSamples) pcm.push(part);
+          else {
+            try {
+              await req.onSamples(part);
+            } catch (error) {
+              callbackFailure = { error };
+              throw error;
+            }
+          }
+        }
         producedSamples += copy.length;
         if (tracing) {
           const dropped = ctx.getDroppedSidWriteTraceCount();
@@ -266,7 +277,7 @@ export function createLibsidplayfpEngine({
         slice++;
         if (req.onProgress) callback(() => req.onProgress!(Math.min(1, sampleCount / wantSamples)));
       }
-      const samples = new Int16Array(sampleCount);
+      const samples = new Int16Array(req.onSamples ? 0 : sampleCount);
       let offset = 0;
       for (const part of pcm) {
         samples.set(part, offset);

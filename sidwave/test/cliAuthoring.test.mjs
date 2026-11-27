@@ -820,6 +820,8 @@ test("the authoring commands start fast in a new process", { skip: process.platf
     const cases = [
       [["--version"], 110], [["format", "--help"], 300], [["format", "s.yaml", "--check"], 1100], [["diff", "s.yaml", "t.yaml"], 1500],
       [["merge", "s.yaml", "t.yaml", "s.yaml"], 2200], [["transform", "s.yaml", "--tempo", "99"], 2200], [["generate", "--seed", "3"], 700],
+      // Measured 150-170 ms at load average 33.
+      [["play", "--help"], 360], [["watch", "--help"], 360],
     ];
     for (const [args, limit] of cases) {
       const used = Math.min(cold(...args), cold(...args));
