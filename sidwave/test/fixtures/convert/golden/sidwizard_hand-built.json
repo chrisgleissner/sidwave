@@ -200,13 +200,6 @@
     "severity": "approx",
     "count": 1,
     "message": "Instrument i2: pulse table (the first pulse width is written) is not exported."
-   },
-   {
-    "stage": "write",
-    "code": "filter.dropped",
-    "severity": "lost",
-    "count": 1,
-    "message": "Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
    }
   ]
  }

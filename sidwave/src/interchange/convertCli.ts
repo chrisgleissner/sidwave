@@ -222,7 +222,7 @@ function humanSummary(file: string, result: ConvertResult, outputs: Array<{ kind
     if (!m.available) lines.push(`quality: not measured (${m.reason})`);
     else {
       lines.push(`quality (reference: the score after the import, all voices): note F1 ${m.noteF1} (precision ${m.precision}, recall ${m.recall}), pitch only ${m.noteF1PitchOnly}, drum identity ${m.drumIdentity}`);
-      lines.push(`  onset error mean ${m.onsetError?.meanMs} ms, max ${m.onsetError?.maxMs} ms (tolerance ${m.onsetToleranceMs} ms); duration overlap ${m.durationOverlap}; voice agreement ${m.voiceAgreement}; octave shifts ${m.octaveShifted}; voices dropped ${m.voicesDropped}; instruments mapped ${m.instruments?.mapped}/${m.instruments?.used}; length ${m.durationSeconds?.reference} s -> ${m.durationSeconds?.output} s`);
+      lines.push(`  onset error mean ${m.onsetError?.meanMs} ms, max ${m.onsetError?.maxMs} ms (tolerance ${m.onsetToleranceMs} ms); duration overlap ${m.durationOverlap}; voice agreement ${m.voiceAgreement} (same voice number ${m.voiceAgreementIdentity}); octave shifts ${m.octaveShifted}; voices dropped ${m.voicesDropped}; instruments mapped ${m.instruments?.mapped}/${m.instruments?.used}; length ${m.durationSeconds?.reference} s -> ${m.durationSeconds?.output} s`);
       if (m.sourceVsOutput) lines.push(`  against the ${m.sourceVsOutput.source}: F1 ${m.sourceVsOutput.noteF1PitchOnly} (precision ${m.sourceVsOutput.precision}, recall ${m.sourceVsOutput.recall}), duration overlap ${m.sourceVsOutput.durationOverlap}`);
       if (m.fdiff) lines.push(`  F-diff ${m.fdiff.differingCalls} register-class differences over ${m.fdiff.comparedCalls} calls`);
     }

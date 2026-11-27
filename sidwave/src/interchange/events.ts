@@ -28,7 +28,7 @@ export interface ExportedInstrument {
   ring: boolean;
   sync: boolean;
   filterRouted: boolean;
-  /** True when a wavetable, pulse table or filter table changes the sound after the note starts. */
+  /** True when a wavetable (more than one step, or a step that changes pitch, ring or sync; a single step that only restates the waveform is not), pulse table or filter table changes the sound after the note starts. */
   tables: { wave: boolean; pulse: boolean; filter: boolean };
 }
 
@@ -145,7 +145,7 @@ function describeInstrument(inst: Instrument, index: number, fps: number, name: 
     ring: !!(inst.wave & 0x04),
     sync: !!(inst.wave & 0x02),
     filterRouted: !!inst.filter,
-    tables: { wave: !!inst.wavetable?.length, pulse: !!inst.pulsetable?.steps.length, filter: !!inst.filtertable?.steps.length },
+    tables: { wave: (inst.wavetable?.length ?? 0) > 1 || !!inst.wavetable?.some((step) => step.note !== undefined || step.ring !== undefined || step.sync !== undefined), pulse: !!inst.pulsetable?.steps.length, filter: !!inst.filtertable?.steps.length },
   };
   if (inst.wave & 0x40) out.pulseWidth = inst.pw;
   if (inst.vibRate) {

@@ -107,13 +107,6 @@
    },
    {
     "stage": "write",
-    "code": "wavetable.dropped",
-    "severity": "lost",
-    "count": 1,
-    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
-   },
-   {
-    "stage": "write",
     "code": "instrument.simplified",
     "severity": "approx",
     "count": 1,
@@ -204,13 +197,6 @@
   "losses": [
    {
     "stage": "write",
-    "code": "wavetable.dropped",
-    "severity": "lost",
-    "count": 2,
-    "message": "Instrument i01_lead: wavetable is not exported. | Instrument i02_bass: wavetable is not exported."
-   },
-   {
-    "stage": "write",
     "code": "pulse.modulation",
     "severity": "approx",
     "count": 1,
@@ -218,10 +204,10 @@
    },
    {
     "stage": "write",
-    "code": "filter.dropped",
-    "severity": "lost",
+    "code": "expression.dropped",
+    "severity": "approx",
     "count": 1,
-    "message": "Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
+    "message": "Note velocities (2 distinct values) are not exported; the module plays at full volume."
    }
   ]
  }

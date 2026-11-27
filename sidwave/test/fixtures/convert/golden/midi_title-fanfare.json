@@ -6,8 +6,8 @@
     "stage": "read",
     "code": "voices.dropped",
     "severity": "lost",
-    "count": 2,
-    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+    "count": 22,
+    "message": "22 notes of 2 source part(s) do not fit in 3 voices and are not imported (Trombone: 14 notes; Contrabass: 8 notes)."
    }
   ]
  },
@@ -18,8 +18,8 @@
     "stage": "read",
     "code": "voices.dropped",
     "severity": "lost",
-    "count": 2,
-    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+    "count": 22,
+    "message": "22 notes of 2 source part(s) do not fit in 3 voices and are not imported (Trombone: 14 notes; Contrabass: 8 notes)."
    },
    {
     "stage": "write",
@@ -37,8 +37,8 @@
     "stage": "read",
     "code": "voices.dropped",
     "severity": "lost",
-    "count": 2,
-    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+    "count": 22,
+    "message": "22 notes of 2 source part(s) do not fit in 3 voices and are not imported (Trombone: 14 notes; Contrabass: 8 notes)."
    },
    {
     "stage": "write",
@@ -70,8 +70,8 @@
     "stage": "read",
     "code": "voices.dropped",
     "severity": "lost",
-    "count": 2,
-    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+    "count": 22,
+    "message": "22 notes of 2 source part(s) do not fit in 3 voices and are not imported (Trombone: 14 notes; Contrabass: 8 notes)."
    },
    {
     "stage": "write",
@@ -110,8 +110,8 @@
     "stage": "read",
     "code": "voices.dropped",
     "severity": "lost",
-    "count": 2,
-    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+    "count": 22,
+    "message": "22 notes of 2 source part(s) do not fit in 3 voices and are not imported (Trombone: 14 notes; Contrabass: 8 notes)."
    },
    {
     "stage": "write",
@@ -150,8 +150,8 @@
     "stage": "read",
     "code": "voices.dropped",
     "severity": "lost",
-    "count": 2,
-    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+    "count": 22,
+    "message": "22 notes of 2 source part(s) do not fit in 3 voices and are not imported (Trombone: 14 notes; Contrabass: 8 notes)."
    },
    {
     "stage": "write",
@@ -183,8 +183,8 @@
     "stage": "read",
     "code": "voices.dropped",
     "severity": "lost",
-    "count": 2,
-    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+    "count": 22,
+    "message": "22 notes of 2 source part(s) do not fit in 3 voices and are not imported (Trombone: 14 notes; Contrabass: 8 notes)."
    },
    {
     "stage": "plan",
@@ -209,8 +209,8 @@
     "stage": "read",
     "code": "voices.dropped",
     "severity": "lost",
-    "count": 2,
-    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+    "count": 22,
+    "message": "22 notes of 2 source part(s) do not fit in 3 voices and are not imported (Trombone: 14 notes; Contrabass: 8 notes)."
    },
    {
     "stage": "write",
@@ -228,8 +228,8 @@
     "stage": "read",
     "code": "voices.dropped",
     "severity": "lost",
-    "count": 2,
-    "message": "2 source part(s) do not fit in 3 voices and are not imported."
+    "count": 22,
+    "message": "22 notes of 2 source part(s) do not fit in 3 voices and are not imported (Trombone: 14 notes; Contrabass: 8 notes)."
    },
    {
     "stage": "write",
@@ -240,10 +240,10 @@
    },
    {
     "stage": "write",
-    "code": "filter.dropped",
-    "severity": "lost",
+    "code": "expression.dropped",
+    "severity": "approx",
     "count": 1,
-    "message": "Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
+    "message": "Note velocities (6 distinct values) are not exported; the module plays at full volume."
    }
   ]
  }

@@ -211,13 +211,6 @@
   "losses": [
    {
     "stage": "write",
-    "code": "wavetable.dropped",
-    "severity": "lost",
-    "count": 7,
-    "message": "Instrument i01_filter_bass: wavetable is not exported. | Instrument i02_hat: wavetable is not exported. | Instrument i03_snare: wavetable is not exported. | Instrument i04_kick: wavetable is not exported. | Instrument i05_chip_arp_major: wavetable is not exported. | Instrument i07_lead_pwm: wavetable is not exported. | Instrument i08_sync_lead: wavetable is not exported."
-   },
-   {
-    "stage": "write",
     "code": "pulse.modulation",
     "severity": "approx",
     "count": 2,
@@ -225,10 +218,17 @@
    },
    {
     "stage": "write",
-    "code": "filter.dropped",
+    "code": "wavetable.dropped",
     "severity": "lost",
     "count": 1,
-    "message": "Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
+    "message": "Instrument i08_sync_lead: wavetable is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "expression.dropped",
+    "severity": "approx",
+    "count": 1,
+    "message": "Note velocities (5 distinct values) are not exported; the module plays at full volume."
    }
   ]
  }

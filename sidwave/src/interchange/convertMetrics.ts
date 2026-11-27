@@ -25,8 +25,10 @@ export interface NoteAgreement {
   onsetToleranceMs: number;
   /** Mean over matched notes of (overlap of the two note intervals) / (union of the intervals). 1 when note ends agree. */
   durationOverlap: number;
-  /** Share of matched notes whose output voice is the voice that most of the notes of the same reference voice went to. */
+  /** Share of matched notes whose output voice is the voice that most notes of the same reference voice went to (best mapping, invariant under a permutation of the voices). */
   voiceAgreement: number;
+  /** Share of matched notes that stay in the voice with the same number. Unlike `voiceAgreement` it is not invariant under a permutation of the voices. */
+  voiceAgreementIdentity: number;
   /** Matched drum hits whose output note is also a drum hit of the same kind, over the drum hits of the reference. 1 without drum hits. */
   drumIdentity: number;
 }
@@ -55,18 +57,17 @@ export function hitsOf(score: ExportedScore): Hit[] {
 }
 
 const round = (n: number, digits = 3): number => Math.round(n * 10 ** digits) / 10 ** digits;
-const OCTAVE_FLOOR = 0.02;
+const FRAME = 0.02;
 const TOLERANCE_CAP = 0.1;
 
 /**
- * Onset tolerance in seconds: a quarter of the 5th-percentile note length of the reference, at least one video frame
- * (20 ms) and at most 100 ms; a row-based target (or an importer that quantises to a grid) widens it to half a row
- * or cell, because rounding to that grid is the format's own resolution.
+ * Onset tolerance in seconds. A format without a grid gets one video frame (20 ms). A row-based target, or an importer
+ * that quantises to a grid (MIDI, MusicXML: 0.25 beat by default), gets half a row or grid cell, at most 100 ms: rounding
+ * a note start to the nearest row moves it by up to half a row (a sawtooth that does not accumulate), which is the
+ * resolution of the format and not an error of the conversion.
  */
-export function onsetTolerance(reference: readonly Hit[], rowSeconds?: number): number {
-  const lengths = reference.map((h) => h.end - h.time).filter((l) => l > 0).sort((a, b) => a - b);
-  const shortest = lengths.length ? lengths[Math.floor(lengths.length * 0.05)]! : 0.1;
-  return Math.min(TOLERANCE_CAP, Math.max(OCTAVE_FLOOR, shortest / 4, rowSeconds ? rowSeconds / 2 : 0));
+export function onsetTolerance(_reference: readonly Hit[], gridSeconds?: number): number {
+  return gridSeconds ? Math.min(TOLERANCE_CAP, Math.max(FRAME, gridSeconds / 2 + 0.01)) : FRAME;
 }
 
 type Pair = [Hit, Hit];
@@ -120,6 +121,7 @@ export function compareHits(ref: readonly Hit[], out: readonly Hit[], tol: numbe
   for (const [a, b] of exact.pairs) { const m = counts.get(a.voice) ?? counts.set(a.voice, new Map()).get(a.voice)!; m.set(b.voice, (m.get(b.voice) ?? 0) + 1); }
   let agree = 0;
   for (const m of counts.values()) agree += Math.max(...m.values());
+  const sameVoice = exact.pairs.filter(([a, b]) => a.voice === b.voice).length;
   const drumsRef = ref.filter((h) => h.drum !== undefined).length;
   const drumsMatched = exact.pairs.filter(([a]) => a.drum !== undefined).length;
   return {
@@ -129,6 +131,7 @@ export function compareHits(ref: readonly Hit[], out: readonly Hit[], tol: numbe
     onsetToleranceMs: round(tol * 1000, 1),
     durationOverlap: round(exact.pairs.length ? overlap / exact.pairs.length : ref.length ? 0 : 1),
     voiceAgreement: round(exact.pairs.length ? agree / exact.pairs.length : ref.length ? 0 : 1),
+    voiceAgreementIdentity: round(exact.pairs.length ? sameVoice / exact.pairs.length : ref.length ? 0 : 1),
     drumIdentity: round(drumsRef ? drumsMatched / drumsRef : 1),
   };
 }

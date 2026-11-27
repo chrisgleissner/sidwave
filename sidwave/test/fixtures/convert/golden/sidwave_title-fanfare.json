@@ -279,7 +279,14 @@
     "code": "filter.dropped",
     "severity": "lost",
     "count": 5,
-    "message": "Instrument trumpet: filter is not exported. | Instrument trumpet_ring: filter is not exported. | Instrument trumpet2: filter is not exported. | Instrument trumpet2_ring: filter is not exported. | Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
+    "message": "Instrument trumpet: filter is not exported. | Instrument trumpet_ring: filter is not exported. | Instrument trumpet2: filter is not exported. | Instrument trumpet2_ring: filter is not exported. | The SID filter settings of the score are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "expression.dropped",
+    "severity": "approx",
+    "count": 1,
+    "message": "Note velocities (24 distinct values) are not exported; the module plays at full volume."
    }
   ]
  }

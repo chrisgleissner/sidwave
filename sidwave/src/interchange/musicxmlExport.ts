@@ -69,14 +69,22 @@ export function exportMusicXml(doc: ParsedSidwave, options: EventExportOptions =
   const plans: PartPlan[] = [];
   let unknownDrum = false;
   let pitchedChannels = 0;
+  // A pitched voice that also plays drum hits is written as two parts: the pitched notes, and the hits as an unpitched
+  // percussion part, so that a reader sees the drums as drums.
+  const partVoices: typeof score.voices = [];
   for (const voice of score.voices) {
+    const hits = voice.kind === "pitched" ? voice.notes.filter((n) => n.percussion) : [];
+    if (hits.length === 0 || hits.length === voice.notes.length) { partVoices.push(voice); continue; }
+    partVoices.push({ ...voice, notes: voice.notes.filter((n) => !n.percussion) });
+    partVoices.push({ ...voice, kind: "drums", ...(voice.name ? { name: `${voice.name} drums` } : { name: "drums" }), notes: hits });
+  }
+  for (const voice of partVoices) {
     const pid = `P${plans.length + 1}`;
     const drums = voice.kind === "drums";
     const slotIndex = drums ? -1 : pitchedChannels++ % 15;
     const channel = drums ? 10 : slotIndex < 9 ? slotIndex + 1 : slotIndex + 2;
     const plan: PartPlan = { voice, pid, slots: new Map(), channel, slotXml: [] };
     for (const note of voice.notes) {
-      // A drum hit inside a pitched voice is written as a pitched note: a part with both kinds would be read back as a drum part.
       const key = drums ? drumKey(note.drum).key : programFor(voice, instruments.get(note.instrument)) + 1000;
       if (plan.slots.has(key)) continue;
       const id = `${pid}-I${plan.slots.size + 1}`;

@@ -348,16 +348,17 @@ report are mapped to codes by `interchange/loss.ts`; a sentence with no rule get
 The output is read back with the target's importer and its notes are compared with a reference note by note. The
 reference is the score after the import, with all voices and before any reduction. It is not the source file: an
 import that drops notes is already in the reference, and only `sourceVsOutput` (below) sees it. A note matches when
-its pitch (for a drum hit: its drum name) is equal and the onsets differ by at most the tolerance. The tolerance is a
-quarter of the shortest notes of the reference (5th percentile), at least 20 ms (one video frame) and at most 100 ms.
-For a target with a row grid (GoatTracker, Furnace, SID-Wizard) it is at least half a row, and for an importer that
-quantises to a grid (MIDI, MusicXML: 0.25 beat by default) at least half a grid cell, because rounding to that grid is
-the resolution of the format. It is printed with the result (`onsetToleranceMs`). There is no wildcard for drums.
+its pitch (for a drum hit: its drum name) is equal and the onsets differ by at most the tolerance. The tolerance is one
+video frame (20 ms) for a format without a grid. For a target with a row grid (GoatTracker, Furnace, SID-Wizard) it is half
+a row, and for an importer that quantises to a grid (MIDI, MusicXML: 0.25 beat by default) half a grid cell, each plus 10 ms
+for rounding, at most 100 ms, because rounding a note start to the nearest row moves it by up to half a row (a sawtooth: the error of each note
+is bounded and does not accumulate). It is printed with the result (`onsetToleranceMs`). There is no wildcard for drums.
 
 Reported: `noteF1` with `precision` and `recall`; `noteF1PitchOnly` (drum identity ignored); `noteF1OctaveTolerant` and
 `octaveShifted` (matches that differ by whole octaves); mean and maximum onset error; `durationOverlap` (mean of
 intersection over union of the note intervals of matched notes, so it sees changed note ends); `voiceAgreement` (the
-share of matched notes whose output voice is the voice that most notes of the same reference voice went to);
+share of matched notes whose output voice is the voice that most notes of the same reference voice went to; it does not
+change when the voices are permuted, so `voiceAgreementIdentity`, the share that keep their voice number, is reported with it);
 `drumIdentity` (drum hits that matched as the same drum); the length of the reference and of the output in seconds
 (`durationSeconds`: a tracker or grid import pads the last bar, so the length can grow by up to a bar without any tempo
 drift); voices dropped; instruments mapped; for a `.sid` or trace input the F-diff of the reconstruct. A1 is not
@@ -379,8 +380,8 @@ and `siddump` source is read by reconstruct with a 4 s horizon. The tables are p
 | Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
 |---|---|---|---|---|---|---|
 | sidwave | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
-| sidwave | midi | 0.69 | 0.66 | 0.91 | 0.90 | drum identity is lost (drum hits that share a voice with pitched notes are written as pitched notes); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID); tempo changes inside a bar move to the bar line |
-| sidwave | musicxml | 0.69 | 0.66 | 0.91 | 0.90 | drum identity is lost (drum hits that share a voice with pitched notes are written as pitched notes); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID); tempo changes inside a bar move to the bar line |
+| sidwave | midi | 0.92 | 0.66 | 0.84 | 0.92 | drum identity is lost (drum hits of the five-voice fixture sit in voices beyond the importer's three); the importer gives one of its 3 voices to the drum part and drops the notes of the weakest pitched part (listed in the read losses); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID) |
+| sidwave | musicxml | 0.92 | 0.66 | 0.84 | 0.92 | drum identity is lost (drum hits of the five-voice fixture sit in voices beyond the importer's three); the importer gives one of its 3 voices to the drum part and drops the notes of the weakest pitched part (listed in the read losses); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID) |
 | sidwave | goattracker | 0.69 | 0.68 | 0.86 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID); notes and ends move to the row grid |
 | sidwave | furnace | 0.69 | 0.68 | 0.86 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID); notes and ends move to the row grid |
 | sidwave | sidwizard | 0.57 | 0.61 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID); notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells |
@@ -390,8 +391,8 @@ and `siddump` source is read by reconstruct with a 4 s horizon. The tables are p
 | Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
 |---|---|---|---|---|---|---|
 | sid | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | recovered by reconstruct from a 4 s horizon |
-| sid | midi | 0.83 | 0.83 | 0.80 | 1.00 | recovered by reconstruct from a 4 s horizon |
-| sid | musicxml | 0.83 | 0.83 | 0.80 | 1.00 | recovered by reconstruct from a 4 s horizon |
+| sid | midi | 1.00 | 1.00 | 0.82 | 1.00 | recovered by reconstruct from a 4 s horizon |
+| sid | musicxml | 1.00 | 1.00 | 0.82 | 1.00 | recovered by reconstruct from a 4 s horizon |
 | sid | goattracker | 1.00 | 1.00 | 0.96 | 1.00 | notes and ends move to the row grid; recovered by reconstruct from a 4 s horizon |
 | sid | furnace | 1.00 | 1.00 | 0.96 | 1.00 | notes and ends move to the row grid; recovered by reconstruct from a 4 s horizon |
 | sid | sidwizard | 1.00 | 1.00 | 0.96 | 1.00 | notes and ends move to the row grid; recovered by reconstruct from a 4 s horizon |
@@ -403,9 +404,9 @@ and `siddump` source is read by reconstruct with a 4 s horizon. The tables are p
 | midi | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
 | midi | midi | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
 | midi | musicxml | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
-| midi | goattracker | 0.74 | 0.74 | 0.87 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
-| midi | furnace | 0.74 | 0.74 | 0.87 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
-| midi | sidwizard | 0.85 | 0.85 | 0.86 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells |
+| midi | goattracker | 0.64 | 0.64 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
+| midi | furnace | 0.64 | 0.64 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
+| midi | sidwizard | 0.78 | 0.78 | 0.89 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells |
 <!-- quality:midi:end -->
 
 <!-- quality:musicxml:start -->
@@ -414,17 +415,17 @@ and `siddump` source is read by reconstruct with a 4 s horizon. The tables are p
 | musicxml | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
 | musicxml | midi | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
 | musicxml | musicxml | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
-| musicxml | goattracker | 0.74 | 0.74 | 0.87 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
-| musicxml | furnace | 0.74 | 0.74 | 0.87 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
-| musicxml | sidwizard | 0.85 | 0.85 | 0.86 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells |
+| musicxml | goattracker | 0.64 | 0.64 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
+| musicxml | furnace | 0.64 | 0.64 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
+| musicxml | sidwizard | 0.78 | 0.78 | 0.89 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells |
 <!-- quality:musicxml:end -->
 
 <!-- quality:goattracker:start -->
 | Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
 |---|---|---|---|---|---|---|
 | goattracker | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
-| goattracker | midi | 0.58 | 0.58 | 0.92 | 0.97 | the tracker's row grid is read back on the 0.25 beat grid |
-| goattracker | musicxml | 0.58 | 0.58 | 0.92 | 0.97 | the tracker's row grid is read back on the 0.25 beat grid |
+| goattracker | midi | 1.00 | 1.00 | 0.77 | 0.93 | the tracker's row grid is read back on the 0.25 beat grid |
+| goattracker | musicxml | 1.00 | 1.00 | 0.77 | 0.93 | the tracker's row grid is read back on the 0.25 beat grid |
 | goattracker | goattracker | 1.00 | 1.00 | 0.87 | 1.00 | notes and ends move to the row grid |
 | goattracker | furnace | 1.00 | 1.00 | 0.87 | 1.00 | notes and ends move to the row grid |
 | goattracker | sidwizard | 1.00 | 1.00 | 0.76 | 1.00 | notes and ends move to the row grid |
@@ -434,8 +435,8 @@ and `siddump` source is read by reconstruct with a 4 s horizon. The tables are p
 | Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
 |---|---|---|---|---|---|---|
 | furnace | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
-| furnace | midi | 0.58 | 0.58 | 0.92 | 0.97 | the tracker's row grid is read back on the 0.25 beat grid |
-| furnace | musicxml | 0.58 | 0.58 | 0.92 | 0.97 | the tracker's row grid is read back on the 0.25 beat grid |
+| furnace | midi | 1.00 | 1.00 | 0.77 | 0.93 | the tracker's row grid is read back on the 0.25 beat grid |
+| furnace | musicxml | 1.00 | 1.00 | 0.77 | 0.93 | the tracker's row grid is read back on the 0.25 beat grid |
 | furnace | goattracker | 1.00 | 1.00 | 1.00 | 1.00 | notes and ends move to the row grid |
 | furnace | furnace | 1.00 | 1.00 | 1.00 | 1.00 | notes and ends move to the row grid |
 | furnace | sidwizard | 1.00 | 1.00 | 1.00 | 1.00 | notes and ends move to the row grid |

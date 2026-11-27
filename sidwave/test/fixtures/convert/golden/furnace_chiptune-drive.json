@@ -233,10 +233,10 @@
    },
    {
     "stage": "write",
-    "code": "filter.dropped",
-    "severity": "lost",
+    "code": "expression.dropped",
+    "severity": "approx",
     "count": 1,
-    "message": "Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
+    "message": "Note velocities (5 distinct values) are not exported; the module plays at full volume."
    }
   ]
  }

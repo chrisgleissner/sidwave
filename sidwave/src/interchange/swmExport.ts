@@ -121,7 +121,14 @@ export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): S
   });
   if (folded) losses.push(`${folded} notes lie outside the SID-Wizard range C-0 to A#7 (MIDI 12 to 106) and were moved by octaves.`);
   if (effectsLost) losses.push(`${effectsLost} notes carry bends, chord arpeggios, legato or an early gate-off that SID-Wizard rows of this export do not express.`);
-  losses.push("Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart.");
+  // Each part of what the module cannot hold is reported only when the score uses it.
+  const velocities = new Set(voices.flatMap((v) => v.notes.map((n) => n.velocity))).size;
+  if (velocities > 1) losses.push(`Note velocities (${velocities} distinct values) are not exported; the module plays at full volume.`);
+  const copies = doc.voices.filter((v) => (v as { echo?: unknown; unison?: unknown; follow?: unknown }).echo || (v as { unison?: unknown }).unison || (v as { follow?: unknown }).follow).length;
+  if (copies) losses.push(`${copies} voices are echo, unison or follow copies of another voice; the copies are not exported.`);
+  if (ev.tempoMap.length > 1) losses.push(`${ev.tempoMap.length - 1} tempo changes are not exported; the module has one tempo.`);
+  if (doc.swing) losses.push("Swing is not exported.");
+  if (doc.sids.some((sid) => sid.filter) || doc.song.global_fx.filter_env) losses.push("The SID filter settings of the score are not exported.");
 
   // Patterns and orderlists.
   const P = options.patternRows ?? 32;

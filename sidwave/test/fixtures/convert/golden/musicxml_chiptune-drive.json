@@ -1,23 +1,45 @@
 {
  "musicxml:chiptune-drive -> sidwave": {
   "ok": true,
-  "losses": []
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 part(s) do not fit in 3 voices and are not imported (v1 Voice1: 16 notes)."
+   }
+  ]
  },
  "musicxml:chiptune-drive -> sid": {
   "ok": true,
   "losses": [
    {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 part(s) do not fit in 3 voices and are not imported (v1 Voice1: 16 notes)."
+   },
+   {
     "stage": "write",
     "code": "compile.advisory",
     "severity": "info",
     "count": 3,
-    "message": "FLAT: Estimated loudness varies by 1.1 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1) | TEMPO-GRID: A sixteenth lasts 5.70 calls; use tempo 150.37 or 125.31 for an exact grid (at song tempo)"
+    "message": "FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1) | TEMPO-GRID: A sixteenth lasts 5.70 calls; use tempo 150.37 or 125.31 for an exact grid (at song tempo)"
    }
   ]
  },
  "musicxml:chiptune-drive -> midi": {
   "ok": true,
   "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 part(s) do not fit in 3 voices and are not imported (v1 Voice1: 16 notes)."
+   },
    {
     "stage": "write",
     "code": "pitch.written",
@@ -44,6 +66,13 @@
  "musicxml:chiptune-drive -> musicxml": {
   "ok": true,
   "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 part(s) do not fit in 3 voices and are not imported (v1 Voice1: 16 notes)."
+   },
    {
     "stage": "write",
     "code": "pitch.written",
@@ -78,11 +107,25 @@
   "ok": true,
   "losses": [
    {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 part(s) do not fit in 3 voices and are not imported (v1 Voice1: 16 notes)."
+   },
+   {
     "stage": "write",
     "code": "pitch.written",
     "severity": "info",
     "count": 1,
     "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
    },
    {
     "stage": "write",
@@ -103,6 +146,13 @@
  "musicxml:chiptune-drive -> furnace": {
   "ok": true,
   "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 part(s) do not fit in 3 voices and are not imported (v1 Voice1: 16 notes)."
+   },
    {
     "stage": "write",
     "code": "pitch.written",
@@ -130,6 +180,13 @@
   "ok": true,
   "losses": [
    {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 part(s) do not fit in 3 voices and are not imported (v1 Voice1: 16 notes)."
+   },
+   {
     "stage": "plan",
     "code": "metadata.dropped",
     "severity": "info",
@@ -141,13 +198,20 @@
     "code": "compile.advisory",
     "severity": "info",
     "count": 3,
-    "message": "FLAT: Estimated loudness varies by 1.1 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1) | TEMPO-GRID: A sixteenth lasts 5.70 calls; use tempo 150.37 or 125.31 for an exact grid (at song tempo)"
+    "message": "FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (at bar 1) | TEMPO-GRID: A sixteenth lasts 5.70 calls; use tempo 150.37 or 125.31 for an exact grid (at song tempo)"
    }
   ]
  },
  "musicxml:chiptune-drive -> events": {
   "ok": true,
   "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 part(s) do not fit in 3 voices and are not imported (v1 Voice1: 16 notes)."
+   },
    {
     "stage": "write",
     "code": "pitch.written",
@@ -161,6 +225,20 @@
   "ok": true,
   "losses": [
    {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 16,
+    "message": "16 notes of 1 part(s) do not fit in 3 voices and are not imported (v1 Voice1: 16 notes)."
+   },
+   {
+    "stage": "write",
+    "code": "notes.drums",
+    "severity": "lost",
+    "count": 1,
+    "message": "Drum voices (v3) are not exported: SID-Wizard drums are instruments, which this export does not build from SIDWave kits."
+   },
+   {
     "stage": "write",
     "code": "rows.one-call",
     "severity": "info",
@@ -169,10 +247,10 @@
    },
    {
     "stage": "write",
-    "code": "filter.dropped",
-    "severity": "lost",
+    "code": "expression.dropped",
+    "severity": "approx",
     "count": 1,
-    "message": "Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
+    "message": "Note velocities (3 distinct values) are not exported; the module plays at full volume."
    }
   ]
  }

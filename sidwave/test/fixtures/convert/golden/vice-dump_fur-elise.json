@@ -312,13 +312,6 @@
     "severity": "approx",
     "count": 304,
     "message": "F-diff: the recovered score differs from the tune in 304 register-class differences over 152 compared player calls (a call can differ in several classes)."
-   },
-   {
-    "stage": "write",
-    "code": "filter.dropped",
-    "severity": "lost",
-    "count": 1,
-    "message": "Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
    }
   ]
  }

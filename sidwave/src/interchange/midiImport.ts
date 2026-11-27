@@ -259,7 +259,7 @@ export function importMidi(bytes: Uint8Array, options: MidiImportOptions = {}): 
   }
   // Voice order: melodic by importance, drums last (so v1 is the most important melody).
   chosen.sort((a, b) => Number(a.drum) - Number(b.drum));
-  if (droppedParts.length) losses.push(`${droppedParts.length} source part(s) do not fit in ${voiceLimit} voices and are not imported.`);
+  if (droppedParts.length) losses.push(`${droppedParts.reduce((n, d) => n + d.notes, 0)} notes of ${droppedParts.length} source part(s) do not fit in ${voiceLimit} voices and are not imported (${droppedParts.map((d) => `${d.name ?? `track ${d.track} channel ${d.channel}`}: ${d.notes} notes`).join('; ')}).`);
 
   const maxMidi = maxSidwaveMidi(mode);
   const fps = sidwaveFrameRate(mode);

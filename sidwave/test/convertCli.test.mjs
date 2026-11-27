@@ -10,6 +10,7 @@ import { ambiguityMessage } from "../src/interchange/convert.ts";
 import { classifyLossText, groupLosses } from "../src/interchange/loss.ts";
 import { planScore } from "../src/interchange/scorePlan.ts";
 import { parseSidwave } from "../src/sidwave.ts";
+import { parseSmf } from "../src/interchange/smf.ts";
 import { FIXTURE_DIR } from "./helpers/convertMatrix.mjs";
 
 const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
@@ -297,13 +298,38 @@ timeline:
   }
 });
 
-test("a plain MIDI, MusicXML or tracker file passes --strict: static sentences are not reported as lost", async () => {
+test("a plain score passes --strict for every target that does not need the engine, and a plain file of every reader passes for SID-Wizard too", async () => {
   const dir = tmp();
-  for (const [file, to] of [["fuer-elise.mid", "out.sng"], ["fuer-elise.mid", "out.musicxml"], ["fuer-elise.musicxml", "out.mid"], ["fuer-elise.fur", "out.mid"], ["fuer-elise.sng", "out.mid"], ["fuer-elise.swm", "out.mid"], ["fuer-elise.mid", "out.fur"]]) {
+  const targets = ["out.yaml", "out.mid", "out.musicxml", "out.sng", "out.fur", "out.swm", "out.prg", "out.sid", "out.json"];
+  for (const file of ["fuer-elise.mid", "fuer-elise.musicxml", "fuer-elise.fur", "fuer-elise.sng", "fuer-elise.swm"]) {
     copy(dir, fix(file));
-    const result = await run(["convert", file, to, "--strict", "--force"], dir);
-    assert.equal(result.code, 0, `${file} -> ${to}: ${result.out}${result.err}`);
+    for (const to of targets) {
+      if (path.extname(to) === path.extname(file)) continue;
+      // An imported SID-Wizard instrument has a first-frame waveform table; GoatTracker has no wavetable step, so that export reports it as lost (true positive).
+      if (file.endsWith(".swm") && [".sng"].includes(path.extname(to))) continue;
+      const result = await run(["convert", file, to, "--strict", "--force"], dir);
+      assert.equal(result.code, 0, `${file} -> ${to}: ${result.out}${result.err}`);
+    }
   }
+  copy(dir, score("sidwave-1.0/fuer-elise.yaml"), "score.yaml");
+  for (const to of targets.filter((t) => t !== "out.yaml")) {
+    const result = await run(["convert", "score.yaml", to, "--strict", "--force"], dir);
+    assert.equal(result.code, 0, `score.yaml -> ${to}: ${result.out}${result.err}`);
+  }
+});
+
+test("drum hits of a pitched voice are written to the percussion channel of MIDI and to an unpitched part of MusicXML", async () => {
+  const bytes = fs.readFileSync(score("sidwave-1.1/chiptune_drive.yaml"));
+  const midi = await convert(bytes, { to: "midi", inputName: "chiptune_drive.yaml", verify: true });
+  const smf = parseSmf(midi.output);
+  const drumTracks = smf.tracks.filter((t) => t.some((e) => e.type === "noteOn" && e.channel === 9));
+  assert.equal(drumTracks.length, 1);
+  assert.ok(drumTracks[0].some((e) => e.type === "noteOn" && e.channel !== 9), "the track of the voice also holds its pitched notes");
+  assert.equal(midi.metrics.drumIdentity, 1);
+  const xml = await convert(bytes, { to: "musicxml", inputName: "chiptune_drive.yaml", verify: true });
+  const text = Buffer.from(xml.output).toString("utf8");
+  assert.match(text, /<part-name>v1 Voice1 drums<\/part-name>|<part-name>v1[^<]*drums<\/part-name>/);
+  assert.equal(xml.metrics.drumIdentity, 1);
 });
 
 test("a score with speed 2 keeps its note times in GoatTracker, Furnace and SID-Wizard; only the end of the song moves to a bar line", async () => {
@@ -311,7 +337,8 @@ test("a score with speed 2 keeps its note times in GoatTracker, Furnace and SID-
   for (const to of ["goattracker", "furnace", "midi"]) {
     const result = await convert(bytes, { to, verify: true, inputName: "chiptune_drive.yaml" });
     const m = result.metrics;
-    assert.equal(m.noteF1PitchOnly, 1, `${to}: ${JSON.stringify(m)}`);
+    // MIDI keeps the drum hits as drums, so only their pitch differs from the reference; a voice limit of the importer drops 16 notes.
+    if (to === "midi") { assert.equal(m.drumIdentity, 1); assert.ok(m.noteF1 >= 0.92, JSON.stringify(m)); } else assert.equal(m.noteF1PitchOnly, 1, `${to}: ${JSON.stringify(m)}`);
     assert.ok(m.onsetError.maxMs <= 40, `${to}: onset error ${m.onsetError.maxMs} ms`);
     // The song length differs by the padding of the last bar, not by a tempo drift: the last note starts within a frame.
     assert.ok(Math.abs(m.durationSeconds.output - m.durationSeconds.reference) < 0.8, `${to}: ${JSON.stringify(m.durationSeconds)}`);

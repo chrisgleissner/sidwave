@@ -300,13 +300,6 @@
     "severity": "info",
     "count": 1,
     "message": "Rows are one player call long (note starts and ends fall on odd calls): the module is correct but large and uses the fastest tempo."
-   },
-   {
-    "stage": "write",
-    "code": "filter.dropped",
-    "severity": "lost",
-    "count": 1,
-    "message": "Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart."
    }
   ]
  },

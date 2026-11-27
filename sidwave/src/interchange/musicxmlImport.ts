@@ -276,7 +276,7 @@ export function importMusicXml(bytes: Uint8Array, options: MusicXmlImportOptions
     else droppedParts.push({ part: c.part.id, ...(c.part.name ? { name: c.part.name } : {}), notes: c.notes.length, reason: `all ${voiceLimit} voices are taken by parts with higher importance` });
   }
   chosen.sort((a, b) => Number(a.drum) - Number(b.drum));
-  if (droppedParts.length) losses.push(`${droppedParts.length} part(s) do not fit in ${voiceLimit} voices and are not imported.`);
+  if (droppedParts.length) losses.push(`${droppedParts.reduce((n, d) => n + d.notes, 0)} notes of ${droppedParts.length} part(s) do not fit in ${voiceLimit} voices and are not imported (${droppedParts.map((d) => `${d.name ?? d.part}: ${d.notes} notes`).join('; ')}).`);
 
   const maxMidi = maxSidwaveMidi(mode);
   const instruments = new Map<string, ImportInstrument>();
