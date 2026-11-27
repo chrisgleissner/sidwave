@@ -11,7 +11,7 @@ Write Commodore 64 SID music as text. Compile it to a C64 program or a SID file.
 
 SIDWave is a music language, compiler and toolkit for the SID sound chip of the Commodore 64. A score is a YAML or JSON file that describes instruments, patterns and a timeline of sections.
 
-The compiler turns a score into a self-playing C64 program (PRG) or a PSID file. Both include the 6502 player code that runs on the C64. The compiler runs without a network connection, an AI assistant or a C64.
+The compiler turns a score into a self-playing C64 program (PRG) or a PSID file. Both include the 6502 player code that runs on the C64. The compiler runs offline and needs no C64.
 
 SIDWave is for chip musicians who prefer a text editor and version control to a tracker, for game and demo developers who need a small, scriptable music pipeline, and for tool authors who want a documented, testable description of SID music.
 
@@ -241,7 +241,7 @@ Known limitations of the language: no per-note velocity, no multiple subtunes, n
 
 ## Related projects
 
-- [c64bridge](https://github.com/chrisgleissner/c64bridge) is an MCP server that connects coding agents to VICE and Ultimate hardware. It is an optional integration: it lets an AI assistant write, compile and play SIDWave scores and run them on a device. SIDWave does not need it.
+- [c64bridge](https://github.com/chrisgleissner/c64bridge) is an MCP server that connects coding agents to VICE and Ultimate hardware. It is an optional integration that writes, compiles and plays SIDWave scores on VICE or a device. SIDWave does not need it.
 - [SIDFlow](https://github.com/chrisgleissner/sidflow) analyses SID collections and streams similar tunes. It is a separate project. SIDWave's planned verification work may use its published analysis data.
 - [6502-toolkit](6502-toolkit/README.md) is the assembler and disassembler in this repository. [c64bridge](https://github.com/chrisgleissner/c64bridge) also uses it to assemble programs for VICE and Ultimate devices.
 
