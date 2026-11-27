@@ -268,7 +268,7 @@ function compileGame(io: CliIo, options: Options, file: string): number {
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, bytes);
     } catch (error) {
-      throw new UsageError(`cannot write ${target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`);
+      throw new SidwaveOperationError("input", `cannot write ${target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: target });
     }
     outputs.push({ kind, path: target, bytes: typeof bytes === "string" ? Buffer.byteLength(bytes) : bytes.length, ...(address === undefined ? {} : { address }) });
   };
@@ -281,7 +281,7 @@ function compileGame(io: CliIo, options: Options, file: string): number {
       symbols, symbolsAll: options.symbolsAll, measure: !options.noMeasure, ...(options.loop === undefined ? {} : { loop: options.loop }),
     });
   } catch (error) {
-    return invalid(io, options, file, error);
+    return withFile(file, (): number => { throw error; });
   }
   try {
     if (format === "sid") write(`${base}.sid`, sidwaveGamePsid(doc, build), "psid", build.combinedOrigin);
@@ -290,7 +290,7 @@ function compileGame(io: CliIo, options: Options, file: string): number {
       write(`${base}.data.bin`, build.data, "data", build.contract.memory.data!.start);
     } else write(`${base}.bin`, build.player, "player", build.contract.memory.player.start);
   } catch (error) {
-    return invalid(io, options, file, error);
+    return withFile(file, (): number => { throw error; });
   }
   for (const [name, content] of Object.entries(build.symbols)) write(`${base}${SYMBOL_EXTENSIONS[name as SidwaveSymbolFormat]}`, content!, `symbols-${name}`);
   const { cycles, contract } = build;
@@ -299,11 +299,11 @@ function compileGame(io: CliIo, options: Options, file: string): number {
   const line = `${outputs[0]!.path}: game build, player $${contract.memory.player.start.toString(16).toUpperCase()}-$${(contract.memory.player.end - 1).toString(16).toUpperCase()}`
     + `${contract.memory.data ? `, data $${contract.memory.data.start.toString(16).toUpperCase()}-$${(contract.memory.data.end - 1).toString(16).toUpperCase()}` : ""}, ${cycleText}`;
   const report = options.json
-    ? `${JSON.stringify({
-      ok: true, file, target: "game", format, outputs, origin: contract.memory.player.start, dataOrigin: options.dataOrigin ?? null,
+    ? `${JSON.stringify(envelope("compile", true, { result: {
+      file, target: "game", format, outputs, origin: contract.memory.player.start, dataOrigin: options.dataOrigin ?? null,
       zeroPage: options.zeroPage ?? 0xfb, contract, cycles, labels: build.labels, totalFrames: build.totalFrames,
       durationSeconds: build.durationSeconds, warnings: build.warnings,
-    }, null, 2)}\n`
+    } }), null, 2)}\n`
     : `${line}\n`;
   io.out(report);
   for (const warning of build.warnings) io.err(`warning: ${warning}\n`);

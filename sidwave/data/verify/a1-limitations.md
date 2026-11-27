@@ -30,7 +30,7 @@ The effective benign set was 7 identical, 7 delay and 4 detune items in the held
 
 ## Held-out once-guard
 
-The rule that the held-out set is evaluated once is enforced by `~/.c64bridge/sidwave-standalone/a1-cache/a1-state.json`, a file outside the repository. Deleting or editing it removes the guard; the guard is a protection against accidents, not against a person. The held-out run happened on 2026-11-27 (log `~/.c64bridge/sidwave-standalone/verify-heldout.log`) and is recorded in the commit titled "Record the held-out A1 evaluation and mark A1 approximate". The rule file hash was recorded in the orchestrator's ledger before the run.
+The rule that the held-out set is evaluated once is enforced by `~/.c64bridge/sidwave-standalone/a1-cache/a1-state.json`, a file outside the repository. Deleting or editing it removes the guard; the guard is a protection against accidents, not against a person. The held-out run happened on 2026-11-27 (log `~/.c64bridge/sidwave-standalone/verify-heldout.log`) and is recorded in commit `72ddde2` ("Record the held-out A1 evaluation and mark A1 approximate"; the hash is that of the rebased branch). The rule file hash was recorded in the orchestrator's ledger before the run.
 
 ## Requirements for A1 version 2
 
