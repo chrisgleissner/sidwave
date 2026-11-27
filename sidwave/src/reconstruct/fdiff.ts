@@ -17,7 +17,8 @@
 //   adsr      attack/decay and sustain/release registers
 //   filter    cutoff ($15, $16), resonance and routing ($17), filter mode and voice 3 off ($18 bits 4 to 7)
 //   volume    $18 bits 0 to 3
-//   timing    spacing of call starts, cumulative offset and a different number of calls
+//   timing    spacing of call starts and cumulative offset. A different number of calls is reported separately
+//             as callCountMismatch and is not a class difference.
 
 import { controlRegister, SID_REGISTER_COUNT, type FrameIr, type IrSidState } from "./ir.js";
 
@@ -77,6 +78,17 @@ export interface FDiffResult {
   firsts: FDiffDifference[];
   /** The earliest difference. */
   first?: FDiffDifference;
+  /** Set when the compared IRs have a different number of calls after alignment. Not counted in any class. */
+  callCountMismatch?: { expected: number; observed: number };
+  /** True when the call periods differ by more than the timing tolerance. */
+  ratesDiffer: boolean;
+  /**
+   * Present when `ratesDiffer` is true or a timing difference exists: call i of one IR is then no longer the same
+   * musical event as call i of the other, so differences in the other classes after the first timing difference
+   * are unreliable. `firstTimingCall` is that call, when there is one.
+   */
+  note?: string;
+  firstTimingCall?: number;
   /** Largest absolute offset of a call start from the aligned expected start, in cycles. */
   maxCumulativeOffsetCycles: number;
   /** Number of calls in which a register was written in one IR but not in the other, with equal resulting state. */
@@ -261,22 +273,7 @@ export function fdiff(expected: FrameIr, observed: FrameIr, options: FDiffOption
     }
   }
 
-  if (nE !== nO) {
-    const i = compared;
-    const cycle = expected.calls[ea + i]?.startCycle ?? expected.calls[expected.calls.length - 1]?.endCycle ?? baseE;
-    const full: FDiffDifference = {
-      class: "timing",
-      call: i,
-      cycle,
-      timeSeconds: (cycle - baseE) / expected.clockHz,
-      expected: nE,
-      observed: nO,
-      detail: "number of calls",
-    };
-    differing.timing.add(i);
-    classFirst.timing ??= full;
-    if (!firsts.has("timing/-/-")) firsts.set("timing/-/-", full);
-  }
+  const callCountMismatch = nE !== nO ? { expected: nE, observed: nO } : undefined;
 
   const classes = Object.fromEntries(
     REGISTER_CLASSES.map((cls) => {
@@ -291,13 +288,22 @@ export function fdiff(expected: FrameIr, observed: FrameIr, options: FDiffOption
       return [cls, summary];
     }),
   ) as Record<RegisterClass, FDiffClassSummary>;
+  const ratesDiffer = Math.abs(expected.periodCycles - observed.periodCycles) > timingTolerance;
+  const timingFirst = classFirst.timing;
+  const note =
+    ratesDiffer || timingFirst
+      ? "call timing differs: per-class comparisons after the first timing difference are unreliable"
+      : undefined;
   const order = (d: FDiffDifference): number => REGISTER_CLASSES.indexOf(d.class);
   const sorted = [...firsts.values()].sort((a, b) => a.cycle - b.cycle || order(a) - order(b));
   return {
-    equal: sorted.length === 0,
+    equal: sorted.length === 0 && !callCountMismatch,
     alignment: { expectedCall: ea, observedCall: oa, compared, expectedCalls: expected.calls.length, observedCalls: observed.calls.length },
     classes,
     firsts: sorted,
+    ...(callCountMismatch ? { callCountMismatch } : {}),
+    ratesDiffer,
+    ...(note ? { note, ...(timingFirst ? { firstTimingCall: timingFirst.call } : {}) } : {}),
     ...(sorted.length ? { first: sorted[0] } : {}),
     maxCumulativeOffsetCycles: maxOffset,
     writtenSetMismatchCalls,

@@ -30,6 +30,7 @@ import {
   featureBins,
   FEATURE_CODE_VERSION,
   headerFeatures,
+  IR_CODE_VERSION,
   styleBins,
   styleFromSidflow,
 } from "sidwave/reconstruct";
@@ -117,6 +118,7 @@ async function processCandidate(job, opts) {
     engine: opts.engine,
     seconds,
     featureCodeVersion: FEATURE_CODE_VERSION,
+    irCodeVersion: IR_CODE_VERSION,
     maxRecords: opts.maxRecords,
   };
   const key = sha256(JSON.stringify(keyObject));
@@ -490,6 +492,7 @@ async function main() {
         horizonSeconds: `min(${opts.seconds}, Songlengths length)`,
         maxRecords: opts.maxRecords,
         featureCodeVersion: FEATURE_CODE_VERSION,
+        irCodeVersion: IR_CODE_VERSION,
       },
       candidateOutcome: { traced: results.length, usable: ok.length, failures: Object.fromEntries(Object.entries(outcomes).sort()) },
       styleSource: style.source ?? { status: style.status },

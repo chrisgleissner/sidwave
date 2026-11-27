@@ -53,9 +53,10 @@ test("buildIr groups a hand-made trace into calls with exact per-call state, wri
   assert.deepEqual(ir.calls[1].sids[0].control, [[0x40], [], []]);
   assert.deepEqual(ir.calls[1].sids[1].control, [[], [0x11], []]);
   assert.equal(ir.calls[1].sids[1].regs[7], 0x12);
-  // Call 2: SID 1 is not written, so it shares the register array of the previous call.
+  // Call 2: SID 1 is not written; it has the same values as in call 1 but its own array.
   assert.equal(ir.calls[2].sids[1].written, 0);
-  assert.equal(ir.calls[2].sids[1].regs, ir.calls[1].sids[1].regs);
+  assert.deepEqual(ir.calls[2].sids[1].regs, ir.calls[1].sids[1].regs);
+  assert.notEqual(ir.calls[2].sids[1].regs, ir.calls[1].sids[1].regs);
   assert.equal(ir.calls[2].sids[0].regs[24], 0x0f);
   assert.equal(ir.calls[2].sids[0].regs.length, 25);
   // Timing: spacings are FRAME and FRAME + 10, so the median period is FRAME + 5.
@@ -112,6 +113,39 @@ test("buildIr removes dense sample writes and reports their rate and share", () 
   assert.equal(short.unsupported.writes, 0);
 });
 
+test("every call holds its own register arrays", () => {
+  const ir = buildIr(packed([[0, 0, 1, 100], [1, 0, 5, 110], [0, 0, 2, 100 + FRAME], [0, 0, 3, 100 + 2 * FRAME]]));
+  const seen = new Set(ir.calls.flatMap((c) => c.sids.map((s) => s.regs)));
+  assert.equal(seen.size, 6);
+  ir.calls[0].sids[0].regs[0] = 99;
+  ir.calls[0].sids[1].regs[0] = 98;
+  assert.equal(ir.calls[1].sids[0].regs[0], 2);
+  assert.equal(ir.calls[1].sids[1].regs[0], 5);
+  assert.equal(ir.calls[2].sids[1].regs[0], 5);
+});
+
+test("sample detection limits: slow sample rates are not detected, a tight in-call loop is", () => {
+  const frames = [];
+  for (let i = 0; i < 6; i++) frames.push([0, 0, i, 5000 + i * FRAME]);
+  // 200 writes to $D418 every 1,100 cycles (about 900 Hz): above the 1,000 cycle gap, so not dense.
+  const slow = [...frames];
+  for (let i = 0; i < 200; i++) slow.push([0, 24, i & 15, 40_000 + i * 1100]);
+  slow.sort((a, b) => a[3] - b[3]);
+  assert.equal(buildIr(packed(slow), { clock: "PAL" }).unsupported.writes, 0);
+  // 32 writes of one register, 10 cycles apart inside one call: detected although it is a single call.
+  const loop = [...frames];
+  for (let i = 0; i < 32; i++) loop.push([0, 2, i, 60_000 + i * 10]);
+  loop.sort((a, b) => a[3] - b[3]);
+  const ir = buildIr(packed(loop), { clock: "PAL" });
+  assert.equal(ir.unsupported.writes, 32);
+  assert.equal(ir.unsupported.streams[0].register, 2);
+  // 31 writes are not.
+  const shortLoop = [...frames];
+  for (let i = 0; i < 31; i++) shortLoop.push([0, 2, i, 60_000 + i * 10]);
+  shortLoop.sort((a, b) => a[3] - b[3]);
+  assert.equal(buildIr(packed(shortLoop), { clock: "PAL" }).unsupported.writes, 0);
+});
+
 test("buildIr ignores writes to $D419-$D41F and counts them", () => {
   const ir = buildIr(packed([[0, 0, 1, 100], [0, 0x19, 7, 110], [0, 0x1f, 8, 120], [0, 1, 2, 130], [0, 0x1c, 9, 999_999]]), {
     horizonCycles: 500,
@@ -122,6 +156,9 @@ test("buildIr ignores writes to $D419-$D41F and counts them", () => {
   assert.equal(ir.calls[0].writes, 2);
   assert.equal(ir.calls[0].sids[0].written, 0b11);
   assert.equal(buildIr(packed([[0, 0, 1, 100]])).ignoredWrites, 0);
+  // An invalid record is rejected even when it would be dropped as an ignored write.
+  assert.throws(() => buildIr(packed([[0, 0, 1, 100], [0, 0x19, 300, 110]])), /Invalid SID write at record 1/);
+  assert.throws(() => buildIr(packed([[0, 0x1a, 1, -5]])), /Invalid SID write at record 0/);
   // Higher offsets are still rejected as invalid traces.
   assert.throws(() => buildIr(packed([[0, 0x20, 1, 100]])), /Invalid SID write/);
 });

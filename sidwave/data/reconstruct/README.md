@@ -25,3 +25,11 @@ HVSC_DIR=/path/to/C64Music nice -n 10 node scripts/select-corpus.mjs
 ```
 
 Options: `--out`, `--cache`, `--sidflow DIR` (default `~/.c64bridge/sidwave-standalone/sidflow-data`, containing the bundle and `SHA256SUMS`), `--no-sidflow`, `--candidates`, `--seconds`, `--workers` (at most 4), `--skip-verify`. A full run took about two hours on a loaded machine. The result must be identical for the same HVSC, Songlengths file, engine version and feature code version; compare the SHA-256 of the manifest.
+
+## Limitations
+
+- Timeouts (240 s of wall time per candidate) and engine errors are not cached. A rerun that hits a timeout on a different set of candidates is not comparable with an earlier run; rerun until no timeout is reported.
+- The cache key includes the IR code version (`IR_CODE_VERSION`) and the feature code version. Cache entries written before the IR code version was added to the key (the run that produced the frozen manifest) are invalid for the current code and are not read. Rerunning selection therefore retraces all candidates and may not reproduce the manifest if the IR or feature code changed.
+- The player signature covers only the first 512 bytes at the init and play addresses. Tunes with the same player code and different data share a signature, and a player whose routines start with different setup code does not.
+- Groups combine composer and player signature only. Tunes by different composers that use the same player, or one composer's tunes with different players, are in separate groups, so the held-out set can contain a tune that is closely related to a development tune.
+- Sample detection treats at least 32 writes to one register, each within 1,000 cycles of the previous one, as non-periodic. Slower sample rates are not detected.

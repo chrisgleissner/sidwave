@@ -172,12 +172,32 @@ test("call spacing, cumulative offset and call count are timing differences", ()
   assert.equal(slow.first.observed, 66 * 150);
   // A missing call.
   const missing = fdiff(make(base()), make(base().slice(0, 3)));
-  assert.deepEqual(
-    [missing.first.class, missing.first.call, missing.first.expected, missing.first.observed, missing.first.detail],
-    ["timing", 3, 4, 3, "number of calls"],
-  );
+  assert.deepEqual(missing.callCountMismatch, { expected: 4, observed: 3 });
   assert.equal(missing.equal, false);
+  assert.equal(missing.first, undefined);
   assert.equal(missing.classes.timing.comparedCalls, 3);
+  assert.equal(missing.classes.timing.differingCalls, 0);
+  assert.equal(missing.classes.timing.matchShare, 1);
+  assert.equal(fdiff(make(base()), make(base())).callCountMismatch, undefined);
+});
+
+test("differing call rates are flagged and make later comparisons unreliable", () => {
+  const calls = Array.from({ length: 20 }, (_, i) => [[0, 0, i]]);
+  const same = fdiff(make(calls), make(calls));
+  assert.equal(same.ratesDiffer, false);
+  assert.equal(same.note, undefined);
+  // Observed calls every 1.5 frames.
+  const writes = calls.map((c, i) => [c[0][0], c[0][1], c[0][2], 1000 + Math.round(i * FRAME * 1.5)]);
+  const slow = buildIr(new Float64Array(writes.flat()), { clock: "PAL" });
+  const r = fdiff(make(calls), slow);
+  assert.equal(r.ratesDiffer, true);
+  assert.equal(r.firstTimingCall, 1);
+  assert.match(r.note, /unreliable/);
+  // A single shifted call is a timing difference without a rate difference.
+  const shifted = fdiff(make(base()), make(base(), { 2: 500 }));
+  assert.equal(shifted.ratesDiffer, false);
+  assert.equal(shifted.firstTimingCall, 2);
+  assert.match(shifted.note, /unreliable/);
 });
 
 test("alignment skips leading calls and tolerates registers written in a different set", () => {

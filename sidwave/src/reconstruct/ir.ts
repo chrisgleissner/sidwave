@@ -10,7 +10,10 @@
 // the 25 write-only registers after the call, the set of registers written in the call and the in-call
 // order of the writes to each voice's control register.
 
-import { DEFAULT_BURST_GAP, callGroups, traceWrites, type TraceWrite } from "../verify/index.js";
+import { DEFAULT_BURST_GAP, VerifyError, callGroups, traceWrites, type TraceWrite } from "../verify/index.js";
+
+/** Increment when the IR construction changes in a way that alters features; part of the corpus cache key. */
+export const IR_CODE_VERSION = 2;
 
 export type IrClock = "PAL" | "NTSC";
 
@@ -22,10 +25,10 @@ export const IR_FRAME_CYCLES: Record<IrClock, number> = { PAL: 19_656, NTSC: 17_
 export const SID_REGISTER_COUNT = 25;
 
 export interface IrSidState {
-  /** The 25 write-only registers after the call; zero until written. Shared with the previous call when nothing was written. */
-  regs: Uint8Array;
+  /** The 25 write-only registers after the call; zero until written. Every call holds its own copy; do not mutate. */
+  readonly regs: Uint8Array;
   /** Bit r is set when register r was written in the call. */
-  written: number;
+  readonly written: number;
   /** Values written to the control register of voice 1, 2 and 3 in this call, in write order. */
   control: [number[], number[], number[]];
 }
@@ -137,7 +140,12 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-/** Marks writes that belong to a dense run of at least `minWrites` writes to one register. */
+/**
+ * Marks writes that belong to a dense run of at least `minWrites` writes to one register, each at most `gap`
+ * cycles after the previous one. Limits of the rule: a sample player slower than about 985 writes per second
+ * (gap 1,000 cycles) is not detected and stays in the call structure; a tight loop of 32 or more writes to one
+ * register inside a single call (for example a register clearing or sweeping loop) is detected as a stream.
+ */
 function findStreams(
   writes: TraceWrite[],
   gap: number,
@@ -204,19 +212,28 @@ export function buildIr(trace: Float64Array, options: IrOptions = {}): FrameIr {
   const origin = options.originCycle ?? 0;
 
   const limit = options.horizonCycles ?? Infinity;
-  // Tunes sometimes write to $D419-$D41F; the trace holds these, but they are not registers of the SID.
+  // The whole trace is validated first, so that an invalid record is never dropped silently. Tunes sometimes
+  // write to $D419-$D41F; the trace holds these, but they are not registers of the SID, so they are ignored.
+  if (trace.length % 4) throw new VerifyError("invalid_trace", "Trace must contain groups of four Float64 values");
+  for (let i = 0; i < trace.length; i += 4) {
+    const [sid, reg, value, cycle] = [trace[i], trace[i + 1], trace[i + 2], trace[i + 3]];
+    const finite = Number.isFinite(sid) && Number.isFinite(reg) && Number.isFinite(value) && Number.isFinite(cycle);
+    if (!finite || sid < 0 || reg < 0 || reg > 0x1f || value < 0 || value > 255 || cycle < 0) {
+      throw new VerifyError("invalid_trace", `Invalid SID write at record ${i / 4}`);
+    }
+  }
   const wide: number[] = [];
   let ignoredWrites = 0;
   let dropped = false;
-  for (let i = 0; i + 3 < trace.length; i += 4) {
-    if (trace[i + 1] > 0x18 && trace[i + 1] <= 0x1f) {
+  for (let i = 0; i < trace.length; i += 4) {
+    if (trace[i + 1] > 0x18) {
       dropped = true;
       if (trace[i + 3] <= limit) ignoredWrites++;
     } else {
       wide.push(trace[i], trace[i + 1], trace[i + 2], trace[i + 3]);
     }
   }
-  const all = traceWrites(trace.length % 4 || !dropped ? trace : Float64Array.from(wide));
+  const all = traceWrites(dropped ? Float64Array.from(wide) : trace);
   const inside = all.filter((w) => w.cycle <= limit);
   const lastCycle = inside.length ? inside[inside.length - 1].cycle : origin;
   const horizonCycles = options.horizonCycles ?? lastCycle;
@@ -246,7 +263,7 @@ export function buildIr(trace: Float64Array, options: IrOptions = {}): FrameIr {
       state.written |= 1 << w.reg;
       for (let v = 0; v < 3; v++) if (w.reg === controlRegister(v)) state.control[v].push(w.value);
     }
-    const sids: IrSidState[] = current.map((regs, sid) => touched.get(sid) ?? { regs, written: 0, control: [[], [], []] });
+    const sids: IrSidState[] = current.map((regs, sid) => touched.get(sid) ?? { regs: regs.slice(), written: 0, control: [[], [], []] });
     current = sids.map((s) => s.regs);
     return {
       index,
