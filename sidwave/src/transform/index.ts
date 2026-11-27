@@ -16,10 +16,11 @@ export interface TransformResult { text: string; report: TransformReport }
  * How a transformation checks its input and result: "compile" (default) parses the score and compiles it to a PRG,
  * "parse" only parses it, "none" skips the check (for fragments that are not complete scores). The input must parse
  * (otherwise code "input"); a result that does not pass the check is never returned, the transformation throws
- * code "precondition" with the message of the parser or compiler instead. "arrange" parses the result and runs the
- * compiler up to the assembler (it finds the errors of the score, such as a bend that does not fit its note, a play call that needs
- * `cpu: turbo` and a song that does not fit in memory, in about 40 % of the time of "compile"; only an error of the
- * assembler itself is left to "compile").
+ * code "precondition" with the message of the parser or compiler instead. "arrange" parses the result and runs every
+ * check of the compiler without assembling the note data (see checkSidwaveCompiles: errors such as a bend that does not
+ * fit its note, an instrument table that is too long, a song that does not fit in memory and a play call that needs
+ * `cpu: turbo`, in about 70 % of the time of "compile"; only an error of the assembler in the note data is left to
+ * "compile").
  */
 export type TransformValidation = "compile" | "arrange" | "parse" | "none";
 export interface TransformOptions {

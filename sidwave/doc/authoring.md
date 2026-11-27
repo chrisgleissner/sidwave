@@ -36,9 +36,9 @@ sidwave transform song.yaml --order intro,verse,chorus,verse,chorus -o long.yaml
 Operations are `--transpose`, `--tempo`, `--tempo-factor`, `--swap-instrument`, `--quantise`, `--humanise` (with
 `--seed`) and `--order`; several can be given and run in the order written. Without `-o` the score goes to standard
 output and the report to standard error, so nothing is overwritten; an existing `-o` file, and the input file, need
-`--force`. The result is checked before it is written: by default it is parsed and the compiler runs up to the assembler
-(`--validate arrange`), which finds a valid score that cannot be compiled; `--validate compile` also assembles the
-player, and `--validate parse` only parses it (fastest).
+`--force`. The result is checked before it is written: by default it is parsed and every check of the compiler runs
+without assembling the note data (`--validate arrange`), which finds a valid score that cannot be compiled;
+`--validate compile` also assembles the note data, and `--validate parse` only parses it (fastest).
 
 ## diff
 

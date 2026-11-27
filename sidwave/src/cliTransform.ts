@@ -44,12 +44,12 @@ Options:
   -o <file>          Write the score to <file>. An existing file needs --force (also when it is the input file).
   --force            Replace an existing -o file.
   --validate <level> What to check on the result:
-                       arrange (default) parses it and runs every check of the compiler except the assembler:
-                         the score rules (a bend that no longer fits its note, an invalid value), the cycle
-                         budget ("cpu: turbo" needed) and the memory size below $D000 (checked when the streams and
-                         samples exceed 20,000 bytes, which is the only case in which a song can be too big).
-                         Not checked: errors of the assembler itself, which no score has produced so far.
-                       compile also assembles the player (about 2.5 times slower), so it checks everything.
+                       arrange (default) parses it and runs every check of the compiler without assembling the note
+                         data: the score rules (a bend that no longer fits its note, an invalid value), the
+                         instrument table limits, the memory size below $D000 and the cycle budget ("cpu: turbo"
+                         needed). Not checked: errors of the assembler in the note data, which no score has
+                         produced so far.
+                       compile also assembles the note data (about 1.4 times as long), so it checks everything.
                        parse only parses the result (fastest).
   --allow-dir <dir>  Allow "file:" sources and library files below <dir>. May be repeated.
   --json             Machine-readable output; without -o the score is in result.text.

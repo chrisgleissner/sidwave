@@ -505,30 +505,40 @@ function checkCycleBudget(doc: ParsedSidwave, { arrangement, digiCycles, require
   }
 }
 
-/**
- * Without effects, streams and samples of at most this many bytes cannot reach $D000: the player and its tables of every
- * bundled score and test score are below 18 KB. The step records of effects (up to 32 effects of 255 steps, 11 bytes
- * each) are part of the player and can exceed the whole memory, so a score with effects is always assembled.
- */
-const MEMORY_CHECK_THRESHOLD = 20_000;
+/** True for the assembler's errors about a program that does not fit in the 64 KB address space. */
+function isPastAddressSpace(error: unknown): boolean {
+  return error instanceof AssemblyError && /passes \$FFFF|outside \$0000-\$FFFF/.test(error.message);
+}
 
 /**
- * Everything compileSidwaveToPrg checks except the assembler: the score is arranged and packed, then the cycle budget
- * (`cpu: turbo`) and the memory size are checked. The size needs the assembled length of the player, so it is
- * checked here only for a score with effects or with more than 20,000 bytes of streams and samples; any other score
- * cannot reach $D000 with any player seen so far. Without that assembly it takes about 40 % of the time of a compile.
- * Throws what the compile would throw, except an error of the assembler itself.
+ * The size check of the PRG: the player and its tables are assembled with empty streams, which gives the exact start of
+ * the stream data without the cost of assembling the streams. Streams larger than 64 KB would otherwise wrap the
+ * address counter inside the assembler. Only the step records of effects (up to 32 effects of 255 steps, 11 bytes each)
+ * can make the player itself larger than 64 KB. buildPlayerAsm also rejects instrument tables that are too long.
+ */
+function checkPlayerFits(prepared: PreparedPlayer): void {
+  const { loop, streams, arrangement, turboOnly } = prepared;
+  const asm = buildPlayerAsm(arrangement, streams.map(() => [OP.LOOP]), loop, turboOnly, false);
+  let layout;
+  try {
+    layout = assemblyToPrgDetailed(asm, { fileName: "sidwave_player.asm", loadAddress: SIDWAVE_LOAD_ADDRESS });
+  } catch (error) {
+    if (!arrangement.effects || !isPastAddressSpace(error)) throw error;
+    const bytes = arrangement.effects.reduce((sum, effect) => sum + effect.steps.length * SIDWAVE_EFFECT_STEP_BYTES, 0);
+    throw new SidwaveValidationError("$.effects",
+      `the compiled player would end past the $D000 limit (about 50 KB); the sound effect steps alone take ${bytes} bytes; use fewer or shorter effects`);
+  }
+  checkMemoryFit(prepared, layout.symbols.get("stream0")!);
+}
+
+/**
+ * Every check of compileSidwaveToPrg, without assembling the note data: the score is arranged and packed, the player and
+ * its tables are built and assembled with empty streams (table limits and memory size), then the cycle budget
+ * (`cpu: turbo`) is checked. Throws what the compile would throw, except an error of the assembler in the note data.
  */
 export function checkSidwaveCompiles(doc: ParsedSidwave, options: SidwaveCompileOptions = {}): void {
   const prepared = preparePlayer(doc, options);
-  const sampleBytes = [...(prepared.arrangement.samples?.defs.values() ?? [])].reduce((sum, sample) => sum + sample.data.length, 0);
-  if (prepared.arrangement.effects || prepared.streams.reduce((sum, st) => sum + st.length, 0) + sampleBytes > MEMORY_CHECK_THRESHOLD) {
-    const layout = assemblyToPrgDetailed(buildPlayerAsm(prepared.arrangement, prepared.streams.map(() => [OP.LOOP]), prepared.loop, prepared.turboOnly, false), {
-      fileName: "sidwave_player.asm",
-      loadAddress: SIDWAVE_LOAD_ADDRESS,
-    });
-    checkMemoryFit(prepared, layout.symbols.get("stream0")!);
-  }
+  checkPlayerFits(prepared);
   checkCycleBudget(doc, prepared);
 }
 
@@ -536,14 +546,8 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
   planned?: Arrangement): CompileResult {
   const prepared = preparePlayer(doc, options, planned);
   const { loop, streams, arrangement, digiCycles, worstCaseCyclesPerCall, budgetAt, requiresTurbo, turboOnly, tightest } = prepared;
-  // Check the size before assembling the streams: the player and its tables are assembled once with
-  // empty streams, which gives the exact start of the stream data. Songs larger than 64 KB would
-  // otherwise wrap the address counter inside the assembler.
-  const layout = assemblyToPrgDetailed(buildPlayerAsm(arrangement, streams.map(() => [OP.LOOP]), loop, turboOnly, false), {
-    fileName: "sidwave_player.asm",
-    loadAddress: SIDWAVE_LOAD_ADDRESS,
-  });
-  checkMemoryFit(prepared, layout.symbols.get("stream0")!);
+  // Check the size before assembling the streams.
+  checkPlayerFits(prepared);
   const sampleBytes = [...(arrangement.samples?.defs.values() ?? [])].reduce((sum, sample) => sum + sample.data.length, 0);
   const warnings: string[] = [];
   for (const field of doc.ignoredFields ?? []) warnings.push(`${field} has no effect before sidwave: 1.2 and was ignored`);
@@ -757,6 +761,10 @@ export function compileSidwaveGameImage(doc: ParsedSidwave, layout: SidwaveGameL
     } catch (error) {
       if (error instanceof AssemblyError && /Overlapping output/.test(error.message)) {
         throw new SidwaveValidationError("$.dataOrigin", "the data block overlaps the player; move it or the origin");
+      }
+      if (isPastAddressSpace(error)) {
+        throw new SidwaveValidationError(arrangement.effects ? "$.effects" : split ? "$.dataOrigin" : "$.origin",
+          `the player and its data would end past $FFFF, far beyond the $D000 limit; lower the origin or the data origin${arrangement.effects ? ", or use fewer or shorter effects" : ""}`);
       }
       throw error;
     }

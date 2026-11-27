@@ -2,7 +2,7 @@
 // Copyright (C) 2025-2026 Christian Gleissner
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
-import { accessSync, constants, existsSync } from "node:fs";
+import { accessSync, constants, existsSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import YAML from "yaml";
 import { EXIT_OK, SidwaveOperationError, UsageError, envelope, type CliIo } from "./cliCore.js";
@@ -128,6 +128,7 @@ export function runGenerateCli(args: string[], io: CliIo): number {
       if (target === "-" || isCharacterDevice(path)) continue;
       // Files are written in place, so an existing file needs write access to the file itself, not to its directory.
       if (existsSync(path)) {
+        if (statSync(path).isDirectory()) throw new SidwaveOperationError("input", `cannot write ${target}: it is a directory`, { file: path });
         try { accessSync(path, constants.W_OK); } catch {
           throw new SidwaveOperationError("input", `cannot write ${target}: the file is not writable`, { file: path });
         }
@@ -136,6 +137,7 @@ export function runGenerateCli(args: string[], io: CliIo): number {
       // The directory is created when it is missing, so the nearest existing parent must be writable.
       let dir = dirname(path);
       while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir);
+      if (!statSync(dir).isDirectory()) throw new SidwaveOperationError("input", `cannot write ${target}: ${dir} is not a directory`, { file: path });
       try { accessSync(dir, constants.W_OK); } catch {
         throw new SidwaveOperationError("input", `cannot write ${target}: the directory ${dir} is not writable`, { file: path });
       }

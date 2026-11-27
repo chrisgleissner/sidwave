@@ -13,7 +13,7 @@ import { formatSidwave, diffSidwave, mergeSidwave } from "../src/format/sidwaveF
 import { transpose, setTempo, scaleTempo, substituteInstrument, quantise, humanise, restructure } from "../src/transform/index.js";
 import { describeChange } from "../src/cliDiff.js";
 import { unknownCommandMessage } from "../src/cliAuthoring.js";
-import { checkSidwaveCompiles, compileSidwaveToPrg } from "../src/sidwaveCompiler.js";
+import { checkSidwaveCompiles, compileSidwaveGameImage, compileSidwaveToPrg } from "../src/sidwaveCompiler.js";
 import { generateSidwave } from "../src/audio/generateSidwave.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -265,6 +265,65 @@ test("the default transform check finds effects that do not fit below $D000, alt
   assert.match(size, /the compiled song needs/);
   assert.equal(message(() => checkSidwaveCompiles(parseSidwave(text), { loop: false })), size);
   assert.throws(() => setTempo(text, { bpm: 120 }), /does not compile/);
+});
+
+test("the default transform check finds instrument tables that are too long in total, although the streams are small", () => {
+  const message = (fn) => { try { fn(); } catch (e) { return e.message; } return undefined; };
+  for (const [table, step] of [["wavetable", { wave: "tri" }], ["pulsetable", { set: 1000, frames: 1 }], ["filtertable", { cutoff: 100, frames: 1 }]]) {
+    const score = YAML.parse(fs.readFileSync(path.join(packageRoot, "data", "sound", "examples", "learn", "05_arpeggios_and_vibrato.yaml"), "utf8"));
+    for (const name of ["arp", "solo"]) score.instruments[name][table] = Array.from({ length: 130 }, () => ({ ...step }));
+    const text = formatSidwave(YAML.stringify(score));
+    const long = message(() => compileSidwaveToPrg(parseSidwave(text), { loop: false }));
+    assert.match(long, new RegExp(`${table} data exceeds 255 steps`));
+    assert.equal(message(() => checkSidwaveCompiles(parseSidwave(text), { loop: false })), long);
+    assert.throws(() => setTempo(text, { bpm: 120 }), /does not compile/);
+  }
+});
+
+test("the default transform check finds a player that is too big because of its sample commands", () => {
+  // 62 instruments, 30 detuned voices and 250 sample commands make a player of about 38 KB; with the note streams it
+  // passes $D000 although streams and samples together are below 20,000 bytes.
+  const message = (fn) => { try { fn(); } catch (e) { return e.message; } return undefined; };
+  const notes = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5", "D5", "E5", "G3", "A3"];
+  const table = (make) => Array.from({ length: 4 }, (_, k) => make(k));
+  const instruments = Object.fromEntries(Array.from({ length: 62 }, (_, i) => [`i${i}`, {
+    waveform: "pulse", adsr: [i % 16, (i >> 4) % 16, 9, 4], vibrato: { depth: 0.1, rate: 5, delay: 2, fade: 10 }, slide: { depth: 1, speed: 4 },
+    hard_restart: { test: true },
+    ...(i < 60 ? {
+      wavetable: table((k) => (k === 0 ? { wave: "tri", note: "C5", slide_to: "C4", frames: 1 } : { wave: "pulse", note: `+${k}`, frames: 1 })),
+      pulsetable: { reset: false, steps: table((k) => ({ set: 1000 + k, frames: 1 })) },
+      filtertable: { reset: false, steps: table((k) => ({ cutoff: 100 + k, resonance: 3, type: "lowpass", frames: 1 })) },
+    } : {}),
+  }]));
+  const voices = Array.from({ length: 30 }, (_, v) => ({ id: v + 1, detune: v + 1, instrument: `i${v}`,
+    patterns: { p: { length: 1, groove: Array.from({ length: 128 }, (_, k) => notes[(k * 7 + v + k * k) % notes.length]).join(" ") } } }));
+  const sid = (i) => `sid${(i % 10) + 1}`;
+  const text = YAML.stringify({ sidwave: 1.4, title: "big", tempo: 120, mode: "PAL", cpu: "turbo",
+    sids: { layout: "ultisid8+sockets", pan: "wide" }, instruments, voices,
+    samples: { rate: 500, defs: { k: { synth: { osc: "noise", ms: 4, seed: 1 } } },
+      triggers: Array.from({ length: 250 }, (_, i) => ({ sid: sid(i), sample: "k", pitch: Math.floor(i / 10) - 12, at: [i * 2] })) },
+    sections: { a: { bars: 32, layers: Object.fromEntries(voices.map((v) => [`v${v.id}`, "p"])) } }, timeline: ["a"] });
+  const size = message(() => compileSidwaveToPrg(parseSidwave(text), { loop: false }));
+  assert.match(size, /the compiled song needs/);
+  assert.equal(message(() => checkSidwaveCompiles(parseSidwave(text), { loop: false })), size);
+});
+
+test("effects that exceed 64 KB are a size error, not an assembler error", () => {
+  const score = YAML.parse(fs.readFileSync(path.join(packageRoot, "data", "sound", "examples", "learn", "07_songs_and_effects.yaml"), "utf8"));
+  const steps = Array.from({ length: 255 }, (_, i) => ({ freq: 500 + i }));
+  score.effects = Object.fromEntries(Array.from({ length: 32 }, (_, i) => [`fx${i}`, { priority: 1, steps }]));
+  const doc = parseSidwave(YAML.stringify(score));
+  const sizeError = (error) => error.name === "SidwaveValidationError" && error.path === "$.effects" && /past (the )?\$/.test(error.message);
+  for (const run of [
+    () => compileSidwaveToPrg(doc, { loop: false }),
+    () => checkSidwaveCompiles(doc, { loop: false }),
+    () => compileSidwaveGameImage(doc, { origin: 0x1000, zeroPage: 0xf0 }),
+    () => compileSidwaveGameImage(doc, { origin: 0x1000, dataOrigin: 0x6000, zeroPage: 0xf0 }),
+  ]) {
+    let thrown;
+    try { run(); } catch (error) { thrown = error; }
+    assert.ok(thrown && sizeError(thrown), String(thrown));
+  }
 });
 
 test("diff --git follows the external diff driver convention and always exits 0", () => {
@@ -642,6 +701,20 @@ test("generate --force replaces a writable file in a read-only directory and ref
     fs.chmodSync(ro, 0o755);
     done();
   }
+});
+
+test("generate --force writes nothing when one output is a directory or lies below a file", () => {
+  const { dir, done } = sandbox();
+  try {
+    fs.mkdirSync(path.join(dir, "adir"));
+    write(dir, "afile", "x");
+    for (const [target, reason] of [["adir", /it is a directory/], ["afile/x.prg", /is not a directory/]]) {
+      const refused = run(dir, "generate", "--seed", "2", "-o", "first.yaml", "--prg", target, "--force");
+      assert.equal(refused.code, EXIT_INPUT);
+      assert.match(refused.err, reason);
+      assert.equal(fs.existsSync(path.join(dir, "first.yaml")), false, "no output was written");
+    }
+  } finally { done(); }
 });
 
 test("unknown command suggestions prefer prefixes and list ambiguous matches", () => {
