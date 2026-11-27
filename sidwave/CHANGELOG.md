@@ -88,6 +88,10 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 - `engines.node` is `>=20.19` (was `>=24`).
 - Published files include `CHANGELOG.md` and `bin`.
 
+### Fixed
+
+- MOD import: the pitch of a looped sample now follows the cycle length of its loop. Before, every sample was treated as having a 64-point cycle, so a 32-point cycle was imported one octave low and other cycle lengths were off by the matching interval. `analyzeSample` reports the measured length as `loopCycle`.
+
 ### Performance
 
 - Compiling a score is 1.8 times faster over all examples (up to 2.6 times on `chiptune_drive`): the filter cutoff in Hz no longer scans all 2048 register codes on every lookup (now a precomputed table and a cache), stream compression compares integers instead of strings, and instrument variants are memoised. `lint`, `transpose`, `diff` and `merge` are faster by the same factor because they compile. `diff` also compiles only one side when both texts hold equal data. A1 comparison is 2.3 times faster (one half-size FFT per real window, no `Math.hypot`); the band energies were identical to the previous ones on every fixture tested. Similarity and quality analysis are 2 to 3 times faster (cached chroma tables and mono mix, a half-size FFT per frame). Parsing scores with synthesised samples is faster (the resampling kernel is computed once for integer rate ratios). Compiler output, PSID, game build and fixtures are byte-identical.

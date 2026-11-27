@@ -2,7 +2,8 @@
 // Copyright (C) 2025-2026 Christian Gleissner
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 // Sample analysis for the MOD importer: each Amiga sample is described by a few measurements (periodicity, the strength of
-// its first harmonics, its amplitude envelope and its length) and becomes a SIDWave waveform, an ADSR and, for percussion, a drum.
+// its first harmonics, its amplitude envelope, its length and the cycle length of its loop) and becomes a SIDWave waveform,
+// an ADSR, a pitch correction and, for percussion, a drum.
 
 import { createHash } from "node:crypto";
 import type { ModSample } from "./mod.js";
@@ -21,6 +22,8 @@ export interface SampleAnalysis {
   periodicity: number;
   /** Period in sample points of the strongest periodicity, 0 when the sample is not periodic. */
   periodPoints: number;
+  /** Length in sample points of one cycle of the looped section (may be fractional), 0 without a loop or a measurable pitch. */
+  loopCycle: number;
   /** Amplitude of harmonics 2 to 6 relative to the first, when the sample is periodic. */
   harmonics: number[];
   zeroCrossings: number;
@@ -89,6 +92,94 @@ export function normalisedAutocorrelation(x: Float64Array, maxLag: number): numb
   return r;
 }
 
+/** Longest cycle, in sample points, that the pitch of a loop is measured for. */
+const MAX_CYCLE = 600;
+/** A cycle with more sign changes than this is noise, and its length says nothing about a pitch. */
+const MAX_SIGN_CHANGES_PER_CYCLE = 16;
+
+/**
+ * The period in a normalised autocorrelation: the shortest lag after the first negative value (so a slowly varying signal
+ * does not count its own smoothness as a period) whose correlation is within 90 % of the best. `lag` is 0 when there is
+ * none; `best` is the highest correlation after the first negative value.
+ */
+function shortestPeriod(r: number[]): { best: number; lag: number } {
+  const first = r.findIndex((v) => v < 0);
+  let best = 0;
+  if (first < 0) return { best, lag: 0 };
+  for (let lag = first; lag < r.length; lag++) if (r[lag]! > best) best = r[lag]!;
+  for (let lag = first; lag < r.length; lag++) if (r[lag]! >= 0.9 * best && best > 0.3) return { best, lag };
+  return { best, lag: 0 };
+}
+
+/**
+ * Number of cycles in a short loop, from its discrete Fourier transform: the largest number k whose multiples (the bins of
+ * a waveform that repeats k times) hold at least 85 % of the energy without the mean. O(length squared).
+ */
+function cyclesFromSpectrum(loop: Int8Array, mean: number): number {
+  const L = loop.length;
+  const cos = Float64Array.from({ length: L }, (_, i) => Math.cos(2 * Math.PI * i / L));
+  const sin = Float64Array.from({ length: L }, (_, i) => Math.sin(2 * Math.PI * i / L));
+  const half = Math.floor(L / 2);
+  const power = new Float64Array(half + 1);
+  let total = 0;
+  for (let k = 1; k <= half; k++) {
+    let re = 0, im = 0;
+    for (let i = 0, a = 0; i < L; i++, a = (a + k) % L) { const v = loop[i]! - mean; re += v * cos[a]!; im += v * sin[a]!; }
+    // Every bin below L / 2 has a mirror image above it.
+    power[k] = (re * re + im * im) * (2 * k === L ? 1 : 2);
+    total += power[k]!;
+  }
+  for (let k = half; k > 1; k--) {
+    let sum = 0;
+    for (let m = k; m <= half; m += k) sum += power[m]!;
+    if (sum >= 0.85 * total) return k;
+  }
+  return 1;
+}
+
+/** Number of cycles in a loop above 600 points, from the autocorrelation of its first 2048 points; 0 without a period. */
+function cyclesFromAutocorrelation(loop: Int8Array, mean: number): number {
+  const L = loop.length;
+  const x = new Float64Array(2048);
+  for (let i = 0; i < x.length; i++) x[i] = loop[i % L]! - mean;
+  const r = normalisedAutocorrelation(x, MAX_CYCLE);
+  const { best, lag } = shortestPeriod(r);
+  if (best < 0.55 || lag === 0) return 0;
+  // The shortest lag may lie below the top of its peak, and an integer lag is too coarse for short cycles: climb to the top,
+  // interpolate the peak, then follow it to 2, 4, 8, ... cycles.
+  let period = lag;
+  while (period < MAX_CYCLE && r[period + 1]! > r[period]!) period++;
+  const reach = Math.max(1, Math.floor(period / 4));
+  for (let m = 1; m * period + reach < MAX_CYCLE; m *= 2) {
+    const centre = Math.round(m * period);
+    let at = centre;
+    for (let q = centre - reach; q <= centre + reach; q++) if (r[q]! > r[at]!) at = q;
+    if (at <= 2 || at >= MAX_CYCLE) break;
+    const curve = r[at - 1]! - 2 * r[at]! + r[at + 1]!;
+    const shift = curve < 0 ? clamp((r[at - 1]! - r[at + 1]!) / (2 * curve), -0.5, 0.5) : 0;
+    period = (at + shift) / m;
+  }
+  // The loop repeats exactly, so it holds a whole number of cycles.
+  return Math.max(1, Math.round(L / period));
+}
+
+/**
+ * Length in sample points of one cycle of a looped section, as it sounds when it repeats: the loop length divided by the
+ * number of cycles in it. Returns 0 for silence, for noise, and for a cycle above 600 points in a loop above 600 points.
+ */
+export function measureLoopCycle(loop: Int8Array): number {
+  const L = loop.length;
+  if (L < 4) return 0;
+  let mean = 0;
+  for (let i = 0; i < L; i++) mean += loop[i]!;
+  mean /= L;
+  let changes = 0;
+  for (let i = 0; i < L; i++) if ((loop[i]! > mean) !== (loop[(i + 1) % L]! > mean)) changes++;
+  if (changes === 0) return 0;
+  const cycles = L > MAX_CYCLE ? cyclesFromAutocorrelation(loop, mean) : cyclesFromSpectrum(loop, mean);
+  return cycles > 0 && changes <= MAX_SIGN_CHANGES_PER_CYCLE * cycles ? L / cycles : 0;
+}
+
 /** Recent analyses by sample content, oldest first. Bounded, because a long-running process imports many modules. */
 const analysisCache = new Map<string, SampleAnalysis>();
 const ANALYSIS_CACHE_LIMIT = 256;
@@ -96,7 +187,8 @@ const ANALYSIS_CACHE_LIMIT = 256;
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
 /**
- * Analyses one sample. Reads at most 2048 points for the periodicity and the harmonics and every point once for the envelope.
+ * Analyses one sample. Reads at most 2048 points for the periodicity, the harmonics and the cycle of a loop above 600
+ * points, and every point once for the envelope and the sign changes of a loop.
  * A sample with the same name, loop and data as an earlier one gets a copy of that analysis.
  */
 export function analyzeSample(s: ModSample): SampleAnalysis {
@@ -117,6 +209,7 @@ function measureSample(s: ModSample): SampleAnalysis {
   const base: SampleAnalysis = {
     name: s.name, bytes: n, looped: s.looped, seconds, periodicity: 0, periodPoints: 0, harmonics: [], zeroCrossings: 0,
     waveform: "pulse", pulseWidth: 0.5, adsr: [0, 4, 10, 4],
+    loopCycle: s.looped ? measureLoopCycle(s.data.subarray(s.loopStart, s.loopStart + s.loopLength)) : 0,
   };
   if (n < 32) {
     const drum = drumFromName(s.name);
@@ -156,17 +249,9 @@ function measureSample(s: ModSample): SampleAnalysis {
   let zc = 0;
   for (let i = 0; i < N; i++) { x[i] = x[i]! - mean; if (i > 0 && (x[i]! > 0) !== (x[i - 1]! > 0)) zc++; }
   const zeroCrossings = zc / N;
-  // Periodicity: normalised autocorrelation. The period is the shortest lag after the first negative value (so a slowly varying
-  // signal does not count its own smoothness as a period) whose correlation is within 90 % of the best.
-  const maxLag = Math.min(600, Math.floor(N / 3));
-  const r = normalisedAutocorrelation(x, maxLag);
-  let firstNegative = 0;
-  for (let lag = 2; lag <= maxLag; lag++) if (r[lag]! < 0) { firstNegative = lag; break; }
-  let best = 0, lagBest = 0;
-  if (firstNegative > 0) {
-    for (let lag = firstNegative; lag <= maxLag; lag++) if (r[lag]! > best) best = r[lag]!;
-    for (let lag = firstNegative; lag <= maxLag; lag++) if (r[lag]! >= 0.9 * best && best > 0.3) { lagBest = lag; break; }
-  }
+  // Periodicity: normalised autocorrelation.
+  const maxLag = Math.min(MAX_CYCLE, Math.floor(N / 3));
+  const { best, lag: lagBest } = shortestPeriod(normalisedAutocorrelation(x, maxLag));
   const periodic = best >= 0.55 && lagBest > 0;
   const harmonics: number[] = [];
   let waveform: SampleWaveform = "noise";

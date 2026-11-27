@@ -845,6 +845,7 @@ The Amiga sample is not reproduced. Each sample that a note uses is measured onc
 
 | Measurement | SIDWave |
 | --- | --- |
+| Cycle length of the loop | pitch of the notes of the sample (see below) |
 | Periodic (normalised autocorrelation of at least 0.55): harmonics 2 and 3 weak | `triangle` |
 | Periodic: harmonic 2 weak, harmonic 3 present (a square wave) | `pulse`, width 0.5 |
 | Periodic: harmonics 2 and 3 strong (a ramp) | `sawtooth` |
@@ -862,7 +863,7 @@ Samples with identical SIDWave definitions share one instrument. SIDWave holds a
 
 ### Notes, levels and effects
 
-Notes: the period is converted to the nearest semitone (`MIDI = 48 + 12 log2(428 / period x 2^(finetune / 96))`, period 428 is MIDI 48, `C3`); `--transpose` adds semitones, and notes outside C0 to A#7 move by octaves (counted). A note without a sample number uses the last sample of the channel; a sample number without a note only resets the volume. A note stays until the next note on the channel, a cut or the end of the song (a looped sample sounds until then, a one-shot sample fades by the ADSR decay).
+Notes: the period is converted to the nearest semitone (`MIDI = 48 + 12 log2(428 / period x 2^(finetune / 96)) + 12 log2(64 / cycle)`). `cycle` is the length in sample points of one cycle of the loop: the loop length divided by the number of cycles in it, measured from the loop only, so the part before the loop does not affect the pitch. A loop of up to 600 points is measured with a Fourier transform (the largest number of cycles whose harmonics hold 85 % of the energy), a longer loop with the autocorrelation of its first 2048 points. With a cycle of 64 points, period 428 is MIDI 48, `C3`; a cycle of 32 points sounds one octave higher. `cycle` is taken as 64 for a sample without a loop, and for a loop that is silent, noise (more than 16 sign changes per cycle) or has a cycle above 600 points in a longer loop. A loop of 2 bytes is not a loop. `--transpose` adds semitones, and notes outside C0 to A#7 move by octaves (counted). A note without a sample number uses the last sample of the channel; a sample number without a note only resets the volume. A note stays until the next note on the channel, a cut or the end of the song (a looped sample sounds until then, a one-shot sample fades by the ADSR decay).
 
 Level: `level = round(15 x volume / 64)`, at least 1, from the time-weighted mean volume over the note, so `Cxx` at the start sets it exactly and slides and later changes average. A note whose volume reaches 0 (`C00`, a slide to 0, `EC0`) ends there.
 
@@ -888,7 +889,7 @@ Measured on the committed fixtures (`test/fixtures/mod`, hand-built, written by 
 
 ### CPU time
 
-Measured with `process.cpuUsage` on Node 24 (`test/interchangeMod.test.mjs`): a 230 KB module with 100 patterns (6400 played rows, 31 samples of 4 KB, effects on a third of the notes) imports without SIDWave validation in 0.5 s in a warmed-up process and 1.0 s as the first import of a process, and in 2.7 s with validation (compiling the score is the largest part); a 100 KB module with 30 patterns (1920 rows) takes 0.13 to 0.21 s without validation; the four-channel fixture takes 0.02 to 0.11 s. Sample analysis is 0.09 s for 31 samples of 4 KB (0.14 s before the energy sums came from prefix sums); a sample that was analysed before costs a hash of its data. `--no-validate` skips the compile; the score is checked again when it is compiled.
+Measured with `process.cpuUsage` on Node 24 (`test/interchangeMod.test.mjs`): a 230 KB module with 100 patterns (6400 played rows, 31 samples of 4 KB, effects on a third of the notes) imports without SIDWave validation in 0.5 s in a warmed-up process and 1.0 s as the first import of a process, and in 2.7 s with validation (compiling the score is the largest part); a 100 KB module with 30 patterns (1920 rows) takes 0.13 to 0.21 s without validation; the four-channel fixture takes 0.02 to 0.11 s. Sample analysis is 0.09 s for 31 samples of 4 KB (0.14 s before the energy sums came from prefix sums), the loop cycle adds up to 3 ms per looped sample; a sample that was analysed before costs a hash of its data. `--no-validate` skips the compile; the score is checked again when it is compiled.
 
 ### Where this differs from the SID Factory II converter
 
