@@ -329,18 +329,18 @@ export type SidwaveFileReader = (path: string) => Uint8Array;
 /** Largest PCM file accepted by default. */
 export const DEFAULT_MAX_PCM_FILE_BYTES = 16 * 1024 * 1024;
 
-/** How `file:` sample sources are read. Without a reader, a `file:` source is an error. */
 /** One library a score used (SIDWave 1.4 `imports`): what a compile result reports so that licences are visible. */
 export interface SidwaveUsedLibrary {
   /** The namespace the score (or a library) imported it as, for example `drums` or `drums.inner`. */
   namespace: string;
   name: string;
   version: string;
-  /** SHA-256 of the canonical library text. */
+  /** The pin: SHA-256 of the canonical library text combined with the hashes of the libraries it imports. */
   sha256: string;
   licence: string;
 }
 
+/** How `file:` sample sources are read. Without a reader, a `file:` source is an error. */
 export interface SidwaveReadOptions {
   readFile?: SidwaveFileReader;
   /** SIDWave 1.4: replaces the `imports` of a score by the library items it uses. Without it a score with imports is rejected. */

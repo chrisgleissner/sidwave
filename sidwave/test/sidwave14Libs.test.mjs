@@ -484,7 +484,7 @@ test("a bundle compiles offline to the same bytes and lists every library with h
     assert.deepEqual(drums.provenance, { author: "SIDWave tests", source: "https://example.invalid/drums", created: "2026-11-27" });
     assert.deepEqual(drums.imports, [{ as: "base", file: "libs/fixture-base-1.0.2.yaml" }]);
     assert.equal(manifest.score.sha256, sha(fs.readFileSync(path.join(out, "score.yaml"))));
-    for (const lib of manifest.libraries) assert.equal(canonicalLibraryHash(fs.readFileSync(path.join(out, lib.file), "utf8")), lib.sha256);
+    for (const lib of manifest.libraries.filter((l) => l.imports.length === 0)) assert.equal(canonicalLibraryHash(fs.readFileSync(path.join(out, lib.file), "utf8")), lib.sha256);
     // The original and the bundle compile to the same bytes. The bundle has no node_modules and sits elsewhere.
     const original = compileSidwaveBytes(parseFile(score), { format: "sid" });
     const copy = path.join(os.tmpdir(), `sidwave-bundle-copy-${process.pid}`);
@@ -647,5 +647,35 @@ test("the library file and the import shown in the specification load and compil
     // The import lines of the specification are well formed.
     const entries = readImportEntries(YAML.parse(imports.replace("<64 hexadecimal digits>", "0".repeat(64))).imports);
     assert.deepEqual(entries.map((e) => e.as), ["drums", "pads"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review round: closure pins, nested effects, samples in bundles, transforms, scanning, error text
+
+test("a pin covers the dependency closure: swapping a nested library changes the hash and breaks the pin", () => {
+  withProject(({ dir, score }) => {
+    const locked = lockScore(fs.readFileSync(score, "utf8"), score).text;
+    fs.writeFileSync(score, locked);
+    assert.ok(parseFile(score).libraries.length === 3);
+    // drums.yaml now imports base2.yaml, a different library with the same instrument names and a compatible version.
+    const base = fs.readFileSync(path.join(dir, "libs", "base.yaml"), "utf8");
+    fs.writeFileSync(path.join(dir, "libs", "base2.yaml"), base.replace("{ waveform: noise, adsr: [0, 4, 0, 0]", "{ waveform: noise, adsr: [0, 5, 0, 0]"));
+    const drums = path.join(dir, "libs", "drums.yaml");
+    fs.writeFileSync(drums, fs.readFileSync(drums, "utf8").replace("./base.yaml", "./base2.yaml"));
+    expectError(() => parseFile(score), /\$\.imports\[0\]\.sha256: library fixture-drums .* but the import pins/);
+    // The libraries own text is unchanged apart from the location of its import, yet its closure hash differs.
+    const relocked = lockScore(locked, score).text;
+    assert.notEqual(relocked, locked);
+  });
+});
+
+test("the closure hash of a library without imports is the hash of its canonical text", () => {
+  withProject(({ dir, score }) => {
+    const doc = parseFile(score);
+    const pad = doc.libraries.find((l) => l.name === "sidwave-lib-pad");
+    assert.equal(pad.sha256, canonicalLibraryHash(fs.readFileSync(path.join(dir, "node_modules", "sidwave-lib-pad", "pad.yaml"), "utf8")));
+    const drums = doc.libraries.find((l) => l.name === "fixture-drums");
+    assert.notEqual(drums.sha256, canonicalLibraryHash(fs.readFileSync(path.join(dir, "libs", "drums.yaml"), "utf8")));
   });
 });

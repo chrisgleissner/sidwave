@@ -130,6 +130,9 @@ interface LoadedLibrary {
   /** Display name used in messages (relative to the score directory when possible). */
   label: string;
   meta: SidwaveLibraryMeta;
+  /** Hash of this file's canonical text alone. */
+  contentHash: string;
+  /** The pin: the content hash, combined with the pins of the libraries it imports (Merkle style). */
   sha256: string;
   size: number;
   instruments: Record<string, Record<string, any>>;
@@ -327,11 +330,12 @@ class Loader {
     }
     const entries = raw.imports === undefined ? [] : parseEntries(raw.imports, at("$.imports"));
     const loaded: LoadedLibrary = {
-      file, label, size, sha256: "", imports: [], resolved: false, height: 0, entries, ...bodies,
+      file, label, size, contentHash: "", sha256: "", imports: [], resolved: false, height: 0, entries, ...bodies,
       meta: { name: lib.name, version: lib.version, licence: lib.licence, provenance: { author: prov.author, source: prov.source, created } },
     };
     try {
-      loaded.sha256 = canonicalLibraryHash(text);
+      loaded.contentHash = canonicalLibraryHash(text);
+      loaded.sha256 = loaded.contentHash;
     } catch (error) {
       fail(at("$"), (error as Error).message);
     }
@@ -352,13 +356,15 @@ class Loader {
         try { ok = satisfiesVersion(lib.meta.version, entry.version); } catch (error) { return fail(`${path}.version`, (error as Error).message); }
         if (!ok) fail(`${path}.version`, `library ${lib.meta.name} (${lib.label}) is version ${lib.meta.version}, which does not satisfy ${entry.version}`);
       }
-      if (entry.sha256 !== undefined && entry.sha256 !== lib.sha256) {
-        fail(`${path}.sha256`, `library ${lib.meta.name} (${lib.label}) has sha256 ${lib.sha256}, but the import pins ${entry.sha256}`);
-      }
       if (!lib.resolved) {
         lib.imports = this.resolveEntries(lib.entries, file, `${path} (${lib.label}) $.imports`, chain);
         lib.height = lib.imports.length === 0 ? 0 : 1 + Math.max(...lib.imports.map((i) => i.lib.height));
         lib.resolved = true;
+        const nested = [...new Set(lib.imports.map((i) => i.lib.sha256))].sort();
+        if (nested.length) lib.sha256 = sha256Hex([lib.contentHash, ...nested].join("\n"));
+      }
+      if (entry.sha256 !== undefined && entry.sha256 !== lib.sha256) {
+        fail(`${path}.sha256`, `library ${lib.meta.name} (${lib.label}) has sha256 ${lib.sha256}, but the import pins ${entry.sha256}`);
       }
       if (stack.length + 1 + lib.height > SIDWAVE_LIBRARY_LIMITS.maxDepth) fail(path, `libraries import each other more than ${SIDWAVE_LIBRARY_LIMITS.maxDepth} levels deep`);
       return { as: entry.as, lib };
@@ -651,7 +657,7 @@ export function bundleScore(text: string, file: string, outDir: string, allowedD
     const rel = `libs/${names.get(lib.file)}`;
     writeFileSync(join(target, rel), out);
     const check = canonicalLibraryHash(out);
-    if (check !== lib.sha256) throw new Error(`internal error: the bundled copy of ${lib.label} hashes to ${check}, not ${lib.sha256}`);
+    if (check !== lib.contentHash) throw new Error(`internal error: the bundled copy of ${lib.label} hashes to ${check}, not ${lib.contentHash}`);
     manifest.libraries.push({
       file: rel, name: lib.meta.name, version: lib.meta.version, sha256: lib.sha256, licence: lib.meta.licence,
       provenance: lib.meta.provenance, imports: lib.imports.map((i) => ({ as: i.as, file: `libs/${names.get(i.lib.file)}` })),
