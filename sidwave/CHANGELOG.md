@@ -18,6 +18,8 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 - Verification level A1 (`compareAudioA1`, `data/verify/a1-rules.json`): a windowed audio comparison with thresholds fitted on score-level mutations. Status: approximate (held-out false accepts 15.3 %, false rejects 22.2 %; see `data/verify/a1-limitations.md`). `scripts/calibrate-a1.mjs` and the mutation generator are included.
 - `sidwave reconstruct` and `reconstructSid` (`sidwave/reconstruct`): recover a SIDWave score from a SID tune, recompile it and compare the two traces call by call. The report carries the horizon, call rate, unsupported features, strict and register-state F-diff verdicts and language-extension candidates with reproducers. Exit 1 with `ok: false` when the strict F-diff is not exact.
 
+- `sidwave export` and `sidwave import` and the library entry point `sidwave/export`: structured event export (`sidwave.events/1`), Standard MIDI File import and export, MusicXML (partwise) import and export, GoatTracker `.sng` import (`GTS!`, `GTS2`, `GTS3` to `GTS5`) and GTS5 export, Furnace `.fur` import and export (C64 chip), and `sidwave render --stems`. Each mapping and its losses are in `doc/interchange.md`. The GoatTracker importer is checked against `gt2reloc` of GoatTracker 2.77; the Furnace export has not been loaded by Furnace itself.
+
 ### Changed
 
 - Breaking (command line): an invalid score or unreadable input exits 3 (was 1 or 2), an unwritable output exits 3 (was 2), a failed verdict is the only exit 1; `--json` prints `{ ok, command, result | error: { category, message, details } }`; the engine yields to the event loop while rendering.

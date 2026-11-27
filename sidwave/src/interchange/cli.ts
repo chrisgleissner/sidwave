@@ -10,8 +10,14 @@ import { parseSidwave } from "../sidwave.js";
 import { confinedReadOptions } from "../sidwaveOps.js";
 import { InterchangeUsageError } from "./errors.js";
 import { exportEvents } from "./events.js";
+import { exportGoatTracker } from "./goattrackerExport.js";
 import { exportMidi } from "./midiExport.js";
+import { exportFurnace } from "./furnaceExport.js";
+import { importFurnace } from "./furnaceImport.js";
+import { importGoatTracker } from "./goattrackerImport.js";
 import { importMidi } from "./midiImport.js";
+import { exportMusicXml } from "./musicxmlExport.js";
+import { importMusicXml } from "./musicxmlImport.js";
 
 export { InterchangeUsageError };
 /** Largest score or interchange file the command line reads. */
@@ -88,8 +94,8 @@ function exportCommand(args: string[], io: CliIo): number {
   const file = a.positional[0]!;
   const output = (a.flags.get("-o") ?? a.flags.get("--output")) as string | undefined;
   const ext = output === undefined ? "" : extname(output).toLowerCase();
-  const format = (a.flags.get("--format") as string | undefined) ?? (ext === ".mid" || ext === ".midi" ? "midi" : ext === ".musicxml" || ext === ".xml" ? "musicxml" : "events");
-  if (!["events", "midi", "musicxml"].includes(format)) throw new UsageError(`--format must be events, midi or musicxml, not ${format}`);
+  const format = (a.flags.get("--format") as string | undefined) ?? (ext === ".mid" || ext === ".midi" ? "midi" : ext === ".musicxml" || ext === ".xml" ? "musicxml" : ext === ".sng" ? "goattracker" : ext === ".fur" ? "furnace" : "events");
+  if (!["events", "midi", "musicxml", "goattracker", "furnace"].includes(format)) throw new UsageError(`--format must be events, midi, musicxml, goattracker or furnace, not ${format}`);
   if (format !== "midi" && a.flags.has("--bend")) throw new UsageError("--bend applies to --format midi only");
   const { bytes, path } = readBounded(io, file);
   const song = numberFlag(a, "--song");
@@ -118,6 +124,24 @@ function exportCommand(args: string[], io: CliIo): number {
       return done({ file, format, output: written, bytes: result.bytes.length, ppq: result.ppq, tracks: result.tracks, losses: result.losses, warnings: result.warnings },
         `${written}: MIDI, ${result.tracks.length} voice tracks, ${result.bytes.length} bytes`);
     }
+    if (format === "goattracker") {
+      const result = exportGoatTracker(doc, common);
+      const target = output ?? `${stem(file)}.sng`;
+      for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
+      if (target === "-") { io.outBytes(result.bytes); return 0; }
+      const written = writeOutput(io, path, target, result.bytes);
+      const { bytes: _bytes, ...info } = result;
+      return done({ file, format, output: written, bytes: result.bytes.length, ...info }, `${written}: GoatTracker GTS5, ${result.voices} channels, ${result.rows} rows, ${result.ticksPerRow} calls per row`);
+    }
+    if (format === "furnace") {
+      const result = exportFurnace(doc, common);
+      const target = output ?? `${stem(file)}.fur`;
+      for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
+      if (target === "-") { io.outBytes(result.bytes); return 0; }
+      const written = writeOutput(io, path, target, result.bytes);
+      const { bytes: _bytes, ...info } = result;
+      return done({ file, format, output: written, bytes: result.bytes.length, ...info }, `${written}: Furnace module, ${result.voices} channels, ${result.rows} rows, ${result.ticksPerRow} ticks per row`);
+    }
     return musicXmlExport(doc, common, output, path, io, json);
   } catch (error) {
     if (error instanceof RangeError) throw new UsageError(error.message);
@@ -125,19 +149,62 @@ function exportCommand(args: string[], io: CliIo): number {
   }
 }
 
-/** Replaced once the MusicXML exporter is registered (see musicxmlCli.ts). */
-let musicXmlExport: (doc: ReturnType<typeof parseSidwave>, common: { song?: number; ppq?: number }, output: string | undefined, input: string, io: CliIo, json: boolean) => number = () => {
-  throw new UsageError("MusicXML export is not available in this build");
-};
-export function registerMusicXmlExport(fn: typeof musicXmlExport): void { musicXmlExport = fn; }
+function musicXmlExport(doc: ReturnType<typeof parseSidwave>, common: { song?: number; ppq?: number }, output: string | undefined, input: string, io: CliIo, json: boolean): number {
+  const result = exportMusicXml(doc, common);
+  const target = output ?? `${stem(input)}.musicxml`;
+  for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
+  if (target === "-") { io.out(result.xml); return 0; }
+  const written = writeOutput(io, input, target, result.xml);
+  const summary = { file: input, format: "musicxml", output: written, bytes: Buffer.byteLength(result.xml), divisions: result.divisions, bars: result.bars, parts: result.parts, losses: result.losses, warnings: result.warnings };
+  io.out(json ? `${JSON.stringify(envelope("export", true, { result: summary }), null, 2)}\n` : `${written}: MusicXML, ${result.parts.length} parts, ${result.bars} bars\n`);
+  return 0;
+}
 
 export interface ImportResultLike { yaml: string; report: unknown }
 export type ImportHandler = (bytes: Buffer, args: InterchangeArgs) => ImportResultLike;
 const importers = new Map<string, ImportHandler>();
 export function registerImporter(format: string, handler: ImportHandler): void { importers.set(format, handler); }
 /** Importer flags registered by other modules (valued, bare). */
-export const IMPORT_VALUED = ["-o", "--output", "--format", "--grid", "--voices", "--title", "--mode", "--allow-dir"];
+export const IMPORT_VALUED = ["-o", "--output", "--format", "--grid", "--voices", "--title", "--mode", "--song", "--allow-dir"];
 export const IMPORT_BARE = ["--no-drums", "--no-bend", "--no-validate", "--json", "--force"];
+
+importers.set("musicxml", (bytes, a) => {
+  const grid = numberFlag(a, "--grid");
+  const voices = numberFlag(a, "--voices");
+  const mode = a.flags.get("--mode") as string | undefined;
+  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
+  try {
+    return importMusicXml(bytes, {
+      ...(grid === undefined ? {} : { grid }), ...(voices === undefined ? {} : { voices }),
+      ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}),
+      ...(mode ? { mode } : {}), drums: !a.flags.has("--no-drums"), validate: !a.flags.has("--no-validate"),
+    });
+  } catch (error) {
+    if (error instanceof RangeError) throw new UsageError(error.message);
+    throw error;
+  }
+});
+
+importers.set("goattracker", (bytes, a) => {
+  const song = numberFlag(a, "--song");
+  const mode = a.flags.get("--mode") as string | undefined;
+  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
+  try {
+    return importGoatTracker(bytes, {
+      ...(song === undefined ? {} : { song }), ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}),
+      ...(mode ? { mode } : {}), validate: !a.flags.has("--no-validate"),
+    });
+  } catch (error) {
+    if (error instanceof RangeError) throw new UsageError(error.message);
+    throw error;
+  }
+});
+
+importers.set("furnace", (bytes, a) => {
+  const mode = a.flags.get("--mode") as string | undefined;
+  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
+  return importFurnace(bytes, { ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}), ...(mode ? { mode } : {}), validate: !a.flags.has("--no-validate") });
+});
 
 const detect = (file: string, bytes: Buffer): string | undefined => {
   if (bytes.subarray(0, 4).toString("latin1") === "MThd") return "midi";
@@ -145,7 +212,7 @@ const detect = (file: string, bytes: Buffer): string | undefined => {
   if (ext === ".musicxml" || ext === ".xml") return "musicxml";
   if (ext === ".mxl") return "musicxml";
   if (bytes.subarray(0, 4).toString("latin1") === "GTS5" || bytes.subarray(0, 4).toString("latin1") === "GTS4" || bytes.subarray(0, 4).toString("latin1") === "GTS3" || bytes.subarray(0, 4).toString("latin1") === "GTS2" || ext === ".sng") return "goattracker";
-  if (ext === ".fur" || bytes.subarray(0, 2).toString("hex") === "789c" || bytes.subarray(0, 16).toString("latin1").startsWith("-Furnace module-")) return "furnace";
+  if (ext === ".fur" || bytes[0] === 0x78 || bytes.subarray(0, 16).toString("latin1").startsWith("-Furnace module-")) return "furnace";
   return undefined;
 };
 
@@ -194,8 +261,8 @@ function importCommand(args: string[], io: CliIo): number {
   return 0;
 }
 
-export const INTERCHANGE_HELP = `  sidwave export <file> [--format events|midi|musicxml] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--json]
-  sidwave import <file> [--format midi|musicxml|goattracker|furnace] [-o <out.yaml>] [--grid <beats>] [--voices 1-3]
+export const INTERCHANGE_HELP = `  sidwave export <file> [--format events|midi|musicxml|goattracker|furnace] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--json]
+  sidwave import <file> [--format midi|musicxml|goattracker|furnace] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>]
                         [--no-drums] [--no-bend] [--title <text>] [--mode PAL|NTSC] [--no-validate] [--force] [--json]
 `;
 

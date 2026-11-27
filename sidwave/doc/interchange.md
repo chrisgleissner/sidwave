@@ -5,13 +5,15 @@ SIDWave scores can be exported to and imported from other formats. Every mapping
 All commands read at most 16 MiB, never modify their input, never overwrite the input file, never use the network, and refuse to overwrite an existing output without `--force` (imports and `render`; `render` checks every target before it writes any). Parsers bound their work (see each section). Exit codes and the `--json` envelope are those of the command line (`{ ok, command, result | error }`): a malformed or unreadable input file is exit 3 (`input`), a refused score for stems is exit 5 (`limit_exceeded`), a usage mistake is exit 2.
 
 ```
-sidwave export <file> [--format events|midi|musicxml] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--json]
-sidwave import <file> [--format midi|musicxml|goattracker|furnace] [-o <out.yaml>] [--grid <beats>] [--voices 1-3]
+sidwave export <file> [--format events|midi|musicxml|goattracker|furnace] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--json]
+sidwave import <file> [--format midi|musicxml|goattracker|furnace] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>]
                       [--no-drums] [--no-bend] [--title <text>] [--mode PAL|NTSC] [--no-validate] [--force] [--json]
 sidwave render <score> --stems [-o <dir>] [--force] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite] [--model 6581|8580] [--song <n>]
 ```
 
-Library entry point: `sidwave/export` (`exportEvents`, `exportMidi`, `importMidi`, `parseSmf`, `writeSmf`, `renderStems`, `writeWav`).
+Library entry point: `sidwave/export` (`exportEvents`, `exportMidi`, `importMidi`, `exportMusicXml`, `importMusicXml`, `parseGoatTracker`, `writeGoatTracker`, `importGoatTracker`, `exportGoatTracker`, `parseFurnace`, `writeFurnace`, `importFurnace`, `exportFurnace`, `parseSmf`, `writeSmf`, `renderStems`, `writeWav`).
+
+Speed: every importer and exporter is linear in the input (maps, sorted arrays and one forward pass; no repeated scans). `test/interchangePerformance.test.mjs` bounds the CPU time (`process.cpuUsage`) on large allowed inputs. Measured on a loaded machine: MusicXML export of 1500 bars 0.41 s, MusicXML import of 2.1 MB 0.63 s without validation, a 56 KB file 0.19 s with SIDWave validation; GoatTracker import of 16,256 rows by 3 channels 0.13 s, small song 0.05 s with validation; Furnace import of 16,384 rows by 3 channels 0.11 s, export of 300 bars 0.16 s. Validation (compiling the result) is the largest part of the import time of a very large score; `--no-validate` skips it.
 
 ## Structured event export
 
@@ -75,6 +77,116 @@ The result is a SIDWave 1.3 score for one SID (at most 3 voices), validated by c
 * **Time signatures.** 2/4, 3/4, 4/4, 5/4, 6/8, 7/8, 9/8 and 12/8 map to the same SIDWave metre. A signature with another number of beats per bar maps to the SIDWave metre with the same bar length when there is one (for example 6/4 to 12/8); otherwise the import fails. A signature that is not on a bar line starts at the next bar line.
 * **Pitch bend.** With the bend range of RPN 0 (default 2 semitones), a bend at the start of a note shifts its written pitch to the nearest semitone. A bend inside a note that ends at least one semitone away from the start becomes a SIDWave `bend` (`to` in semitones, `frames` from the last bend event). Bend that returns to its start pitch (vibrato) and other bends are not imported (`bendsLost`).
 * **Not imported:** controllers other than the bend range, aftertouch, SysEx, text other than track names, the note release velocity, drum velocity, polyphony, more than three voices, SMPTE time division. File size (8 MiB), tracks (256), events (2,000,000), ticks (2^31), bars (2048) and grid cells (400,000) are bounded, and the parser reports malformed files as errors.
+
+## MusicXML
+
+Uncompressed partwise MusicXML (`.musicxml`, `.xml`). SIDWave reads and writes it with its own bounded XML reader (`parseXml`, no dependency). The tests verify the output with the independent `fast-xml-parser` (MIT, dev dependency only).
+
+Reader limits (untrusted input): at most 16 MiB; elements nested at most 64 deep; at most 1,000,000 elements and 64 attributes per element; at most 2,000,000 notes, 2048 bars and 400,000 grid cells. Only the five predefined XML entities and numeric character references are decoded. A `DOCTYPE` with an internal subset (where entities are declared) and any other entity reference are rejected; the external DTD named by a `DOCTYPE` is never fetched. Compressed `.mxl` (zip) files are rejected with a message that asks for an uncompressed export (no zip reader without a new dependency). `score-timewise` is rejected.
+
+### Export
+
+`sidwave export score.yaml -o score.musicxml [--song n] [--ppq n]`
+
+| SIDWave | MusicXML |
+| --- | --- |
+| Title, author | `work-title`, `creator type="composer"`. |
+| One voice | One `part` (named `v<id> <name>`), one `voice` 1 inside it. |
+| Section metre | `time` (beats, beat-type) at the first measure of each section with a new signature; measures are one bar of the section metre. |
+| Tempo (sections, ramps) | `direction` with `metronome` and `sound tempo` in the first part, at the tick of each tempo-map entry; a note that spans a tempo change is split into tied notes. |
+| Section names | `rehearsal` directions in the first part. |
+| Note | `note` with `pitch` (sharps), `duration` in divisions (`divisions` = ticks per quarter note, default 480; there is no `type`), `tie`/`tied` where a note crosses a bar line or a tempo change. Rests fill the gaps. |
+| Velocity | `dynamics` attribute of the note, `velocity / 90 x 100` (MusicXML defines 100 as MIDI velocity 90). |
+| Instrument | One `score-instrument`/`midi-instrument` per distinct GM program in the part (program table as for MIDI), referenced by each note. |
+| Drum hit | `unpitched` note with a `midi-unpitched` key (GM percussion key + 1) per drum name; the part uses the percussion clef. |
+
+Exact: pitch, order, voice assignment, bar structure, tempo and metre at bar lines. Approximate: velocity. Lost: ADSR, waveform, pulse width, ring, sync, filter, wavetables, bend, glide, slide, vibrato, the note type (the duration is exact in ticks but is not engraved as quarter or eighth note), key signature (always C major).
+
+### Import
+
+`sidwave import tune.musicxml -o tune.yaml [--grid 0.25] [--voices 3] [--no-drums]`
+
+Voice allocation, monophony (skyline: highest note wins, lowest in a part with a median below C3), range, quantisation, tempo-per-bar and time-signature rules are those of the MIDI import. Differences:
+
+* Parts are the unit of allocation (instead of MIDI track and channel). A part with more unpitched than pitched notes is a drum part; its hits map through the `midi-unpitched` key of the note's `instrument` in the part list (hits without a key are counted in `droppedHits`).
+* Instruments: the `midi-program` of the note's `instrument`, else of the part's first `midi-instrument`, by the GM family table; a bass part without program uses `bass`. A note carries `inst` only when its program differs from the voice's most common one.
+* Positions come from `duration`, `backup`, `forward` and `chord`; `divisions` can change per measure. Ties merge notes of equal pitch. Transposition (`transpose`: `chromatic` and `octave-change`) is applied, so notes are imported at sounding pitch.
+* A first measure marked `implicit="yes"` that is shorter than its bar (a pickup) is padded with a rest at its start, with a warning. A measure whose content differs from its time signature produces a warning.
+* Tempo comes from `sound tempo` or `metronome` (beat-unit and dots); a tempo inside a bar takes effect at the next bar line. Level comes from the `dynamics` attribute (`velocity = 0.9 x dynamics`; 127 without it).
+* Not imported (always in the report): grace notes, cue notes, unpitched notes in pitched parts, repeat signs and endings (measures play once as written), dynamics marks, articulations, slurs, ornaments, lyrics, key signatures, clefs, additive or free time signatures (an error), polyphony, more than three voices.
+
+## GoatTracker
+
+`.sng` song files of GoatTracker 1.x (`GTS!`), GoatTracker 2.0 beta (`GTS2`) and GoatTracker 2.x (`GTS3`, `GTS4`, `GTS5`) import through one path: the parser converts every version to the GTS5 model exactly as the loader of GoatTracker 2.77 does (`src/gsong.c`), and the importer works on that model. Export writes GTS5. Sources: upstream GoatTracker 2.77 (SourceForge, `GoatTracker_2.77.zip`, SHA-256 `96c2bd6a6ab3aca2f5bb18b1c764ac6ea69ac245cae14002a72cd87c554561ef`, GPL-2.0-or-later). Only file layout and conversion rules are used; no source is copied. The fork `leafo/goattracker2` (commit a78e7e5, 2013, MIDI note input) has the same `.sng` loader (magics `GTS3` to `GTS5`, `GTS2`, `GTS!`) and no `gt2reloc`, so the differential check uses upstream 2.77 (`gt2reloc` built with `-U_FORTIFY_SOURCE -fno-stack-protector`, which the 2.77 sources need on current compilers).
+
+Input bounds: 256 KiB per file (the largest file GoatTracker writes is about 125 KB), at most 32 songs, 63 instruments, 208 patterns of at most 128 rows, tables of at most 255 entries. A truncated file is an error (GoatTracker itself zero-fills). The import expands the first pass of each order list; at most 100,000 rows per channel.
+
+### Import
+
+`sidwave import tune.sng -o tune.yaml [--song n] [--mode PAL|NTSC]`
+
+| GoatTracker | SIDWave |
+| --- | --- |
+| Song name, author, copyright | Title, author, a comment line. |
+| Channels 1 to 3 of the chosen subsong (`--song`, 1-based) | Voices 1 to 3. |
+| Order list: patterns, REPEAT, TRANSPOSE | Expanded into one grid cell per pattern row. Transposition is applied to the notes. LOOPSONG ends the import; a loop to a position other than the start is reported (SIDWave loops the whole timeline). |
+| Row length (tempo, in player calls) | The grid has 4 rows per beat (2, 8 or 1 when a tempo would leave 30 to 220 BPM). `tempo = 60 x frame rate / (rows per beat x calls per row)` for each bar (125.31 BPM for the default 6 calls on PAL). Funk tempo is played with the average row length. |
+| Note, rest, key off | Note, tie, rest. Tone portamento notes are played as new notes. Notes are moved by octaves into the playable range. |
+| Instrument | A SIDWave instrument per instrument used: ADSR, wavetable (waveform bits, gate, ring, sync, test, relative and absolute note steps, delays, loop), pulse table (set and add steps, loop), filter table (set, cutoff and add steps, type, resonance), vibrato (approximated as a triangle in semitones at C4) and hard restart (gate timer, or off when its no-hard-restart flag is set). |
+
+Approximate: the first frame of a note (GoatTracker applies the first waveform and not the wavetable pitch on tick 0; the importer starts the wavetable on the first frame), the vibrato depth (GoatTracker's depends on the note), filter cutoff (8 bit to 11 bit by a shift of three), the filter routing (GoatTracker's filter is global and routes the channels named in the filter control byte; SIDWave routes the voice of the instrument that starts the table), relative wavetable offsets (limited to the range of the notes the song plays on the instrument), and tempo changes that are not on a bar line (the rows in between keep the earlier row length).
+
+Not imported (counted in `commands` and `losses`): pattern commands other than tempo (portamento, vibrato, set AD, SR, waveform, wavetable, pulse and filter pointers, filter control and cutoff, master volume), per-channel tempo, wavetable command steps, loops to other than the start, the per-channel differences in order list length (shorter channels are padded with rests), and the instrument names beyond their use as score names.
+
+Per-version conversions reported in `report.conversions`: `GTS!` (GoatTracker 1.x instruments, pulse parameters turned into a pulse table, the filter table rebuilt, patterns of three bytes, old arpeggio parameters turned into wavetables, portamento and vibrato parameters into the speed table), `GTS2` (three tables, the speed table made on load), `GTS3` (pulse speeds doubled, legato and no-hard-restart flags derived), `GTS4` (flags derived), `GTS5` (none).
+
+### Export
+
+`sidwave export score.yaml -o song.sng`
+
+Writes GTS5 for the first three voices of the first SID. The row length is the largest number of player calls from 3 to 12 at which every note start and end is within one call of a row (the result reports `ticksPerRow` and `maxTimingErrorCalls`); a tempo command sets it. Patterns have 64 rows and identical patterns are shared. Instruments: ADSR, waveform, ring and sync bits, a fixed pulse width in a pulse table, arpeggios as wavetable steps, hard restart 2 calls. Lost: filter, vibrato, slides, glides (plain notes), pulse width modulation, volume levels, wavetables other than arpeggios, notes beyond three voices, two notes on one row.
+
+### Differential check against gt2reloc
+
+`test/interchangeGoatTracker.test.mjs` runs `gt2reloc` (upstream 2.77, `GT2RELOC` or `~/.c64bridge/sidwave-standalone/tools/goattracker2-upstream-2.77/linux/gt2reloc`; the tests skip without it) on a hand-authored file of each version (`GTS!`, `GTS2`, `GTS3`, `GTS4`, `GTS5`, built byte by byte in `test/helpers/gtFixtures.mjs`), on the SIDWave export, and on five of the example songs, and compares the PSID with the one compiled from the imported (or original) score. The loader of `gt2reloc` converts the older formats, so each version is also a test of the importer's conversion.
+
+Alignment: the GoatTracker player starts every channel one row late (its call counter starts at one row, a row being tempo + 1 = 6 calls with the default tempo value 5) and sets the note pitch from the wavetable one call after the note starts, while the SIDWave player plays its first note on call 0. The reference therefore lags by `ticks per row + 1` calls (7 calls, 143 ms, at the default 6). The tests derive the expected shift from the song's initial ticks per row and assert that a search over -12 to 12 calls finds it (within one call on the example songs).
+
+Results on the hand-authored files (six seconds, SIDLite trace, pinned shift): the gate agrees in 98 % and 100 % of the calls of voices 1 and 2 and the note (in semitones) in 95 % and 98 %, for all five versions. The export direction gives gate 94 % and 97 %, note 94 % and 98 %. On the example songs (eight to ten seconds; gate / note agreement of voices 1/2/3, and the share of A1 windows outside the thresholds): dojo 1.00/0.98/0.98 and 1.00/0.67/0.67, 39 %; consultant 1.00/1.00/1.00 and 0.98/0.99/0.95, 15 %; sanction 0.97/0.97/0.98 and 0.97/0.89/0.72, 57 %; funktest 0.99/0.80/0.99 and 0.88/0.70/0.34, 32 %; transylvanian 0.93/0.93/0.99 and 0.50/0.93/0.89, 60 %; 2xtest (checked once, not in the test) 0.99/0.96/1.00 and 0.82/0.40/0.00, 61 %. The ladder: T0, T1 and A0 fail on every file (the players run different code and the frequency table of GoatTracker differs from the SIDWave table, so register values differ even for equal notes); A1 is evaluated with the open ROMs and fails on every file, status approximate. The F-diff class match shares on the fixtures after alignment: waveform 0.92 to 0.98, adsr 0.81, volume 0.95, timing 0.83 to 0.95, gate 0.67 to 0.88, filter 1.0, pitch and pulse about 0.
+
+What the results support: on simple songs the gate (rhythm) agrees closely and the note mostly; on songs with wavetable arpeggios, drums and vibrato, note agreement falls to between 0 % and 99 % per voice and the sound differs (A1 fails). The tests require gate agreement of at least 90 % on the fixtures and 75 % on the example songs, and print the other figures.
+
+The 14 example songs of GoatTracker 2.77 (all `GTS5`) import without error (not committed; the test reads them from the local tool directory when present).
+
+## Furnace
+
+`.fur` modules (C64 chip only: 6581, chip id 0x47, and 8580, 0x07). Import reads zlib-compressed and uncompressed files of format version 157 (Furnace 0.6pre6) and later: the `INFO` header (versions 157 to 239) and the `INF2` header (240 and later). Older versions, other chips (and modules with more than one chip) are errors that say what to change. Export writes format version 228 (Furnace 0.6.8.1), uncompressed; newer Furnace versions load older formats. The layout is taken from `papers/format.md` and `papers/newIns.md` of the Furnace repository.
+
+Input bounds: 16 MiB file, 32 MiB after decompression (`zlib` with `maxOutputLength`; a compression bomb is an error), 256 instruments, 65,536 patterns, 256 rows by 256 order positions, at most 100,000 rows.
+
+Verification status: the reader and writer are tested against modules built byte by byte from the specification in `test/helpers/furFixtures.mjs` (versions 228 and 240, compressed and uncompressed) and by writing and reading back. No Furnace program or command-line converter is installed on this machine, so no module written by SIDWave has been loaded by Furnace itself. The order table is channels-outer (all positions of channel 1, then channel 2, as `fur.cpp` reads and `song.cpp` writes it), and a pattern row's effect bytes follow one combined effect mask in bit order; both were checked by a review against the Furnace source. The macro header length of 8 rests on the specification text alone. Treat the export as untested against Furnace until a module has been opened in it.
+
+### Import
+
+`sidwave import tune.fur -o tune.yaml`
+
+| Furnace | SIDWave |
+| --- | --- |
+| Song name, author | Title, author. |
+| Channels 1 to 3 | Voices 1 to 3 (first subsong only; the count is reported). |
+| Orders, patterns | One grid cell per row. Jumps and other flow effects are not followed. |
+| Speed (ticks per row) and tick rate | The mean of the speed pattern gives the row length in seconds; 4 rows per beat (2, 8 or 1 when the tempo would leave 30 to 220 BPM). |
+| Note, note off, release | Note (MIDI = note - 48, so 108 is C-4), tie, rest. |
+| Volume column | Level of the following notes (0 to 15, at least 1). |
+| C64 instrument | ADSR, waveform bits, pulse width (duty), arpeggio and waveform macros as a wavetable (the macro speed as frames per step, the loop), duty macro as a pulse table. |
+
+Lost (in `losses`): all effect commands (counted), subsongs after the first, ring modulation and sync flags, the filter, other macros, panning, wavetables, samples, the patchbay, and instruments that are not C64 instruments (a plain pulse instrument is used). Macro steps count Furnace ticks and SIDWave steps count player calls, which run at different rates.
+
+### Export
+
+`sidwave export score.yaml -o song.fur`
+
+First three voices of the first SID; the row length is chosen as for GoatTracker (1 to 12 ticks at the call rate of the score as tick rate). Instruments: ADSR, waveform, duty, ring and sync flags, arpeggio as an arpeggio macro. Lost: filter, pulse width modulation, vibrato, slides, levels, wavetable steps other than arpeggios, hard restart settings, more than three voices, two notes on one row. The writer emits no effect commands (no speed, tempo or volume effects).
 
 ## WAV and stems
 

@@ -11,3 +11,8 @@ export class InterchangeUsageError extends Error {
 export class StemsRefusedError extends Error {
   constructor(message: string) { super(message); this.name = "StemsRefusedError"; }
 }
+
+/** A malformed or unsupported input file of a tracker or notation format. Classified as `input` like InterchangeUsageError. */
+export class InterchangeInputError extends InterchangeUsageError {
+  constructor(message: string, readonly yaml?: string) { super(message); this.name = "InterchangeInputError"; }
+}
