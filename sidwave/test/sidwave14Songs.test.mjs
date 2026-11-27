@@ -118,7 +118,7 @@ const fails = (obj, pattern, pathPart) => {
 
 test("a 1.3 document that contains songs is rejected with an error that names the version and the field", () => {
   for (const version of [1.2, 1.3, "1.3"]) fails(make({ sidwave: version, songs: TWO }), /songs require sidwave: 1\.4/, "$.songs");
-  assert.throws(() => parse({ ...make({ sidwave: 1.5 }), timeline: ["x"] }), /use 1\.0, 1\.1, 1\.2, 1\.3 or 1\.4/);
+  assert.throws(() => parse({ ...make({ sidwave: 1.6 }), timeline: ["x"] }), /use 1\.0, 1\.1, 1\.2, 1\.3, 1\.4 or 1\.5/);
 });
 
 test("songs: 0 songs, 1 song and the maximum number of songs", () => {

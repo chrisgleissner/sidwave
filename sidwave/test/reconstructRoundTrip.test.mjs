@@ -54,7 +54,7 @@ test("round trip of combined features (pulse, arpeggio, hard restart, vibrato an
 
 test("round trip of combined features, all 8 seeds", {
   timeout: 180_000,
-  todo: "measured verdicts for seeds 1 to 8: exact, different, exact, different, exact, different, state_exact, call_count. Seeds 2, 4 and 6 differ in register state (the shrunk fixture combined-seed2.yaml isolates a failed vibrato fit on a note of an instrument with vibrato delay 4, a pulse table and a test-bit hard restart); seed 7 differs only in call timing; seed 8 has a call count mismatch",
+  todo: "measured verdicts for seeds 1 to 8: exact, different, exact, state_exact, exact, state_exact, state_exact, call_count. Seed 2 differs in register state (the shrunk fixture combined-seed2.yaml isolates a failed vibrato fit on a note of an instrument with vibrato delay 4, a pulse table and a test-bit hard restart); seeds 4, 6 and 7 differ only in the control-write order or call timing; seed 8 has a call count mismatch",
 }, async () => {
   for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
     const r = await roundTrip(buildScore("combined", seed));
@@ -145,7 +145,7 @@ test("a score that does not compile is never equal-looking: every class counts a
   const { reconstructSid } = await import("../src/reconstruct/reconstruct.ts");
   const { buildFixture } = await import("./helpers/reconstructFixtures.mjs");
   const { sharedEngine } = await import("./helpers/reconstructRoundTrip.mjs");
-  const { report } = await reconstructSid(new Uint8Array(buildFixture("testBit").sid), { engine: sharedEngine(), seconds: 3 });
+  const { report } = await reconstructSid(new Uint8Array(buildFixture("multispeed9").sid), { engine: sharedEngine(), seconds: 3 });
   assert.equal(report.compile.ok, false);
   assert.equal(report.fdiff.compileOk, false);
   assert.equal(report.fdiff.equal, false);

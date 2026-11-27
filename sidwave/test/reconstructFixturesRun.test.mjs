@@ -10,17 +10,18 @@ import { reconstructSid } from "../src/reconstruct/reconstruct.ts";
 
 /** Per fixture: the strict verdict and unsupported kinds the recovery reports (all of them; the lists are exact sets). */
 const EXPECTED = {
-  hardRestart: ["different", ["pitch", "tuning"]],
-  arpeggio: ["different", ["pitch", "pulsetable"]],
-  vibrato: ["different", ["pitch", "pulsetable"]],
-  pulseSweep: ["different", ["pulsetable"]],
-  filterSweep: ["different", ["pulsetable"]],
-  sync: ["different", ["pitch", "pulsetable", "tuning"]],
-  ring: ["different", ["pitch", "pulsetable", "tuning"]],
-  multispeed: ["different", ["pitch", "pulsetable"]],
-  twoSids: ["different", ["multi_sid", "pitch", "pulsetable"]],
-  testBit: ["compile_failed", ["pitch"]],
-  nmiSampler: ["call_count", ["non_periodic_writes", "pitch", "pulsetable"]],
+  hardRestart: ["different", []],
+  arpeggio: ["state_exact", ["pitch"]],
+  vibrato: ["state_exact", ["pitch"]],
+  pulseSweep: ["state_exact", []],
+  filterSweep: ["state_exact", []],
+  sync: ["state_exact", ["pitch"]],
+  ring: ["state_exact", ["pitch"]],
+  multispeed: ["different", ["instrument_budget", "wavetable"]],
+  multispeed9: ["compile_failed", ["instrument_budget", "wavetable"]],
+  twoSids: ["different", ["multi_sid", "pitch"]],
+  testBit: ["different", ["pitch"]],
+  nmiSampler: ["call_count", ["non_periodic_writes", "pitch"]],
 };
 
 for (const name of FIXTURE_NAMES) {
