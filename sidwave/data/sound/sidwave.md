@@ -1334,6 +1334,43 @@ size and count caps, path traversal (`../`, absolute, URLs, symbolic links to fi
 version ranges and mismatches, hash mismatch and whitespace/location independence, malformed library files, lock, bundle
 round trip, the command line, and byte identity for scores without imports.
 
+## Composer 2 and completion
+
+`generateSidwave({ composer: 2, profile, seed, root, style, system })` selects composer 2. Without `composer: 2` the
+original generator runs and its output is unchanged for every existing style and seed. Composer 2 builds a score from a
+**profile**: a data record that fixes tempo, speed, metre, mode, form, voice layout, instrument palette, groove,
+syncopation, density, phrase length, harmonic rhythm and the key of the contrasting sections (33 profiles, listed in
+`data/compose/profiles.md`). The seed chooses everything else.
+
+- **Form**: AABA, verse and chorus, rondo, binary, through-composed, arch or a short loop, as named timeline sections with a
+  length in bars, a loop point (`loop_to`) or an `end`, and a dynamic level per section.
+- **Harmony**: a functional grammar (tonic, predominant, dominant) over the triads of the mode, cadences (authentic, half,
+  plagal, deceptive) at phrase ends, optional modulation of contrasting sections that returns through the home dominant.
+- **Melody and motif development**: one motif per piece and its development (sequence, inversion, augmentation,
+  fragmentation) shaped by a contour, with chord tones on beats and cadential endings; repeated sections ornament the lead.
+- **Counterpoint**: a counter line against the lead, built on chord tones with consonance on strong beats, no parallel
+  fifths or octaves, no crossing and a preference for contrary motion. `checkCounterpoint` reports violations of these rules.
+- **Rhythm**: groove tables per profile, syncopation, bass patterns and drum patterns with fills.
+- **Instrumentation**: lead, counter line, chord arpeggio, bass, percussion and pad on at most three voices per SID (one or
+  two SIDs), using library instruments without filter tables. The plan is measured on the bundled 6502 interpreter against a
+  cycle budget (default 80 percent of a video frame divided by `speed`); an over-budget plan loses its vibrato, then its
+  pad, counter line, arpeggio and percussion voices, then one speed step, and the result lists the repairs.
+
+`sidwave complete <score> --op continue|harmonise|accompany|fill-section` (library: `completeScore`) adds to an existing
+score of any version: a continuation in the key, tempo and instruments of the score with the motif of its last section,
+a harmony voice (chord arpeggio or counter line) under a melody voice, a bass line and percussion on free voices, or a
+named missing section. The operations add patterns, voices and timeline entries and never rewrite one that plays. A target
+voice that plays is refused. Unless `--no-verify` is given, the original and the completed score are run on the bundled
+6502 interpreter and the SID register writes of every protected voice are compared call by call; a difference stops the
+command. At the end of a voice's last original section the last hard-restart frames plus one player calls are left out when
+that voice continues, because the next attack writes its hard restart there. Inserting a section before later material is
+accepted only when it moves that material by a whole number of player calls. Scores with several songs, a tempo change or a
+section metre other than the song metre are refused.
+
+`scripts/evaluate-composer.mjs` compares composer 2 with the version 1 generator on 33 profiles and held-out seeds
+(`data/compose/composer-eval.md`). The measures are proxies for technical correctness, lint, structure and variation. They
+do not measure musical quality.
+
 ## Authoring and Validation
 
 - Validation uses JSON Schema (`sidwave.schema.json`); the compiler applies the same rules and additionally checks note ranges after transposition and minimum note durations.
