@@ -5,7 +5,8 @@
 // breaks, pattern loops, pattern delays, speed and tempo) and the notes of each channel with the effects that apply to them.
 // It does not render audio. One tick lasts 2.5 / BPM seconds (the ProTracker CIA tempo; 125 BPM is 50 ticks per second).
 
-import { ModError, MOD_ROWS, periodToMidi, type ModSong } from "./mod.js";
+import { ModError, MOD_REFERENCE_CYCLE, MOD_ROWS, periodToMidi, type ModSong } from "./mod.js";
+import { analyzeSample } from "./modSamples.js";
 
 export interface PlayedRow {
   order: number;
@@ -157,6 +158,16 @@ export function collectNotes(song: ModSong, seq: PlaySequence, tallies?: Array<M
   const ch = song.channels;
   const out: ChannelNotes[] = [];
   const total = seq.rows.length;
+  // Semitones each sample sounds above a 64-point cycle, from the cycle of its loop. Measured once per sample that plays.
+  const tunings = new Map<number, number>();
+  const tuningOf = (sample: number): number => {
+    let t = tunings.get(sample);
+    if (t === undefined) {
+      const cycle = sample ? analyzeSample(song.samples[sample - 1]!).loopCycle : 0;
+      tunings.set(sample, t = cycle > 0 ? 12 * Math.log2(MOD_REFERENCE_CYCLE / cycle) : 0);
+    }
+    return t;
+  };
   for (let c = 0; c < ch; c++) {
     if (only && !only.has(c)) continue;
     const tally = tallies?.[c];
@@ -188,7 +199,7 @@ export function collectNotes(song: ModSong, seq: PlaySequence, tallies?: Array<M
       close(startTime);
       period = Math.max(28, per);
       cur = {
-        channel: c, row: i, delayTicks, startTime, endTime: seq.seconds, sample, midi: periodToMidi(period, finetune), glide, volume,
+        channel: c, row: i, delayTicks, startTime, endTime: seq.seconds, sample, midi: periodToMidi(period, finetune, tuningOf(sample)), glide, volume,
         meanVolume: volume, slide: undefined, portamento: portSeconds > 0 ? { seconds: portSeconds } : undefined, vibrato: undefined,
         arpeggio: undefined, tickSec, cutRow: -1, cutTick: -1, silent: sample === 0 || volume === 0,
       };

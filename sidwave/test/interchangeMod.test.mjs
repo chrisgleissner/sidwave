@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseMod, ModError, periodToMidi, MOD_MAX_BYTES } from "../src/interchange/mod.js";
 import { importMod, chooseRowsPerBeat, planBars } from "../src/interchange/modImport.js";
-import { analyzeSample, drumFromName, normalisedAutocorrelation } from "../src/interchange/modSamples.js";
+import { analyzeSample, drumFromName, measureLoopCycle, normalisedAutocorrelation } from "../src/interchange/modSamples.js";
 import { convert } from "../src/interchange/convert.js";
 import { detectFormat } from "../src/interchange/registry.js";
 import { exportEvents } from "../src/interchange/events.js";
@@ -32,14 +32,18 @@ test("committed hand-built fixtures are the bytes of the test kit", () => {
   }
 });
 
-test("period to note: 428 is MIDI 48, finetune shifts the period", () => {
+test("period to note: 428 is MIDI 48, finetune shifts the pitch", () => {
   assert.equal(periodToMidi(428), 48);
   assert.equal(periodToMidi(214), 60);
   assert.equal(periodToMidi(856), 36);
   assert.equal(periodToMidi(113), 71);
-  // Finetune -8 plays a period 2^(8/96) (5.9 %) higher in ProTracker's table... the note a period maps to does not move.
-  assert.equal(periodToMidi(Math.round(428 * 2 ** (-3 / 96)), 3), 48);
-  assert.equal(periodToMidi(Math.round(428 * 2 ** (8 / 96)), -8), 48);
+  // A pattern period is the period without finetune; a positive finetune raises the pitch by eighths of a semitone.
+  assert.equal(periodToMidi(428, 7), 49);
+  assert.equal(periodToMidi(428, 3), 48);
+  assert.equal(periodToMidi(428, -3), 48);
+  assert.equal(periodToMidi(428, 4), 48);
+  assert.equal(periodToMidi(428, -4), 47);
+  assert.equal(periodToMidi(428, -8), 47);
 });
 
 test("reader: every layout gives its channel count, patterns and cells", () => {
@@ -139,6 +143,167 @@ test("drum names match as whole words; digits and underscores separate words", (
   for (const name of [
     "Bride", "Pride pad", "Clapton", "Kickstart", "Ride of the strings", "ride pad", "stride", "overrides", "crashed", "cymatic", "splashy", "snares", "chat", "chord", "Ohio", "hatch", "kicks",
   ]) assert.equal(drumFromName(name), undefined, name);
+});
+
+/** One waveform with `cycles` cycles in `length` points. */
+const loopOf = (kind, length, cycles = 1) => Int8Array.from({ length }, (_, i) => {
+  const ph = ((i * cycles) % length) / length;
+  if (kind === "square") return ph < 0.5 ? 100 : -100;
+  if (kind === "saw") return Math.round(200 * ph - 100);
+  return Math.round(100 * Math.sin(2 * Math.PI * ph));
+});
+const noiseData = (length) => { let seed = 4321; return Int8Array.from({ length }, () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return ((seed >> 8) & 0xff) - 128; }); };
+
+/** The note that the imported score plays when the sample is triggered once at `period`. */
+function importedPitch(sample, period) {
+  const mod = buildMod({ samples: [{ name: "tone", volume: 64, ...sample }], patterns: [[[{ period, sample: 1 }]]] });
+  return exportEvents(parseSidwave(importMod(mod).yaml)).voices[0].notes[0].pitch;
+}
+
+/**
+ * The imported note against the pitch of the Amiga: 7093789.2 / (2 x period) sample points per second, one cycle every
+ * `cycle` points. The note must be within half a semitone, plus the 17.6 cents by which period 428 on a 64-point cycle
+ * (129.5 Hz) is below equal temperament.
+ */
+function assertPitch(sample, period, cycle, label) {
+  const expected = 7093789.2 / (2 * period) / cycle;
+  const midi = importedPitch(sample, period);
+  const actual = 440 * 2 ** ((midi - 69) / 12);
+  const cents = 1200 * Math.log2(actual / expected);
+  assert.ok(Math.abs(cents) <= 68, `${label}, period ${period}: MIDI ${midi} is ${actual.toFixed(2)} Hz, the MOD plays ${expected.toFixed(2)} Hz (${cents.toFixed(0)} cents)`);
+}
+
+test("pitch of a looped sample: one cycle per loop, 4 to 600 points", () => {
+  // The period keeps the note inside the range of SIDWave, so no note is moved by octaves.
+  for (const [length, period] of [[4, 856], [6, 856], [8, 856], [10, 428], [12, 428], [16, 428], [24, 428], [32, 428], [36, 428], [48, 428], [50, 428], [64, 428],
+    [96, 428], [100, 428], [128, 428], [200, 214], [256, 214], [342, 214], [400, 214], [512, 214], [600, 214]]) {
+    for (const kind of length < 8 ? ["square"] : ["sine", "square", "saw"]) {
+      assertPitch({ data: loopOf(kind, length), loop: [0, length] }, period, length, `${kind} loop of ${length}`);
+    }
+  }
+});
+
+test("pitch of a looped sample: several cycles per loop, up to 4096 points", () => {
+  for (const [length, cycles] of [[64, 2], [64, 4], [96, 3], [100, 4], [64, 6], [1000, 8], [1024, 1024 / 256], [2048, 32], [3000, 30], [4096, 64], [4096, 128], [4096, 41], [4096, 100], [4094, 23], [3640, 7]]) {
+    for (const kind of ["sine", "saw"]) assertPitch({ data: loopOf(kind, length, cycles), loop: [0, length] }, 428, length / cycles, `${kind}, ${cycles} cycles in ${length}`);
+  }
+});
+
+test("pitch of a looped sample follows the loop, not the part before it", () => {
+  for (const [attack, loop, cycles] of [
+    [loopOf("saw", 2048, 2048 / 100), loopOf("sine", 32), 1], [loopOf("square", 3000, 100), loopOf("saw", 48), 1],
+    [noiseData(1500), loopOf("square", 24), 1], [loopOf("sine", 640, 10), loopOf("sine", 1000, 10), 10],
+  ]) {
+    const data = new Int8Array(attack.length + loop.length);
+    data.set(attack); data.set(loop, attack.length);
+    assertPitch({ data, loop: [attack.length, loop.length] }, 428, loop.length / cycles, `loop of ${loop.length} after ${attack.length}`);
+  }
+});
+
+test("pitch is that of a 64-point cycle without a loop or a measurable pitch", () => {
+  // A loop length of 2 bytes means no loop.
+  for (const [label, sample] of [
+    ["one-shot", { data: loopOf("sine", 2048, 64) }], ["loop of 2", { data: loopOf("sine", 64, 2), loop: [0, 2] }],
+    ["silent loop", { data: new Int8Array(64), loop: [0, 64] }], ["noise loop of 64", { data: noiseData(64), loop: [0, 64] }],
+    ["noise loop of 1024", { data: noiseData(1024), loop: [0, 1024] }], ["one cycle of 4096", { data: loopOf("sine", 4096), loop: [0, 4096] }],
+  ]) assert.equal(importedPitch(sample, 428), 48, label);
+  assert.equal(measureLoopCycle(loopOf("sine", 2)), 0);
+  assert.equal(measureLoopCycle(loopOf("sine", 4096, 64)), 64);
+});
+
+test("finetune: the nibble 0..7 raises and 8..15 lowers the pitch, as in the ProTracker period tables", () => {
+  // The period ProTracker plays for a pattern period of 428 (C-2), by finetune nibble: 0 to +7, then -8 to -1.
+  const played = [428, 425, 422, 419, 416, 413, 410, 407, 453, 450, 447, 444, 441, 437, 434, 431];
+  for (const [nibble, period] of played.entries()) {
+    const mod = buildMod({ samples: [{ name: "tone", volume: 64, data: loopOf("sine", 64), loop: [0, 64] }], patterns: [[[{ period: 428, sample: 1 }]]], finetune: { 0: nibble } });
+    const midi = exportEvents(parseSidwave(importMod(mod).yaml)).voices[0].notes[0].pitch;
+    // The nearest semitone of the table entry, counted from period 428 = MIDI 48.
+    assert.equal(midi, 48 + Math.round(12 * Math.log2(428 / period)), `finetune nibble ${nibble}, played period ${period}`);
+  }
+});
+
+test("the offset of a sample moves all its notes by the same number of semitones", () => {
+  // C-1 to B-3 of the ProTracker table. The periods are rounded, so they are up to a tenth of a semitone off.
+  const table = [856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453, 428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
+    214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113];
+  for (const tuning of [-12.5, -0.5, 0.46, 0.48, 0.5, 0.52, 12.5]) {
+    for (const finetune of [-4, 0, 4]) {
+      const offsets = new Set(table.map((period, i) => periodToMidi(period, finetune, tuning) - (36 + i)));
+      assert.equal(offsets.size, 1, `tuning ${tuning}, finetune ${finetune}: ${[...offsets]}`);
+    }
+  }
+});
+
+test("a pulse wave with a changing width keeps the pitch of its pulses", () => {
+  // `sweeps` width cycles over the loop: the mean of the wave moves at that rate, far below the pitch.
+  const pwm = (cycle, cycles, sweeps, centre, depth) => Int8Array.from({ length: cycle * cycles }, (_, i) =>
+    (i % cycle) / cycle < centre + depth * Math.sin(2 * Math.PI * sweeps * i / (cycle * cycles)) ? 100 : -100);
+  for (const [cycle, cycles] of [[16, 8], [16, 16], [32, 8], [32, 16], [32, 32], [64, 4], [64, 8], [64, 16], [128, 8]]) {
+    for (const [centre, depth] of [[0.5, 0.4], [0.5, 0.2], [0.3, 0.2]]) {
+      const data = pwm(cycle, cycles, 1, centre, depth);
+      assert.equal(measureLoopCycle(data), cycle, `${cycles} cycles of ${cycle}, width ${centre} +- ${depth}`);
+      assertPitch({ data, loop: [0, data.length] }, 428, cycle, `PWM, ${cycles} cycles of ${cycle}`);
+    }
+  }
+  // Unevenly spaced pulses are not counted.
+  const uneven = Int8Array.from({ length: 256 }, (_, i) => ([0, 20, 90, 200].some((at) => i >= at && i < at + 6) ? 100 : -100));
+  assert.ok(measureLoopCycle(uneven) !== 64, `${measureLoopCycle(uneven)}`);
+});
+
+/** A sum of sine partials `[bin, amplitude]` over `length` points, scaled to a peak near 100. */
+const partials = (length, list) => {
+  const sum = list.reduce((t, [, a]) => t + a, 0);
+  return Int8Array.from({ length }, (_, i) => Math.round(100 * list.reduce((t, [k, a]) => t + a * Math.sin(2 * Math.PI * k * i / length), 0) / sum));
+};
+
+const unmeasuredLoss = (sample) => {
+  const mod = buildMod({ samples: [{ name: "tone", volume: 64, ...sample }], patterns: [[[{ period: 428, sample: 1 }]]] });
+  return importMod(mod).report.losses.filter((l) => l.startsWith("The cycle length of the loop"));
+};
+
+test("a loop without a reliable cycle keeps the pitch of a 64-point cycle and is reported", () => {
+  const whole = (data) => ({ data, loop: [0, data.length] });
+  const cases = [];
+  // Chords repeat at a cycle that holds no energy of its own: it would transpose the sample down by one or two octaves.
+  for (const length of [64, 256, 512, 600, 2048, 8192, 20000]) {
+    const k = Math.max(4, Math.round(length / 64));
+    cases.push([`major chord, ${length}`, whole(partials(length, [[k, 1], [Math.round(k * 1.25), 1], [Math.round(k * 1.5), 1]]))]);
+    cases.push([`fifth, ${length}`, whole(partials(length, [[k - (k % 2), 1], [(k - (k % 2)) * 3 / 2, 1]]))]);
+  }
+  for (const length of [256, 600, 8192]) cases.push([`noise, ${length}`, whole(noiseData(length))]);
+  // A long loop that is periodic at its start only.
+  const mixed = noiseData(16384);
+  mixed.set(loopOf("sine", 4096, 41));
+  cases.push(["periodic start, then noise", whole(mixed)]);
+  // A quiet tail loop after a loud attack: 4 points would raise the notes by four octaves.
+  const tail = new Int8Array(2048);
+  tail.set(loopOf("square", 2000, 20));
+  for (let i = 0; i < 48; i++) tail[2000 + i] = i % 4 < 2 ? 8 : -8;
+  cases.push(["quiet tail", { data: tail, loop: [2000, 48] }]);
+  const short = loopOf("square", 2004, 20);
+  short.set([60, 60, -60, -60], 2000);
+  cases.push(["loop of 4 points after a long attack", { data: short, loop: [2000, 4] }]);
+  for (const [label, sample] of cases) {
+    assert.equal(importedPitch(sample, 428), 48, label);
+    assert.equal(unmeasuredLoss(sample).length, 1, label);
+  }
+  // Nothing to report: no loop, a silent loop, and a loop that is measured.
+  for (const sample of [{ data: loopOf("sine", 2048, 64) }, whole(new Int8Array(64)), whole(loopOf("square", 32))]) assert.deepEqual(unmeasuredLoss(sample), []);
+});
+
+test("a weak fundamental below a dominant harmonic still sets the cycle", () => {
+  for (const [length, harmonic, period] of [[64, 2, 428], [64, 3, 428], [256, 2, 214], [512, 3, 214]]) {
+    assert.equal(measureLoopCycle(partials(length, [[1, 0.35], [harmonic, 1]])), length, `harmonic ${harmonic} of ${length}`);
+    assertPitch({ data: partials(length, [[1, 0.35], [harmonic, 1]]), loop: [0, length] }, period, length, `harmonic ${harmonic} of ${length}`);
+  }
+});
+
+test("pitch of a long sampled loop with noise, a decay and a cycle between whole points", () => {
+  const noise = noiseData(20000);
+  for (const [length, cycle] of [[2048, 90], [8192, 67.3], [20000, 67.3]]) {
+    const data = Int8Array.from({ length }, (_, i) => Math.round((100 - 40 * i / length) * Math.sin(2 * Math.PI * i / cycle) + noise[i] / 32));
+    assert.ok(Math.abs(12 * Math.log2(measureLoopCycle(data) / cycle)) < 0.3, `${length} points, cycle ${cycle}: ${measureLoopCycle(data)}`);
+  }
 });
 
 /** The autocorrelation written out directly: all three sums inside the lag loop. */

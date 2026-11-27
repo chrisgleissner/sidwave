@@ -845,6 +845,7 @@ The Amiga sample is not reproduced. Each sample that a note uses is measured onc
 
 | Measurement | SIDWave |
 | --- | --- |
+| Cycle length of the loop | pitch of the notes of the sample (see below) |
 | Periodic (normalised autocorrelation of at least 0.55): harmonics 2 and 3 weak | `triangle` |
 | Periodic: harmonic 2 weak, harmonic 3 present (a square wave) | `pulse`, width 0.5 |
 | Periodic: harmonics 2 and 3 strong (a ramp) | `sawtooth` |
@@ -862,7 +863,15 @@ Samples with identical SIDWave definitions share one instrument. SIDWave holds a
 
 ### Notes, levels and effects
 
-Notes: the period is converted to the nearest semitone (`MIDI = 48 + 12 log2(428 / period x 2^(finetune / 96))`, period 428 is MIDI 48, `C3`); `--transpose` adds semitones, and notes outside C0 to A#7 move by octaves (counted). A note without a sample number uses the last sample of the channel; a sample number without a note only resets the volume. A note stays until the next note on the channel, a cut or the end of the song (a looped sample sounds until then, a one-shot sample fades by the ADSR decay).
+Notes: the period is converted to the nearest semitone and the offset of the sample is added in whole semitones (`MIDI = 48 + round(12 log2(428 / period)) + round(finetune / 8 + 12 log2(64 / cycle))`; a tie in the second term rounds down). Rounding the two terms separately keeps the intervals between the notes of a sample. `finetune` is the signed value of the sample header (nibble 0 to 7 is 0 to 7, nibble 8 to 15 is -8 to -1) in eighths of a semitone: pattern periods are stored without finetune, and a positive value raises the pitch. `cycle` is the length in sample points of one cycle of the loop: the loop length divided by the number of cycles in it, measured from the loop only, so the part before the loop does not affect the pitch. With a cycle of 64 points, period 428 is MIDI 48, `C3`; a cycle of 32 points sounds one octave higher.
+
+The cycle is used only when the measurement is clear:
+
+- A loop of up to 600 points is measured with a Fourier transform. The number of cycles `k` must hold at least 5 % of the energy by itself, its harmonics at least 85 %, and no other frequency 5 % or more.
+- A longer loop is measured with the autocorrelation of its first 2048 points. The period must repeat (correlation of at least 0.8) in three quarters of up to 8 stretches spread over the loop, and its frequency must hold at least 5 % of the energy.
+- A pulse wave (at least 90 % of the points within a tenth of the range from the highest or the lowest value, rising edges evenly spaced) takes the distance of its pulses as the cycle when the other measurement gives nothing or a cycle of 3 pulses or more. A changing pulse width moves the mean of the wave at the rate of the change, far below the pitch.
+
+`cycle` is taken as 64 for a sample without a loop or with a silent loop (level below 4 of 127). It is also taken as 64, and the report lists the sample in `losses`, when the loop is audible and not measured: noise (more than 16 sign changes per cycle), a chord or another sound without one dominant repetition, a cycle above 600 points in a longer loop, a loop below a tenth of the level of the loudest part of the sample, and a loop under 16 points after 256 points or more. A loop of 2 bytes is not a loop. `--transpose` adds semitones, and notes outside C0 to A#7 move by octaves (counted). A note without a sample number uses the last sample of the channel; a sample number without a note only resets the volume. A note stays until the next note on the channel, a cut or the end of the song (a looped sample sounds until then, a one-shot sample fades by the ADSR decay).
 
 Level: `level = round(15 x volume / 64)`, at least 1, from the time-weighted mean volume over the note, so `Cxx` at the start sets it exactly and slides and later changes average. A note whose volume reaches 0 (`C00`, a slide to 0, `EC0`) ends there.
 
@@ -888,7 +897,7 @@ Measured on the committed fixtures (`test/fixtures/mod`, hand-built, written by 
 
 ### CPU time
 
-Measured with `process.cpuUsage` on Node 24 (`test/interchangeMod.test.mjs`): a 230 KB module with 100 patterns (6400 played rows, 31 samples of 4 KB, effects on a third of the notes) imports without SIDWave validation in 0.5 s in a warmed-up process and 1.0 s as the first import of a process, and in 2.7 s with validation (compiling the score is the largest part); a 100 KB module with 30 patterns (1920 rows) takes 0.13 to 0.21 s without validation; the four-channel fixture takes 0.02 to 0.11 s. Sample analysis is 0.09 s for 31 samples of 4 KB (0.14 s before the energy sums came from prefix sums); a sample that was analysed before costs a hash of its data. `--no-validate` skips the compile; the score is checked again when it is compiled.
+Measured with `process.cpuUsage` on Node 24 (`test/interchangeMod.test.mjs`): a 230 KB module with 100 patterns (6400 played rows, 31 samples of 4 KB, effects on a third of the notes) imports without SIDWave validation in 0.5 s in a warmed-up process and 1.0 s as the first import of a process, and in 2.7 s with validation (compiling the score is the largest part); a 100 KB module with 30 patterns (1920 rows) takes 0.13 to 0.21 s without validation; the four-channel fixture takes 0.02 to 0.11 s. Sample analysis is 0.09 s for 31 samples of 4 KB (0.14 s before the energy sums came from prefix sums), the loop cycle adds up to 3 ms per looped sample of up to 4 KB and up to 13 ms for a loop of 128 KB; a sample that was analysed before costs a hash of its data. `--no-validate` skips the compile; the score is checked again when it is compiled.
 
 ### Where this differs from the SID Factory II converter
 

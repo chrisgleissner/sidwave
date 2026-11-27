@@ -53,8 +53,8 @@
     "stage": "write",
     "code": "compile.advisory",
     "severity": "info",
-    "count": 1,
-    "message": "FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1)"
+    "count": 2,
+    "message": "FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | NO-BASS: Add a voice below C3 or transpose the bass down (at bar 1)"
    }
   ]
  },
@@ -335,8 +335,8 @@
     "stage": "write",
     "code": "compile.advisory",
     "severity": "info",
-    "count": 1,
-    "message": "FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1)"
+    "count": 2,
+    "message": "FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | NO-BASS: Add a voice below C3 or transpose the bass down (at bar 1)"
    }
   ]
  },
