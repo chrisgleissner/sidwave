@@ -20,3 +20,8 @@ export * from "./goattrackerExport.js";
 export * from "./furnace.js";
 export * from "./furnaceImport.js";
 export * from "./furnaceExport.js";
+export * from "./traceInput.js";
+export * from "./traceReconstruct.js";
+export * from "./swm.js";
+export * from "./swmImport.js";
+export * from "./swmExport.js";

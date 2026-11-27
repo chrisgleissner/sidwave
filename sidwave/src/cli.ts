@@ -16,6 +16,7 @@ import { ANALYZE_COMMANDS, ANALYZE_HELP, ANALYZE_USAGE, takeAnalyzeFlag, type An
 import { RECONSTRUCT_COMMAND_HELP, RECONSTRUCT_USAGE, reconstructCommand } from "./cliReconstruct.js";
 import { INTERCHANGE_COMMANDS, INTERCHANGE_HELP } from "./interchange/cli.js";
 import { runCompleteCli } from "./cliComplete.js";
+import { isTraceInput, reconstructFromTraceCommand } from "./interchange/traceCli.js";
 import { RUN_COMMANDS, RUN_HELP, flagName, takeRunFlag, type RunFlags } from "./cliVerify.js";
 import {
   compileSidwaveBytes, confinedReadOptions, describeSidwave, isExampleName, lintSidwave, listSidwaveExamples,
@@ -408,8 +409,9 @@ export function runCli(args: string[], io: CliIo): number | Promise<number> {
     if (first === "-h" || first === "--help" || first === "help") { io.out(HELP); return EXIT_OK; }
     if (first === "-V" || first === "--version") { io.out(`${packageVersion()}\n`); return EXIT_OK; }
     if (first === "retarget") return runRetarget(io, rest);
-    if (interchange) return interchange(rest, io);
+    if (interchange) { const outcome = interchange(rest, io); return outcome instanceof Promise ? outcome.catch((error: unknown) => fail(io, json, name, error)) : outcome; }
     if (first === "complete") return runCompleteCli(rest, io);
+    if (first === "reconstruct" && (rest.some((arg) => arg === "--from" || arg.startsWith("--from=")) || isTraceInput(rest, io.cwd))) return reconstructFromTraceCommand(rest, io).catch((error: unknown) => fail(io, json, name, error));
     const command = name === "sidwave" ? undefined : COMMANDS[name];
     if (!command) throw new UsageError(`unknown command "${first}"`);
     const options = parseArgs(rest, name);
