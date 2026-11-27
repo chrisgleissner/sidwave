@@ -121,6 +121,8 @@ export function bestFdiff(expected: FrameIr, observed: FrameIr, firstExpected = 
     const score = summary.differingCalls + (summary.callCountMismatch ? 1 : 0);
     const bestScore = best ? best.differingCalls + (best.callCountMismatch ? 1 : 0) : Infinity;
     if (score < bestScore) best = summary;
+    // The standard alignment is the only one that can give a strict pass; when it already shows no difference the others cannot do better.
+    if (best && best.differingCalls === 0 && !best.callCountMismatch && best.standardAlignment) break;
   }
   return best!;
 }
@@ -191,7 +193,8 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
     const recompiled = irOfTrace(second);
     const tc3 = performance.now();
     report.fdiff = bestFdiff(original, recompiled, recovered.firstCall);
-    report.fdiffState = bestFdiff(stateOnlyIr(original), stateOnlyIr(recompiled), recovered.firstCall);
+    // When the complete F-diff is equal, the register-state F-diff (a weaker comparison of the same IRs) is equal too.
+    report.fdiffState = report.fdiff.equal && report.fdiff.standardAlignment ? report.fdiff : bestFdiff(stateOnlyIr(original), stateOnlyIr(recompiled), recovered.firstCall);
     report.compile = { ok: true };
     timings.compileMs = tc1 - tc0;
     timings.retraceMs = tc2 - tc1;
