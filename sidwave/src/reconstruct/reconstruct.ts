@@ -64,7 +64,7 @@ export interface ReconstructReport {
    */
   registerStateExact: boolean;
   languageExtensions: LanguageExtension[];
-  recovery: Pick<RecoveredScore, "speed" | "tempo" | "firstCall" | "rows" | "tuningCents" | "noteCount" | "phantomNotes" | "instrumentCount" | "patternCount" | "structure" | "tuningEvidence">;
+  recovery: Pick<RecoveredScore, "speed" | "tempo" | "firstCall" | "rows" | "tuningCents" | "noteCount" | "phantomNotes" | "instrumentCount" | "patternCount" | "structure" | "tuningEvidence" | "languageVersion" | "softStartOff">;
   compile?: { ok: boolean; error?: string };
 }
 
@@ -178,6 +178,7 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
       speed: recovered.speed, tempo: recovered.tempo, firstCall: recovered.firstCall, rows: recovered.rows,
       tuningCents: recovered.tuningCents, noteCount: recovered.noteCount, phantomNotes: recovered.phantomNotes, instrumentCount: recovered.instrumentCount,
       patternCount: recovered.patternCount, structure: recovered.structure, tuningEvidence: recovered.tuningEvidence,
+      languageVersion: recovered.languageVersion, softStartOff: recovered.softStartOff,
     },
   };
   try {

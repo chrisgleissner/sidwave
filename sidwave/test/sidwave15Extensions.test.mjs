@@ -101,3 +101,53 @@ test("a wavetable step with reg writes the exact frequency register value", asyn
   assert.throws(() => parseSidwave(score("1.5", "", "{ waveform: pulse, wavetable: [{ reg: 70000 }] }")), /reg/);
   assert.throws(() => parseSidwave(score("1.5", "", "{ waveform: pulse, wavetable: [{ reg: '$1CD6', note: C5 }] }")), /reg cannot be combined/);
 });
+
+const freqsOf = async (text) => {
+  const w = await writes(text);
+  const out = [];
+  let lo = 0;
+  for (const x of w) {
+    if (x.reg === 0) lo = x.value;
+    else if (x.reg === 1) out.push(lo | (x.value << 8));
+  }
+  return out;
+};
+
+test("tuning.registers replaces the register of single notes and tuning.cents shifts every note", async () => {
+  const plain = await freqsOf(score("1.5"));
+  const exact = await freqsOf(score("1.5", "tuning: { registers: { A4: '$1234', C5: 0x2222 } }\n"));
+  const A4 = plain.find((f) => f > 0);
+  assert.ok(A4 !== 0x1234 && plain.includes(A4));
+  assert.ok(exact.includes(0x1234), `A4 is the exact register: ${exact.slice(0, 6).map((f) => f.toString(16))}`);
+  assert.ok(exact.includes(0x2222), "C5 is the exact register");
+  assert.ok(!exact.includes(A4), "the equal-temperament value of A4 is gone");
+  const shifted = await freqsOf(score("1.5", "tuning: { cents: 50 }\n"));
+  const a4Shifted = Math.round(440 * 2 ** (50 / 1200) * 16777216 / 985248);
+  assert.ok(shifted.some((f) => Math.abs(f - a4Shifted) <= 1), `A4 +50 cents is ${a4Shifted}: ${shifted.slice(0, 4)}`);
+});
+
+test("tuning is rejected in a 1.4 document and for bad values; a score without it keeps its bytes", () => {
+  assert.throws(() => parseSidwave(score("1.4", "tuning: { cents: 5 }\n")), /\$\.tuning.*sidwave: 1\.5.*sidwave: 1\.4/);
+  assert.throws(() => parseSidwave(score("1.5", "tuning: { cents: 150 }\n")), /cents/);
+  assert.throws(() => parseSidwave(score("1.5", "tuning: { registers: { C9: 100 } }\n")), /registers\.C9/);
+  assert.throws(() => parseSidwave(score("1.5", "tuning: { registers: { A4: 0 } }\n")), /registers\.A4/);
+  assert.equal(sha(compile(score("1.5", "tuning: {}\n"))), sha(compile(score("1.4"))));
+});
+
+test("speed up to 8 and rows of 1/128 beat are accepted from 1.5", async () => {
+  const body = (speed, version) => `sidwave: "${version}"
+title: T
+tempo: ${60 * 50.1245 / 16}
+speed: ${speed}
+voices:
+  - { id: 1, instrument: lead, patterns: { a: { length: ${1 / (16 * speed)}, bars: 1, groove: [${Array.from({ length: 8 }, (_, i) => `{ note: ${i % 2 ? "C5" : "A4"}, len: 0.5 }`).join(", ")}] } } }
+instruments:
+  lead: { waveform: pulse, adsr: [0, 4, 12, 3], hard_restart: { frames: 0 } }
+timeline:
+  - { section: Main, bars: 2, layers: { v1: a } }
+`;
+  assert.throws(() => parseSidwave(body(8, "1.4")), /speed|length/);
+  assert.throws(() => parseSidwave(body(5, "1.4")), /speed|length/);
+  const calls = (await writes(body(8, "1.5"), 1)).filter((w) => w.reg === 4).length;
+  assert.ok(calls > 8 * 40, `eight player calls per frame: ${calls} control writes in 1 s`);
+});

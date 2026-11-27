@@ -297,6 +297,8 @@ export interface ParsedSidwave {
   version: "1.0" | "1.1" | "1.2" | "1.3" | "1.4" | "1.5";
   /** SIDWave 1.5: player options; absent when the document sets none. */
   player?: { softStart: boolean };
+  /** SIDWave 1.5: the note-to-register table of the document's clock: a shift of every note in cents and exact register values for single notes (MIDI note to register). */
+  tuning?: { cents: number; registers: Array<[number, number]> };
   song: Required<Pick<SidwaveSongMeta, "title" | "tempo" | "mode">> & {
     author?: string;
     length_bars: number;
@@ -368,7 +370,7 @@ export const SIDWAVE_MAX_SPEED_15 = 8;
 /** The shortest pattern length and groove `len` in beats: 1/64 up to 1.4, 1/128 in 1.5 (a call at speed 8 is 1/128 beat). Set at the start of every parseSidwave call. */
 let rowMinimum = 1 / 64;
 
-const TOP_LEVEL_KEYS = new Set(["player", "sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs", "effects"]);
+const TOP_LEVEL_KEYS = new Set(["player", "tuning", "sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs", "effects"]);
 const LEGACY_KEYS = new Set(["song", "voices", "timeline"]);
 const LEGACY_SONG_KEYS = new Set(["title", "author", "tempo", "mode", "length_bars", "global_fx"]);
 const VOICE_KEYS = new Set(["id", "sid", "channel", "name", "waveform", "pulse_width", "adsr", "patterns", "instrument", "echo", "unison", "detune", "level", "role", "center"]);
@@ -433,6 +435,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   const v14 = obj.sidwave === 1.4 || obj.sidwave === "1.4" || v15;
   const v13 = obj.sidwave === 1.3 || obj.sidwave === "1.3" || v14;
   if (obj.player !== undefined && !v15) throw new SidwaveValidationError("$.player", "player options require sidwave: 1.5; the document declares " + (obj.sidwave === undefined ? "no version" : `sidwave: ${scalarText(obj.sidwave, "$.sidwave")}`));
+  if (obj.tuning !== undefined && !v15) throw new SidwaveValidationError("$.tuning", "tuning requires sidwave: 1.5; the document declares " + (obj.sidwave === undefined ? "no version" : `sidwave: ${scalarText(obj.sidwave, "$.sidwave")}`));
   if (obj.songs !== undefined && !v14) throw new SidwaveValidationError("$.songs", "songs require sidwave: 1.4");
   if (obj.effects !== undefined && !v14) throw new SidwaveValidationError("$.effects", "effects require sidwave: 1.4");
   const modern = obj.sidwave === 1.2 || obj.sidwave === "1.2" || v13;
@@ -583,6 +586,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   const declaredVersion = String(obj.sidwave);
   const version = declaredVersion === "1.1" || declaredVersion === "1.2" || declaredVersion === "1.3" || declaredVersion === "1.4" || declaredVersion === "1.5" ? declaredVersion : "1.0";
   const player = obj.player === undefined ? undefined : parsePlayer(obj.player);
+  const tuning = obj.tuning === undefined ? undefined : parseTuning(obj.tuning);
   for (const [chip, sid] of sids.entries()) {
     const owner = sid.filter?.owner;
     if (owner === undefined) continue;
@@ -591,7 +595,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     sid.filter!.route ??= [slot % 3 + 1];
   }
   const effects = obj.effects === undefined ? undefined : parseEffects(obj.effects);
-  return { version, ...(player ? { player } : {}), song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,
+  return { version, ...(player ? { player } : {}), ...(tuning ? { tuning } : {}), song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,
     accent, swing, swingUnit, loopTo, end, layout, digiVoices, ...(effects?.length ? { effects } : {}), ...(songs ? { songs, definedSections: isPlainObject(obj.sections) ? Object.keys(obj.sections) : [] } : {}), ...(ignoredFields.length ? { ignoredFields } : {}), ...(libraries ? { libraries } : {}) };
 
 }
@@ -1534,6 +1538,30 @@ export const SIDWAVE_MAX_EFFECT_STEPS = 255;
 export const SIDWAVE_MAX_EFFECT_HZ = 3848;
 const EFFECT_KEYS = new Set(["priority", "voices", "steps"]);
 const EFFECT_STEP_KEYS = new Set(["freq", "wave", "pulse", "adsr", "gate", "filter", "wait"]);
+
+/**
+ * SIDWave 1.5: parses `tuning`: `cents` shifts every note (-100 to 100) and `registers` maps note names (C0 to B7) to
+ * exact 16-bit frequency register values, as integers or `$hhhh`. Both replace entries of the note table that the
+ * player copies at init; no player code changes.
+ */
+function parseTuning(raw: unknown): { cents: number; registers: Array<[number, number]> } {
+  const value = requireObject(raw, "$.tuning", ["cents", "registers"]);
+  const cents = value.cents === undefined ? 0 : requireNumber(value.cents, "$.tuning.cents", { min: -100, max: 100 });
+  const registers: Array<[number, number]> = [];
+  if (value.registers !== undefined) {
+    if (!isPlainObject(value.registers)) throw new SidwaveValidationError("$.tuning.registers", "expected a mapping from note names (C0 to B7) to register values");
+    for (const [name, entry] of Object.entries(value.registers as Record<string, unknown>)) {
+      const path = `$.tuning.registers.${name}`;
+      const midi = noteNameToMidi(name);
+      if (midi === undefined || midi < 12 || midi > 107) throw new SidwaveValidationError(path, "expected a note name from C0 to B7");
+      const text = typeof entry === "string" ? entry.trim() : entry;
+      const reg = typeof text === "string" ? (/^\$[0-9a-fA-F]{1,4}$/.test(text) ? Number.parseInt(text.slice(1), 16) : Number.NaN) : text;
+      if (typeof reg !== "number" || !Number.isInteger(reg) || reg < 1 || reg > 0xffff) throw new SidwaveValidationError(path, "expected a frequency register value from 1 to 65535, such as $1CD6");
+      registers.push([midi, reg]);
+    }
+  }
+  return { cents, registers };
+}
 
 /** SIDWave 1.5: parses `player`, the player options. `soft_start: false` removes the volume ramp that the player runs over its first calls (default true). */
 function parsePlayer(raw: unknown): { softStart: boolean } {

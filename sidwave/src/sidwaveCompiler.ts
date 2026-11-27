@@ -1114,6 +1114,8 @@ export interface Arrangement {
   chips?: ChipArrangement[];
   turbo?: boolean;
   softVolume?: boolean;
+  /** SIDWave 1.5 `tuning`: the 96 register values C0..B7 of the document's clock; absent without a tuning. */
+  noteTable?: number[];
   clock?: TimelineClock;
   findings?: SidwaveFindings;
   loopOffsets?: number[];
@@ -1321,7 +1323,16 @@ function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrange
     }),
     turbo: doc.cpu === "turbo",
     softVolume: isModern(doc) && doc.player?.softStart !== false,
+    ...(doc.tuning && (doc.tuning.cents || doc.tuning.registers.length) ? { noteTable: noteTableOf(doc) } : {}),
   };
+}
+
+/** The 96 register values C0..B7 of a document with a `tuning`, for its own clock. */
+function noteTableOf(doc: ParsedSidwave): number[] {
+  const { cents, registers } = doc.tuning!;
+  const table = Array.from({ length: 96 }, (_, n) => hzToSidFrequency(midiToHz(n + 12 + cents / 100), doc.song.mode));
+  for (const [midi, reg] of registers) table[midi - 12] = reg;
+  return table;
 }
 
 function arrangeSamples(doc: ParsedSidwave, timing: Arrangement, voices: Arrangement["voices"]): SidwaveSamples | undefined {
@@ -4120,7 +4131,7 @@ c_ret:
 
   // Frequency tables C0..B7 for both clocks; init copies the right one into ftlo/fthi.
   for (const sys of ["PAL", "NTSC"] as const) {
-    const values = Array.from({ length: 96 }, (_, n) => hzToSidFrequency(midiToHz(n + 12), sys));
+    const values = arr.noteTable && sys === arr.system ? arr.noteTable : Array.from({ length: 96 }, (_, n) => hzToSidFrequency(midiToHz(n + 12), sys));
     col(`${sys.toLowerCase()}_lo`, values.map((v) => v & 0xff));
     col(`${sys.toLowerCase()}_hi`, values.map((v) => v >> 8));
   }

@@ -193,6 +193,10 @@ export interface RecoveredScore {
   unsupported: UnsupportedFeature[];
   extensions: LanguageExtension[];
   tuningEvidence: { distinctRegisters: number; matched: number; histogramModeCents: number };
+  /** The language version of the emitted score: 1.5 only when it uses a 1.5 construct. */
+  languageVersion: "1.4" | "1.5";
+  /** True when the original has no soft-start volume ramp, so the score sets player.soft_start to false. */
+  softStartOff: boolean;
 }
 
 export interface RecoverOptions {
@@ -1256,6 +1260,7 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     },
     unsupported, extensions: [...extensions.values()],
     tuningEvidence: { distinctRegisters: tuning.distinct, matched: tuning.matched, histogramModeCents: tuning.mode },
+    languageVersion: v15 ? "1.5" : "1.4", softStartOff,
   };
 }
 
