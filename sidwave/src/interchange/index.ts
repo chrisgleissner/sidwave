@@ -10,3 +10,4 @@ export * from "./midiImport.js";
 export * from "./smf.js";
 export * from "./stems.js";
 export * from "./wav.js";
+export * from "./errors.js";

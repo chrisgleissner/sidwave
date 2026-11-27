@@ -5,20 +5,17 @@
 
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
-import type { CliIo } from "../cli.js";
+import { UsageError, envelope, withFile, type CliIo } from "../cliCore.js";
 import { parseSidwave } from "../sidwave.js";
-import { confinedReadOptions, validationFailure } from "../sidwaveOps.js";
+import { confinedReadOptions } from "../sidwaveOps.js";
+import { InterchangeUsageError } from "./errors.js";
 import { exportEvents } from "./events.js";
 import { exportMidi } from "./midiExport.js";
-import { importMidi, MidiImportError } from "./midiImport.js";
+import { importMidi } from "./midiImport.js";
 
-const EXIT_OK = 0;
-const EXIT_FAILED = 1;
-const EXIT_USAGE = 2;
+export { InterchangeUsageError };
 /** Largest score or interchange file the command line reads. */
 export const MAX_INPUT_BYTES = 16 * 1024 * 1024;
-
-export class InterchangeUsageError extends Error {}
 
 export interface InterchangeArgs {
   positional: string[];
@@ -26,7 +23,7 @@ export interface InterchangeArgs {
   allowDirs: string[];
 }
 
-/** Flags with a value, then flags without one. Unknown flags are errors. */
+/** Flags with a value, then flags without one. Unknown flags are usage errors. */
 export function parseFlags(args: string[], valued: string[], bare: string[]): InterchangeArgs {
   const out: InterchangeArgs = { positional: [], flags: new Map(), allowDirs: [] };
   for (let i = 0; i < args.length; i++) {
@@ -36,11 +33,11 @@ export function parseFlags(args: string[], valued: string[], bare: string[]): In
     if (arg === "--") { out.positional.push(...args.slice(i + 1)); break; }
     if (valued.includes(arg)) {
       const value = inline ?? args[++i];
-      if (value === undefined) throw new InterchangeUsageError(`${arg} needs a value`);
+      if (value === undefined) throw new UsageError(`${arg} needs a value`);
       if (arg === "--allow-dir") out.allowDirs.push(value); else out.flags.set(arg, value);
-    } else if (inline !== undefined) throw new InterchangeUsageError(`${arg} does not take a value`);
+    } else if (inline !== undefined) throw new UsageError(`${arg} does not take a value`);
     else if (bare.includes(arg)) out.flags.set(arg, true);
-    else if (arg !== "-" && arg.startsWith("-")) throw new InterchangeUsageError(`unknown option ${arg}`);
+    else if (arg !== "-" && arg.startsWith("-")) throw new UsageError(`unknown option ${arg}`);
     else out.positional.push(arg);
   }
   return out;
@@ -50,7 +47,7 @@ export function numberFlag(args: InterchangeArgs, flag: string): number | undefi
   const value = args.flags.get(flag);
   if (value === undefined) return undefined;
   const n = typeof value === "string" ? Number(value) : NaN;
-  if (!Number.isFinite(n)) throw new InterchangeUsageError(`${flag} needs a number, not "${String(value)}"`);
+  if (!Number.isFinite(n)) throw new UsageError(`${flag} needs a number, not "${String(value)}"`);
   return n;
 }
 
@@ -73,7 +70,7 @@ function sameFile(a: string, b: string): boolean {
 
 export function writeOutput(io: CliIo, input: string, target: string, bytes: Uint8Array | string): string {
   const path = resolve(io.cwd, target);
-  if (sameFile(path, input)) throw new InterchangeUsageError("the output file is the input file; refusing to overwrite it");
+  if (sameFile(path, input)) throw new UsageError("the output file is the input file; refusing to overwrite it");
   try {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, bytes);
@@ -87,49 +84,50 @@ const stem = (file: string): string => basename(file, extname(file)).replace(/\.
 
 function exportCommand(args: string[], io: CliIo): number {
   const a = parseFlags(args, ["-o", "--output", "--format", "--song", "--ppq", "--allow-dir"], ["--bend", "--json"]);
-  if (a.positional.length !== 1) throw new InterchangeUsageError("export needs exactly one score file");
+  if (a.positional.length !== 1) throw new UsageError("export needs exactly one score file");
   const file = a.positional[0]!;
   const output = (a.flags.get("-o") ?? a.flags.get("--output")) as string | undefined;
   const ext = output === undefined ? "" : extname(output).toLowerCase();
   const format = (a.flags.get("--format") as string | undefined) ?? (ext === ".mid" || ext === ".midi" ? "midi" : ext === ".musicxml" || ext === ".xml" ? "musicxml" : "events");
-  if (!["events", "midi", "musicxml"].includes(format)) throw new InterchangeUsageError(`--format must be events, midi or musicxml, not ${format}`);
-  if (format !== "midi" && a.flags.has("--bend")) throw new InterchangeUsageError("--bend applies to --format midi only");
+  if (!["events", "midi", "musicxml"].includes(format)) throw new UsageError(`--format must be events, midi or musicxml, not ${format}`);
+  if (format !== "midi" && a.flags.has("--bend")) throw new UsageError("--bend applies to --format midi only");
   const { bytes, path } = readBounded(io, file);
   const song = numberFlag(a, "--song");
   const ppq = numberFlag(a, "--ppq");
+  const json = a.flags.has("--json");
+  const done = (result: unknown, text: string): number => { io.out(json ? `${JSON.stringify(envelope("export", true, { result }), null, 2)}\n` : `${text}\n`); return 0; };
   try {
-    const doc = parseSidwave(bytes.toString("utf8"), confinedReadOptions(io.cwd, a.allowDirs));
+    const doc = withFile(file, () => parseSidwave(bytes.toString("utf8"), confinedReadOptions(io.cwd, a.allowDirs)));
     const common = { ...(song === undefined ? {} : { song }), ...(ppq === undefined ? {} : { ppq }) };
     if (format === "events") {
-      const text = `${JSON.stringify(exportEvents(doc, common), null, 2)}\n`;
-      if (output === undefined || output === "-") io.out(text);
-      else io.out(`${writeOutput(io, path, output, text)}: ${text.length} bytes of events\n`);
-      return EXIT_OK;
+      const events = exportEvents(doc, common);
+      if (output === undefined || output === "-") {
+        io.out(json ? `${JSON.stringify(envelope("export", true, { result: events }), null, 2)}\n` : `${JSON.stringify(events, null, 2)}\n`);
+        return 0;
+      }
+      const text = `${JSON.stringify(events, null, 2)}\n`;
+      const written = writeOutput(io, path, output, text);
+      return done({ file, format, output: written, bytes: text.length }, `${written}: ${text.length} bytes of events`);
     }
     if (format === "midi") {
       const result = exportMidi(doc, { ...common, bend: a.flags.has("--bend") });
       const target = output ?? `${stem(file)}.mid`;
-      if (target === "-") io.outBytes(result.bytes);
-      else {
-        const written = writeOutput(io, path, target, result.bytes);
-        if (a.flags.has("--json")) io.out(`${JSON.stringify({ ok: true, output: written, bytes: result.bytes.length, ppq: result.ppq, tracks: result.tracks, losses: result.losses, warnings: result.warnings }, null, 2)}\n`);
-        else io.out(`${written}: MIDI, ${result.tracks.length} voice tracks, ${result.bytes.length} bytes\n`);
-      }
       for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
-      return EXIT_OK;
+      if (target === "-") { io.outBytes(result.bytes); return 0; }
+      const written = writeOutput(io, path, target, result.bytes);
+      return done({ file, format, output: written, bytes: result.bytes.length, ppq: result.ppq, tracks: result.tracks, losses: result.losses, warnings: result.warnings },
+        `${written}: MIDI, ${result.tracks.length} voice tracks, ${result.bytes.length} bytes`);
     }
-    return musicXmlExport(doc, common, output, path, io);
+    return musicXmlExport(doc, common, output, path, io, json);
   } catch (error) {
-    const failure = validationFailure(error);
-    if (failure) { io.err(`${file}: ${failure.message}\n`); return EXIT_FAILED; }
-    if (error instanceof RangeError) throw new InterchangeUsageError(error.message);
+    if (error instanceof RangeError) throw new UsageError(error.message);
     throw error;
   }
 }
 
 /** Replaced once the MusicXML exporter is registered (see musicxmlCli.ts). */
-let musicXmlExport: (doc: ReturnType<typeof parseSidwave>, common: { song?: number; ppq?: number }, output: string | undefined, input: string, io: CliIo) => number = () => {
-  throw new InterchangeUsageError("MusicXML export is not available in this build");
+let musicXmlExport: (doc: ReturnType<typeof parseSidwave>, common: { song?: number; ppq?: number }, output: string | undefined, input: string, io: CliIo, json: boolean) => number = () => {
+  throw new UsageError("MusicXML export is not available in this build");
 };
 export function registerMusicXmlExport(fn: typeof musicXmlExport): void { musicXmlExport = fn; }
 
@@ -155,7 +153,7 @@ importers.set("midi", (bytes, a) => {
   const grid = numberFlag(a, "--grid");
   const voices = numberFlag(a, "--voices");
   const mode = a.flags.get("--mode") as string | undefined;
-  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new InterchangeUsageError("--mode must be PAL or NTSC");
+  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
   try {
     return importMidi(bytes, {
       ...(grid === undefined ? {} : { grid }), ...(voices === undefined ? {} : { voices }),
@@ -163,62 +161,43 @@ importers.set("midi", (bytes, a) => {
       ...(mode ? { mode } : {}), drums: !a.flags.has("--no-drums"), bend: !a.flags.has("--no-bend"), validate: !a.flags.has("--no-validate"),
     });
   } catch (error) {
-    if (error instanceof RangeError) throw new InterchangeUsageError(error.message);
+    if (error instanceof RangeError) throw new UsageError(error.message);
     throw error;
   }
 });
 
 function importCommand(args: string[], io: CliIo): number {
   const a = parseFlags(args, IMPORT_VALUED, IMPORT_BARE);
-  if (a.positional.length !== 1) throw new InterchangeUsageError("import needs exactly one input file");
+  if (a.positional.length !== 1) throw new UsageError("import needs exactly one input file");
   const file = a.positional[0]!;
   const { bytes, path } = readBounded(io, file);
   const format = (a.flags.get("--format") as string | undefined) ?? detect(file, bytes);
-  if (format === undefined) throw new InterchangeUsageError(`cannot tell the format of ${file}; pass --format midi, musicxml, goattracker or furnace`);
+  if (format === undefined) throw new UsageError(`cannot tell the format of ${file}; pass --format midi, musicxml, goattracker or furnace`);
   const handler = importers.get(format);
-  if (!handler) throw new InterchangeUsageError(`unknown or unavailable import format "${format}"`);
+  if (!handler) throw new UsageError(`unknown or unavailable import format "${format}"`);
   const output = (a.flags.get("-o") ?? a.flags.get("--output")) as string | undefined ?? `${stem(file)}.yaml`;
-  let result: ImportResultLike;
-  try {
-    result = handler(bytes, a);
-  } catch (error) {
-    if (error instanceof MidiImportError || (error instanceof Error && error.name.endsWith("ImportError"))) {
-      io.err(`${file}: ${error.message}\n`);
-      return EXIT_FAILED;
-    }
-    throw error;
-  }
+  const result = withFile(file, () => handler(bytes, a));
   const json = a.flags.has("--json");
   if (output === "-") {
     io.out(result.yaml);
     io.err(`${JSON.stringify(result.report, null, 2)}\n`);
-    return EXIT_OK;
+    return 0;
   }
   const target = resolve(io.cwd, output);
-  if (existsSync(target) && !a.flags.has("--force")) throw new InterchangeUsageError(`${target} exists; use --force to overwrite it`);
+  if (existsSync(target) && !a.flags.has("--force")) throw new UsageError(`${target} exists; use --force to overwrite it`);
   const written = writeOutput(io, path, output, result.yaml);
-  io.out(json ? `${JSON.stringify({ ok: true, file, format, output: written, report: result.report }, null, 2)}\n`
+  io.out(json ? `${JSON.stringify(envelope("import", true, { result: { file, format, output: written, report: result.report } }), null, 2)}\n`
     : `${written}: imported ${format}; report follows\n${JSON.stringify(result.report, null, 2)}\n`);
-  return EXIT_OK;
+  return 0;
 }
 
 export const INTERCHANGE_HELP = `  sidwave export <file> [--format events|midi|musicxml] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--json]
   sidwave import <file> [--format midi|musicxml|goattracker|furnace] [-o <out.yaml>] [--grid <beats>] [--voices 1-3]
                         [--no-drums] [--no-bend] [--title <text>] [--mode PAL|NTSC] [--no-validate] [--force] [--json]
-  sidwave render <file> --stems [-o <dir>] [--seconds <n>] [--sample-rate <hz>] [--model 6581|8580] [--song <n>] [--json]
 `;
 
 /** Commands handled here; `cli.ts` hands the arguments after the command name to the matching function. */
 export const INTERCHANGE_COMMANDS: Record<string, (args: string[], io: CliIo) => number> = {
-  export: guarded(exportCommand),
-  import: guarded(importCommand),
+  export: exportCommand,
+  import: importCommand,
 };
-
-function guarded(run: (args: string[], io: CliIo) => number): (args: string[], io: CliIo) => number {
-  return (args, io) => {
-    try { return run(args, io); } catch (error) {
-      if (error instanceof InterchangeUsageError) { io.err(`sidwave: ${error.message}\nRun "sidwave --help" for usage.\n`); return EXIT_USAGE; }
-      throw error;
-    }
-  };
-}

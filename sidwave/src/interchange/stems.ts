@@ -3,6 +3,7 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 // Stem rendering: each voice alone, through the same player and engine as the mix.
 
+import { StemsRefusedError } from "./errors.js";
 import type { ParsedSidwave } from "../sidwave.js";
 import { arrangeSidwave, compileSidwaveToPrg, compileSidwaveToSid } from "../sidwaveCompiler.js";
 import { songDoc } from "../sidwaveSongs.js";
@@ -17,6 +18,8 @@ export interface StemOptions {
   song?: number;
   emulation?: SidEmulation;
   engine?: SidEngine;
+  signal?: AbortSignal;
+  maxSeconds?: number;
 }
 
 export interface StemInfo {
@@ -107,15 +110,18 @@ function toPsid(doc: ParsedSidwave): Uint8Array {
 /** Renders the mix and one stem per voice. Throws for scores that cannot be a PSID (digi samples, more than 3 SIDs). */
 export async function renderStems(input: ParsedSidwave, options: StemOptions = {}): Promise<StemResult> {
   const doc = input.songs ? songDoc(input, options.song ?? 0) : input;
-  if (options.song && !input.songs) throw new RangeError("the score has no songs");
-  if (doc.samples || doc.digiVoices?.length) throw new Error("stems of scores with digi samples are not supported (the PSID player omits the CIA2 NMI samples)");
-  if (doc.sids.length > 3) throw new Error("stems are rendered through a PSID, which supports at most 3 SIDs");
+  if (options.song && !input.songs) throw new StemsRefusedError("the score has no songs");
+  if (doc.samples || doc.digiVoices?.length) throw new StemsRefusedError("stems of scores with digi samples are not supported (the PSID player omits the CIA2 NMI samples)");
+  if (doc.sids.length > 3) throw new StemsRefusedError("stems are rendered through a PSID, which supports at most 3 SIDs");
   const emulation = options.emulation ?? "sidlite";
   const engine = options.engine ?? createLibsidplayfpEngine({ emulation });
   const arrangement = arrangeSidwave(doc);
   const seconds = options.seconds ?? Math.min(600, arrangement.totalFrames / arrangement.fps);
   const sampleRate = options.sampleRate ?? 44_100;
-  const request = { seconds, sampleRate, channels: 1 as const, ...(options.model ? { model: options.model } : {}) };
+  const request = {
+    seconds, sampleRate, channels: 1 as const, ...(options.model ? { model: options.model } : {}),
+    ...(options.signal ? { signal: options.signal } : {}), ...(options.maxSeconds === undefined ? {} : { maxSeconds: options.maxSeconds }),
+  };
   const mix = await engine.render({ sid: toPsid(doc), ...request });
   const coupling = detectCoupling(doc, arrangement);
 

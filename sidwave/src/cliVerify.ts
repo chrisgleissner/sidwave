@@ -10,6 +10,7 @@ import {
   VERIFY_LEVELS, defaultHorizon, loadRoms, loadTune, readInput, readSonglengths, renderTune, sidInfo, traceTune, verifyTunes,
   type LoadedTune, type RunControl, type TraceFormat, type VerifyLevel, type VerifyReport,
 } from "./sidwaveTools.js";
+import { renderStemsCommand } from "./interchange/renderCli.js";
 import { parseA1Rules } from "./verify/a1.js";
 
 /** Flags of verify, render, trace and sid-info. The parser in cli.ts hands every flag to takeRunFlag first. */
@@ -23,6 +24,8 @@ export interface RunFlags {
   maxRecords?: number;
   maxBytes?: number;
   rate?: number;
+  /** render only: write one WAV per voice into a directory. */
+  stems?: boolean;
   model?: "6581" | "8580";
   engine?: SidEmulation;
   clock?: SidClock;
@@ -33,7 +36,7 @@ export interface RunFlags {
 
 const FLAGS: Record<string, keyof RunFlags> = {
   "--song": "song", "--seconds": "seconds", "--level": "level", "--tolerance-cycles": "toleranceCycles", "--progress": "progress",
-  "--max-seconds": "maxSeconds", "--max-records": "maxRecords", "--max-bytes": "maxBytes", "--rate": "rate", "--model": "model",
+  "--max-seconds": "maxSeconds", "--max-records": "maxRecords", "--max-bytes": "maxBytes", "--rate": "rate", "--sample-rate": "rate", "--emulation": "engine", "--stems": "stems", "--model": "model",
   "--engine": "engine", "--clock": "clock", "--roms": "roms", "--a1-rules": "a1Rules", "--songlengths": "songlengths",
 };
 
@@ -58,9 +61,9 @@ function oneOf<T extends string>(flag: string, text: string, values: readonly T[
 export function takeRunFlag(flags: RunFlags, arg: string, inline: string | undefined, next: () => string | undefined): boolean {
   const key = FLAGS[arg];
   if (key === undefined) return false;
-  if (key === "progress") {
+  if (key === "progress" || key === "stems") {
     if (inline !== undefined) throw new UsageError(`${arg} does not take a value`);
-    flags.progress = true;
+    flags[key] = true;
     return true;
   }
   const text = inline ?? next();
@@ -85,6 +88,7 @@ export function takeRunFlag(flags: RunFlags, arg: string, inline: string | undef
 export const RUN_HELP = {
   usage: `  sidwave verify   <reference.sid|score> <candidate.sid|score> [--song <n>] [--seconds <s>] [--level T0|T1|A0|A1] [--tolerance-cycles <n>] [run options]
   sidwave render   <file.sid|score> [-o <out.wav>] [--song <n>] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite] [run options]
+  sidwave render   <score> --stems [-o <dir>] [--force] [--song <n>] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite] [--model 6581|8580]
   sidwave trace    <file.sid|score> [-o <out>] [--format csv|jsonl] [--song <n>] [--seconds <s>] [run options]
   sidwave sid-info <file.sid> [--songlengths <Songlengths.md5>] [--json]
 `,
@@ -94,7 +98,9 @@ export const RUN_HELP = {
              level that counts as a pass (default A1). Prints the highest level reached, the status of each
              level, the first difference and the horizon. Exit 0 when a level up to the requested one passes, 1
              when none does.
-  render     Write 16-bit mono PCM as a WAV file (default <name>.wav; "-o -" writes to standard output).
+  render     Write 16-bit mono PCM as a WAV file (default <name>.wav; "-o -" writes to standard output). With
+             --stems (scores only) write the mix, one WAV per voice and a manifest into the directory -o (default
+             <name>-stems); --sample-rate and --emulation are aliases of --rate and --engine. See doc/interchange.md.
   trace      Write the SID register writes as CSV (sid,address,value,cycle) or JSON lines to standard output, or to -o.
   sid-info   Print the header of a SID file; with --songlengths also the length of each subtune.
 `,
@@ -146,11 +152,11 @@ interface CommandOptions {
   run: RunFlags;
 }
 
-const common = (command: string, options: CommandOptions, allow: { output?: boolean; format?: boolean } = {}) =>
+const common = (command: string, options: CommandOptions, allow: { output?: boolean; format?: boolean; force?: boolean } = {}) =>
   rejectOld(options, command, [
     ...(allow.output ? [] : [["output", "-o"] as [keyof CommandOptions, string]]),
     ...(allow.format ? [] : [["format", "--format"] as [keyof CommandOptions, string]]),
-    ["loop", "--loop/--no-loop"], ["strict", "--strict"], ["force", "--force"],
+    ["loop", "--loop/--no-loop"], ["strict", "--strict"], ...(allow.force ? [] : [["force", "--force"] as [keyof CommandOptions, string]]),
   ]);
 
 function reject(options: CommandOptions, command: string, keys: Array<keyof RunFlags>): void {
@@ -216,7 +222,7 @@ export function formatVerify(report: VerifyReport): string {
 
 async function verifyCommand(io: CliIo, options: CommandOptions): Promise<number> {
   common("verify", options);
-  reject(options, "verify", ["rate", "engine", "model"]);
+  reject(options, "verify", ["rate", "engine", "model", "stems"]);
   if (options.positional.length !== 2) throw new UsageError("verify needs a reference and a candidate");
   const run = options.run;
   const [reference, candidate] = loadInputs(io, options, options.positional) as [LoadedTune, LoadedTune];
@@ -243,10 +249,20 @@ function singleInput(options: CommandOptions, command: string): string {
 }
 
 async function renderCommand(io: CliIo, options: CommandOptions): Promise<number> {
-  common("render", options, { output: true });
+  common("render", options, { output: true, force: !!options.run.stems });
   reject(options, "render", ["level", "toleranceCycles", "maxRecords", "a1Rules"]);
   const file = singleInput(options, "render");
   const run = options.run;
+  if (run.stems) {
+    reject(options, "render --stems", ["clock", "roms", "songlengths"]);
+    return renderStemsCommand(io, {
+      file, json: options.json, force: options.force, allowDirs: options.allowDirs,
+      ...(options.output === undefined ? {} : { output: options.output }),
+      ...(run.song === undefined ? {} : { song: run.song }), ...(run.seconds === undefined ? {} : { seconds: run.seconds }),
+      ...(run.rate === undefined ? {} : { rate: run.rate }), ...(run.model ? { model: run.model } : {}), ...(run.engine ? { engine: run.engine } : {}),
+      ...(run.maxSeconds === undefined ? {} : { maxSeconds: run.maxSeconds }), ...(run.maxBytes === undefined ? {} : { maxBytes: run.maxBytes }),
+    });
+  }
   const [tune] = loadInputs(io, options, [file]) as [LoadedTune];
   const songlengths = run.songlengths ? readSonglengths(run.songlengths, { cwd: io.cwd }) : undefined;
   const rom = run.roms ? loadRoms(run.roms, { cwd: io.cwd }) : undefined;
@@ -271,7 +287,7 @@ async function renderCommand(io: CliIo, options: CommandOptions): Promise<number
 
 async function traceCommand(io: CliIo, options: CommandOptions): Promise<number> {
   common("trace", options, { output: true, format: true });
-  reject(options, "trace", ["level", "toleranceCycles", "a1Rules", "rate", "model", "engine"]);
+  reject(options, "trace", ["level", "toleranceCycles", "a1Rules", "rate", "model", "engine", "stems"]);
   const file = singleInput(options, "trace");
   const run = options.run;
   const format = options.format === undefined ? "csv" : oneOf("--format", options.format, ["csv", "jsonl"] as const) as TraceFormat;
@@ -297,7 +313,7 @@ async function traceCommand(io: CliIo, options: CommandOptions): Promise<number>
 
 function sidInfoCommand(io: CliIo, options: CommandOptions): number {
   common("sid-info", options);
-  reject(options, "sid-info", ["song", "seconds", "level", "toleranceCycles", "progress", "maxSeconds", "maxRecords", "rate", "model", "engine", "clock", "roms", "a1Rules"]);
+  reject(options, "sid-info", ["song", "seconds", "level", "toleranceCycles", "progress", "maxSeconds", "maxRecords", "rate", "model", "engine", "clock", "roms", "a1Rules", "stems"]);
   const file = singleInput(options, "sid-info");
   const bytes = readInput(file, { cwd: io.cwd, ...(options.run.maxBytes === undefined ? {} : { maxBytes: options.run.maxBytes }) });
   const songlengths = options.run.songlengths ? readSonglengths(options.run.songlengths, { cwd: io.cwd }) : undefined;

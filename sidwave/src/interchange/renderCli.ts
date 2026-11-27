@@ -1,91 +1,99 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2025-2026 Christian Gleissner
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
-// `sidwave render`: WAV of the mix, or `--stems` for one WAV per voice. Asynchronous because the engine is.
+// `sidwave render --stems`: the stem branch of the render command in cliVerify.ts.
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { basename, extname, join, resolve } from "node:path";
-import type { CliIo } from "../cli.js";
-import { SidEngineError } from "../engine/libsidplayfp.js";
+import { basename, dirname, extname, join, resolve } from "node:path";
+import { EXIT_OK, SidwaveOperationError, UsageError, envelope, withFile, type CliIo } from "../cliCore.js";
+import { createLibsidplayfpEngine } from "../engine/libsidplayfp.js";
+import type { SidEmulation } from "../engine/types.js";
 import { parseSidwave } from "../sidwave.js";
-import { confinedReadOptions, validationFailure } from "../sidwaveOps.js";
-import { InterchangeUsageError, numberFlag, parseFlags, readBounded } from "./cli.js";
+import { confinedReadOptions } from "../sidwaveOps.js";
+import { readBounded } from "./cli.js";
+import { StemsRefusedError } from "./errors.js";
 import { renderStems, STEM_ENERGY_TOLERANCE } from "./stems.js";
 import { writeWav } from "./wav.js";
 
-/** Runs `sidwave render`. `args` excludes the command name. */
-export async function runRender(args: string[], io: CliIo): Promise<number> {
+/** What the stem renderer reads from the parsed command line of `render`. */
+export interface StemsCommandInput {
+  file: string;
+  output?: string;
+  json: boolean;
+  force: boolean;
+  allowDirs: string[];
+  /** `--song` of the run options, 1-based like the other run commands. */
+  song?: number;
+  seconds?: number;
+  rate?: number;
+  model?: "6581" | "8580";
+  engine?: SidEmulation;
+  maxSeconds?: number;
+  maxBytes?: number;
+}
+
+/** Writes the mix, one WAV per voice and a manifest into a directory. Engine and signal come from `io`. */
+export async function renderStemsCommand(io: CliIo, input: StemsCommandInput): Promise<number> {
+  if (input.output === "-") throw new UsageError("render --stems writes a directory; -o - is not possible");
+  const { file } = input;
+  const { bytes } = readBounded(io, file);
+  const stem = basename(file, extname(file)).replace(/\.sidwave$/i, "");
+  const doc = withFile(file, () => parseSidwave(bytes.toString("utf8"), confinedReadOptions(io.cwd, input.allowDirs)));
+  const emulation = input.engine ?? "residfp";
+  const engine = io.createEngine ? io.createEngine(emulation) : createLibsidplayfpEngine({ emulation });
+  let result;
   try {
-    const a = parseFlags(args, ["-o", "--output", "--seconds", "--sample-rate", "--model", "--song", "--emulation", "--allow-dir"], ["--stems", "--json", "--force"]);
-    if (a.positional.length !== 1) throw new InterchangeUsageError("render needs exactly one score file");
-    const file = a.positional[0]!;
-    const model = a.flags.get("--model") as string | undefined;
-    if (model !== undefined && model !== "6581" && model !== "8580") throw new InterchangeUsageError("--model must be 6581 or 8580");
-    const emulation = (a.flags.get("--emulation") as string | undefined) ?? "residfp";
-    if (emulation !== "residfp" && emulation !== "sidlite") throw new InterchangeUsageError("--emulation must be residfp or sidlite");
-    const seconds = numberFlag(a, "--seconds");
-    const sampleRate = numberFlag(a, "--sample-rate");
-    const song = numberFlag(a, "--song");
-    const { bytes } = readBounded(io, file);
-    const stem = basename(file, extname(file)).replace(/\.sidwave$/i, "");
-    const output = (a.flags.get("-o") ?? a.flags.get("--output")) as string | undefined;
-    let doc;
-    try { doc = parseSidwave(bytes.toString("utf8"), confinedReadOptions(io.cwd, a.allowDirs)); } catch (error) {
-      const failure = validationFailure(error);
-      if (!failure) throw error;
-      io.err(`${file}: ${failure.message}\n`);
-      return 1;
-    }
-    let result;
-    try {
-      result = await renderStems(doc, {
-        emulation, ...(seconds === undefined ? {} : { seconds }), ...(sampleRate === undefined ? {} : { sampleRate }),
-        ...(model ? { model } : {}), ...(song === undefined ? {} : { song }),
-      });
-    } catch (error) {
-      if (error instanceof SidEngineError) throw new InterchangeUsageError(error.message);
-      if (error instanceof RangeError || (error instanceof Error && /^stems? /.test(error.message))) throw new InterchangeUsageError(error.message);
-      throw error;
-    }
-    // Check every target first so that a refusal leaves no partial output.
-    const targets = a.flags.has("--stems")
-      ? [join(output ?? `${stem}-stems`, `${stem}.mix.wav`), ...result.stems.map((s) => join(output ?? `${stem}-stems`, `${stem}.v${s.voices.join("+v")}.wav`)), join(output ?? `${stem}-stems`, `${stem}.stems.json`)]
-      : [output ?? `${stem}.wav`];
-    if (!a.flags.has("--force")) {
-      const taken = targets.map((t) => resolve(io.cwd, t)).find((t) => existsSync(t));
-      if (taken) throw new InterchangeUsageError(`${taken} exists; use --force to overwrite it`);
-    }
-    const files: Array<{ kind: string; path: string; bytes: number; voices?: number[] }> = [];
-    const put = (path: string, data: Uint8Array | string, kind: string, voices?: number[]) => {
-      const target = resolve(io.cwd, path);
-      if (existsSync(target) && !a.flags.has("--force")) throw new InterchangeUsageError(`${target} exists; use --force to overwrite it`);
-      mkdirSync(resolve(target, ".."), { recursive: true });
-      writeFileSync(target, data);
-      files.push({ kind, path: target, bytes: data.length, ...(voices ? { voices } : {}) });
-    };
-    if (!a.flags.has("--stems")) {
-      put(output ?? `${stem}.wav`, writeWav(result.mix, result.sampleRate), "mix");
-    } else {
-      const dir = output ?? `${stem}-stems`;
-      put(join(dir, `${stem}.mix.wav`), writeWav(result.mix, result.sampleRate), "mix");
-      for (const s of result.stems) put(join(dir, `${stem}.v${s.voices.join("+v")}.wav`), writeWav(s.samples, result.sampleRate), "stem", s.voices);
-      const manifest = {
-        score: file, sampleRate: result.sampleRate, seconds: result.seconds, engine: result.engine,
-        additive: result.additive, energyRatio: result.sumError.energyRatio, energyWithinTolerance: result.energyWithinTolerance,
-        note: result.additive
-          ? `Measured energy ratio ${result.sumError.energyRatio.toFixed(3)}: the stems add up to the mix in energy within ${STEM_ENERGY_TOLERANCE * 100}% (not sample by sample); each stem has the idle SID baseline removed.`
-          : result.coupling.length
-            ? `NON-ADDITIVE: the voices influence each other (see coupling), so the stems do not add up to the mix. Measured energy ratio ${result.sumError.energyRatio.toFixed(3)}.`
-            : `NON-ADDITIVE: the measured energy ratio ${result.sumError.energyRatio.toFixed(3)} is outside the tolerance of ${STEM_ENERGY_TOLERANCE * 100}%.`,
-        coupling: result.coupling, sumError: result.sumError, files,
-      };
-      put(join(dir, `${stem}.stems.json`), `${JSON.stringify(manifest, null, 2)}\n`, "manifest");
-    }
-    io.out(a.flags.has("--json") ? `${JSON.stringify({ ok: true, additive: result.additive, coupling: result.coupling, sumError: result.sumError, files }, null, 2)}\n`
-      : `${files.map((f) => f.path).join("\n")}\n${a.flags.has("--stems") ? (result.additive ? "stems are additive\n" : `stems are NON-ADDITIVE: ${result.coupling.map((c) => c.kind).join(", ")}\n`) : ""}`);
-    return 0;
+    result = await renderStems(doc, {
+      engine, emulation, sampleRate: input.rate ?? 48_000,
+      ...(input.seconds === undefined ? {} : { seconds: input.seconds }),
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.song === undefined ? {} : { song: input.song - 1 }),
+      ...(io.signal ? { signal: io.signal } : {}),
+      ...(input.maxSeconds === undefined ? {} : { maxSeconds: input.maxSeconds }),
+    });
   } catch (error) {
-    if (error instanceof InterchangeUsageError) { io.err(`sidwave: ${error.message}\nRun "sidwave --help" for usage.\n`); return 2; }
+    if (error instanceof StemsRefusedError) throw new SidwaveOperationError("limit_exceeded", error.message, {}, { cause: error });
+    if (error instanceof RangeError) throw new UsageError(error.message);
     throw error;
   }
+  const dir = input.output ?? `${stem}-stems`;
+  const targets = [
+    join(dir, `${stem}.mix.wav`), ...result.stems.map((s) => join(dir, `${stem}.v${s.voices.join("+v")}.wav`)), join(dir, `${stem}.stems.json`),
+  ];
+  // Check every target first so that a refusal leaves no partial output.
+  if (!input.force) {
+    const taken = targets.map((t) => resolve(io.cwd, t)).find((t) => existsSync(t));
+    if (taken) throw new UsageError(`${taken} exists; use --force to overwrite it`);
+  }
+  const files: Array<{ kind: string; path: string; bytes: number; voices?: number[] }> = [];
+  const put = (path: string, data: Uint8Array | string, kind: string, voices?: number[]) => {
+    const target = resolve(io.cwd, path);
+    if (input.maxBytes !== undefined && data.length > input.maxBytes) throw new SidwaveOperationError("limit_exceeded", `${target} would have ${data.length} bytes; the limit is ${input.maxBytes}`);
+    try {
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, data);
+    } catch (error) {
+      throw new SidwaveOperationError("input", `cannot write ${target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: target });
+    }
+    files.push({ kind, path: target, bytes: data.length, ...(voices ? { voices } : {}) });
+  };
+  put(targets[0]!, writeWav(result.mix, result.sampleRate), "mix");
+  result.stems.forEach((s, i) => put(targets[i + 1]!, writeWav(s.samples, result.sampleRate), "stem", s.voices));
+  const ratio = result.sumError.energyRatio.toFixed(3);
+  const manifest = {
+    score: file, sampleRate: result.sampleRate, seconds: result.seconds, engine: result.engine,
+    additive: result.additive, energyRatio: result.sumError.energyRatio, energyWithinTolerance: result.energyWithinTolerance,
+    note: result.additive
+      ? `Measured energy ratio ${ratio}: the stems add up to the mix in energy within ${STEM_ENERGY_TOLERANCE * 100}% (not sample by sample); each stem has the idle SID baseline removed.`
+      : result.coupling.length
+        ? `NON-ADDITIVE: the voices influence each other (see coupling), so the stems do not add up to the mix. Measured energy ratio ${ratio}.`
+        : `NON-ADDITIVE: the measured energy ratio ${ratio} is outside the tolerance of ${STEM_ENERGY_TOLERANCE * 100}%.`,
+    coupling: result.coupling, sumError: result.sumError, files: [...files],
+  };
+  put(targets[targets.length - 1]!, `${JSON.stringify(manifest, null, 2)}\n`, "manifest");
+  const summary = { file, directory: resolve(io.cwd, dir), additive: result.additive, energyRatio: result.sumError.energyRatio,
+    energyWithinTolerance: result.energyWithinTolerance, coupling: result.coupling, sumError: result.sumError, files };
+  io.out(input.json ? `${JSON.stringify(envelope("render", true, { result: summary }), null, 2)}\n`
+    : `${files.map((f) => f.path).join("\n")}\n${result.additive ? `stems are additive (energy ratio ${ratio})` : `stems are NON-ADDITIVE: ${result.coupling.map((c) => c.kind).join(", ") || `energy ratio ${ratio}`}`}\n`);
+  return EXIT_OK;
 }

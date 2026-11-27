@@ -263,11 +263,14 @@ test("command line: export, import and refuse to overwrite the input", () => {
     assert.equal(run("import", "song.mid", "-o", "again.yaml").code, 2, "refuses to overwrite without --force");
     assert.equal(run("import", "song.mid", "-o", "song.mid", "--force").code, 2, "refuses to overwrite its input");
     assert.equal(run("export", "song.yaml", "-o", "song.yaml", "--format", "midi").code, 2);
-    assert.equal(run("export", "missing.yaml").code, 2);
+    assert.equal(run("export", "missing.yaml").code, 3, "unreadable input");
     assert.equal(run("export", "song.yaml", "--format", "nope").code, 2);
     assert.equal(run("export", "song.yaml", "--bend").code, 2, "--bend needs midi");
     fs.writeFileSync(path.join(dir, "bad.mid"), "MThd garbage");
-    assert.equal(run("import", "bad.mid").code, 1);
+    assert.equal(run("import", "bad.mid").code, 3, "malformed MIDI is an input error");
+    const bad = run("import", "bad.mid", "--json");
+    assert.equal(JSON.parse(bad.out).error.category, "input");
+    fs.writeFileSync(path.join(dir, "unknown.bin"), "hello");
     assert.equal(run("import", "unknown.bin").code, 2);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
