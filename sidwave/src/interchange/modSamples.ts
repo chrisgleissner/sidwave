@@ -4,6 +4,7 @@
 // Sample analysis for the MOD importer: each Amiga sample is described by a few measurements (periodicity, the strength of
 // its first harmonics, its amplitude envelope and its length) and becomes a SIDWave waveform, an ADSR and, for percussion, a drum.
 
+import { createHash } from "node:crypto";
 import type { ModSample } from "./mod.js";
 
 /** Playback rate of a sample at period 428 (PAL Amiga: 7093789.2 / (2 x 428)). */
@@ -44,26 +45,73 @@ function nearest(ms: number, table: number[]): number {
   return best;
 }
 
-/** Sample names that identify percussion, with the General MIDI key they stand for. First match wins. */
-const NAME_DRUMS: Array<[RegExp, number]> = [
-  [/(^|[^a-z])(bd|kick|bassdrum|bass ?dr(um)?|bassd|bdrum|bd\d)([^a-z]|$)|kick/i, 36],
-  [/(^|[^a-z])(sn|snare|sd|snr|rimshot|rim)([^a-z]|$)|snare/i, 38],
-  [/clap/i, 39],
-  [/(^|[^a-z])(oh|open ?h(at)?|ohat)([^a-z]|$)/i, 46],
-  [/(^|[^a-z])(hh|hat|hihat|hi-hat|chh|ch|h-h)([^a-z]|$)|hihat|hi-hat/i, 42],
-  [/(^|[^a-z])(tom|tm)([^a-z]|$)|tomtom/i, 45],
-  [/crash|cymbal|cym|ride|splash/i, 49],
-];
+/** A pattern that matches one of the alternatives as a whole word: no letter before or after it (digits are allowed). */
+const word = (alternatives: string): string => `(?<![a-z])(?:${alternatives})(?![a-z])`;
+
+/**
+ * Sample names that identify percussion, with the General MIDI key they stand for. First match wins. The compound names
+ * hihat, hi-hat, tomtom and cymbal match anywhere in the name.
+ */
+const NAME_DRUMS: Array<[RegExp, number]> = ([
+  [word("bd|kick|bassdrum|bass ?dr(?:um)?|bassd|bdrum"), 36],
+  [word("sn|snare|sd|snr|rimshot|rim"), 38],
+  [word("clap"), 39],
+  [word("oh|open ?h(?:at)?|ohat"), 46],
+  [`${word("hh|hat|chh|ch|h-h")}|hihat|hi-hat`, 42],
+  [`${word("tom|tm")}|tomtom`, 45],
+  [`${word("crash|cym|splash")}|cymbal`, 49],
+] as Array<[string, number]>).map(([source, key]) => [new RegExp(source, "i"), key]);
 
 export function drumFromName(name: string): number | undefined {
   for (const [re, key] of NAME_DRUMS) if (re.test(name)) return key;
+  // "ride" is also an ordinary word, so it names a drum only without other words of three or more letters.
+  const words: string[] = name.toLowerCase().match(/[a-z]+/g) ?? [];
+  if (words.includes("ride") && words.every((w) => w.length < 3 || w === "ride" || w === "cymbal" || w === "bell")) return 49;
   return undefined;
 }
 
+/**
+ * Normalised autocorrelation of `x` for the lags 2 to `maxLag` (entries 0 and 1 are 0). The energies of the two
+ * overlapping parts come from prefix sums, so only the cross product is summed per lag.
+ */
+export function normalisedAutocorrelation(x: Float64Array, maxLag: number): number[] {
+  const N = x.length;
+  const r: number[] = new Array(maxLag + 1).fill(0);
+  const energy = new Float64Array(N + 1);
+  for (let i = 0; i < N; i++) energy[i + 1] = energy[i]! + x[i]! * x[i]!;
+  for (let lag = 2; lag <= maxLag; lag++) {
+    let num = 0;
+    for (let i = 0; i + lag < N; i++) num += x[i]! * x[i + lag]!;
+    const e1 = energy[N - lag]!;
+    const e2 = energy[N]! - energy[lag]!;
+    r[lag] = e1 > 0 && e2 > 0 ? num / Math.sqrt(e1 * e2) : 0;
+  }
+  return r;
+}
+
+/** Recent analyses by sample content, oldest first. Bounded, because a long-running process imports many modules. */
+const analysisCache = new Map<string, SampleAnalysis>();
+const ANALYSIS_CACHE_LIMIT = 256;
+
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-/** Analyses one sample. Reads at most 2048 points for the periodicity and the harmonics and every point once for the envelope. */
+/**
+ * Analyses one sample. Reads at most 2048 points for the periodicity and the harmonics and every point once for the envelope.
+ * A sample with the same name, loop and data as an earlier one gets a copy of that analysis.
+ */
 export function analyzeSample(s: ModSample): SampleAnalysis {
+  const digest = createHash("sha1").update(new Uint8Array(s.data.buffer, s.data.byteOffset, s.data.byteLength)).digest("base64");
+  const key = JSON.stringify([s.name, s.length, s.looped, s.loopStart, s.loopLength, digest]);
+  let result = analysisCache.get(key);
+  if (!result) {
+    result = measureSample(s);
+    if (analysisCache.size >= ANALYSIS_CACHE_LIMIT) analysisCache.delete(analysisCache.keys().next().value!);
+    analysisCache.set(key, result);
+  }
+  return structuredClone(result);
+}
+
+function measureSample(s: ModSample): SampleAnalysis {
   const n = s.length;
   const seconds = n / MOD_BASE_RATE;
   const base: SampleAnalysis = {
@@ -111,12 +159,7 @@ export function analyzeSample(s: ModSample): SampleAnalysis {
   // Periodicity: normalised autocorrelation. The period is the shortest lag after the first negative value (so a slowly varying
   // signal does not count its own smoothness as a period) whose correlation is within 90 % of the best.
   const maxLag = Math.min(600, Math.floor(N / 3));
-  const r: number[] = new Array(maxLag + 1).fill(0);
-  for (let lag = 2; lag <= maxLag; lag++) {
-    let num = 0, e1 = 0, e2 = 0;
-    for (let i = 0; i + lag < N; i++) { num += x[i]! * x[i + lag]!; e1 += x[i]! * x[i]!; e2 += x[i + lag]! * x[i + lag]!; }
-    r[lag] = e1 > 0 && e2 > 0 ? num / Math.sqrt(e1 * e2) : 0;
-  }
+  const r = normalisedAutocorrelation(x, maxLag);
   let firstNegative = 0;
   for (let lag = 2; lag <= maxLag; lag++) if (r[lag]! < 0) { firstNegative = lag; break; }
   let best = 0, lagBest = 0;

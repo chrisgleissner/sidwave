@@ -9,7 +9,9 @@ import { InterchangeUsageError } from "../src/interchange/errors.js";
 import { parseSidwave } from "../src/sidwave.js";
 import { runCli } from "../src/cli.js";
 import { fuzz } from "./helpers/formatKit.mjs";
-import { handBuilt } from "./helpers/jchKit.mjs";
+import { handBuilt, buildJch } from "./helpers/jchKit.mjs";
+import { convert } from "../src/interchange/convert.js";
+import { detectFormat } from "../src/interchange/registry.js";
 import { haveEngine, compileScoreToSid, irOf, agreement } from "./helpers/trackerDifferential.mjs";
 
 const fixtures = new URL("./fixtures/jch/", import.meta.url);
@@ -88,6 +90,31 @@ test("CLI: detection by content and report", async () => {
   assert.equal(JSON.parse(r.out).result.format, "jch");
   fs.writeFileSync(path.join(dir, "bad.bin"), new Uint8Array(300));
   assert.equal((await cli(["import", "bad.bin", "--format", "jch", "--json"], dir)).code, 3);
+});
+
+test("an unsupported NewPlayer version is detected and gives the typed error from import and convert", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "jch-version-"));
+  const lists = [[], [], []];
+  for (const version of ["21.G4", "20.C0", "2204"]) {
+    const bytes = buildJch({ lists, sequences: [], version });
+    assert.ok(looksLikeJch(bytes), version);
+    assert.throws(() => importJch(bytes), JchError);
+    await assert.rejects(convert(bytes, { inputName: "unsupported.prg", to: "sidwave" }), JchError);
+    fs.writeFileSync(path.join(dir, "unsupported.prg"), bytes);
+    for (const args of [["import", "unsupported.prg"], ["convert", "unsupported.prg", "out.yaml"]]) {
+      const r = await cli([...args, "--json"], dir);
+      assert.equal(r.code, 3, `${args[0]} ${version}: ${r.out}${r.err}`);
+      assert.equal(JSON.parse(r.out).error.category, "input");
+      assert.match(r.out, /only JCH NewPlayer 20\.G editor images are supported/);
+    }
+  }
+  for (const version of ["", "x0.G4", "20-G4", "20.g4"]) assert.ok(!looksLikeJch(buildJch({ lists, sequences: [], version })), JSON.stringify(version));
+  // The same image inside a PSID file named .sid stays a .sid for convert.
+  const header = new Uint8Array(0x7c);
+  header.set([0x50, 0x53, 0x49, 0x44, 0, 2, 0, 0x7c]);
+  header[15] = header[17] = 1;
+  const image = buildJch({ lists, sequences: [], version: "21.G4" });
+  assert.equal(detectFormat(Uint8Array.from([...header, ...image]), "tune.sid").best?.id, "sid");
 });
 
 const haveHvsc = REAL.every((f) => fs.existsSync(f)) && await haveEngine();

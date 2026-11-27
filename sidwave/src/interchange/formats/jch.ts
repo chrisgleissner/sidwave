@@ -13,7 +13,7 @@ import { importJch } from "../jchImport.js";
 export const JCH_NEWPLAYER: FormatDefinition = {
   id: "jch", name: "JCH NewPlayer 20.G editor image", extensions: [], aliases: ["jch-newplayer", "np20"],
   magic: (bytes) => (looksLikeJch(bytes) ? 0.95 : 0),
-  detection: "load address $0F00 and the mark 20.G at $0FEE, in a PRG or in a PSID file",
+  detection: "load address $0F00 and a plausible NewPlayer version mark at $0FEE, in a PRG or in a PSID file",
   caps: { kind: "tracker", maxVoices: 3, tempo: "grid", instruments: "native", expression: "none", loop: true, metadata: true },
   lossSummary: "read only: the filter, most commands, the wave table dwell and per-voice looping are not imported; packed or relocated tunes are not supported",
   read: (bytes, ctx) => {

@@ -63,12 +63,12 @@ function loadImage(bytes: Uint8Array): Uint8Array {
   return mem;
 }
 
-/** True for a PRG or PSID file that holds a JCH NewPlayer 20.G editor image: load address $0F00 and the `20.G` mark at $0FEE. */
+/** True for a PRG or PSID with a plausible NewPlayer version mark at $0FEE, loaded at $0F00. */
 export function looksLikeJch(bytes: Uint8Array): boolean {
   try {
     if (bytes.length < 0x100) return false;
     const mem = loadImage(bytes);
-    return String.fromCharCode(mem[0xfee]!, mem[0xfef]!, mem[0xff0]!, mem[0xff1]!) === "20.G";
+    return /^[0-9]{2}[0-9.][0-9A-Z]$/.test(String.fromCharCode(mem[0xfee]!, mem[0xfef]!, mem[0xff0]!, mem[0xff1]!));
   } catch { return false; }
 }
 

@@ -4,8 +4,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseMod, ModError, periodToMidi, MOD_MAX_BYTES } from "../src/interchange/mod.js";
-import { importMod } from "../src/interchange/modImport.js";
-import { analyzeSample, drumFromName } from "../src/interchange/modSamples.js";
+import { importMod, chooseRowsPerBeat, planBars } from "../src/interchange/modImport.js";
+import { analyzeSample, drumFromName, normalisedAutocorrelation } from "../src/interchange/modSamples.js";
+import { convert } from "../src/interchange/convert.js";
+import { detectFormat } from "../src/interchange/registry.js";
+import { exportEvents } from "../src/interchange/events.js";
+import { UsageError } from "../src/cliCore.js";
 import { playRows } from "../src/interchange/modPlay.js";
 import { InterchangeUsageError } from "../src/interchange/errors.js";
 import { parseSidwave } from "../src/sidwave.js";
@@ -124,6 +128,108 @@ test("sample analysis: waveform from harmonics, noise, percussion by name and by
   for (const [name, key] of [["Bassdrum", 36], ["BD_01", 36], ["snare 2", 38], ["hihat", 42], ["open hat", 46], ["crash", 49], ["tom lo", 45], ["lead", undefined], ["abdomen", undefined]]) {
     assert.equal(drumFromName(name), key, name);
   }
+});
+
+test("drum names match as whole words; digits and underscores separate words", () => {
+  for (const [name, key] of [
+    ["kick1", 36], ["808kick", 36], ["Kick_2", 36], ["bd2", 36], ["bassdrum", 36], ["snare_hard", 38], ["clap 2", 39], ["oh1", 46], ["openhat", 46], ["Open Hat", 46],
+    ["ch_1", 42], ["hat3", 42], ["hihat", 42], ["MyHiHats", 42], ["hi-hat", 42], ["tomtom", 45], ["tom2", 45], ["crash1", 49], ["cym", 49], ["splash 1", 49], ["cymbals", 49],
+    ["ride", 49], ["Ride 2", 49], ["ride_01", 49], ["ride bell", 49], ["RideCymbal", 49], ["my ride cymbal", 49], ["ride of", 49],
+  ]) assert.equal(drumFromName(name), key, name);
+  for (const name of [
+    "Bride", "Pride pad", "Clapton", "Kickstart", "Ride of the strings", "ride pad", "stride", "overrides", "crashed", "cymatic", "splashy", "snares", "chat", "chord", "Ohio", "hatch", "kicks",
+  ]) assert.equal(drumFromName(name), undefined, name);
+});
+
+/** The autocorrelation written out directly: all three sums inside the lag loop. */
+function referenceAutocorrelation(x, maxLag) {
+  const r = new Array(maxLag + 1).fill(0);
+  for (let lag = 2; lag <= maxLag; lag++) {
+    let num = 0, e1 = 0, e2 = 0;
+    for (let i = 0; i + lag < x.length; i++) { num += x[i] * x[i + lag]; e1 += x[i] * x[i]; e2 += x[i + lag] * x[i + lag]; }
+    r[lag] = e1 > 0 && e2 > 0 ? num / Math.sqrt(e1 * e2) : 0;
+  }
+  return r;
+}
+
+test("sample analysis: the prefix-sum autocorrelation equals the direct computation", () => {
+  let seed = 99;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return ((seed >> 8) & 0xff) - 128; };
+  const signals = {
+    noise: Float64Array.from({ length: 2048 }, () => rnd() + 0.3),
+    sine: Float64Array.from({ length: 2048 }, (_, i) => 100 * Math.sin(i / 5)),
+    silentTail: Float64Array.from({ length: 1500 }, (_, i) => (i < 400 ? rnd() : 0)),
+    silentHead: Float64Array.from({ length: 1500 }, (_, i) => (i < 1100 ? 0 : rnd())),
+    quietTail: Float64Array.from({ length: 2048 }, (_, i) => (i < 1000 ? 127 * rnd() : rnd() / 4096)),
+    silence: new Float64Array(300),
+    short: Float64Array.from({ length: 64 }, () => rnd()),
+  };
+  for (const [name, x] of Object.entries(signals)) {
+    const maxLag = Math.min(600, Math.floor(x.length / 3));
+    const got = normalisedAutocorrelation(x, maxLag), want = referenceAutocorrelation(x, maxLag);
+    assert.equal(got.length, want.length, name);
+    for (let lag = 0; lag <= maxLag; lag++) assert.ok(Math.abs(got[lag] - want[lag]) < 1e-9, `${name} lag ${lag}: ${got[lag]} against ${want[lag]}`);
+  }
+});
+
+test("sample analysis: cached by content, each caller gets its own copy", () => {
+  const song = parseMod(buildMod({ samples: [{ ...SAMPLES.saw, name: "cached", data: SAMPLES.saw.data.map((v, i) => v + (i % 3)), loop: [0, 64] }], patterns: [[]] }));
+  const sample = song.samples[0];
+  const first = analyzeSample(sample);
+  const copy = structuredClone(first);
+  first.adsr[0] = 15; first.harmonics.length = 0; first.waveform = "noise";
+  assert.deepEqual(analyzeSample(sample), copy);
+  // A change of the data, the loop or the name is a different sample.
+  const other = Int8Array.from(sample.data, (_, i) => ((i * 7919) % 251) - 125);
+  assert.notDeepEqual(analyzeSample({ ...sample, data: other }), copy);
+  assert.equal(analyzeSample({ ...sample, looped: false }).adsr[2], 0);
+  assert.equal(analyzeSample({ ...sample, name: "snare" }).drum, 38);
+  // 3000 repeats of a 32 KB one-shot sample cost a hash and a copy each; measuring it every time takes seconds.
+  const large = { ...sample, name: "large", looped: false, length: 32768, data: Int8Array.from({ length: 32768 }, (_, i) => ((i * 31) % 200) - 100) };
+  analyzeSample(large);
+  const repeats = cpuMs(() => { for (let i = 0; i < 3000; i++) analyzeSample(large); });
+  assert.ok(repeats.ms < 1500, `${repeats.ms} ms`);
+});
+
+test("timing: a speed and tempo change inside a bar reports the measured largest onset error", () => {
+  const rows = Array.from({ length: 64 }, () => [{}, {}, {}, {}]);
+  rows[0][0] = { note: 48, sample: 1, fx: 0xf, param: 0x03 };
+  rows[8][0] = { note: 50, sample: 1, fx: 0xf, param: 0x40 };
+  const r = importMod(buildMod({ samples: [SAMPLES.sine], patterns: [rows] }));
+  const real = [...Array(8).fill(3 * 2.5 / 125), ...Array(56).fill(3 * 2.5 / 64)];
+  // Four rows per beat would clamp the first bar (250 BPM); eight is the first value without a clamped bar.
+  assert.equal(r.report.timing.rowsPerBeat, 8);
+  assert.equal(r.report.timing.clampedBars, 0);
+  assert.equal(r.report.timing.mistimedRows, 32);
+  // The first bar holds 32 rows; every other bar has rows of one length.
+  const mean = real.slice(0, 32).reduce((t, v) => t + v, 0) / 32;
+  let start = 0, largest = 0;
+  for (let i = 0; i < 32; i++) { largest = Math.max(largest, Math.abs(start - i * mean)); start += real[i]; }
+  assert.equal(Math.round(largest * 1000), 343);
+  const loss = r.report.losses.find((l) => /different length/.test(l));
+  assert.match(loss, /largest onset error is 343 ms/);
+  assert.doesNotMatch(loss, /up to one row/);
+  // The imported score moves the note of row 8 from 0.48 s by that error, within the frame rounding of SIDWave.
+  const onset = exportEvents(parseSidwave(r.yaml)).voices[0].notes[1].on.time;
+  assert.ok(Math.abs(onset - (0.48 + largest)) < 0.02, `onset ${onset} s`);
+});
+
+test("timing: among row grids with equally few clamped bars the one with fewer mistimed rows wins", () => {
+  // Four rows of 0.16 s, then rows of 0.24 s: only 2 rows per beat can end a bar at the change without a clamped bar.
+  const rowSeconds = [...Array(4).fill(0.16), ...Array(60).fill(0.24)];
+  assert.equal(planBars(rowSeconds, 4).mistimed, 16);
+  assert.equal(planBars(rowSeconds, 2).mistimed, 0);
+  assert.equal(chooseRowsPerBeat(rowSeconds), 2);
+  // A grid with more bars than a score holds loses against one that fits, even when it has fewer mistimed rows.
+  const long = [...Array(4).fill(0.16), ...Array(20_000).fill(0.24)];
+  assert.ok(planBars(long, 2).bars.length > 2048);
+  assert.equal(chooseRowsPerBeat(long), 4);
+  // Choosing the grid stays fast for the longest sequence the importer accepts.
+  const uniform = Array(100_000).fill(0.12);
+  const run = cpuMs(() => chooseRowsPerBeat(uniform));
+  // 100,000 rows fit into 2048 bars only with 16 rows per beat.
+  assert.equal(run.value, 16);
+  assert.ok(run.ms < 500, `${run.ms} ms`);
 });
 
 test("playback model: pattern break, jump loop, pattern loop, pattern delay, speed and tempo", () => {
@@ -320,14 +426,74 @@ test("CLI: detection by signature, flags, report and typed failure", async () =>
   assert.equal(r.code, 2);
 });
 
+test("detection: a 15-sample module is found by its content only under the .mod extension", async () => {
+  const dir = tmpdir();
+  const fifteen = songVariant(null, 4);
+  for (const name of ["fifteen.mod", "FIFTEEN.MOD"]) assert.equal(detectFormat(fifteen, name).best?.id, "mod", name);
+  // Under any other name the module adds no candidate, so the detection of other formats is unaffected.
+  for (const name of [undefined, "x", "x.sng", "x.bin", "x.prg"]) assert.ok(!detectFormat(fifteen, name).candidates.some((c) => c.id === "mod"), String(name));
+  fs.writeFileSync(path.join(dir, "fifteen.mod"), fifteen);
+  let r = await cli(["convert", "fifteen.mod", "out.yaml", "--json"], dir);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(JSON.parse(r.out).result.from, "mod");
+  r = await cli(["info", "fifteen.mod", "--json"], dir);
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /15-sample/);
+});
+
+test("detection: random and truncated .mod files give a typed input error", async () => {
+  const dir = tmpdir();
+  let seed = 5;
+  const random = (n) => Uint8Array.from({ length: n }, () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed >> 8) & 0xff; });
+  const fifteen = songVariant(null, 4);
+  const files = [new Uint8Array(0), new Uint8Array(3), random(100), random(599), random(600), random(1083), random(1084), random(5000), random(70_000), new Uint8Array(5000),
+    fifteen.subarray(0, 100), fifteen.subarray(0, 599), fifteen.subarray(0, 600), fifteen.subarray(0, 1623), songFourChannel().subarray(0, 1000)];
+  for (const [i, bytes] of files.entries()) {
+    const name = `bad${i}.mod`;
+    await assert.rejects(convert(bytes, { inputName: name, to: "sidwave" }), InterchangeUsageError, name);
+    fs.writeFileSync(path.join(dir, name), bytes);
+    const r = await cli(["convert", name, "out.yaml", "--json"], dir);
+    assert.equal(r.code, 3, `${name}: ${r.out}${r.err}`);
+    assert.equal(JSON.parse(r.out).error.category, "input", name);
+  }
+});
+
+test("convert --sids: keeps three voices per SID for MOD input and is a usage error otherwise", async () => {
+  const dir = tmpdir();
+  fs.writeFileSync(path.join(dir, "four.mod"), songFourChannel());
+  fs.writeFileSync(path.join(dir, "fifteen.mod"), songVariant(null, 4));
+  const voices = (file) => parseSidwave(fs.readFileSync(path.join(dir, file), "utf8")).voices.length;
+  let r = await cli(["convert", "four.mod", "one.yaml"], dir);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(voices("one.yaml"), 3);
+  for (const [i, args] of [["four.mod"], ["fifteen.mod"], ["four.mod", "--from", "protracker"]].entries()) {
+    r = await cli(["convert", ...args, `two${i}.yaml`, "--sids", "2"], dir);
+    assert.equal(r.code, 0, r.err);
+    assert.equal(voices(`two${i}.yaml`), 4, args.join(" "));
+  }
+  fs.copyFileSync(path.join(dir, "one.yaml"), path.join(dir, "score.yaml"));
+  fs.writeFileSync(path.join(dir, "tune.sid"), (await convert(fs.readFileSync(path.join(dir, "one.yaml")), { inputName: "one.yaml", to: "sid" })).output);
+  for (const args of [["score.yaml", "x.mid"], ["tune.sid", "x.mid"], ["tune.sid", "x.mid", "--dry-run"], ["score.yaml", "x.mid", "--from", "sidwave"]]) {
+    r = await cli(["convert", ...args, "--sids", "2", "--json"], dir);
+    assert.equal(r.code, 2, `${args.join(" ")}: ${r.out}${r.err}`);
+    assert.equal(JSON.parse(r.out).error.category, "usage");
+    assert.match(r.out, /--sids is supported only for MOD input/);
+  }
+  for (const value of ["0", "11", "x"]) assert.equal((await cli(["convert", "four.mod", "y.yaml", "--sids", value], dir)).code, 2, value);
+  await assert.rejects(convert(songFourChannel(), { inputName: "four.mod", to: "sidwave", sids: 11 }), UsageError);
+  assert.match((await cli(["convert", "--help"], dir)).out, /--sids <n>/);
+});
+
 test("import speed: a 230 KB module with 6400 rows imports within the CPU budget", () => {
   const big = songLarge(100);
   assert.ok(big.length > 200_000);
+  // New sample names, so that earlier tests have not filled the analysis cache for these samples.
+  for (let s = 0; s < 31; s++) big[20 + s * 30] = "t".charCodeAt(0);
   const noValidate = cpuMs(() => importMod(big, { validate: false }));
   const typical = cpuMs(() => importMod(songLarge(30), { validate: false }));
   const small = cpuMs(() => importMod(songFourChannel()));
   console.log(`MOD import CPU: 230 KB / 6400 rows without validation ${noValidate.ms.toFixed(0)} ms; 100 KB / 1920 rows ${typical.ms.toFixed(0)} ms; four-channel song with validation ${small.ms.toFixed(0)} ms`);
-  assert.ok(noValidate.ms < 3000, `${noValidate.ms} ms`);
+  assert.ok(noValidate.ms < 1200, `${noValidate.ms} ms`);
   assert.ok(typical.ms < 1000, `${typical.ms} ms`);
   assert.ok(small.ms < 1500, `${small.ms} ms`);
 });

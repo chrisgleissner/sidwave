@@ -185,6 +185,14 @@ export function looksLikeMod(bytes: Uint8Array): boolean {
   return false;
 }
 
+/** True when a 15-sample MOD passes the parser's plausibility checks. */
+export function looksLikeFifteenSampleMod(bytes: Uint8Array): boolean {
+  try { return parseMod(bytes).sampleCount === 15; } catch (error) {
+    if (error instanceof ModError) return false;
+    throw error;
+  }
+}
+
 // Period of a note, in note numbers relative to period 428 = MIDI 48 (ProTracker C-2). Finetune scales a period by 2^(-ft/96).
 export const MOD_REFERENCE_PERIOD = 428;
 export const MOD_REFERENCE_MIDI = 48;

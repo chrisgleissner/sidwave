@@ -57,6 +57,9 @@ const sidAddress = (i: number): string => `$D${(4 + (i >> 3)).toString(16).toUpp
 
 interface Unit { name: string; channels: number[]; drums: boolean; notes: ModNote[]; score: number }
 
+/** The most bars a SIDWave score holds. */
+const MAX_BARS = 2048;
+
 /** The bar plan: bars of 2 to 5 beats that end where the row length changes when it can, otherwise 4 beats. */
 export function planBars(rowSeconds: number[], rpb: number): { bars: Array<{ start: number; rows: number; beats: number; seconds: number }>; mistimed: number; aligned: number } {
   const bars: Array<{ start: number; rows: number; beats: number; seconds: number }> = [];
@@ -68,7 +71,9 @@ export function planBars(rowSeconds: number[], rpb: number): { bars: Array<{ sta
   while (pos < R) {
     const d = rowSeconds[pos]!;
     let change = pos + 1;
-    while (change < R && Math.abs(rowSeconds[change]! - d) <= d * 1e-4) change++;
+    // No bar looks further ahead than 5 beats, which keeps the plan linear in the number of rows.
+    const horizon = Math.min(R, pos + 5 * rpb + 1);
+    while (change < horizon && Math.abs(rowSeconds[change]! - d) <= d * 1e-4) change++;
     let beats = 4;
     const rest = R - pos;
     if (change < R && change - pos < 4 * rpb) {
@@ -88,13 +93,15 @@ export function planBars(rowSeconds: number[], rpb: number): { bars: Array<{ sta
 }
 
 export function chooseRowsPerBeat(rowSeconds: number[]): number {
-  let best = 4, bestClamped = Infinity;
+  // Lowest first: more bars than a score holds, clamped bars, mistimed rows. Ties keep the earlier value.
+  let best = 4, bestCost = [Infinity, Infinity, Infinity];
   for (const rpb of [4, 8, 2, 16, 1]) {
     const plan = planBars(rowSeconds, rpb);
     let clamped = 0;
     for (const bar of plan.bars) { const t = 60 * bar.beats / bar.seconds; if (t < 30 || t > 220) clamped++; }
-    if (clamped < bestClamped) { bestClamped = clamped; best = rpb; }
-    if (clamped === 0) break;
+    const cost = [plan.bars.length > MAX_BARS ? 1 : 0, clamped, plan.mistimed];
+    const differs = cost.findIndex((value, i) => value !== bestCost[i]);
+    if (differs >= 0 && cost[differs]! < bestCost[differs]!) { best = rpb; bestCost = cost; }
   }
   return best;
 }
@@ -170,7 +177,7 @@ export function importMod(bytes: Uint8Array, options: ModImportOptions = {}): Mo
   const rowSeconds = seq.rows.map((r) => r.seconds);
   const rpb = chooseRowsPerBeat(rowSeconds);
   const plan = planBars(rowSeconds, rpb);
-  if (plan.bars.length > 2048) throw new ModError(`the song has ${plan.bars.length} bars; the limit is 2048`);
+  if (plan.bars.length > MAX_BARS) throw new ModError(`the song has ${plan.bars.length} bars; the limit is ${MAX_BARS}`);
   const bars: GridBar[] = [];
   let clampedBars = 0;
   for (const bar of plan.bars) {
@@ -180,7 +187,19 @@ export function importMod(bytes: Uint8Array, options: ModImportOptions = {}): Mo
     bars.push({ cells: bar.rows, sig: `${bar.beats}/4`, tempo: bpm });
   }
   const totalCells = bars.reduce((t, b) => t + b.cells, 0);
-  if (plan.mistimed) losses.push(`${plan.mistimed} row(s) have a different length from the rest of their bar (a speed or tempo change inside a bar, or a pattern delay); the bar plays them with its mean row length, so notes inside that bar move by up to one row. Bar lengths stay exact.`);
+  if (plan.mistimed) {
+    let actualStart = 0, scoreStart = 0, maxError = 0;
+    for (const bar of plan.bars) {
+      const rows = Math.min(bar.rows, rowSeconds.length - bar.start);
+      const mean = bar.seconds / bar.rows;
+      for (let i = 0; i < rows; i++) {
+        maxError = Math.max(maxError, Math.abs(actualStart - (scoreStart + i * mean)));
+        actualStart += rowSeconds[bar.start + i]!;
+      }
+      scoreStart += bar.seconds;
+    }
+    losses.push(`${plan.mistimed} row(s) have a different length from the rest of their bar (a speed or tempo change inside a bar, or a pattern delay); the bar plays its rows with their mean length. The largest onset error is ${Math.round(maxError * 1000)} ms. Bar lengths stay exact.`);
+  }
   if (clampedBars) losses.push(`${clampedBars} bar(s) have a row length outside the SIDWave tempo range of 30 to 220 BPM and are clamped, so the song drifts there.`);
   if (seq.end === "loop" && seq.loopTo !== 0) losses.push(`The song loops back to row ${seq.loopTo} (order ${seq.rows[seq.loopTo]!.order}); SIDWave loops the whole timeline, so the part before the loop point plays again on each pass.`);
   if (seq.end === "stop") warnings.push("The song ends with F00 (stop).");
