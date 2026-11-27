@@ -80,7 +80,8 @@ test("a score with speed 5 recovers to a compilable 1.5 score and keeps the call
 });
 
 test("a score with speed 5 round trips with the register state exact", {
-  todo: "open: the recompiled player differs in the volume register around the start (the first difference is volume, call 1), and 76 of 750 calls differ in pitch; the cause is not isolated yet (see HANDOVER-S5d)",
+  timeout: 120_000,
+  todo: "open: the soft-start misdetection is fixed (the volume ramp is now kept), but the first difference is volume at call 0: the original IR starts at call 0 as its own init call while the recompiled IR skips one, so the alignment is off by one call; not isolated yet",
 }, async () => {
   const unit = 1 / 80;
   const score = {

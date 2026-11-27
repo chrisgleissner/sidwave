@@ -80,6 +80,8 @@ export const MAX_INSTRUMENT_SHAPES = 63;
 export const MAX_TABLE_STEPS_TOTAL = 255;
 /** A gate-off span with changed ADSR before a note is a hard restart only up to this many frames; a longer span is an ordinary rest. */
 export const HARD_RESTART_MAX_FRAMES = 8;
+/** The 1.4 player ramps the volume over its first 15 frames; a tune whose volume is 15 for this many frames has no ramp. */
+export const SOFT_START_FRAMES = 20;
 /** Spacing deviation (relative) up to which the call rate counts as an integer multiple of the frame rate. */
 export const CALL_RATE_TOLERANCE = 0.02;
 
@@ -1122,7 +1124,9 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     return end;
   })();
   // The 1.4 player ramps the volume from 1 to 15 over its first calls. A tune that sets the full volume at once and keeps it has no ramp: soft_start is switched off.
-  const softStartOff = volumeRamp === firstCall + 1 && (ir.calls[firstCall]!.sids[0]!.regs[0x18]! & 15) === 15;
+  const rampWindow = Math.min(ir.calls.length, firstCall + SOFT_START_FRAMES * speed);
+  let softStartOff = true;
+  for (let k = firstCall; k < rampWindow && softStartOff; k++) if ((ir.calls[k]!.sids[0]!.regs[0x18]! & 15) !== 15) softStartOff = false;
   const volumeAfterRamp = new Set<number>();
   for (let k = volumeRamp; k < ir.calls.length; k++) volumeAfterRamp.add(ir.calls[k]!.sids[0]!.regs[0x18]!);
   if (volumeAfterRamp.size) globalSeen.set(0x18, volumeAfterRamp);
