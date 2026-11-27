@@ -67,8 +67,18 @@ export function readBounded(io: CliIo, file: string): { bytes: Buffer; path: str
     return { bytes: readFileSync(path), path };
   } catch (error) {
     if (error instanceof InterchangeUsageError) throw error;
-    throw new InterchangeUsageError(`cannot read ${file}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`);
+    throw new InterchangeUsageError(fileProblem("read", file, error));
   }
+}
+
+/** A plain sentence for a failed file operation, with the path. */
+export function fileProblem(action: "read" | "write", file: string, error: unknown): string {
+  const code = (error as NodeJS.ErrnoException).code;
+  const reasons: Record<string, string> = {
+    ENOENT: action === "read" ? "the file does not exist" : "a directory of the path does not exist", EISDIR: "it is a directory, not a file", ENOTDIR: "a part of the path is a file, not a directory",
+    EACCES: "permission denied", EPERM: "operation not permitted", ENOSPC: "no space left on the device", EROFS: "the file system is read only",
+  };
+  return `cannot ${action} ${file}: ${(code && reasons[code]) ?? code ?? (error as Error).message}`;
 }
 
 function sameFile(a: string, b: string): boolean {
@@ -83,7 +93,7 @@ export function writeOutput(io: CliIo, input: string, target: string, bytes: Uin
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, bytes);
   } catch (error) {
-    throw new InterchangeUsageError(`cannot write ${path}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`);
+    throw new InterchangeUsageError(fileProblem("write", path, error));
   }
   return path;
 }

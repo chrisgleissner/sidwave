@@ -42,7 +42,8 @@ test("every GoatTracker version imports through one path to the same notes", () 
   assert.equal(doc.song.author, "Tester");
   // 6 calls per row, 4 rows per beat: 60 * 50.1245 / 24 = 125.31 BPM.
   assert.ok(Math.abs(doc.song.tempo - 125.3114) < 1e-3);
-  assert.ok(detail.report.losses.some((l) => /Master volume/.test(l)));
+  // Losses list only dropped content with counts; the fixture drops nothing, so no fixed sentence is reported.
+  assert.ok(!detail.report.losses.some((l) => /Master volume/.test(l)));
 });
 
 test("GoatTracker 1.x pulse parameters, filter table and arpeggio are converted as GoatTracker does", () => {

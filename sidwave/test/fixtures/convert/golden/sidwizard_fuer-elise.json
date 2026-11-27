@@ -1,0 +1,295 @@
+{
+ "sidwizard:fuer-elise -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> sidwizard": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 3,
+    "message": "Instrument i1: wavetable is not exported. | Instrument i2: wavetable is not exported. | Instrument i3: wavetable is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "expression.dropped",
+    "severity": "approx",
+    "count": 1,
+    "message": "Note velocities (3 distinct values) are not exported; the module plays at full volume."
+   }
+  ]
+ },
+ "sidwizard:fuer-elise -> vice-dump": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "trace.cycles",
+    "severity": "info",
+    "count": 1,
+    "message": "Cycle numbers are those of SIDWave's engine; a real VICE run of the same SID file starts with its own power-on delay."
+   }
+  ]
+ }
+}

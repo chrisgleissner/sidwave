@@ -102,7 +102,7 @@ The compiler output, PSID files, the game build and the example fixtures are byt
 ## Regression tests
 
 `test/performanceBudgets.test.mjs` measures parse, compile, format, diff, cutoff resolution, Songlengths parsing, trace
-comparison, trace IR and A1 as the smallest CPU time of several runs, divided by the smallest CPU time of a fixed workload
+comparison, trace IR, A1 and `convert` (score to MIDI and to GoatTracker with `--verify`: 6.5 x the reference, limit 24 x) as the smallest CPU time of several runs, divided by the smallest CPU time of a fixed workload
 measured alternately in the same process (a mixed allocation, sort and JSON workload; a tight arithmetic loop was
 rejected because it ran 5 times slower in some processes). The bounds are about five times the measured ratio, so they
 flag a complexity regression (a quadratic scan, a repeated parse). Run with

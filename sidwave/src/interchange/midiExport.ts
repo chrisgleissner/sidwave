@@ -95,10 +95,10 @@ export function exportMidi(doc: ParsedSidwave, options: MidiExportOptions = {}):
   for (const voice of score.voices) {
     const events: MidiEvent[] = [];
     const drums = voice.kind === "drums";
-    let channel = 9;
+    let pitchChannel = 9;
     if (!drums) {
       if (pitchedIndex >= PITCHED_CHANNELS.length) shared = true;
-      channel = PITCHED_CHANNELS[pitchedIndex % PITCHED_CHANNELS.length]!;
+      pitchChannel = PITCHED_CHANNELS[pitchedIndex % PITCHED_CHANNELS.length]!;
       pitchedIndex++;
     }
     events.push({ tick: 0, type: "text", kind: 0x03, text: `v${voice.id}${voice.name ? ` ${voice.name}` : ""}` });
@@ -107,13 +107,16 @@ export function exportMidi(doc: ParsedSidwave, options: MidiExportOptions = {}):
     let bendCount = 0;
     if (options.bend && !drums) {
       for (const [controller, value] of [[101, 0], [100, 0], [6, BEND_RANGE_SEMITONES], [38, 0], [101, 127], [100, 127]] as const) {
-        events.push({ tick: 0, type: "controller", channel, controller, value });
+        events.push({ tick: 0, type: "controller", channel: pitchChannel, controller, value });
       }
     }
     for (const note of voice.notes) {
       const inst = instruments.get(note.instrument);
       let key = note.pitch;
-      if (drums || note.percussion) {
+      // Drum hits of a pitched voice go to the percussion channel (channel 10) of the same track, as General MIDI expects.
+      const hit = drums || note.percussion === true;
+      const channel = hit ? 9 : pitchChannel;
+      if (hit) {
         const mapped = drumKey(note.drum);
         key = mapped.key;
         if (!mapped.known) unknownDrum = true;
@@ -147,7 +150,7 @@ export function exportMidi(doc: ParsedSidwave, options: MidiExportOptions = {}):
     }
     events.push({ tick: score.totalTicks, type: "endOfTrack" });
     smf.tracks.push(events);
-    tracks.push({ voice: voice.index, id: voice.id, ...(voice.name ? { name: voice.name } : {}), channel,
+    tracks.push({ voice: voice.index, id: voice.id, ...(voice.name ? { name: voice.name } : {}), channel: pitchChannel,
       ...(program === undefined ? {} : { program }), notes: voice.notes.length, pitchBendEvents: bendCount });
   }
 

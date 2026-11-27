@@ -9,6 +9,7 @@ import { compareAudioA1, loadA1Rules } from "../src/verify/a1.ts";
 import { buildIr } from "../src/reconstruct/ir.ts";
 import { parseSonglengths } from "../src/songlengths.ts";
 import { resolveCutoff } from "../src/sidwaveFilterModel.ts";
+import { convert } from "../src/interchange/convert.ts";
 
 // CPU-time budgets (see doc/performance.md). Each operation is measured as the smallest CPU time of a few runs, and
 // compared with the CPU time of a fixed reference workload measured the same way in the same process. A slow or busy
@@ -126,4 +127,18 @@ test("A1 comparison of 10 seconds of audio stays within its budget", () => {
   const reference_ = pcm(3);
   const candidate = pcm(9);
   within("A1", () => compareAudioA1(reference_, candidate, rules), 30, 3);
+});
+
+test("convert of a score to MIDI and to GoatTracker, with --verify, stays within its budget", async () => {
+  const bytes = new TextEncoder().encode(text);
+  // The hub parses the score, plans, writes and (with verify) reads the output back; it is dominated by those stages.
+  for (const [to, multiple] of [["midi", 24], ["goattracker", 24]]) {
+    await convert(bytes, { to, verify: true });
+    const runs = [];
+    for (let i = 0; i < 5; i++) { const before = process.cpuUsage(); await convert(bytes, { to, verify: true }); const u = process.cpuUsage(before); runs.push((u.user + u.system) / 1000); }
+    const { reference } = measure(() => 0, 5);
+    const op = Math.min(...runs);
+    if (process.env.SIDWAVE_PERF_REPORT) console.log(`convert ${to}: ${op.toFixed(1)} ms = ${(op / reference).toFixed(1)} x reference (${reference.toFixed(2)} ms), limit ${multiple} x`);
+    assert.ok(op <= multiple * reference, `convert to ${to} took ${op.toFixed(1)} ms CPU, over ${(multiple * reference).toFixed(1)} ms (${multiple} x the reference loop of ${reference.toFixed(2)} ms)`);
+  }
 });

@@ -6,7 +6,7 @@
 // tempo. Everything else is listed in the result's `losses`. Mapping: doc/interchange.md.
 
 import type { ParsedSidwave } from "../sidwave.js";
-import { exportEvents, type ExportedInstrument } from "./events.js";
+import { exportEvents, type ExportedInstrument, type ExportedScore } from "./events.js";
 import { SWM_WRITE_MAX_INSTRUMENTS, SWM_WRITE_MAX_PATTERNS, defaultSwmHeader, SwmError, SWM_NOTEFX, writeSwm, writeSwi, type SwmInstrument, type SwmModule, type SwmPattern, type SwmRow } from "./swm.js";
 
 export interface SwmExportOptions {
@@ -14,6 +14,9 @@ export interface SwmExportOptions {
   song?: number;
   /** Rows per pattern: 16, 32 or 64. Default 32. */
   patternRows?: number;
+  /** Voices chosen by the convert hub's ScorePlan, and its event export of the song. */
+  voiceIds?: readonly number[];
+  source?: ExportedScore;
 }
 
 export interface SwmExportResult {
@@ -49,7 +52,7 @@ export function swmInstrumentFor(inst: ExportedInstrument, name: string): SwmIns
 }
 
 export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): SwmExportResult {
-  const ev = exportEvents(doc, { ...(options.song === undefined ? {} : { song: options.song }) });
+  const ev = exportEvents(doc, { ...(options.song === undefined ? {} : { song: options.song }), ...(options.voiceIds ? { voiceIds: options.voiceIds } : {}), ...(options.source ? { source: options.source } : {}) });
   const losses: string[] = [];
   const frameRate = ev.mode === "PAL" ? 985_248 / 19_656 : 1_022_727 / 17_095;
   const speed = Math.round(ev.callRate / frameRate);
@@ -57,7 +60,7 @@ export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): S
   const pitched = ev.voices.filter((v) => v.kind === "pitched" && v.notes.length > 0);
   const dropped = ev.voices.filter((v) => v.kind === "drums" && v.notes.length > 0);
   if (dropped.length) losses.push(`Drum voices (${dropped.map((v) => `v${v.id}`).join(", ")}) are not exported: SID-Wizard drums are instruments, which this export does not build from SIDWave kits.`);
-  const voices = pitched.filter((v) => v.sid === 0).slice(0, 3);
+  const voices = options.voiceIds ? pitched.slice(0, 3) : pitched.filter((v) => v.sid === 0).slice(0, 3);
   const others = pitched.filter((v) => !voices.includes(v));
   if (others.length) losses.push(`Voices ${others.map((v) => `v${v.id}`).join(", ")} are not exported: an SWM module has three tracks (one SID).`);
   if (voices.length === 0) throw new SwmError("the score has no pitched voice on the first SID to export");
@@ -118,7 +121,14 @@ export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): S
   });
   if (folded) losses.push(`${folded} notes lie outside the SID-Wizard range C-0 to A#7 (MIDI 12 to 106) and were moved by octaves.`);
   if (effectsLost) losses.push(`${effectsLost} notes carry bends, chord arpeggios, legato or an early gate-off that SID-Wizard rows of this export do not express.`);
-  losses.push("Velocity, voice and section levels, echo and follow copies, tempo changes, swing and filter settings are not exported; the module plays at full volume with the default hard restart.");
+  // Each part of what the module cannot hold is reported only when the score uses it.
+  const velocities = new Set(voices.flatMap((v) => v.notes.map((n) => n.velocity))).size;
+  if (velocities > 1) losses.push(`Note velocities (${velocities} distinct values) are not exported; the module plays at full volume.`);
+  const copies = doc.voices.filter((v) => (v as { echo?: unknown; unison?: unknown; follow?: unknown }).echo || (v as { unison?: unknown }).unison || (v as { follow?: unknown }).follow).length;
+  if (copies) losses.push(`${copies} voices are echo, unison or follow copies of another voice; the copies are not exported.`);
+  if (ev.tempoMap.length > 1) losses.push(`${ev.tempoMap.length - 1} tempo changes are not exported; the module has one tempo.`);
+  if (doc.swing) losses.push("Swing is not exported.");
+  if (doc.sids.some((sid) => sid.filter) || doc.song.global_fx.filter_env) losses.push("The SID filter settings of the score are not exported.");
 
   // Patterns and orderlists.
   const P = options.patternRows ?? 32;

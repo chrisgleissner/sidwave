@@ -1,0 +1,367 @@
+{
+ "sidwave:chiptune-drive -> sidwave": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwave:chiptune-drive -> sid": {
+  "ok": true,
+  "losses": []
+ },
+ "sidwave:chiptune-drive -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 20,
+    "message": "18 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 20,
+    "message": "18 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "timing.multispeed",
+    "severity": "approx",
+    "count": 1,
+    "message": "The score calls its player 2 times per frame (multispeed); GoatTracker plays one call per frame, so note times are rounded to frames."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 18,
+    "message": "18 glides and portamento notes are exported as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "timing.multispeed",
+    "severity": "approx",
+    "count": 1,
+    "message": "The score calls its player 2 times per frame (multispeed); the module plays one tick per frame, so note times are rounded to frames."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 20,
+    "message": "18 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sidwave:chiptune-drive -> sidwizard": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 20,
+    "message": "18 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "rows.one-call",
+    "severity": "info",
+    "count": 1,
+    "message": "Rows are one player call long (note starts and ends fall on odd calls): the module is correct but large and uses the fastest tempo."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Instrument lib:filter_bass: filter is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 6,
+    "message": "Instrument lib:hat: wavetable is not exported. | Instrument lib:snare: wavetable is not exported. | Instrument lib:kick: wavetable is not exported. | Instrument lib:chip_arp_major: wavetable is not exported. | Instrument lib:chip_arp_minor: wavetable is not exported. | Instrument lib:sync_lead: wavetable is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Instrument lib:lead_pwm: vibrato is not exported. | Instrument lib:sync_lead: vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument lib:lead_pwm: pulse table (the first pulse width is written) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 18,
+    "message": "18 notes carry bends, chord arpeggios, legato or an early gate-off that SID-Wizard rows of this export do not express."
+   },
+   {
+    "stage": "write",
+    "code": "expression.dropped",
+    "severity": "approx",
+    "count": 1,
+    "message": "Note velocities (5 distinct values) are not exported; the module plays at full volume."
+   }
+  ]
+ }
+}

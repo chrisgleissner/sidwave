@@ -28,7 +28,7 @@ export interface ExportedInstrument {
   ring: boolean;
   sync: boolean;
   filterRouted: boolean;
-  /** True when a wavetable, pulse table or filter table changes the sound after the note starts. */
+  /** True when a wavetable (more than one step, or a step that changes pitch, ring or sync; a single step that only restates the waveform is not), pulse table or filter table changes the sound after the note starts. */
   tables: { wave: boolean; pulse: boolean; filter: boolean };
 }
 
@@ -106,6 +106,16 @@ export interface EventExportOptions {
   song?: number;
   /** Ticks per quarter note, 24..9600. Default 480. */
   ppq?: number;
+  /**
+   * Declared voice ids to export; the other voices are left out. Set by the convert hub's ScorePlan after it has
+   * ranked the voices for a target with a voice limit. Default: all voices.
+   */
+  voiceIds?: readonly number[];
+  /**
+   * The event export of this song at the same `ppq`, already computed by the caller (the convert hub computes it once
+   * for the plan and the exporter). It is returned instead of a new export, restricted to `voiceIds` when given.
+   */
+  source?: ExportedScore;
 }
 
 const round6 = (value: number): number => Math.round(value * 1e6) / 1e6;
@@ -135,7 +145,7 @@ function describeInstrument(inst: Instrument, index: number, fps: number, name: 
     ring: !!(inst.wave & 0x04),
     sync: !!(inst.wave & 0x02),
     filterRouted: !!inst.filter,
-    tables: { wave: !!inst.wavetable?.length, pulse: !!inst.pulsetable?.steps.length, filter: !!inst.filtertable?.steps.length },
+    tables: { wave: (inst.wavetable?.length ?? 0) > 1 || !!inst.wavetable?.some((step) => step.note !== undefined || step.ring !== undefined || step.sync !== undefined), pulse: !!inst.pulsetable?.steps.length, filter: !!inst.filtertable?.steps.length },
   };
   if (inst.wave & 0x40) out.pulseWidth = inst.pw;
   if (inst.vibRate) {
@@ -181,6 +191,25 @@ function velocityOf(note: ArrangedNote, inst: Instrument): { velocity: number; b
 
 /** Exports one song of a parsed score as a structured event list. */
 export function exportEvents(doc: ParsedSidwave, options: EventExportOptions = {}): ExportedScore {
+  const { source, voiceIds, ...rest } = options;
+  const base = source && (rest.ppq === undefined || rest.ppq === source.ppq) ? source : buildEvents(doc, rest);
+  return voiceIds === undefined ? base : selectVoices(base, voiceIds);
+}
+
+/** The export restricted to the listed declared voice ids; voices and notes are renumbered, the other fields are shared. */
+export function selectVoices(score: ExportedScore, voiceIds: readonly number[]): ExportedScore {
+  const keep = new Set(voiceIds);
+  const remap = new Map<number, number>();
+  const voices = score.voices.filter((v) => keep.has(v.id)).map((v, i) => {
+    remap.set(v.index, i);
+    return { ...v, index: i, notes: v.notes.map((n) => ({ ...n, voice: i })) };
+  });
+  const events = score.events.filter((e) => !("voice" in e) || remap.has(e.voice)).map((e) => ("voice" in e ? { ...e, voice: remap.get(e.voice)! } : e));
+  const used = new Set(voices.flatMap((v) => v.notes.map((n) => n.instrument)));
+  return { ...score, voices, events, instruments: score.instruments.filter((i) => used.has(i.index)) };
+}
+
+function buildEvents(doc: ParsedSidwave, options: EventExportOptions): ExportedScore {
   const ppq = options.ppq ?? DEFAULT_PPQ;
   if (!Number.isInteger(ppq) || ppq < 24 || ppq > 9600) throw new RangeError("ppq must be an integer from 24 to 9600");
   const song = options.song ?? 0;

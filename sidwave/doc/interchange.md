@@ -263,3 +263,229 @@ Writes an SWM1 module for the subset that the format expresses; everything else 
 Not exported: drum voices, voices beyond three or on another SID, velocity and levels, vibrato, arpeggios, slides, wavetables, pulse and filter tables, filter routing, echo and follow copies, tempo changes and swing, bends and legato. `--format swi` writes one instrument (waveform, ADSR, pulse width) and lists what it leaves out. Scores whose speed is not 1 to 8 calls per frame, with more than 100 distinct patterns, more than 124 patterns per track or more than 37 instruments are refused (exit 3). `.sws` export is not available.
 
 Verification of the export: the exported file is read back by `sidwave import` (same note count, pitches and start times within 30 ms on the test score), and by SWMconvert, the SID-Wizard author's own converter built from its source (`SWMconvert.c`, public domain; the test builds it with `gcc` when the SID-Wizard checkout is present and skips otherwise): it converts the exported module to a MIDI file with the same three tracks, the same 14, 8 and 2 notes with the same pitches and the same relative timing as the score's event export. SWMconvert has no licence text in the repository; it was read and built locally for this check only, nothing from it is part of SIDWave. Player check not achieved: SID-Maker (`exporter.asm`) assembles with 64tass 1.60 (`-D SID_AMOUNT=1 -D SFX_SUPPORT=0 -D SLOWDOWN_SUPP=0 -D SWP_EXPORT=0`) and runs in `x64sc -sounddev dummy` under Xvfb with a remote monitor; its file selector (`*.SWM`, drive 8) came up and read the directory of a d64 image. Two steps failed: the exported file did not appear in the list (the selector filters on the file type name, which a plain c1541 `-write` does not set), and keys written into the KERNAL keyboard buffer through the monitor were not consumed (the program scans `$DC01` directly), so no module was converted. Status: exact for the expressible subset at note level (read back by two independent readers), not verified at register level against the player.
+
+## Conversion hub: `sidwave convert`
+
+`sidwave convert <in> [<out>]` converts between the formats of this document, the SIDWave score, the compiled PRG
+and PSID, and (as a source) a PSID. One command replaces the two-step `import` then `export`; the same conversion is
+available as `convert()` from the package root.
+
+```
+sidwave convert song.sng song.mid          # GoatTracker song to MIDI
+sidwave convert tune.mid tune.sid          # MIDI to a playable SID file
+sidwave convert tune.sid tune.sng          # SID to GoatTracker (traces the tune: slower, approximate)
+sidwave convert song.fur song.sng --dry-run --json
+sidwave formats                            # the format table below, from the registry
+sidwave info unknown.bin                   # detect and describe any supported file
+```
+
+### Formats
+
+| Id | Reads | Writes | Extensions | Detected by |
+|---|---|---|---|---|
+| `sidwave` | yes | yes | `.yaml` `.yml` `.sidwave` | top-level key `sidwave:` (older scores: `song:` and `voices:`) |
+| `sid` | approximate (reconstruct) | yes | `.sid` | magic `PSID` or `RSID` |
+| `midi` | yes | yes | `.mid` `.midi` `.smf` | header chunk `MThd` |
+| `musicxml` | yes (uncompressed) | yes | `.musicxml` `.xml` (`.mxl` input only) | root element `score-partwise` or `score-timewise` |
+| `goattracker` | yes | yes | `.sng` | magic `GTS!`, `GTS2` to `GTS5` |
+| `sidwizard` | yes | yes | `.swm` `.sws` | identifier `SWM1` or `SWMS` at offset 2 (`.swi` instruments are not handled by convert) |
+| `vice-dump` | approximate (reconstruct) | yes | `.dump` | lines of three decimal numbers |
+| `siddump` | approximate (reconstruct) | no | `.siddump` | a table with `|` rows and a Frame column |
+| `furnace` | yes | yes | `.fur` | header `-Furnace module-`, also inside zlib |
+| `wav` | no | yes (mix, mono 48 kHz) | `.wav` | `RIFF` and `WAVE` |
+| `prg` | no | yes | `.prg` | extension only |
+| `events` | no | yes (lossy JSON view) | `.json` | JSON key `schema: sidwave.events/1` |
+
+`sidwave formats` prints the same table with a loss summary per format. Reading events JSON, WAV and PRG is not
+supported by design or not yet: events are a lossy view, a PRG has no score, and audio transcription is planned.
+
+### Detection
+
+The content decides. Each format has a magic detector that returns a confidence from 0 to 1. A weak match gains 0.35
+when the extension agrees. If nothing matches the content, the extension alone gives confidence 0.5. The best
+candidate is used when its confidence is at least 0.6 and the second best is more than 0.2 behind. Otherwise
+`convert` exits 3 and lists the candidates with the `--from` option that fixes it. When the extension contradicts a
+clear magic (0.9 or more), the content wins and a warning is printed.
+
+### Chain
+
+`read` (importer, or reconstruct for a `.sid`) then `normalise` (the result is parsed as a SIDWave score) then `plan`
+(ScorePlan, below) then `write` (exporter). With `--verify` the output is read again and compared with the score.
+Converting a SIDWave score to the same format is a plain copy through the writer. The input and output of a
+converted pair are always checked first: nothing is written when any output file exists (without `--force`) or when
+the output is the input.
+
+### ScorePlan
+
+Every exporter receives its score from `planScore()` (`interchange/scorePlan.ts`). The plan decides, from the
+capabilities of the target (`TargetCaps`):
+
+- Voices: when the target holds fewer voices than the score has (GoatTracker and Furnace: three), the voices with the
+  highest notes x pitch range are kept; ties keep the voice that comes first. The dropped voices are reported
+  (`voices.dropped`, severity `lost`). `--voices n` lowers the limit further.
+- Tempo: a target with a tempo map gets the tempo map; a tracker with one tempo folds tempo changes into its row grid
+  (`tempo.folded`). Tempo ramps are reported for every target (`tempo.ramp`): they become steps in a tempo map and
+  are not stored in a single-tempo format.
+- Glides, slides and vibrato are reported when the target writes plain notes (`bend.dropped`).
+- A loop point that the target cannot store (`loop.restart`) and title and author that the target does not store
+  (`metadata.dropped`).
+- Row grid: the GoatTracker and Furnace exporters pick the largest row length of 3 to 12 calls that fits every note
+  start. They always count time in video frames: a score with `speed: 2` has its notes rounded to frames
+  (`timing.multispeed`).
+
+Drum hits that share a voice with pitched notes are written as pitched notes in MIDI and MusicXML, because a part with
+both kinds is read back as a drum part and loses its pitched notes.
+
+### Losses
+
+Each stage returns losses `{ stage, code, severity, count, where?, message }`. The hub groups them by stage and code.
+Severity `info`: nothing musical is lost. `approx`: the result is close, not equal. `lost`: content is missing in the
+output. `--strict` exits 1 and writes nothing when any loss is `lost`. The sentences that importers and exporters
+report are mapped to codes by `interchange/loss.ts`; a sentence with no rule gets the code `note` and severity `approx`, and a test fails on every `note` code.
+
+### Quality measure (`--verify`)
+
+The output is read back with the target's importer and its notes are compared with a reference note by note. The
+reference is the score after the import, with all voices and before any reduction. It is not the source file: an
+import that drops notes is already in the reference, and only `sourceVsOutput` (below) sees it. A note matches when
+its pitch (for a drum hit: its drum name) is equal and the onsets differ by at most the tolerance. The tolerance is one
+video frame (20 ms) for a format without a grid. For a target with a row grid (GoatTracker, Furnace, SID-Wizard) it is half
+a row, and for an importer that quantises to a grid (MIDI, MusicXML: 0.25 beat by default) half a grid cell, each plus 10 ms
+for rounding, at most 100 ms, because rounding a note start to the nearest row moves it by up to half a row (a sawtooth: the error of each note
+is bounded and does not accumulate). It is printed with the result (`onsetToleranceMs`). There is no wildcard for drums.
+
+Reported: `noteF1` with `precision` and `recall`; `noteF1PitchOnly` (drum identity ignored); `noteF1OctaveTolerant` and
+`octaveShifted` (matches that differ by whole octaves); mean and maximum onset error; `durationOverlap` (mean of
+intersection over union of the note intervals of matched notes, so it sees changed note ends); `voiceAgreement` (the
+share of matched notes whose output voice is the voice that most notes of the same reference voice went to; it does not
+change when the voices are permuted, so `voiceAgreementIdentity`, the share that keep their voice number, is reported with it);
+`drumIdentity` (drum hits that matched as the same drum); the length of the reference and of the output in seconds
+(`durationSeconds`: a tracker or grid import pads the last bar, so the length can grow by up to a bar without any tempo
+drift); voices dropped; instruments mapped; for a `.sid` or trace input the F-diff of the reconstruct. A1 is not
+computed by `convert`; use `sidwave verify` for compiled tunes. Targets that cannot be read back (`prg`, `sid`, `wav`,
+`events`, `vice-dump`) report `available: false` with the reason.
+
+For a source that carries notes, `sourceVsOutput` repeats the comparison against the notes of the source file itself,
+read independently of the importer (pitch only, no drum identity). It exists for MIDI. For MusicXML and the trackers
+the reference is the imported score only, because their notes are read by the importers and there is no second reader.
+
+Quality thresholds of the conversion test matrix (`test/convertMatrix.test.mjs`), per source and target format. Every
+pair is converted for each committed fixture, read back, and must reach the note F1, the duration overlap and the voice
+agreement of its row. Each value is the lowest measured over the fixtures of the pair, rounded down to two digits, so
+that a change that makes a pair worse fails the test; the reason column names what limits the value. The second F1
+column applies to scores with more than three voices (the fixture `title_fanfare`, five voices). A `sid`, `vice-dump`
+and `siddump` source is read by reconstruct with a 4 s horizon. The tables are per source, in one block each.
+
+<!-- quality:sidwave:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| sidwave | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| sidwave | midi | 0.92 | 0.66 | 0.84 | 0.92 | drum identity is lost (drum hits of the five-voice fixture sit in voices beyond the importer's three); the importer gives one of its 3 voices to the drum part and drops the notes of the weakest pitched part (listed in the read losses); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID) |
+| sidwave | musicxml | 0.92 | 0.66 | 0.84 | 0.92 | drum identity is lost (drum hits of the five-voice fixture sit in voices beyond the importer's three); the importer gives one of its 3 voices to the drum part and drops the notes of the weakest pitched part (listed in the read losses); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID) |
+| sidwave | goattracker | 0.69 | 0.68 | 0.86 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID); notes and ends move to the row grid |
+| sidwave | furnace | 0.69 | 0.68 | 0.86 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID); notes and ends move to the row grid |
+| sidwave | sidwizard | 0.57 | 0.61 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); voices beyond three are dropped (trackers) or not read back (MIDI and MusicXML: three voices per SID); notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells |
+<!-- quality:sidwave:end -->
+
+<!-- quality:sid:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| sid | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | recovered by reconstruct from a 4 s horizon |
+| sid | midi | 1.00 | 1.00 | 0.82 | 1.00 | recovered by reconstruct from a 4 s horizon |
+| sid | musicxml | 1.00 | 1.00 | 0.82 | 1.00 | recovered by reconstruct from a 4 s horizon |
+| sid | goattracker | 1.00 | 1.00 | 0.96 | 1.00 | notes and ends move to the row grid; recovered by reconstruct from a 4 s horizon |
+| sid | furnace | 1.00 | 1.00 | 0.96 | 1.00 | notes and ends move to the row grid; recovered by reconstruct from a 4 s horizon |
+| sid | sidwizard | 1.00 | 1.00 | 0.96 | 1.00 | notes and ends move to the row grid; recovered by reconstruct from a 4 s horizon |
+<!-- quality:sid:end -->
+
+<!-- quality:midi:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| midi | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| midi | midi | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| midi | musicxml | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| midi | goattracker | 0.64 | 0.64 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
+| midi | furnace | 0.64 | 0.64 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
+| midi | sidwizard | 0.78 | 0.78 | 0.89 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells |
+<!-- quality:midi:end -->
+
+<!-- quality:musicxml:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| musicxml | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| musicxml | midi | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| musicxml | musicxml | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| musicxml | goattracker | 0.64 | 0.64 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
+| musicxml | furnace | 0.64 | 0.64 | 0.90 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid |
+| musicxml | sidwizard | 0.78 | 0.78 | 0.89 | 1.00 | drum identity is lost (no drum channel: hits become pitched notes); notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells |
+<!-- quality:musicxml:end -->
+
+<!-- quality:goattracker:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| goattracker | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| goattracker | midi | 1.00 | 1.00 | 0.77 | 0.93 | the tracker's row grid is read back on the 0.25 beat grid |
+| goattracker | musicxml | 1.00 | 1.00 | 0.77 | 0.93 | the tracker's row grid is read back on the 0.25 beat grid |
+| goattracker | goattracker | 1.00 | 1.00 | 0.87 | 1.00 | notes and ends move to the row grid |
+| goattracker | furnace | 1.00 | 1.00 | 0.87 | 1.00 | notes and ends move to the row grid |
+| goattracker | sidwizard | 1.00 | 1.00 | 0.76 | 1.00 | notes and ends move to the row grid |
+<!-- quality:goattracker:end -->
+
+<!-- quality:furnace:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| furnace | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| furnace | midi | 1.00 | 1.00 | 0.77 | 0.93 | the tracker's row grid is read back on the 0.25 beat grid |
+| furnace | musicxml | 1.00 | 1.00 | 0.77 | 0.93 | the tracker's row grid is read back on the 0.25 beat grid |
+| furnace | goattracker | 1.00 | 1.00 | 1.00 | 1.00 | notes and ends move to the row grid |
+| furnace | furnace | 1.00 | 1.00 | 1.00 | 1.00 | notes and ends move to the row grid |
+| furnace | sidwizard | 1.00 | 1.00 | 1.00 | 1.00 | notes and ends move to the row grid |
+<!-- quality:furnace:end -->
+
+<!-- quality:sidwizard:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| sidwizard | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | exact round trip |
+| sidwizard | midi | 1.00 | 1.00 | 0.92 | 1.00 | the tracker's row grid is read back on the 0.25 beat grid |
+| sidwizard | musicxml | 1.00 | 1.00 | 0.92 | 1.00 | the tracker's row grid is read back on the 0.25 beat grid |
+| sidwizard | goattracker | 1.00 | 1.00 | 0.96 | 1.00 | notes and ends move to the row grid |
+| sidwizard | furnace | 1.00 | 1.00 | 0.96 | 1.00 | notes and ends move to the row grid |
+| sidwizard | sidwizard | 1.00 | 1.00 | 0.83 | 1.00 | notes and ends move to the row grid |
+<!-- quality:sidwizard:end -->
+
+<!-- quality:vice-dump:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| vice-dump | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | recovered by reconstruct from a 4 s horizon |
+| vice-dump | midi | 1.00 | 1.00 | 1.00 | 1.00 | recovered by reconstruct from a 4 s horizon |
+| vice-dump | musicxml | 1.00 | 1.00 | 1.00 | 1.00 | recovered by reconstruct from a 4 s horizon |
+| vice-dump | goattracker | 1.00 | 1.00 | 1.00 | 1.00 | notes and ends move to the row grid; recovered by reconstruct from a 4 s horizon |
+| vice-dump | furnace | 1.00 | 1.00 | 1.00 | 1.00 | notes and ends move to the row grid; recovered by reconstruct from a 4 s horizon |
+| vice-dump | sidwizard | 1.00 | 1.00 | 1.00 | 1.00 | notes and ends move to the row grid; recovered by reconstruct from a 4 s horizon |
+<!-- quality:vice-dump:end -->
+
+<!-- quality:siddump:start -->
+| Source | Target | Note F1, at most 3 voices | Note F1, more than 3 voices | Duration overlap | Voice agreement | Reason |
+|---|---|---|---|---|---|---|
+| siddump | sidwave | 1.00 | 1.00 | 1.00 | 1.00 | siddump is sampled once per frame (approximate) |
+| siddump | midi | 0.80 | 0.80 | 0.53 | 1.00 | siddump is sampled once per frame (approximate) |
+| siddump | musicxml | 0.80 | 0.80 | 0.53 | 1.00 | siddump is sampled once per frame (approximate) |
+| siddump | goattracker | 0.80 | 0.80 | 0.38 | 1.00 | notes and ends move to the row grid; siddump is sampled once per frame (approximate) |
+| siddump | furnace | 0.80 | 0.80 | 0.38 | 1.00 | notes and ends move to the row grid; siddump is sampled once per frame (approximate) |
+| siddump | sidwizard | 0.80 | 0.80 | 0.75 | 1.00 | notes and ends move to the row grid; speed-2 scores need one-call rows, merged to 3-frame cells; siddump is sampled once per frame (approximate) |
+<!-- quality:siddump:end -->
+
+The golden losses of every pair are in `test/fixtures/convert/golden/`, one file per input. The files are generated by
+`scripts/regenerate-convert-golden.mjs`, never by hand. The binary fixtures are generated by
+`scripts/make-convert-fixtures.mjs` from the committed scores.
+
+### Adding a format
+
+Create one file `interchange/formats/<name>.ts` that exports a `FormatDefinition` (`interchange/formatTypes.ts`): `id`,
+`extensions`, `magic(bytes)`, `caps`, a `detection` and `lossSummary` text, and `read` and/or `write` that wrap the
+format's importer and exporter (see `builtinFormats.ts` and `formats/sidwizard.ts`). The registry loads every module
+in `interchange/formats/` at start-up and registers each exported definition, so no existing file is edited. A format
+whose writer renders audio or traces sets `writeNeedsEngine`; a reader that reconstructs a tune sets
+`readIsApproximate`. Detection, `convert`, `formats`, `info` and the conversion test matrix pick the format up: add
+fixtures for it to `test/helpers/convertMatrix.mjs` (the matrix test fails on a readable format without a fixture), a
+block for it to the threshold tables below, and run `scripts/regenerate-convert-golden.mjs`.

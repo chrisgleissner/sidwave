@@ -1,0 +1,456 @@
+{
+ "siddump:fur-elise -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 25,
+    "message": "Only the first 4 s (25 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 63,
+    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   }
+  ]
+ },
+ "siddump:fur-elise -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 25,
+    "message": "Only the first 4 s (25 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 63,
+    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "HR-SHORT: Hard restart of 1 frame(s) is under 32768 cycles; use at least 2 frames or frames: 0 (at bar 1 v1)"
+   }
+  ]
+ },
+ "siddump:fur-elise -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 25,
+    "message": "Only the first 4 s (25 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 63,
+    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "siddump:fur-elise -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 25,
+    "message": "Only the first 4 s (25 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 63,
+    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "siddump:fur-elise -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 25,
+    "message": "Only the first 4 s (25 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 63,
+    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   },
+   {
+    "stage": "write",
+    "code": "notes.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Voice 1: two notes fall on row 4; the later one is dropped. | Voice 1: two notes fall on row 5; the later one is dropped."
+   }
+  ]
+ },
+ "siddump:fur-elise -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 25,
+    "message": "Only the first 4 s (25 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 63,
+    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   },
+   {
+    "stage": "write",
+    "code": "notes.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Two notes fall on row 4; the later one is dropped. | Two notes fall on row 5; the later one is dropped."
+   }
+  ]
+ },
+ "siddump:fur-elise -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 17,
+    "message": "Only the first 1 s (17 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 39,
+    "message": "F-diff: the recovered score differs from the tune in 39 register-class differences over 17 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ },
+ "siddump:fur-elise -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 25,
+    "message": "Only the first 4 s (25 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 63,
+    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "HR-SHORT: Hard restart of 1 frame(s) is under 32768 cycles; use at least 2 frames or frames: 0 (at bar 1 v1)"
+   }
+  ]
+ },
+ "siddump:fur-elise -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 25,
+    "message": "Only the first 4 s (25 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 63,
+    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "siddump:fur-elise -> sidwizard": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 25,
+    "message": "Only the first 4 s (25 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 63,
+    "message": "F-diff: the recovered score differs from the tune in 63 register-class differences over 24 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "write",
+    "code": "rows.one-call",
+    "severity": "info",
+    "count": 1,
+    "message": "Rows are one player call long (note starts and ends fall on odd calls): the module is correct but large and uses the fastest tempo."
+   }
+  ]
+ },
+ "siddump:fur-elise -> vice-dump": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "reconstruct.horizon",
+    "severity": "approx",
+    "count": 17,
+    "message": "Only the first 1 s (17 player calls) of the siddump trace were analysed."
+   },
+   {
+    "stage": "read",
+    "code": "reconstruct.fdiff",
+    "severity": "approx",
+    "count": 39,
+    "message": "F-diff: the recovered score differs from the tune in 39 register-class differences over 17 compared player calls (a call can differ in several classes)."
+   },
+   {
+    "stage": "read",
+    "code": "trace.approximate",
+    "severity": "approx",
+    "count": 1,
+    "message": "siddump samples the registers once per frame: the order and cycles of writes inside a frame are invented, so hard restarts and short gate pulses are lost."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "trace.cycles",
+    "severity": "info",
+    "count": 1,
+    "message": "Cycle numbers are those of SIDWave's engine; a real VICE run of the same SID file starts with its own power-on delay."
+   }
+  ]
+ }
+}

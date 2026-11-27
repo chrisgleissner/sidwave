@@ -1,0 +1,250 @@
+{
+ "musicxml:title-fanfare -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 22,
+    "message": "22 notes of 2 part(s) do not fit in 3 voices and are not imported (v4 Trombone: 14 notes; v3 Contrabass: 8 notes)."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 22,
+    "message": "22 notes of 2 part(s) do not fit in 3 voices and are not imported (v4 Trombone: 14 notes; v3 Contrabass: 8 notes)."
+   },
+   {
+    "stage": "write",
+    "code": "compile.advisory",
+    "severity": "info",
+    "count": 3,
+    "message": "TABLE-CUT: A wavetable needs 6 frames but only 4 are available before the next attack or the note end; lengthen the note or shorten the table (at bar 4 v3) | FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (2 times, first at bar 2)"
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 22,
+    "message": "22 notes of 2 part(s) do not fit in 3 voices and are not imported (v4 Trombone: 14 notes; v3 Contrabass: 8 notes)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 22,
+    "message": "22 notes of 2 part(s) do not fit in 3 voices and are not imported (v4 Trombone: 14 notes; v3 Contrabass: 8 notes)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 22,
+    "message": "22 notes of 2 part(s) do not fit in 3 voices and are not imported (v4 Trombone: 14 notes; v3 Contrabass: 8 notes)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 22,
+    "message": "22 notes of 2 part(s) do not fit in 3 voices and are not imported (v4 Trombone: 14 notes; v3 Contrabass: 8 notes)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 22,
+    "message": "22 notes of 2 part(s) do not fit in 3 voices and are not imported (v4 Trombone: 14 notes; v3 Contrabass: 8 notes)."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "compile.advisory",
+    "severity": "info",
+    "count": 3,
+    "message": "TABLE-CUT: A wavetable needs 6 frames but only 4 are available before the next attack or the note end; lengthen the note or shorten the table (at bar 4 v3) | FLAT: Estimated loudness varies by 0.0 dB; set section level or volume to build and release (at bar 1) | HR-GAP: Stagger attacks or hold one voice with legato so the mix is never silent at once (2 times, first at bar 2)"
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 22,
+    "message": "22 notes of 2 part(s) do not fit in 3 voices and are not imported (v4 Trombone: 14 notes; v3 Contrabass: 8 notes)."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "musicxml:title-fanfare -> sidwizard": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 22,
+    "message": "22 notes of 2 part(s) do not fit in 3 voices and are not imported (v4 Trombone: 14 notes; v3 Contrabass: 8 notes)."
+   },
+   {
+    "stage": "write",
+    "code": "notes.drums",
+    "severity": "lost",
+    "count": 1,
+    "message": "Drum voices (v3) are not exported: SID-Wizard drums are instruments, which this export does not build from SIDWave kits."
+   },
+   {
+    "stage": "write",
+    "code": "expression.dropped",
+    "severity": "approx",
+    "count": 1,
+    "message": "Note velocities (6 distinct values) are not exported; the module plays at full volume."
+   }
+  ]
+ }
+}

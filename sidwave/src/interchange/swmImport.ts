@@ -271,20 +271,20 @@ function convertModule(m: SwmModule, options: SwmImportOptions): SwmImportResult
   let bpm = framesPerBeatBase * cellBeats / cellCalls;
   if (bpm < 30 || bpm > 220) { warnings.push(`the tempo ${bpm.toFixed(1)} BPM is outside SIDWave's 30 to 220 and was clamped`); bpm = clamp(bpm, 30, 220); }
   if (k > 1) lose(`rows are 1 to ${[...durations].sort((a, b) => a - b)[0]} calls long; SIDWave needs at least 3 frames per note, so ${k} grid steps of ${g} calls are merged and note starts are moved to the merged grid`);
-  if (durations.size > 1 && g !== Math.max(...durations)) lose("the tempo changes or alternates (funk tempo, tempo program, track tempo); rows are placed on a common grid of the greatest common divisor of their lengths");
+  const alternates = durations.size > 1;
 
   const end = Math.max(...results.map((r) => r.end), 0);
   const cellsPerBar = Math.round(4 / cellBeats);
   const rawCells = Math.max(1, Math.ceil(end / cellCalls));
   const cellCount = Math.ceil(rawCells / cellsPerBar) * cellsPerBar;
   const maxMidi = maxSidwaveMidi(mode);
-  let moved = 0, eventCount = 0;
+  let moved = 0, eventCount = 0, maxShift = 0;
   type Cell = { kind: "rest" } | { kind: "tie" } | { kind: "note"; pitch: number; inst: number; legato: boolean };
   const voiceCells: Cell[][] = results.map((r) => {
     const cells: Cell[] = Array.from({ length: cellCount }, () => ({ kind: "rest" }));
     // Quantise, keeping the last event of a cell.
     const slots = new Map<number, TrackEvent>();
-    for (const e of r.events) { eventCount++; const c = Math.round(e.at / cellCalls); if (c * cellCalls !== e.at) moved++; slots.set(c, e); }
+    for (const e of r.events) { eventCount++; const c = Math.round(e.at / cellCalls); if (c * cellCalls !== e.at) { moved++; maxShift = Math.max(maxShift, Math.abs(c * cellCalls - e.at)); } slots.set(c, e); }
     const sorted = [...slots.entries()].sort((a, b) => a[0] - b[0]);
     for (let i = 0; i < sorted.length; i++) {
       const [c, e] = sorted[i]!;
@@ -299,6 +299,9 @@ function convertModule(m: SwmModule, options: SwmImportOptions): SwmImportResult
     }
     return cells;
   });
+  if (alternates && moved > 0) {
+    lose(`Funk tempo, tempo program or track tempo: the rows are ${[...durations].sort((a, b) => a - b).join(' and ')} calls long and SIDWave has one tempo per bar, so the rows are placed on a grid of ${cellCalls} calls; ${moved} of ${eventCount} note starts move by up to ${maxShift} calls (${(maxShift / callRate * 1000).toFixed(0)} ms)`);
+  } else if (alternates) lose(`Funk tempo, tempo program or track tempo: the rows are ${[...durations].sort((a, b) => a - b).join(' and ')} calls long and are placed on a grid of ${cellCalls} calls; no note start moves`);
 
   // Instruments used, voices, patterns, timeline.
   const used = new Set<number>();

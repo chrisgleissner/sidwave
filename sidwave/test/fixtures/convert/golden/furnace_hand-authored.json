@@ -1,0 +1,236 @@
+{
+ "furnace:hand-authored -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   }
+  ]
+ },
+ "furnace:hand-authored -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   }
+  ]
+ },
+ "furnace:hand-authored -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "furnace:hand-authored -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "furnace:hand-authored -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "furnace:hand-authored -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "furnace:hand-authored -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "furnace:hand-authored -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "furnace:hand-authored -> sidwizard": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument 0: macro steps count Furnace ticks; SIDWave counts player calls (a different rate), and arpeggio and waveform macros of different lengths are held at their last value."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Instrument f00_lead: wavetable is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "expression.dropped",
+    "severity": "approx",
+    "count": 1,
+    "message": "Note velocities (2 distinct values) are not exported; the module plays at full volume."
+   }
+  ]
+ }
+}

@@ -154,7 +154,6 @@ export function importFurnace(bytes: Uint8Array, options: FurnaceImportOptions =
     for (const l of converted.lost) losses.push(`Instrument ${index}: ${l}.`);
   }
   if (instReports.length > 63) throw new FurnaceError(`the song uses ${instReports.length} instruments; SIDWave allows 63`);
-  losses.push("The volume column of a row sets the level of the following notes (0 to 15); panning, wavetables, samples and the song's patchbay are not imported.");
   if (voices.every((v) => v.cells.every((cell) => cell.kind === "rest"))) throw new FurnaceError("the module contains no notes on the C64 channels");
   const yaml = buildGridScore({
     title: options.title ?? (song.name || "Imported Furnace module"), ...(song.author ? { author: song.author } : {}), mode, grid: 1 / rowsPerBeat, bars, voices, instruments: defs,

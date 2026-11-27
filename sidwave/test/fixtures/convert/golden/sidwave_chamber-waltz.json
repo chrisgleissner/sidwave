@@ -1,0 +1,334 @@
+{
+ "sidwave:chamber-waltz -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "0 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "0 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   },
+   {
+    "stage": "write",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "A note that crosses a bar line is written as tied notes."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 21,
+    "message": "21 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps cannot be stored; the notes keep their times but not the tempo curve."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 21,
+    "message": "21 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps cannot be stored; the notes keep their times but not the tempo curve."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are written as steps of constant tempo."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "0 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.ramp",
+    "severity": "approx",
+    "count": 1,
+    "message": "Tempo ramps are exported as one tempo change per beat and one per note start inside the ramp; between two entries the tempo is constant."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "sidwave:chamber-waltz -> sidwizard": {
+  "ok": false,
+  "category": "input",
+  "message": "the song needs 212 patterns per track; an SWM orderlist holds 124. Use patternRows 64 or a shorter score"
+ }
+}

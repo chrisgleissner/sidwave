@@ -14,7 +14,10 @@ import {
 } from "./cliCore.js";
 import { ANALYZE_COMMANDS, ANALYZE_HELP, ANALYZE_USAGE, takeAnalyzeFlag, type AnalyzeFlags } from "./cliAnalyze.js";
 import { RECONSTRUCT_COMMAND_HELP, RECONSTRUCT_USAGE, reconstructCommand } from "./cliReconstruct.js";
-import { INTERCHANGE_COMMANDS, INTERCHANGE_HELP } from "./interchange/cli.js";
+import { INTERCHANGE_COMMANDS as BASE_INTERCHANGE_COMMANDS, INTERCHANGE_HELP } from "./interchange/cli.js";
+import { CONVERT_HELP, HUB_COMMANDS } from "./interchange/convertCli.js";
+
+const INTERCHANGE_COMMANDS = { ...BASE_INTERCHANGE_COMMANDS, ...HUB_COMMANDS };
 import { runCompleteCli } from "./cliComplete.js";
 import { isTraceInput, reconstructFromTraceCommand } from "./interchange/traceCli.js";
 import { RUN_COMMANDS, RUN_HELP, flagName, takeRunFlag, type RunFlags } from "./cliVerify.js";
@@ -39,7 +42,7 @@ Usage:
   sidwave retarget <file> [--clock pal|ntsc] [--model 6581|8580] [--sids <n>] [--budget-cycles <n>] [--budget-bytes <n>]
                           [--allow-changes] [-o <out>] [--force] [--json]   (see "sidwave retarget --help")
   sidwave complete <score> --op continue|harmonise|accompany|fill-section [options]   (see "sidwave complete --help")
-${INTERCHANGE_HELP}${RUN_HELP.usage}${RECONSTRUCT_USAGE}${ANALYZE_USAGE}  sidwave --help | --version
+${INTERCHANGE_HELP}${CONVERT_HELP}${RUN_HELP.usage}${RECONSTRUCT_USAGE}${ANALYZE_USAGE}  sidwave --help | --version
 
 Commands:
   validate   Parse a score. Exit 0 when it is valid, 3 with the path of the first error otherwise.

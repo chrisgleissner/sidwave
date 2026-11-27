@@ -259,7 +259,7 @@ export function importMidi(bytes: Uint8Array, options: MidiImportOptions = {}): 
   }
   // Voice order: melodic by importance, drums last (so v1 is the most important melody).
   chosen.sort((a, b) => Number(a.drum) - Number(b.drum));
-  if (droppedParts.length) losses.push(`${droppedParts.length} source part(s) do not fit in ${voiceLimit} voices and are not imported.`);
+  if (droppedParts.length) losses.push(`${droppedParts.reduce((n, d) => n + d.notes, 0)} notes of ${droppedParts.length} source part(s) do not fit in ${voiceLimit} voices and are not imported (${droppedParts.map((d) => `${d.name ?? `track ${d.track} channel ${d.channel}`}: ${d.notes} notes`).join('; ')}).`);
 
   const maxMidi = maxSidwaveMidi(mode);
   const fps = sidwaveFrameRate(mode);
@@ -460,7 +460,9 @@ export function importMidi(bytes: Uint8Array, options: MidiImportOptions = {}): 
       throw error;
     }
   }
-  losses.push("Controllers other than RPN 0 pitch bend range, aftertouch, SysEx and per-note release are not imported; instruments come from the GM program family (see doc/interchange.md).");
+  let unread = 0;
+  for (const track of smf.tracks) for (const e of track) if ((e.type === "controller" && ![101, 100, 6, 38].includes(e.controller)) || e.type === "other") unread++;
+  if (unread) losses.push(`${unread} MIDI events (controllers other than the pitch bend range, aftertouch, SysEx and other meta events) are not imported.`);
   if (options.bend === false) losses.push("Pitch bend import is disabled.");
   return {
     yaml: text,
