@@ -17,3 +17,6 @@ export { parseXml, XmlError, type XmlNode } from "./xml.js";
 export * from "./goattracker.js";
 export * from "./goattrackerImport.js";
 export * from "./goattrackerExport.js";
+export * from "./furnace.js";
+export * from "./furnaceImport.js";
+export * from "./furnaceExport.js";

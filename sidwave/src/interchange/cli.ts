@@ -12,6 +12,8 @@ import { InterchangeUsageError } from "./errors.js";
 import { exportEvents } from "./events.js";
 import { exportGoatTracker } from "./goattrackerExport.js";
 import { exportMidi } from "./midiExport.js";
+import { exportFurnace } from "./furnaceExport.js";
+import { importFurnace } from "./furnaceImport.js";
 import { importGoatTracker } from "./goattrackerImport.js";
 import { importMidi } from "./midiImport.js";
 import { exportMusicXml } from "./musicxmlExport.js";
@@ -131,18 +133,21 @@ function exportCommand(args: string[], io: CliIo): number {
       const { bytes: _bytes, ...info } = result;
       return done({ file, format, output: written, bytes: result.bytes.length, ...info }, `${written}: GoatTracker GTS5, ${result.voices} channels, ${result.rows} rows, ${result.ticksPerRow} calls per row`);
     }
-    if (format === "furnace") return furnaceExport(doc, common, output, path, io, json);
+    if (format === "furnace") {
+      const result = exportFurnace(doc, common);
+      const target = output ?? `${stem(file)}.fur`;
+      for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
+      if (target === "-") { io.outBytes(result.bytes); return 0; }
+      const written = writeOutput(io, path, target, result.bytes);
+      const { bytes: _bytes, ...info } = result;
+      return done({ file, format, output: written, bytes: result.bytes.length, ...info }, `${written}: Furnace module, ${result.voices} channels, ${result.rows} rows, ${result.ticksPerRow} ticks per row`);
+    }
     return musicXmlExport(doc, common, output, path, io, json);
   } catch (error) {
     if (error instanceof RangeError) throw new UsageError(error.message);
     throw error;
   }
 }
-
-let furnaceExport: (doc: ReturnType<typeof parseSidwave>, common: { song?: number; ppq?: number }, output: string | undefined, input: string, io: CliIo, json: boolean) => number = () => {
-  throw new UsageError("Furnace export is not available in this build");
-};
-export function registerFurnaceExport(fn: typeof furnaceExport): void { furnaceExport = fn; }
 
 function musicXmlExport(doc: ReturnType<typeof parseSidwave>, common: { song?: number; ppq?: number }, output: string | undefined, input: string, io: CliIo, json: boolean): number {
   const result = exportMusicXml(doc, common);
@@ -195,13 +200,19 @@ importers.set("goattracker", (bytes, a) => {
   }
 });
 
+importers.set("furnace", (bytes, a) => {
+  const mode = a.flags.get("--mode") as string | undefined;
+  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
+  return importFurnace(bytes, { ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}), ...(mode ? { mode } : {}), validate: !a.flags.has("--no-validate") });
+});
+
 const detect = (file: string, bytes: Buffer): string | undefined => {
   if (bytes.subarray(0, 4).toString("latin1") === "MThd") return "midi";
   const ext = extname(file).toLowerCase();
   if (ext === ".musicxml" || ext === ".xml") return "musicxml";
   if (ext === ".mxl") return "musicxml";
   if (bytes.subarray(0, 4).toString("latin1") === "GTS5" || bytes.subarray(0, 4).toString("latin1") === "GTS4" || bytes.subarray(0, 4).toString("latin1") === "GTS3" || bytes.subarray(0, 4).toString("latin1") === "GTS2" || ext === ".sng") return "goattracker";
-  if (ext === ".fur" || bytes.subarray(0, 2).toString("hex") === "789c" || bytes.subarray(0, 16).toString("latin1").startsWith("-Furnace module-")) return "furnace";
+  if (ext === ".fur" || bytes[0] === 0x78 || bytes.subarray(0, 16).toString("latin1").startsWith("-Furnace module-")) return "furnace";
   return undefined;
 };
 
