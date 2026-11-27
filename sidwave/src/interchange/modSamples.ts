@@ -224,9 +224,38 @@ function cyclesFromAutocorrelation(loop: Int8Array, mean: number): number {
 }
 
 /**
+ * Number of pulses in a loop that is a pulse wave: at least 90 % of the points within a tenth of the range from the highest
+ * or the lowest value, and rising edges that are evenly spaced (each distance within a quarter of the mean one). 0 otherwise.
+ */
+function evenPulses(loop: Int8Array): number {
+  const L = loop.length;
+  let min = 127, max = -128;
+  for (let i = 0; i < L; i++) { min = Math.min(min, loop[i]!); max = Math.max(max, loop[i]!); }
+  const edge = (max - min) / 10;
+  let outer = 0;
+  for (let i = 0; i < L; i++) if (loop[i]! >= max - edge || loop[i]! <= min + edge) outer++;
+  if (outer < 0.9 * L) return 0;
+  // Two passes: the first one finds the level the loop starts with.
+  const rising: number[] = [];
+  let high = false;
+  for (let i = 0; i < 2 * L; i++) {
+    const v = loop[i % L]!;
+    if (!high && v >= max - edge) { high = true; if (i >= L) rising.push(i); }
+    else if (high && v <= min + edge) high = false;
+  }
+  const n = rising.length;
+  const even = rising.every((at, i) => Math.abs((i + 1 < n ? rising[i + 1]! : rising[0]! + L) - at - L / n) <= L / n / 4);
+  return even ? n : 0;
+}
+
+/**
  * Length in sample points of one cycle of a looped section, as it sounds when it repeats: the loop length divided by the
  * number of cycles in it. Returns 0 when there is no reliable value: silence, noise, a chord or other sound without one
  * dominant repetition, and a cycle above 600 points in a loop above 600 points.
+ *
+ * A pulse wave whose width changes has a moving mean at the rate of the change, one or more octaves below its pitch, which
+ * the spectrum and the autocorrelation can take for the cycle. Its evenly spaced pulses are counted instead when there is no
+ * other result or at least 3 of them in one measured cycle.
  */
 export function measureLoopCycle(loop: Int8Array): number {
   const L = loop.length;
@@ -237,8 +266,11 @@ export function measureLoopCycle(loop: Int8Array): number {
   let changes = 0;
   for (let i = 0; i < L; i++) if ((loop[i]! > mean) !== (loop[(i + 1) % L]! > mean)) changes++;
   if (changes === 0) return 0;
-  const cycles = L > MAX_CYCLE ? cyclesFromAutocorrelation(loop, mean) : cyclesFromSpectrum(loop, mean);
-  return cycles > 0 && changes <= MAX_SIGN_CHANGES_PER_CYCLE * cycles ? L / cycles : 0;
+  let cycles = L > MAX_CYCLE ? cyclesFromAutocorrelation(loop, mean) : cyclesFromSpectrum(loop, mean);
+  if (changes > MAX_SIGN_CHANGES_PER_CYCLE * cycles) cycles = 0;
+  const pulses = evenPulses(loop);
+  if (pulses > 0 && L / pulses >= 4 && L / pulses <= MAX_CYCLE && (cycles === 0 || pulses >= 3 * cycles)) cycles = pulses;
+  return cycles > 0 ? L / cycles : 0;
 }
 
 /** Root mean square around the mean of the points from `from` to `to`. */

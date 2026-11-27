@@ -203,12 +203,15 @@ export const MOD_REFERENCE_MIDI = 48;
 export const MOD_REFERENCE_CYCLE = 64;
 
 /**
- * Nearest MIDI note of a period played by a sample with the given finetune (-8..7). `tuning` is added before rounding:
- * the semitones by which the sample sounds above a sample with a cycle of 64 points.
+ * MIDI note of a period played by a sample with the given finetune (-8..7). `tuning` is the semitones by which the sample
+ * sounds above a sample with a cycle of 64 points. The note of the period and the offset of the sample are rounded
+ * separately: periods are rounded values, so one rounding of the sum would move some notes of a sample whose offset is near
+ * half a semitone by one semitone more than others and change the intervals of its melody.
  */
 export function periodToMidi(period: number, finetune = 0, tuning = 0): number {
+  const note = Math.round(12 * Math.log2(MOD_REFERENCE_PERIOD / period));
   // A tie rounds down, as the table entries do: finetune +4 is just below half a semitone, -4 just above.
-  return MOD_REFERENCE_MIDI + Math.round(12 * Math.log2(MOD_REFERENCE_PERIOD / period) + finetune / 8 + tuning - 1e-9);
+  return MOD_REFERENCE_MIDI + note + Math.round(finetune / 8 + tuning - 1e-9);
 }
 
 /** Period of a MIDI note at finetune 0, as a real number. */

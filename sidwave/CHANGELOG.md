@@ -90,7 +90,7 @@ All notable changes to `sidwave` are listed here. The format follows [Keep a Cha
 
 ### Fixed
 
-- MOD import: the pitch of a looped sample now follows the cycle length of its loop. Before, every sample was treated as having a 64-point cycle, so a 32-point cycle was imported one octave low and other cycle lengths were off by the matching interval. `analyzeSample` reports the measured length as `loopCycle`. When the cycle of an audible loop cannot be measured reliably (noise, a chord, a quiet or very short tail, no clear period), the notes keep the 64-point pitch, the report lists the sample in `losses` and `analyzeSample` sets `loopUnmeasured`.
+- MOD import: the pitch of a looped sample now follows the cycle length of its loop. Before, every sample was treated as having a 64-point cycle, so a 32-point cycle was imported one octave low and other cycle lengths were off by the matching interval. `analyzeSample` reports the measured length as `loopCycle`. Evenly spaced pulses of a pulse wave are counted, so that a changing pulse width does not set the pitch. When the cycle of an audible loop cannot be measured reliably (noise, a chord, a quiet or very short tail, no clear period), the notes keep the 64-point pitch, the report lists the sample in `losses` and `analyzeSample` sets `loopUnmeasured`.
 - MOD import: the sample finetune now moves the pitch in the ProTracker direction (nibble 0 to 7 raises it, 8 to 15 lowers it, in eighths of a semitone). Before, the sign was inverted, so a finetune of 4 or more in either direction could move a note by one or two semitones from the pitch the Amiga plays.
 
 ### Performance

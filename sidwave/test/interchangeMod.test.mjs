@@ -222,6 +222,34 @@ test("finetune: the nibble 0..7 raises and 8..15 lowers the pitch, as in the Pro
   }
 });
 
+test("the offset of a sample moves all its notes by the same number of semitones", () => {
+  // C-1 to B-3 of the ProTracker table. The periods are rounded, so they are up to a tenth of a semitone off.
+  const table = [856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453, 428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
+    214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113];
+  for (const tuning of [-12.5, -0.5, 0.46, 0.48, 0.5, 0.52, 12.5]) {
+    for (const finetune of [-4, 0, 4]) {
+      const offsets = new Set(table.map((period, i) => periodToMidi(period, finetune, tuning) - (36 + i)));
+      assert.equal(offsets.size, 1, `tuning ${tuning}, finetune ${finetune}: ${[...offsets]}`);
+    }
+  }
+});
+
+test("a pulse wave with a changing width keeps the pitch of its pulses", () => {
+  // `sweeps` width cycles over the loop: the mean of the wave moves at that rate, far below the pitch.
+  const pwm = (cycle, cycles, sweeps, centre, depth) => Int8Array.from({ length: cycle * cycles }, (_, i) =>
+    (i % cycle) / cycle < centre + depth * Math.sin(2 * Math.PI * sweeps * i / (cycle * cycles)) ? 100 : -100);
+  for (const [cycle, cycles] of [[16, 8], [16, 16], [32, 8], [32, 16], [32, 32], [64, 4], [64, 8], [64, 16], [128, 8]]) {
+    for (const [centre, depth] of [[0.5, 0.4], [0.5, 0.2], [0.3, 0.2]]) {
+      const data = pwm(cycle, cycles, 1, centre, depth);
+      assert.equal(measureLoopCycle(data), cycle, `${cycles} cycles of ${cycle}, width ${centre} +- ${depth}`);
+      assertPitch({ data, loop: [0, data.length] }, 428, cycle, `PWM, ${cycles} cycles of ${cycle}`);
+    }
+  }
+  // Unevenly spaced pulses are not counted.
+  const uneven = Int8Array.from({ length: 256 }, (_, i) => ([0, 20, 90, 200].some((at) => i >= at && i < at + 6) ? 100 : -100));
+  assert.ok(measureLoopCycle(uneven) !== 64, `${measureLoopCycle(uneven)}`);
+});
+
 /** A sum of sine partials `[bin, amplitude]` over `length` points, scaled to a peak near 100. */
 const partials = (length, list) => {
   const sum = list.reduce((t, [, a]) => t + a, 0);
