@@ -6,7 +6,7 @@
 // traces call by call (F-diff).
 
 import { parseSidFile, type SidFile } from "../sidFile.js";
-import { parseSidwave } from "../sidwave.js";
+import { SidwaveValidationError, parseSidwave } from "../sidwave.js";
 import { compileSidwaveBytes } from "../sidwaveOps.js";
 import { psidClock, type SidEngine } from "../engine/libsidplayfp.js";
 import { fdiff, REGISTER_CLASSES, type FDiffResult, type RegisterClass } from "./fdiff.js";
@@ -50,6 +50,15 @@ function recoverySummary(recovered: RecoveredScore): ReconstructReport["recovery
     patternCount: recovered.patternCount, structure: recovered.structure, tuningEvidence: recovered.tuningEvidence,
     languageVersion: recovered.languageVersion, softStartOff: recovered.softStartOff,
   };
+}
+
+/**
+ * How far a candidate score is from the tune: its register-class differences, with every call of the tune that was not
+ * compared counted as differing in all classes. Without that term a recompiled trace that loses the call alignment, and so
+ * compares almost nothing, would look closest.
+ */
+export function candidateCost(fd: { differingCalls: number; comparedCalls: number; expectedCalls: number }): number {
+  return fd.differingCalls + REGISTER_CLASSES.length * Math.max(0, fd.expectedCalls - fd.comparedCalls);
 }
 
 /** The calls of an IR that start within `seconds` of the call at `first` (the alignment point), together with the calls before it. */
@@ -276,14 +285,23 @@ export async function reconstructSid(sidBytes: Uint8Array, options: ReconstructO
       timings.compileMs += performance.now() - tc0;
       return { candidate, text, exceeded, bytes, result: await compare(bytes, staged ? PROBE_SECONDS : seconds, staged) };
     };
-    let best = await attempt(recovered);
+    let best: Awaited<ReturnType<typeof attempt>>;
+    try {
+      best = await attempt(recovered);
+    } catch (error) {
+      // The voices of several SIDs can exceed a limit of one score (instrument variants, table steps, memory). The first SID alone is then recovered.
+      if (!(error instanceof SidwaveValidationError) || !recovered.document.sids) throw error;
+      recovered = recoverScore(original, { title: options.title });
+      scoreText = recovered.text;
+      best = await attempt(recovered);
+    }
     // When filter or volume differ, a second candidate writes those registers from a global_table; the closer one is kept.
     if (best.result.fd.classes.filter.differingCalls + best.result.fd.classes.volume.differingCalls > 0) {
       const alternative = withGlobalTable(original, recovered);
       if (alternative) {
         try {
           const other = await attempt(alternative);
-          const cost = (a: typeof best) => a.result.fd.differingCalls + (a.exceeded ? 1 : 0);
+          const cost = (a: typeof best) => candidateCost(a.result.fd) + (a.exceeded ? 1 : 0);
           if (cost(other) < cost(best) && (!other.exceeded || best.exceeded)) best = other;
         } catch (error) {
           // The alternative does not compile (memory, cycles): the first candidate stands.

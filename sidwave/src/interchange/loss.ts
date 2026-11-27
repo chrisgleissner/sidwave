@@ -22,6 +22,8 @@ const SEVERITY_ORDER: Record<LossSeverity, number> = { info: 0, approx: 1, lost:
 
 /** Ordered rules: the first matching pattern gives the code and severity of a sentence. */
 const RULES: Array<[RegExp, string, LossSeverity]> = [
+  [/^The global_table .* is not exported/i, "filter.dropped", "lost"],
+  [/wavetable steps without a waveform/i, "wavetable.waveless", "approx"],
   [/^\d+ ABC chord\(s\)/i, "abc.chords", "approx"],
   [/^\d+ ABC chord tone\(s\) are dropped/i, "abc.chord-tones.dropped", "lost"],
   [/^\d+ ABC note\(s\) are moved or resized/i, "abc.timing.quantized", "approx"],

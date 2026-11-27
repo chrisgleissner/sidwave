@@ -1388,8 +1388,11 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   if ((60 * frameRate * speed) / callsPerBeat > TEMPO_LIMIT) callsPerBeat = CALLS_PER_BEAT_PER_SPEED_FAST * speed;
   const tempo = (60 * frameRate * speed) / callsPerBeat;
 
-  // The SIDs the score covers: all of them when their addresses are known, otherwise the first.
-  const sidMap = ir.sidCount > 1 && (options.sids?.length ?? 0) >= ir.sidCount ? options.sids!.slice(0, ir.sidCount) : undefined;
+  // The SIDs the score covers: all of them when their addresses are known and SIDWave can use them, otherwise the first.
+  // A PSID header may place a further SID at $DE00 to $DFE0, which a score cannot declare.
+  const given = ir.sidCount > 1 ? options.sids?.slice(0, ir.sidCount) : undefined;
+  const sidMap = given?.length === ir.sidCount && new Set(given.map((sid) => sid.address)).size === given.length
+    && given.every(({ address }) => address >= 0xd400 && address <= 0xd7e0 && address % 0x20 === 0) ? given : undefined;
   const sidsRecovered = sidMap?.length ?? 1;
   const extract = (from: number): Track[] => extractTracks(ir, from).filter((t) => t.sid < sidsRecovered);
   let tracks = extract(firstCall);

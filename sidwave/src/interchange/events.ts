@@ -262,6 +262,10 @@ function buildEvents(doc: ParsedSidwave, options: EventExportOptions): ExportedS
     return Math.round(snap(beat, halfFrame) * ppq);
   };
   const losses: string[] = [];
+  if (arr.globalTable) losses.push("The global_table (per-call values of the filter and volume registers) is not exported.");
+  if (arr.instruments.some((inst) => inst.wavetable?.some((step) => step.wave === "none"))) {
+    losses.push("Tracker formats do not write wavetable steps without a waveform (wave: none); such a step uses the instrument's waveform there.");
+  }
 
   // Tempo map and time signatures.
   const tempoMap: ExportedTempo[] = [];

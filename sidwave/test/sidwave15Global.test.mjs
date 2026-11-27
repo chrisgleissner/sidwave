@@ -4,8 +4,10 @@ import assert from "#test/assert";
 import { readFileSync } from "node:fs";
 import { parseSidwave } from "../src/sidwave.ts";
 import { compileSidwaveBytes } from "../src/sidwaveOps.ts";
-import { compileSidwaveToPrg } from "../src/sidwaveCompiler.ts";
-import { irOfTrace } from "../src/reconstruct/reconstruct.ts";
+import { SIDWAVE_INIT_ADDRESS, SIDWAVE_PLAY_ADDRESS, compileSidwaveToPrg } from "../src/sidwaveCompiler.ts";
+import { Cpu6502 } from "../src/sidwaveEmulator.ts";
+import { exportEvents } from "../src/interchange/events.ts";
+import { candidateCost, irOfTrace, reconstructSid } from "../src/reconstruct/reconstruct.ts";
 import { globalTableSteps, recoverScore } from "../src/reconstruct/recover.ts";
 import { buildIr } from "../src/reconstruct/ir.ts";
 import { sharedEngine, roundTrip } from "./helpers/reconstructRoundTrip.mjs";
@@ -105,12 +107,13 @@ test("player.init writes its registers in init, and an empty start step writes n
   assert.equal(ir.calls[2].sids[0].regs[0x0c], 15);
 });
 
-test("a 1.5 score whose cycle estimate exceeds the 1 MHz budget compiles when the measured worst call fits", () => {
+const dense = (version, extra = "") => {
   const grooves = ["A4@v C5 E5@w G5@s", "A4 C5@w E5@v G5@w", "A4@w C5@s E5 G5@v"];
-  const dense = (version) => `sidwave: "${version}"
+  return `sidwave: "${version}"
 title: T
 tempo: 120
 speed: 3
+${extra}
 voices:
 ${grooves.map((groove, i) => `  - { id: ${i + 1}, instrument: p, patterns: { a: { length: 1, bars: 1, groove: "${groove}" } } }`).join("\n")}
 instruments:
@@ -121,6 +124,9 @@ instruments:
 timeline:
   - { section: Main, bars: 1, layers: { v1: a, v2: a, v3: a } }
 `;
+};
+
+test("a 1.5 score whose cycle estimate exceeds the 1 MHz budget compiles when the measured worst call fits", () => {
   assert.throws(() => compileSidwaveToPrg(parseSidwave(dense("1.4"))), /use cpu: turbo/);
   const result = compileSidwaveToPrg(parseSidwave(dense("1.5")));
   assert.ok(result.warnings.some((w) => /measured at \d+ cycles/.test(w)), JSON.stringify(result.warnings));
@@ -181,4 +187,101 @@ test("an instrument that never opens the gate stays silent when the instrument b
   const voice = recovered.document.voices.find((v) => v.id === 1);
   const used = new Set(JSON.stringify(voice).match(/i\d+/g));
   for (const name of used) assert.ok(recovered.document.instruments[name].wavetable.every((step) => step.gate === false), name);
+});
+
+test("global_table is rejected with samples when it sets d418", () => {
+  const text = doc("1.5", `${TABLE}
+samples: { rate: 2500, defs: { kick: { kit: kick } }, voices: [{ sample: kick, bar: 1, beat: 1 }] }`);
+  assert.throws(() => parseSidwave(text), /cannot be combined with samples/);
+});
+
+test("player.init and player.start write the first SID at its address", async () => {
+  const text = doc("1.5", `player: { soft_start: false, init: [{ reg: "$D40C", value: 15 }], start: [[{ reg: "$D417", value: 2 }]] }
+sids: [{ id: left, address: "$D420" }]`);
+  const prg = compileSidwaveToPrg(parseSidwave(text)).prg;
+  const mem = new Uint8Array(0x10000);
+  mem.set(prg.subarray(2), prg[0] | (prg[1] << 8));
+  mem[1] = 0x37;
+  const cpu = new Cpu6502(mem);
+  cpu.call(SIDWAVE_INIT_ADDRESS);
+  assert.equal(mem[0xd42c], 15);
+  assert.equal(mem[0xd40c], 0);
+  cpu.call(SIDWAVE_PLAY_ADDRESS);
+  assert.equal(mem[0xd437], 2);
+  assert.equal(mem[0xd417], 0);
+});
+
+test("a looping global_table whose alignments are too many to run is measured with its variation added", () => {
+  // The song loop is 301 calls. A table loop of 602 calls stays in step with it; one of 509 calls needs 153,209 calls for all
+  // alignments, more than the measured limit.
+  const measured = (calls) => {
+    const steps = ["{ d416: 1, calls: 45 }", ...calls.map((n) => `{ d416_add: 1, calls: ${n} }`)].join(", ");
+    const result = compileSidwaveToPrg(parseSidwave(dense("1.5", `player: { soft_start: false }
+global_table: { loop: 1, steps: [${steps}] }`)));
+    return Number(result.warnings.map((w) => /measured at (\d+) cycles/.exec(w)?.[1]).find(Boolean));
+  };
+  const inStep = measured([255, 255, 92]);
+  assert.ok(inStep > 0);
+  assert.ok(measured([255, 254]) >= inStep + 100, `${measured([255, 254])} against ${inStep}`);
+});
+
+test("an event export reports the global_table and waveform-less wavetable steps as losses", () => {
+  const text = doc("1.5", TABLE, "{ waveform: pulse, wavetable: [{ wave: none, test: true, calls: 1 }, { wave: pulse }] }");
+  const losses = exportEvents(parseSidwave(text)).losses.join("\n");
+  assert.match(losses, /global_table/);
+  assert.match(losses, /wave: none/);
+});
+
+test("recovery keeps to the first SID when a further SID has an address that a score cannot declare", () => {
+  const writes = [];
+  for (let call = 0; call < 200; call++) {
+    const at = 10_000 + call * 19_656;
+    for (const sid of [0, 1]) writes.push(sid, 1, 20, at + sid * 100, sid, 6, 240, at + sid * 100 + 10, sid, 4, call % 12 < 8 ? 0x21 : 0x20, at + sid * 100 + 20);
+  }
+  const ir = buildIr(Float64Array.from(writes), { clock: "PAL" });
+  const recovered = recoverScore(ir, { sids: [{ address: 0xd400 }, { address: 0xde00 }] });
+  assert.equal(recovered.document.sids, undefined);
+  assert.ok(recovered.unsupported.some((u) => u.kind === "multi_sid"));
+  assert.doesNotThrow(() => compileSidwaveBytes(parseSidwave(recovered.text), { format: "sid", loop: true }));
+  assert.ok(recoverScore(ir, { sids: [{ address: 0xd400 }, { address: 0xd420 }] }).document.sids);
+});
+
+test("a candidate score whose trace compares almost nothing is not closer than one that compares every call", () => {
+  const lost = { differingCalls: 5, comparedCalls: 1, expectedCalls: 4012 };
+  const whole = { differingCalls: 9000, comparedCalls: 4012, expectedCalls: 4012 };
+  assert.ok(candidateCost(whole) < candidateCost(lost));
+});
+
+test("reconstruction falls back to the first SID when the voices of all SIDs do not fit one score", { timeout: 60_000 }, async () => {
+  const header = compile(`sidwave: "1.5"
+title: T
+tempo: 120
+sids:
+  - { id: a, address: "$D400" }
+  - { id: b, address: "$D420" }
+  - { id: c, address: "$D440" }
+instruments: { lead: { waveform: pulse } }
+voices:
+  - { id: 1, instrument: lead, patterns: { a: { length: 1, bars: 1, groove: "A4 - C5 -" } } }
+timeline:
+  - { section: Main, bars: 1, layers: { v1: a } }
+`);
+  // Plain notes on the first SID; random writes on the others, whose voices need more than 63 instrument variants.
+  let seed = 7;
+  const random = (n) => { seed = (seed * 48271) % 2147483647; return seed % n; };
+  const writes = [];
+  for (let call = 0, at = 20_000; call < 500; call++, at += 19_656) {
+    writes.push(0, 1, 20, at, 0, 6, 240, at + 10, 0, 4, call % 12 < 8 ? 0x21 : 0x20, at + 20);
+    for (let i = 0; i < 12; i++) {
+      const reg = random(21);
+      writes.push(1 + (i % 2), reg, reg % 7 === 4 ? [0x41, 0x40, 0x09, 0x81, 0x21, 0x20][random(6)] : random(256), at + 100 + i * 40);
+    }
+  }
+  const records = Float64Array.from(writes);
+  assert.throws(() => compileSidwaveBytes(parseSidwave(`${recoverScore(buildIr(records, { clock: "PAL" }), { sids: [{ address: 0xd400 }, { address: 0xd420 }, { address: 0xd440 }] }).text}cpu: turbo\n`), { format: "sid", loop: true }));
+  const engine = { trace: async () => ({ records, clock: "PAL", horizonCycles: 500 * 19_656, originCycle: 0 }) };
+  const result = await reconstructSid(header, { engine, seconds: 10 });
+  assert.equal(result.report.compile.ok, true, result.report.compile.error);
+  assert.doesNotMatch(result.score, /^sids:/m);
+  assert.ok(result.report.unsupported.some((u) => u.kind === "multi_sid"));
 });

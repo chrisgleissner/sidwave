@@ -608,6 +608,8 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     if (songs) throw new SidwaveValidationError("$.global_table", "global_table cannot be combined with songs");
     if (effects?.length) throw new SidwaveValidationError("$.global_table", "global_table cannot be combined with effects");
     if (sids.length > 1) throw new SidwaveValidationError("$.global_table", "global_table supports one SID");
+    // The digi interrupt writes $D418 from the player's own copy of the filter mode, which the table does not update.
+    if (samples && globalTable.registers.includes(0x18)) throw new SidwaveValidationError("$.global_table", "a table that sets d418 cannot be combined with samples, which also write that register");
     if (globalTable.registers.includes(0x18) && player?.softStart !== false) throw new SidwaveValidationError("$.global_table", "a table that sets d418 needs player.soft_start: false, because the volume ramp also writes that register");
   }
   return { version, ...(player ? { player } : {}), ...(tuning ? { tuning } : {}), ...(globalTable ? { globalTable } : {}), song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,

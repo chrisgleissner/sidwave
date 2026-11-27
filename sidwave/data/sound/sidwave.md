@@ -1365,26 +1365,19 @@ speed 5 or more is less than one player call at tempos up to 220.
 
 **Design.** In 1.5, `speed` is 1 to 8 and pattern length and groove `len` are at least 1/128 beat. A note still lasts at least
 one frame (`speed` calls). The compiler's cycle budget check still applies: at the higher speeds the 1.4 player needs more cycles per
-call than one call period holds at 1 MHz, and such a score is rejected with `use cpu: turbo`. Seven of the 24 development tunes are
-rejected for that reason (speeds 4 to 8), so the recovered score does not compile for them.
-
-**Known limit.** At speed 8 the first note of a score lasts one call fewer than its row count (gate off at call 29 instead of 30
-in the round-trip test), because the player's first row starts one call into the song at that speed. A recovered speed-8 score
-therefore has a first note one call shorter than the tune; later notes are exact. This is open (`todo` in `reconstructRepairs.test.mjs`).
+call than one call period holds at 1 MHz, and such a score is rejected with `use cpu: turbo` unless the measurement described under
+"Cycle budget" shows that it fits.
 
 **Rejected alternative.** Mapping a multi-speed tune onto a slower grid: the call timing then differs.
-
-#### Not designed here
-
-SID addresses in a multi-SID score exist already (`sids[].address`), so recovery of tunes with several SIDs is a recovery
-change (the recovery emits only SID 1 today), not a language change. A table of global volume, filter and routing steps
-(`global_table`) is not implemented: 10 of 24 tunes change the filter or volume registers outside any note, and the S5d work did not reach it.
 
 #### Cycle budget
 
 The compiler's cycle estimate is a static upper bound. For a `sidwave: 1.5` score whose estimate exceeds the 1 MHz
 budget, the compiler runs the assembled player on its 6502 emulator over init, every call of the song and one further pass
-of its loop. When the worst measured call plus 50 cycles fits the budget, the score compiles without `cpu: turbo` and a
+of its loop. With a `global_table` that loops, the run is extended until every alignment of the two loops has occurred; when
+that needs more than 100,000 calls, or the table keeps looping after an explicit `end`, 170 cycles are added for the table
+instead. When the worst measured call plus 50
+cycles fits the budget, the score compiles without `cpu: turbo` and a
 warning gives both numbers. Documents with several songs, effects or samples keep the estimate, as do older versions.
 
 #### Global registers: `global_table`
@@ -1419,7 +1412,10 @@ values the registers then hold, or keeps the last values when there is no `loop`
 The table owns the registers that it names: the player no longer writes them, so filter tables and filter settings have no
 effect on those registers. The other registers of the four stay with the player. The table runs once per call from the
 first call after `player.start`, `init` restarts it, and a song loop does not. A table that names `d418` needs
-`player.soft_start: false`. The construct supports one SID and cannot be combined with `songs` or `effects`.
+`player.soft_start: false` and cannot be combined with `samples`. The construct supports one SID and cannot be combined
+with `songs` or `effects`.
+
+Event-based exports (MIDI, MusicXML, the tracker formats) report the table as not exported.
 
 Recovery emits the table only when a score without it differs from the tune in the filter or volume class, and keeps it
 only when it brings the two traces closer; the instruments of such a score have no filter tables.
