@@ -373,6 +373,60 @@
    }
   ]
  },
+ "mod:four-channel -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Channels 3 are not imported because the score has 3 voices (channel 3: 32 notes); use --sids to keep more channels."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "The song ends at the end of the order list without a jump back."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.modulation.dropped",
+    "severity": "lost",
+    "count": 64,
+    "message": "64 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 13,
+    "message": "13 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 129,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 8 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 94 gate-offs shortly before the next note of a voice are written together with that note."
+   }
+  ]
+ },
  "mod:four-channel -> cheesecutter": {
   "ok": true,
   "losses": [

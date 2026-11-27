@@ -242,6 +242,61 @@
    }
   ]
  },
+ "sidwave:title-fanfare -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "where": "v4,v3",
+    "message": "2 voices dropped to fit 3 voices (22 notes): kept v1, v2, v5, ranked by notes x pitch range."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.sid.moved",
+    "severity": "approx",
+    "count": 1,
+    "message": "Voices of other SIDs play on the SID at $D400, with one filter and one volume for all voices."
+   },
+   {
+    "stage": "write",
+    "code": "basic.modulation.dropped",
+    "severity": "lost",
+    "count": 28,
+    "message": "28 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 361,
+    "message": "361 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 53,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 7 ms mean, 66 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 67 gate-offs shortly before the next note of a voice are written together with that note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.dense",
+    "severity": "approx",
+    "count": 4,
+    "message": "4 events are too dense for BASIC V2 and are delayed by more than 25 ms, at most 66 ms (predicted). --voices 2 or 1 writes fewer registers."
+   }
+  ]
+ },
  "sidwave:title-fanfare -> cheesecutter": {
   "ok": true,
   "losses": [

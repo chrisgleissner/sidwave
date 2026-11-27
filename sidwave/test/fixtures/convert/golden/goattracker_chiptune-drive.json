@@ -206,6 +206,39 @@
    }
   ]
  },
+ "goattracker:chiptune-drive -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 12,
+    "message": "12 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 64,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 5 ms mean, 25 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 98 gate-offs shortly before the next note of a voice are written together with that note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.dense",
+    "severity": "approx",
+    "count": 1,
+    "message": "1 event are too dense for BASIC V2 and are delayed by more than 25 ms, at most 25 ms (predicted). --voices 2 or 1 writes fewer registers."
+   }
+  ]
+ },
  "goattracker:chiptune-drive -> cheesecutter": {
   "ok": true,
   "losses": [

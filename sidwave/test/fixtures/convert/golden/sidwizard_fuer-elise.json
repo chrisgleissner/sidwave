@@ -240,6 +240,39 @@
    }
   ]
  },
+ "sidwizard:fuer-elise -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.merged",
+    "severity": "approx",
+    "count": 1,
+    "message": "rows are 1 to 1 calls long; SIDWave needs at least 3 frames per note, so 3 grid steps of 1 calls are merged and note starts are moved to the merged grid"
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 13,
+    "message": "13 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 32,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 7 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 37 gate-offs shortly before the next note of a voice are written together with that note."
+   }
+  ]
+ },
  "sidwizard:fuer-elise -> cheesecutter": {
   "ok": true,
   "losses": [

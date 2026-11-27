@@ -304,6 +304,46 @@
    }
   ]
  },
+ "sidwave:digi-groove -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.modulation.dropped",
+    "severity": "lost",
+    "count": 251,
+    "message": "251 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 2006,
+    "message": "2006 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.digi.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Digi samples are not played by the BASIC program."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 1055,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 24 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 292 gate-offs shortly before the next note of a voice are written together with that note."
+   }
+  ]
+ },
  "sidwave:digi-groove -> cheesecutter": {
   "ok": true,
   "losses": [

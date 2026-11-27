@@ -697,6 +697,8 @@ and `siddump` source is read by reconstruct with a 4 s horizon. The tables are p
 | abc | goattracker | 1.00 | 1.00 | 0.97 | 1.00 | the tracker's row grid shortens some note ends |
 | abc | furnace | 1.00 | 1.00 | 0.97 | 1.00 | the tracker's row grid shortens some note ends |
 | abc | sidwizard | 1.00 | 1.00 | 0.97 | 1.00 | the tracker's row grid shortens some note ends |
+| abc | cheesecutter | 1.00 | 1.00 | 0.97 | 1.00 | the tracker's row grid shortens some note ends |
+| abc | sf2 | 1.00 | 1.00 | 0.97 | 1.00 | the tracker's row grid shortens some note ends |
 <!-- quality:abc:end -->
 
 <!-- quality:goattracker:start -->
