@@ -110,6 +110,7 @@
     "!dist/.tsbuildinfo",
     "data/**",
     "doc/licensing.md",
+    "doc/tutorial.md",
     "CHANGELOG.md",
     "LICENSE",
     "LICENSE-EXCEPTION.md",

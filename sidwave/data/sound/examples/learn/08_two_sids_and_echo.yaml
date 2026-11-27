@@ -1,0 +1,43 @@
+# Lesson 8: two SID chips and an echo
+#
+# Concepts: a second SID chip adds three more voices and lets you pan the music left and right; an echo repeats a voice
+# a little later, softer, on another voice.
+#
+# `sids` now lists two chips. The first is panned left, the second right (these pan names are for an Ultimate machine;
+# on a real C64 with two SIDs the hardware decides). Voice 4 is the first voice of the second chip. It has no patterns:
+# `echo` makes it play what voice 1 plays, `delay_beats: 0.75` (three sixteenths) later and at half the volume. Put voice 1 on the timeline and the echo follows it. The bass on voice 2 stays on the left chip.
+#
+# This score needs a second SID at $D420, for example on an Ultimate 64 or in VICE with a second SID enabled.
+#
+# Try this: set `delay_beats` to 0.5 (an eighth note) or 1.5, or make the echo quieter with `volume: 0.3`.
+sidwave: 1.4
+title: Lesson 8 - Echo
+tempo: 93.98
+mode: PAL
+sids:
+  - { id: left, address: "$D400", model: "8580", pan: "Left 3" }
+  - { id: right, address: "$D420", model: "8580", pan: "Right 3" }
+instruments:
+  pluck: { waveform: pulse, pulse_width: 0.3, adsr: [0, 6, 6, 5] }
+  bass: { waveform: sawtooth, adsr: [0, 6, 8, 4] }
+voices:
+  - id: 1
+    name: Melody (left)
+    instrument: pluck
+    patterns:
+      riff:
+        length: 0.5
+        bars: 2
+        groove: "D4 - A4 - F4 - A4 - | C4 - G4 - E4 - G4 -"
+  - id: 2
+    name: Bass (left)
+    instrument: bass
+    patterns:
+      root: { length: 2, bars: 2, groove: "D2 ~ | C2 ~" }
+  - id: 4
+    name: Echo of the melody (right)
+    echo: { voice: 1, delay_beats: 0.75, volume: 0.5 }
+sections:
+  soft: { bars: 2, level: mp, layers: { v1: riff, v2: root } }
+  full: { bars: 2, level: ff, layers: { v1: riff, v2: root } }
+timeline: [soft, full]

@@ -1,0 +1,8 @@
+sidwave: 1.4
+library:
+  name: sidwave-lib-pad
+  version: 0.3.1
+  licence: CC-BY-4.0
+  provenance: { author: SIDWave tests, source: "pkg:sidwave-lib-pad", created: 2026-11-27 }
+instruments:
+  pad: { waveform: triangle, adsr: [6, 8, 12, 8] }

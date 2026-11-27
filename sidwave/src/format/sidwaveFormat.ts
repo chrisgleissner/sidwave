@@ -3,6 +3,7 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 import YAML from "yaml";
 import { parseSidwave } from "../sidwave.js";
+import type { SidwaveReadOptions } from "../sidwavePcm.js";
 import { compileSidwaveToPrg } from "../sidwaveCompiler.js";
 
 export type ChangeClass = "formatting" | "musical" | "synthesis" | "hardware" | "structural";
@@ -58,8 +59,8 @@ function classify(path: string): ChangeClass {
 }
 function esc(s: string) { return s.replace(/~/g, "~0").replace(/\//g, "~1"); }
 function equal(a: unknown, b: unknown): boolean { return JSON.stringify(a) === JSON.stringify(b); }
-function compileEqual(a: string, b: string): boolean {
-  try { const x = compileSidwaveToPrg(parseSidwave(a), { loop: false }).prg; const y = compileSidwaveToPrg(parseSidwave(b), { loop: false }).prg; return x.equals(y); }
+function compileEqual(a: string, b: string, read?: SidwaveReadOptions): boolean {
+  try { const x = compileSidwaveToPrg(parseSidwave(a, read), { loop: false }).prg; const y = compileSidwaveToPrg(parseSidwave(b, read), { loop: false }).prg; return x.equals(y); }
   catch { return false; }
 }
 /** Schema kind of the value under each key, per parent kind. "named" is a map whose keys are user chosen names and whose values have the given kind; "list" is a sequence of that kind. */
@@ -118,7 +119,8 @@ export function formatSidwave(text: string): string {
   return doc.toString({ indent: 2, lineWidth: 0, defaultStringType: "QUOTE_DOUBLE", flowCollectionPadding: false });
 }
 
-export function diffSidwave(a: string, b: string): SemanticDiff {
+/** `read` is the parser's read options (`confinedReadOptions`); a score with `imports` needs it for `compiledEqual`. */
+export function diffSidwave(a: string, b: string, read?: SidwaveReadOptions): SemanticDiff {
   const av = YAML.parse(a), bv = YAML.parse(b);
   const changes: SemanticChange[] = [];
   const walk = (x: any, y: any, path: string) => {
@@ -131,7 +133,7 @@ export function diffSidwave(a: string, b: string): SemanticDiff {
   };
   walk(av, bv, "");
   if (!changes.length && a !== b) changes.push({ class: "formatting", path: "", summary: "YAML formatting changed" });
-  return { changes, compiledEqual: compileEqual(a, b) };
+  return { changes, compiledEqual: compileEqual(a, b, read) };
 }
 
 /**
@@ -175,7 +177,7 @@ export interface MergeResult {
   /** Present with `merged` when `preserved` is false: why the edits could not be applied to the document of ours. */
   warnings?: string[];
 }
-export function mergeSidwave(base: string, ours: string, theirs: string): MergeResult {
+export function mergeSidwave(base: string, ours: string, theirs: string, read?: SidwaveReadOptions): MergeResult {
   const b: any = YAML.parse(base), o: any = YAML.parse(ours), t: any = YAML.parse(theirs), conflicts: Conflict[] = [];
   const merge = (bv: any, ov: any, tv: any, path: string): any => {
     if (equal(ov, tv)) return ov;
@@ -200,7 +202,7 @@ export function mergeSidwave(base: string, ours: string, theirs: string): MergeR
   if (conflicts.length) return { conflicts };
   try {
     const applied = applyToOurs(ours, o, result), merged = formatSidwave(applied.text);
-    parseSidwave(merged);
+    parseSidwave(merged, read);
     return applied.preserved ? { merged, conflicts, preserved: true } : { merged, conflicts, preserved: false, warnings: [`Comments and aliases of the ours side were not kept: ${applied.reason}`] };
   }
   catch (e) { return { conflicts: [{ path: "", summary: e instanceof Error ? e.message : String(e) }] }; }

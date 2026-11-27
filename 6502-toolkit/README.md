@@ -23,7 +23,7 @@ An assembler and a disassembler for the NMOS 6502 and 6510 (Commodore 64), writt
 npm install 6502-toolkit
 ```
 
-Node.js 20.19 or later, or Bun 1.3.1 or later. The package is ESM only and ships its TypeScript declarations. It uses no Node.js modules and no `Buffer`, so a bundler needs no polyfills for it. The assembler returns a `Uint8Array`.
+Node.js 20.19 or later, or Bun 1.4.5 or later. The package is ESM only and ships its TypeScript declarations. It uses no Node.js modules and no `Buffer`, so a bundler needs no polyfills for it. The assembler returns a `Uint8Array`.
 
 ## Quick start
 
@@ -183,7 +183,7 @@ The README of @moonbase-machines/mos6502 describes its assembler as one "for Moo
 
 - The package follows semantic versioning from 1.0.0. Before 1.0.0, a minor version may contain breaking changes. They are listed in [CHANGELOG.md](CHANGELOG.md).
 - A deprecated export or option is announced in the changelog one minor release before it is removed.
-- Supported runtimes: Node.js 20.19 or later (the oldest version in CI is 20), Bun 1.3.1 or later, and current browsers through a bundler or native ES modules.
+- Supported runtimes: Node.js 20.19 or later (the oldest version in CI is 20), Bun 1.4.5 or later, and current browsers through a bundler or native ES modules.
 - The package is ESM only. On Node.js 20.19 and later, 22.12 and later, and all later versions, `require("6502-toolkit")` loads it through `require(esm)`. On older versions, use `await import("6502-toolkit")`.
 
 ## Documentation

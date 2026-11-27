@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { parseSidwave } from "./sidwave.js";
+import { bundleCommand, lockCommand } from "./cliAssets.js";
 import { SIDWAVE_SYMBOL_FORMATS, compileSidwave, sidwaveGamePsid, type SidwaveSymbolFormat } from "./sidwaveGame.js";
 import {
   classifyError, envelope, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, SidwaveOperationError, UsageError, withFile,
@@ -27,6 +28,8 @@ Usage:
   sidwave compile  <file> --target game --origin <addr> [--data-origin <addr>] [--zp <addr>] [--symbols <list>]
                           [--symbols-all] [--no-measure] [--format bin|sid] [-o <out>] [--loop|--no-loop] [--json]
   sidwave lint     <file> [--loop|--no-loop] [--strict] [--json] [--allow-dir <dir>]
+  sidwave lock     <score> [-o <out>] [--json] [--allow-dir <dir>]
+  sidwave bundle   <score> -o <dir> [--force] [--json] [--allow-dir <dir>]
   sidwave examples [<name>] [-o <dir>] [--force] [--json]
 ${RUN_HELP.usage}${RECONSTRUCT_USAGE}  sidwave --help | --version
 
@@ -45,11 +48,18 @@ Commands:
              register contract, the cycles and the exported labels.
   lint       Print the lint findings. Exit 0 unless the score is invalid; with --strict, exit 1 when there is a
              finding that is not an informational note.
+  lock       SIDWave 1.4 libraries: write the sha256 of each library the score imports into its imports (in place
+             unless -o names another file; "-o -" prints the score). The version range of each import is checked.
+  bundle     Write the score and every library it depends on into the directory -o (libs/ plus bundle.json with
+             hashes, licences and provenance), with the import paths rewritten to relative ones. The bundle compiles
+             offline to the same bytes. Without --force the directory must be empty. "file:" samples are copied to
+             samples/ (read relative to the current directory); compile the bundle from inside its directory.
   examples   Without a name, list the bundled example scores. With a name, print the score, or write
              <name>.yaml into the directory given by -o (it is not overwritten without --force).
 ${RUN_HELP.commands}${RECONSTRUCT_COMMAND_HELP}
 Options:
-  --allow-dir <dir>   Allow "file:" sample sources below <dir>. Without it they must lie below the current
+  --allow-dir <dir>   Allow "file:" sample sources below <dir>, and library files of "imports" (the library search
+                      path). Without it samples must lie below the current
                       directory. May be repeated. The sidwave command never uses the network.
   --song <n>          Score with songs (SIDWave 1.4): the song the PRG plays and the PSID starts with, 0-based (default 0).
   --symbols-all       With --target game: also export every internal label as sidwave_int_<label>.
@@ -187,8 +197,8 @@ function emit(io: CliIo, options: Options, command: string, result: unknown, tex
 function validate(io: CliIo, options: Options): number {
   rejectOptions(options, "validate", [["output", "-o"], ["format", "--format"], ["loop", "--loop/--no-loop"], ["strict", "--strict"], ["force", "--force"], ...GAME_FLAGS]);
   const file = pickFile(options, "validate");
-  const { text } = readScore(io, file);
-  const description = withFile(file, () => describeSidwave(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs))));
+  const { text, path } = readScore(io, file);
+  const description = withFile(file, () => describeSidwave(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs, path))));
   emit(io, options, "validate", { file, ...description }, `${file}: valid SIDWAVE ${description.version}, ${description.voices} voices, ${description.sids} SID${description.sids === 1 ? "" : "s"}`);
   return EXIT_OK;
 }
@@ -223,7 +233,7 @@ function compile(io: CliIo, options: Options): number {
   const stem = basename(file, extname(file)).replace(/\.sidwave$/i, "");
   const outPath = toStdout ? undefined : resolve(io.cwd, options.output ?? `${stem}.${format}`);
   if (outPath !== undefined && sameFile(outPath, path)) throw new UsageError("the output file is the input file; refusing to overwrite it");
-  const compiled = withFile(file, () => compileSidwaveBytes(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs)), { format, ...(options.loop === undefined ? {} : { loop: options.loop }), ...(options.song === undefined ? {} : { song: options.song }) }));
+  const compiled = withFile(file, () => compileSidwaveBytes(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs, path)), { format, ...(options.loop === undefined ? {} : { loop: options.loop }), ...(options.song === undefined ? {} : { song: options.song }) }));
   const { summary, bytes } = compiled;
   if (outPath === undefined) io.outBytes(bytes);
   else {
@@ -240,6 +250,7 @@ function compile(io: CliIo, options: Options): number {
   // With bytes on standard output the summary goes to standard error so the two never mix.
   if (toStdout) io.err(report); else io.out(report);
   for (const warning of summary.warnings) io.err(`warning: ${warning}\n`);
+  for (const lib of summary.libraries ?? []) io.err(`library ${lib.namespace}: ${lib.name} ${lib.version}, ${lib.licence}, sha256 ${lib.sha256}\n`);
   return EXIT_OK;
 }
 
@@ -276,7 +287,7 @@ function compileGame(io: CliIo, options: Options, file: string): number {
   let build;
   let doc;
   try {
-    doc = parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs));
+    doc = parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs, path));
     build = compileSidwave(doc, {
       target: "game", origin: options.origin, dataOrigin: options.dataOrigin, zeroPage: options.zeroPage,
       symbols, symbolsAll: options.symbolsAll, measure: !options.noMeasure, ...(options.loop === undefined ? {} : { loop: options.loop }),
@@ -304,6 +315,7 @@ function compileGame(io: CliIo, options: Options, file: string): number {
       file, target: "game", format, outputs, origin: contract.memory.player.start, dataOrigin: options.dataOrigin ?? null,
       zeroPage: options.zeroPage ?? 0xfb, contract, cycles, labels: build.labels, totalFrames: build.totalFrames,
       durationSeconds: build.durationSeconds, warnings: build.warnings,
+      ...(doc.libraries ? { libraries: doc.libraries } : {}),
     } }), null, 2)}\n`
     : `${line}\n`;
   io.out(report);
@@ -314,8 +326,8 @@ function compileGame(io: CliIo, options: Options, file: string): number {
 function lint(io: CliIo, options: Options): number {
   rejectOptions(options, "lint", [["output", "-o"], ["format", "--format"], ["force", "--force"], ...GAME_FLAGS]);
   const file = pickFile(options, "lint");
-  const { text } = readScore(io, file);
-  const report = withFile(file, () => lintSidwave(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs)), options.loop === undefined ? {} : { loop: options.loop }));
+  const { text, path } = readScore(io, file);
+  const report = withFile(file, () => lintSidwave(parseSidwave(text, confinedReadOptions(io.cwd, options.allowDirs, path)), options.loop === undefined ? {} : { loop: options.loop }));
   const failed = options.strict && report.actionable > 0;
   emit(io, options, "lint", { file, findings: report.findings, actionable: report.actionable },
     report.findings.length === 0 ? `${file}: no lint findings` : report.formatted.map((line) => `${file}: ${line}`).join("\n"), !failed);
@@ -351,7 +363,11 @@ function examples(io: CliIo, options: Options): number {
 }
 
 type Command = (io: CliIo, options: Options) => number | Promise<number>;
-const COMMANDS: Record<string, Command> = { validate, compile, lint, examples, ...RUN_COMMANDS, reconstruct: reconstructCommand };
+const assetArgs = (options: Options, command: string) => ({ file: pickFile(options, command), ...(options.output === undefined ? {} : { output: options.output }), force: options.force, json: options.json, allowDirs: options.allowDirs });
+const lock: Command = (io, options) => lockCommand(io, assetArgs(options, "lock"));
+const bundle: Command = (io, options) => bundleCommand(io, assetArgs(options, "bundle"));
+
+const COMMANDS: Record<string, Command> = { validate, compile, lint, examples, lock, bundle, ...RUN_COMMANDS, reconstruct: reconstructCommand };
 
 /** Reports a failure in the form the caller asked for and returns the exit code of its category. */
 function fail(io: CliIo, json: boolean, command: string, error: unknown): number {

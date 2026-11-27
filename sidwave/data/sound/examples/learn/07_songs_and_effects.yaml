@@ -1,0 +1,53 @@
+# Lesson 7: songs and a sound effect for a game
+#
+# Concepts: `songs` puts several songs (a title tune and a game-over jingle) into one player that a game selects by
+# number; `effects` defines short sounds that a game starts at any moment, on top of the music.
+#
+# The instruments, voices, patterns and `sections` are shared by both songs. Each song has its own timeline, and its
+# own tempo if it wants one. The title loops (it returns to its first section). The jingle has `loop: false`: it plays
+# once and ends. The effect "coin" runs on voice 3, which the music leaves free; a game starts it by calling the
+# player's sfx entry with the effect number (0 for the first effect). See "Using the player in a game" in the
+# README for the calls.
+#
+# Try this: add a third song, or make the coin effect one step longer with another { freq: ... } line.
+sidwave: 1.4
+title: Lesson 7 - Game Music
+tempo: 125.31
+mode: PAL
+sids:
+  - { id: sid1, address: "$D400", model: "8580" }
+instruments:
+  lead: { waveform: pulse, pulse_width: 0.4, adsr: [1, 5, 10, 4] }
+  bass: { waveform: sawtooth, adsr: [0, 5, 9, 3] }
+voices:
+  - id: 1
+    name: Lead
+    instrument: lead
+    patterns:
+      theme: { length: 1, bars: 2, groove: "A4 C5 E5 D5 | C5 B4 A4 ~" }
+      fall: { length: 1, bars: 2, groove: "E5 D5 C5 B4 | A4 ~ ~ ~" }
+  - id: 2
+    name: Bass
+    instrument: bass
+    patterns:
+      root: { length: 1, bars: 2, groove: "A2 ~ A2 ~ | F2 ~ G2 ~" }
+      low: { length: 4, bars: 1, groove: "A1" }
+sections:
+  intro: { bars: 2, layers: { v2: low } }
+  verse: { bars: 2, layers: { v1: theme, v2: root } }
+  fallen: { bars: 2, layers: { v1: fall, v2: low } }
+songs:
+  - name: title
+    timeline: [intro, verse, verse]
+  - name: gameover
+    tempo: 93.98
+    loop: false
+    timeline: [fallen]
+effects:
+  coin:                          # effect number 0
+    priority: 8                  # a more important effect may interrupt a less important one (0-15)
+    voices: [3]                  # only voice 3 may play it
+    steps:
+      - { freq: 1500, wave: pulse, pulse: 0.5, adsr: [0, 0, 15, 4] }   # one play call at 1500 Hz
+      - { freq: 2000, wait: 3 }                                          # then 2000 Hz for three calls
+      - { gate: false, wait: 4 }                                         # release for four calls

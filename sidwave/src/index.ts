@@ -12,6 +12,7 @@ export * from "./sidwaveFilterModel.js";
 export * from "./sidwaveLint.js";
 export * from "./sidwaveExamples.js";
 export * from "./sidwaveOps.js";
+export * from "./sidwaveLibs.js";
 export * from "./sidFile.js";
 export * from "./songlengths.js";
 export * from "./audio/generateSidwave.js";

@@ -7,8 +7,9 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { parseSidwave, SidwaveValidationError, type ParsedSidwave } from "./sidwave.js";
 import { compileSidwaveToPrg, compileSidwaveToSid, type CompileResult, type EffectSummary } from "./sidwaveCompiler.js";
 import { SIDWAVE_SCORE_RESOURCES, readSidwaveExample } from "./sidwaveExamples.js";
+import { createImportResolver } from "./sidwaveLibs.js";
 import { formatFinding, isInfoCode, type SidwaveFinding } from "./sidwaveLint.js";
-import type { SidwaveFileReader, SidwaveReadOptions } from "./sidwavePcm.js";
+import type { SidwaveFileReader, SidwaveReadOptions, SidwaveUsedLibrary } from "./sidwavePcm.js";
 
 /**
  * Whole-score operations behind the `sidwave` command line. The command line only translates arguments and
@@ -37,8 +38,15 @@ function isInside(dir: string, target: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-export function confinedReadOptions(root: string, allowedDirs: readonly string[] = []): SidwaveReadOptions {
-  return { readFile: confinedFileReader(root, allowedDirs) };
+/**
+ * Read options for a score. With `scoreFile`, the score's `imports` are resolved relative to that file (SIDWave 1.4
+ * asset libraries), confined to its directory and `allowedDirs`.
+ */
+export function confinedReadOptions(root: string, allowedDirs: readonly string[] = [], scoreFile?: string): SidwaveReadOptions {
+  return {
+    readFile: confinedFileReader(root, allowedDirs),
+    ...(scoreFile === undefined ? {} : { imports: createImportResolver({ file: scoreFile, allowedDirs }) }),
+  };
 }
 
 export interface ScoreDescription {
@@ -81,6 +89,8 @@ export interface CompileSummary {
   worstCaseCyclesPerCall: number;
   lintFindings: number;
   warnings: string[];
+  /** SIDWave 1.4, a score with `imports`: the libraries it uses, so licence obligations are visible. */
+  libraries?: SidwaveUsedLibrary[];
   /** SIDWave 1.4, a score with `effects`: the address of the `sfx` entry and the effects with their indexes. */
   sfxAddress?: number;
   effects?: EffectSummary[];
@@ -114,6 +124,7 @@ export function compileSidwaveBytes(doc: ParsedSidwave, options: { format?: Sidw
     worstCaseCyclesPerCall: result.worstCaseCyclesPerCall,
     lintFindings: (result.lint ?? []).length,
     warnings: result.warnings,
+    ...(doc.libraries ? { libraries: doc.libraries } : {}),
     ...(result.effects ? { sfxAddress: result.sfxAddress, effects: result.effects } : {}),
   };
   return { bytes, summary, result };

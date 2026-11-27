@@ -1,0 +1,30 @@
+# A small drum kit for the lessons. A library holds instruments, patterns and effects that scores import.
+sidwave: 1.4
+library:
+  name: learn-chip-kit
+  version: 1.0.0
+  licence: CC0-1.0                  # an SPDX licence identifier; scores that use this kit report it
+  provenance: { author: SIDWave project, source: original, created: 2026-11-27 }
+instruments:
+  kick:
+    waveform: pulse
+    adsr: [0, 8, 0, 0]
+    wavetable: [{ wave: noise, note: A6 }, { wave: pulse, note: A3, slide_to: D2, frames: 3 }, { gate: false }]
+  snare:
+    waveform: noise
+    adsr: [0, 7, 0, 0]
+    wavetable: [{ wave: noise, note: C6 }, { wave: noise, note: A5, frames: 2 }, { gate: false }]
+  hat:
+    waveform: noise
+    adsr: [0, 4, 0, 0]
+    wavetable: [{ wave: noise, note: G7 }, { gate: false }]
+patterns:
+  # Every character of "steps" is one entry of `length` beats: k kick, s snare, h hat, "." rest.
+  beat:
+    length: 0.5
+    bars: 1
+    drums: { kit: { k: kick, s: snare, h: hat }, steps: "k.h.s.h." }
+  fill:
+    length: 0.25
+    bars: 1
+    drums: { kit: { k: kick, s: snare, h: hat }, steps: "k.h.s.sskksskss." }
