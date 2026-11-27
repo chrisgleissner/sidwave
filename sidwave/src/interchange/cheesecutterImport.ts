@@ -123,10 +123,9 @@ const wavePart = (wave: number): { name?: string; ring: boolean; sync: boolean; 
 const FILTER_TYPES: Record<number, string> = { 0x10: "lowpass", 0x20: "bandpass", 0x40: "highpass", 0x50: "lowpass+highpass", 0x60: "bandpass+highpass", 0x70: "all", 0x30: "lowpass" };
 
 /*
- * TODO (SIDWave 1.5, branch feat/reconstruct-corpus-dev, not on main): the driver's own frequency table can be written as
- * `tuning.registers`, and the first frame of a note (the previous pitch while the restart waveform is written) as a
- * wavetable `reg` step. Both would remove the two largest remaining note disagreements. Emit them only when the target
- * version is 1.5, after that branch has merged; until then the importers write the equal-tempered pitch and skip the first frame.
+ * TODO (SIDWave 1.5): the driver's own frequency table can be written as `tuning.registers`, and the first frame of a note (the
+ * previous pitch while the restart waveform is written) as a wavetable `reg` step. Both would remove the two largest remaining
+ * note disagreements. Until then the importers write the equal-tempered pitch and skip the first frame.
  */
 /** Per-instrument conversion, shared with the tests. */
 export function convertCtInstrument(song: CtSong, number: number, multiplier: number, range: { low: number; high: number }, maxMidi: number, chordStart?: number, vibrato?: { depth: number; rate: number }): { def: Record<string, unknown>; notes: string[] } {

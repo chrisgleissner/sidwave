@@ -71,10 +71,9 @@ export function driver11Tables(song: Sf2Song): Record<"cmd" | "instr" | "wave" |
 export interface Sf2Variant { instrument: number; adsr?: [number, number]; arp?: { start: number; speed: number }; vibrato?: { depth: number; rate: number }; wave?: number }
 
 /*
- * TODO (SIDWave 1.5, branch feat/reconstruct-corpus-dev, not on main): the driver's own frequency table can be written as
- * `tuning.registers`, and the first frame of a note (the previous pitch while the restart waveform is written) as a
- * wavetable `reg` step. Both would remove the two largest remaining note disagreements. Emit them only when the target
- * version is 1.5, after that branch has merged; until then the importers write the equal-tempered pitch and skip the first frame.
+ * TODO (SIDWave 1.5): the driver's own frequency table can be written as `tuning.registers`, and the first frame of a note (the
+ * previous pitch while the restart waveform is written) as a wavetable `reg` step. Both would remove the two largest remaining
+ * note disagreements. Until then the importers write the equal-tempered pitch and skip the first frame.
  */
 /** Converts one instrument of a driver 11 song. */
 export function convertSf2Instrument(song: Sf2Song, number: number, variant: Sf2Variant, range: { low: number; high: number }, maxMidi: number, fps: number, softRestart = false, noPulseTable = false, noFilterTable = false): { def: Record<string, unknown>; notes: string[] } {

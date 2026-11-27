@@ -336,7 +336,7 @@ CPU time (`process.cpuUsage`): import of a song of 16,000 ticks by 3 tracks 0.24
 
 ### SIDWave 1.5
 
-TODO, after `feat/reconstruct-corpus-dev` has merged (SIDWave 1.5 is not on main yet): both importers can then write the driver's own frequency table as `tuning.registers` and the first frame of a note (the previous pitch while the restart waveform is written) as a wavetable `reg` step. Those two account for most of the remaining note disagreement (for example the extreme drum pitches that SIDWave clamps, and the first call of every note). The code will emit them only when the target version is 1.5; until then the importers write equal-tempered pitches and skip the first frame.
+Not used yet: both importers could write the driver's own frequency table as `tuning.registers` and the first frame of a note (the previous pitch while the restart waveform is written) as a wavetable `reg` step. Those two account for most of the remaining note disagreement (for example the extreme drum pitches that SIDWave clamps, and the first call of every note). Until then the importers write equal-tempered pitches and skip the first frame.
 
 ## WAV and stems
 
