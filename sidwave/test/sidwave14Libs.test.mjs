@@ -14,6 +14,8 @@ import { compileSidwaveToPrg } from "../src/sidwaveCompiler.js";
 import { SIDWAVE_SCORE_RESOURCES, readSidwaveExample } from "../src/sidwaveExamples.js";
 import { compileSidwaveBytes, confinedReadOptions } from "../src/sidwaveOps.js";
 import { readExampleScore } from "../src/sidwaveOps.js";
+import { diffSidwave, formatSidwave, mergeSidwave } from "../src/format/sidwaveFormat.js";
+import { setTempo, transpose } from "../src/transform/index.js";
 import { SIDWAVE_LIBRARY_LIMITS, bundleScore, canonicalLibraryHash, libraryClosure, lockScore, readImportEntries, satisfiesVersion } from "../src/sidwaveLibs.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -819,4 +821,31 @@ test("bundle refuses samples outside the confinement and larger than the sample 
   } finally {
     p.done();
   }
+});
+
+test("transforms, diff and merge work on a score with imports when given the read options", () => {
+  withProject(({ dir, score }) => {
+    const read = confinedReadOptions(dir, [], score);
+    const text = fs.readFileSync(score, "utf8");
+    expectError(() => transpose(text, { semitones: 2 }), /library resolver/);
+    const up = transpose(text, { semitones: 2, read });
+    assert.match(up.text, /imports:/);
+    assert.ok(up.text.includes("drums.beat"));
+    const moved = parseSidwave(up.text, read);
+    assert.deepEqual(moved.libraries.map((l) => l.name), ["fixture-drums", "fixture-base", "sidwave-lib-pad"]);
+    assert.equal(setTempo(text, { bpm: 90, validate: "parse", read }).text.includes("tempo: 90"), true);
+    // diff: a layout change is equal to the compiler, a note change is not.
+    const reformatted = formatSidwave(text);
+    assert.equal(diffSidwave(text, reformatted, read).compiledEqual, true);
+    assert.equal(diffSidwave(text, up.text, read).compiledEqual, false);
+    assert.equal(diffSidwave(text, reformatted).compiledEqual, false, "without read options the score cannot be compiled");
+    // merge: disjoint edits join and the result is checked with the resolver.
+    const ours = text.replace("tempo: 120", "tempo: 100");
+    const theirs = text.replace("title: Library Fixture", "title: Renamed");
+    const merged = mergeSidwave(text, ours, theirs, read);
+    assert.deepEqual(merged.conflicts, []);
+    assert.match(merged.merged, /tempo: 100/);
+    assert.match(merged.merged, /title: "Renamed"/);
+    assert.ok(mergeSidwave(text, ours, theirs).conflicts.length === 1, "without read options the merged score does not validate");
+  });
 });
