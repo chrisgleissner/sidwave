@@ -45,7 +45,12 @@ average of 20 to 30 on 8 cores, so it is closer to a worst case than to a best c
 | Semantic `diff` | 600 ms | 340-570 ms | one compile (both texts are compiled only when their data differ) |
 | `merge` | 400 ms | 110-360 ms | the `yaml` package |
 | PSID parse, MD5 | 1 ms | 0.07 ms | |
-| Songlengths.md5, 60,000 lines | 250 ms | 186 ms | |
+| Songlengths.md5, 60,000 entries (120,000 lines, 5 MB) | 250 ms | 135-145 ms cold, 65 ms warm | the Map of keys; the line scan is about 80 ms cold |
+| STIL.txt, 18,500 entries (107,000 lines) | 300 ms | 120-175 ms cold, 50 ms warm | |
+| `sid edit` of one field | 1 ms | 0.3 ms | |
+| `sid info` over all of HVSC (59,886 files) with Songlengths and STIL | tens of seconds | 6 s warm cache, 15 s cold cache (5 s CPU) | reading the files |
+| `songlengths verify` of all of HVSC | tens of seconds | 3 s | reading the files |
+| `sid player` (SIDId, 757 players) | 5 ms per file | 2 ms per file | |
 | Game build with measured cycles | 1 s; 3 s for the largest scores | 0.7-2.3 s | the bundled 6502 interpreter (up to 9 million instructions); `--no-measure` skips it |
 | T0/T1 comparison, two 3-minute traces | 200 ms | 75-100 ms | unpacking the records |
 | Trace IR, one minute of music | 100 ms | 38-55 ms | |

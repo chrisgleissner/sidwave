@@ -5,6 +5,8 @@
 
 import { runCli } from "./cli.js";
 
+process.stdout.on("error", (error: NodeJS.ErrnoException) => { if (error.code === "EPIPE") process.exit(0); throw error; });
+
 // SIGINT aborts the running operation through the signal; a second SIGINT ends the process at once.
 const controller = new AbortController();
 process.on("SIGINT", () => {

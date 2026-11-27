@@ -77,6 +77,10 @@
       "types": "./dist/songlengths.d.ts",
       "default": "./dist/songlengths.js"
     },
+    "./hvsc": {
+      "types": "./dist/hvscIndex.d.ts",
+      "default": "./dist/hvscIndex.js"
+    },
     "./engine": {
       "types": "./dist/engine/libsidplayfp.d.ts",
       "default": "./dist/engine/libsidplayfp.js"

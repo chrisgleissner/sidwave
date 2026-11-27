@@ -8,6 +8,11 @@ import { compareTraces } from "../src/verify/index.ts";
 import { compareAudioA1, loadA1Rules } from "../src/verify/a1.ts";
 import { buildIr } from "../src/reconstruct/ir.ts";
 import { parseSonglengths } from "../src/songlengths.ts";
+import { writeSidFile } from "../src/sidFile.ts";
+import { editSidHeader } from "../src/sidEdit.ts";
+import { parseStil, queryStil } from "../src/stil.ts";
+import { songlengthsKey, writeSonglengthsEntry } from "../src/songlengthsFile.ts";
+import { identifyPlayerInData, parseSidIdConfig } from "../src/sidId.ts";
 import { resolveCutoff } from "../src/sidwaveFilterModel.ts";
 import { convert } from "../src/interchange/convert.ts";
 
@@ -90,6 +95,58 @@ test("Songlengths parsing is linear", () => {
   const lines = ["[Database]"];
   for (let i = 0; i < 20_000; i++) lines.push(`${(i * 2654435761 >>> 0).toString(16).padStart(8, "0")}${(i * 40503 >>> 0).toString(16).padStart(8, "0")}${"0".repeat(16)}=3:${String(i % 60).padStart(2, "0")}`);
   within("parseSonglengths", () => parseSonglengths(lines.join("\n")), 3.5, 3);
+});
+
+// HVSC tools. The inputs are synthetic and shaped like the HVSC files: Songlengths.md5 has a "; /path" line above every
+// entry and CRLF line breaks, STIL.txt has entries of 4 to 8 lines. The real files are timed in hvsc*.test.mjs.
+function syntheticSonglengths(entries) {
+  const lines = ["[Database]"];
+  for (let i = 0; i < entries; i++) {
+    lines.push(`; /MUSICIANS/${String.fromCharCode(65 + (i % 26))}/Artist_${i % 500}/Tune_${i}.sid`);
+    lines.push(`${(Math.imul(i, 2654435761) >>> 0).toString(16).padStart(8, "0")}${(Math.imul(i, 40503) >>> 0).toString(16).padStart(8, "0")}${"0".repeat(16)}=${i % 9}:${String(i % 60).padStart(2, "0")}${i % 4 === 0 ? `.${(i * 7) % 1000}` : ""}${i % 5 === 0 ? ` 1:${String(i % 60).padStart(2, "0")} 0:30` : ""}`);
+  }
+  return `${lines.join("\r\n")}\r\n`;
+}
+
+function syntheticStil(entries) {
+  const lines = ["#  STIL v83 - SID Tune Information List", ""];
+  for (let i = 0; i < entries; i++) {
+    lines.push(`/MUSICIANS/${String.fromCharCode(65 + (i % 26))}/Artist_${i % 500}/Tune_${i}.sid`);
+    if (i % 3 === 0) lines.push("COMMENT: A comment that runs over two lines, as many of the real", "         comments do.");
+    lines.push("(#1)", `   NAME: Tune ${i}`, `  TITLE: Title ${i} [from Album ${i % 40}] (0:00-1:${String(i % 60).padStart(2, "0")})`, " ARTIST: Some Artist");
+    if (i % 2 === 0) lines.push("(#2)", `  TITLE: Other ${i}`, " ARTIST: Another Artist");
+    lines.push("");
+  }
+  return `${lines.join("\r\n")}\r\n`;
+}
+
+test("Songlengths.md5 of 60,000 entries parses, and a lookup and a write stay within their budgets", () => {
+  const text = syntheticSonglengths(60_000);
+  within("songlengthsParse60k", () => parseSonglengths(text), 6, 3);
+  const db = parseSonglengths(text);
+  const payload = Uint8Array.from({ length: 4000 }, (_, i) => (i * 31) & 0xff);
+  const sid = writeSidFile({ magic: "PSID", version: 2, loadAddress: 0x1000, initAddress: 0x1000, playAddress: 0x1003, songs: 3, startSong: 1, speed: 0, name: "n", author: "a", released: "r", payload });
+  within("songlengthsLookup", () => { for (let i = 0; i < 1000; i++) db.get(songlengthsKey(sid, "md5")); }, 1);
+  within("songlengthsWrite60k", () => writeSonglengthsEntry(text, { md5: "f".repeat(32), durations: [1000, 2000, 3000], path: "/MUSICIANS/M/Artist_1/Mid.sid" }), 5, 3);
+});
+
+test("STIL of 18,000 entries parses and a query stays within its budget", () => {
+  const text = syntheticStil(18_000);
+  within("stilParse18k", () => parseStil(text), 6, 3);
+  const db = parseStil(text);
+  within("stilQuery", () => { for (let i = 0; i < 2000; i++) queryStil(db, `/MUSICIANS/${String.fromCharCode(65 + (i % 26))}/Artist_${i % 500}/Tune_${i}.sid`); }, 1);
+});
+
+test("SID header edit and SIDId identification stay within their budgets", () => {
+  const payload = Uint8Array.from({ length: 20_000 }, (_, i) => (Math.imul(i, 2654435761) >>> 24) & 0xff);
+  const sid = writeSidFile({ magic: "PSID", version: 2, loadAddress: 0x1000, initAddress: 0x1000, playAddress: 0x1003, songs: 3, startSong: 1, speed: 0, name: "n", author: "a", released: "r", payload });
+  within("sidEdit", () => { for (let i = 0; i < 200; i++) editSidHeader(sid, { author: `Author ${i}`, clock: i % 2 ? "PAL" : "NTSC" }); }, 6);
+  const cfg = [];
+  for (let i = 0; i < 750; i++) cfg.push(`Player_${i}`, `${(i * 7 % 256).toString(16).padStart(2, "0")} ${(i * 13 % 256).toString(16).padStart(2, "0")} ?? A9 ${(i % 200).toString(16).padStart(2, "0")} 8D 18 D4 END`, `4C ${(i * 3 % 256).toString(16).padStart(2, "0")} ?? ?? AND 60 ${(i * 11 % 256).toString(16).padStart(2, "0")} 60 END`);
+  const text = `${cfg.join("\r\n")}\r\n`;
+  within("sididParse", () => parseSidIdConfig(text), 1, 3);
+  const db = parseSidIdConfig(text);
+  within("sididIdentify", () => { for (let i = 0; i < 10; i++) identifyPlayerInData(payload, db, { all: true }); }, 15);
 });
 
 function syntheticTrace(seconds) {
