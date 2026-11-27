@@ -1645,6 +1645,8 @@ export interface PlayerOptions {
   idleWrites: boolean | "control";
   /** Register writes of the first player calls, in order; one entry per call. The song starts after the last one. */
   start?: Array<Array<{ reg: number; value: number }>>;
+  /** Register writes that init makes after clearing the SID. */
+  init?: Array<{ reg: number; value: number }>;
 }
 
 export const PLAYER_START_MAX_STEPS = 8;
@@ -1655,27 +1657,28 @@ export const PLAYER_START_MAX_WRITES = 32;
  * `idle_writes` is true (default), false or "control". `start` lists the register writes ($D400 to $D418 of the first SID) of the first player calls.
  */
 function parsePlayer(raw: unknown): PlayerOptions {
-  const value = requireObject(raw, "$.player", ["soft_start", "idle_writes", "start"]);
+  const value = requireObject(raw, "$.player", ["soft_start", "idle_writes", "start", "init"]);
   if (value.idle_writes !== undefined && typeof value.idle_writes !== "boolean" && value.idle_writes !== "control") throw new SidwaveValidationError("$.player.idle_writes", "expected true, false or control");
   if (value.soft_start !== undefined && typeof value.soft_start !== "boolean") throw new SidwaveValidationError("$.player.soft_start", "expected true or false");
+  const writes = (list: unknown, path: string, min: number) => {
+    if (!Array.isArray(list) || list.length < min || list.length > PLAYER_START_MAX_WRITES) throw new SidwaveValidationError(path, `expected a list of ${min} to ${PLAYER_START_MAX_WRITES} writes`);
+    return list.map((write: unknown, j: number) => {
+      const writePath = `${path}[${j}]`;
+      const w = requireObject(write, writePath, ["reg", "value"]);
+      const reg = typeof w.reg === "string" && /^\$[0-9a-fA-F]{4}$/.test(w.reg.trim()) ? Number.parseInt(w.reg.trim().slice(1), 16) : w.reg;
+      if (typeof reg !== "number" || !Number.isInteger(reg) || reg < 0xd400 || reg > 0xd418) throw new SidwaveValidationError(`${writePath}.reg`, "expected a register from $D400 to $D418");
+      if (typeof w.value !== "number" || !Number.isInteger(w.value) || w.value < 0 || w.value > 255) throw new SidwaveValidationError(`${writePath}.value`, "expected a byte value from 0 to 255");
+      return { reg: reg - 0xd400, value: w.value };
+    });
+  };
   let start: PlayerOptions["start"];
   if (value.start !== undefined) {
     const path = "$.player.start";
     if (!Array.isArray(value.start) || value.start.length === 0 || value.start.length > PLAYER_START_MAX_STEPS) throw new SidwaveValidationError(path, `expected a list of 1 to ${PLAYER_START_MAX_STEPS} steps, one per player call`);
-    start = value.start.map((step: unknown, i: number) => {
-      const stepPath = `${path}[${i}]`;
-      if (!Array.isArray(step) || step.length === 0 || step.length > PLAYER_START_MAX_WRITES) throw new SidwaveValidationError(stepPath, `expected a list of 1 to ${PLAYER_START_MAX_WRITES} writes`);
-      return step.map((write: unknown, j: number) => {
-        const writePath = `${stepPath}[${j}]`;
-        const w = requireObject(write, writePath, ["reg", "value"]);
-        const reg = typeof w.reg === "string" && /^\$[0-9a-fA-F]{4}$/.test(w.reg.trim()) ? Number.parseInt(w.reg.trim().slice(1), 16) : w.reg;
-        if (typeof reg !== "number" || !Number.isInteger(reg) || reg < 0xd400 || reg > 0xd418) throw new SidwaveValidationError(`${writePath}.reg`, "expected a register from $D400 to $D418");
-        if (typeof w.value !== "number" || !Number.isInteger(w.value) || w.value < 0 || w.value > 255) throw new SidwaveValidationError(`${writePath}.value`, "expected a byte value from 0 to 255");
-        return { reg: reg - 0xd400, value: w.value };
-      });
-    });
+    start = value.start.map((step: unknown, i: number) => writes(step, `${path}[${i}]`, 0));
   }
-  return { softStart: value.soft_start !== false, idleWrites: value.idle_writes === "control" ? "control" : value.idle_writes !== false, ...(start ? { start } : {}) };
+  const init = value.init === undefined ? undefined : writes(value.init, "$.player.init", 1);
+  return { softStart: value.soft_start !== false, idleWrites: value.idle_writes === "control" ? "control" : value.idle_writes !== false, ...(start ? { start } : {}), ...(init ? { init } : {}) };
 }
 
 /**

@@ -153,6 +153,8 @@ interface NoteSegment {
   /** True when the pitch could not be expressed as equal-temperament semitones. */
   pitchApprox: boolean;
   instrument: number;
+  /** The modulation of a voice before its first gate: a note with the gate off from the first row. */
+  lead?: boolean;
   /** A note after the horizon that is inferred from a hard restart already visible inside the horizon. */
   phantom?: boolean;
   /** Frames before the entry end at which the gate goes off (the `gate_off` of the note); absent when the gate-off is the hard restart or a wavetable step. */
@@ -427,10 +429,12 @@ function extractTracks(ir: FrameIr, first: number): Track[] {
   return tracks;
 }
 
-function segmentTrack(track: Track, tune: TuningSpec, clockHz: number, speed: number, maxMidi: number, notes: { unsupported: Array<{ call: number; kind: string; detail: string }> }): NoteSegment[] {
+function segmentTrack(track: Track, tune: TuningSpec, clockHz: number, speed: number, maxMidi: number, notes: { unsupported: Array<{ call: number; kind: string; detail: string }> },
+  lead: boolean): NoteSegment[] {
   const n = track.ctl.length;
   const starts: number[] = [];
   for (let k = 0; k < n; k++) if (track.ctl[k]! & 1 && (k === 0 || !(track.ctl[k - 1]! & 1))) starts.push(k);
+  if (lead) starts.unshift(0);
   const segs: NoteSegment[] = [];
   for (let i = 0; i < starts.length; i++) {
     const start = starts[i]!;
@@ -453,7 +457,7 @@ function segmentTrack(track: Track, tune: TuningSpec, clockHz: number, speed: nu
     }
     const seg: NoteSegment = {
       start, gateOff, entryEnd: n, restart, length: 0, midi: 60, ad: track.ad[start]!, sr: track.sr[start]!,
-      program: [], pitchApprox: false, instrument: -1, freqs: [], modulated: false,
+      program: [], pitchApprox: false, instrument: -1, freqs: [], modulated: false, ...(lead && i === 0 ? { lead: true } : {}),
     };
     segs.push(seg);
   }
@@ -509,9 +513,12 @@ function segmentTrack(track: Track, tune: TuningSpec, clockHz: number, speed: nu
     const useGateEnd = viaGateOff || (seg.gateOff < end && plainTail && seg.gateOff - seg.start >= minEntry);
     seg.length = useGateEnd && !viaGateOff ? seg.gateOff - seg.start : seg.entryEnd - seg.start;
     const progEnd = useGateEnd ? seg.gateOff : end;
-    const base = exactSemitone(track.freq[seg.start]!, tune, clockHz);
+    // A note that starts with a frequency of zero (a test bit call) takes its pitch from the first call that sounds.
+    let pitched = seg.start;
+    while (pitched + 1 < progEnd && track.freq[pitched] === 0) pitched++;
+    const base = exactSemitone(track.freq[pitched]!, tune, clockHz);
     seg.pitchApprox = base === undefined;
-    seg.midi = base ?? Math.max(MIDI_MIN, Math.min(maxMidi, nearestSemitone(track.freq[seg.start]!, tune.cents, clockHz)));
+    seg.midi = base ?? Math.max(MIDI_MIN, Math.min(maxMidi, track.freq[pitched] ? nearestSemitone(track.freq[pitched]!, tune.cents, clockHz) : 60));
     // The vibrato continues through the release and the restart calls, so the whole span up to the next note is checked.
     for (let k = seg.start; k < (next ? next.start : n); k++) seg.freqs.push(track.freq[k]!);
     seg.modulated = seg.freqs.some((f) => exactSemitone(f, tune, clockHz) === undefined);
@@ -523,7 +530,7 @@ function segmentTrack(track: Track, tune: TuningSpec, clockHz: number, speed: nu
       }
       seg.program.push({
         wave: track.ctl[k]! & 0xfe, gate: track.ctl[k]! & 1,
-        offset: m === undefined ? 0 : m - seg.midi, ...(m === undefined && track.freq[k]! > 0 ? { reg: track.freq[k]! } : {}), pw: track.pw[k]!,
+        offset: m === undefined ? 0 : m - seg.midi, ...(m === undefined ? { reg: track.freq[k]! } : {}), pw: track.pw[k]!,
         ...(track.route[k]! & (1 << track.voice) ? { filt: { cutoff: track.cutoff[k]!, res: track.route[k]! >> 4, type: track.mode[k]! & 0x70 } } : {}),
       });
     }
@@ -1172,18 +1179,21 @@ const START_MAX_WRITES = 32;
 
 /**
  * The register writes of the player calls that precede the first note of every voice, in call order and, within a call, in
- * register order; each write of a control register is listed in the order it happened. A call with more than 32 writes ends the list.
+ * register order; each write of a control register is listed in the order it happened. A call that writes nothing leaves a
+ * gap of whole periods in the IR and becomes an empty step. `calls` is the number of IR calls that the steps cover. A call
+ * with more than 32 writes ends the list.
  */
-function startUpSteps(ir: FrameIr, first: number, tracks: Track[]): Array<Array<{ reg: number; value: number }>> {
+function startUpSteps(ir: FrameIr, first: number, tracks: Track[]): { steps: Array<Array<{ reg: number; value: number }>>; calls: number } {
   let firstGate = Infinity;
   for (const t of tracks) {
     if (t.sid !== 0) continue;
     for (let k = 0; k < t.ctl.length; k++) if (t.ctl[k]! & 1) { firstGate = Math.min(firstGate, k); break; }
   }
-  if (!Number.isFinite(firstGate)) return [];
   const steps: Array<Array<{ reg: number; value: number }>> = [];
-  for (let k = 0; k < Math.min(firstGate, START_MAX_STEPS); k++) {
-    const sid = ir.calls[first + k]!.sids[0]!;
+  let calls = 0;
+  if (!Number.isFinite(firstGate)) return { steps, calls };
+  while (calls < firstGate && steps.length < START_MAX_STEPS) {
+    const sid = ir.calls[first + calls]!.sids[0]!;
     const writes: Array<{ reg: number; value: number }> = [];
     for (let r = 0; r < 25; r++) {
       if (!(sid.written & (1 << r))) continue;
@@ -1193,18 +1203,71 @@ function startUpSteps(ir: FrameIr, first: number, tracks: Track[]): Array<Array<
     }
     if (writes.length === 0 || writes.length > START_MAX_WRITES) break;
     steps.push(writes);
+    const next = ir.calls[first + calls + 1];
+    calls++;
+    if (!next || !ir.periodCycles || ir.callsPerFrame < 1) continue;
+    const periods = (next.startCycle - ir.calls[first + calls - 1]!.startCycle) / ir.periodCycles;
+    // Only a spacing close to a whole number of periods is a gap; anything else is an irregular call.
+    if (periods >= 1.8 && Math.abs(periods - Math.round(periods)) < 0.1) {
+      for (let k = 1; k < Math.round(periods) && steps.length < START_MAX_STEPS; k++) steps.push([]);
+    }
   }
-  return steps;
+  return { steps, calls };
 }
 
-/** True when the voice's control register is written in every call from `from` up to its first note at row `until`, and its other registers hold zero (the value the player leaves them at). */
+/**
+ * The values the registers of SID 1 hold before the call at `first` that differ from what the player's init leaves (0,
+ * volume 15). Control registers are left out: a gate that init opens would start an envelope that no note of the score owns.
+ */
+function initResidue(ir: FrameIr, first: number): Array<{ reg: number; value: number }> {
+  const regs = ir.calls[first - 1]?.sids[0]?.regs;
+  if (!regs) return [];
+  const out: Array<{ reg: number; value: number }> = [];
+  for (let reg = 0; reg < 25; reg++) if (![4, 11, 18].includes(reg) && regs[reg] !== (reg === 0x18 ? 15 : 0)) out.push({ reg, value: regs[reg]! });
+  return out;
+}
+
+/** Voice registers of SID 1 other than control, as the chip holds them before row 0. */
+const IDLE_REGISTERS = [0, 1, 2, 3, 5, 6] as const;
+
+/** True when a register of the voice changes, in the calls from `from` up to row `until`, from the value held before `from`. */
+function changesWhileIdle(ir: FrameIr, from: number, t: Track, until: number): boolean {
+  const base = t.voice * 7;
+  const held = ir.calls[from - 1]?.sids[t.sid]?.regs;
+  for (let k = from; k < from + until; k++) {
+    const regs = ir.calls[k]?.sids[t.sid]?.regs;
+    if (!regs) return false;
+    if (IDLE_REGISTERS.some((i) => regs[base + i] !== (held?.[base + i] ?? 0))) return true;
+    if (regs[base + 4] !== (held?.[base + 4] ?? 0)) return true;
+  }
+  return false;
+}
+
+/**
+ * True when an idle player voice cannot produce what the voice holds in the calls from `from` up to row `until`: the
+ * frequency, pulse width or waveform bits change between those calls (a hard restart before the first note changes only
+ * gate, test and envelope, which the note's restart reproduces), or the constant state has a pulse width, control or envelope that is neither zero
+ * (what the player writes before a first note) nor what the chip holds before the span (what `idle_writes: false` keeps).
+ */
+function needsLeadNote(ir: FrameIr, from: number, t: Track, until: number): boolean {
+  const base = t.voice * 7;
+  const at = (k: number): string => {
+    const r = ir.calls[k]!.sids[t.sid]!.regs;
+    return hex([...r.subarray(base, base + 4), r[base + 4]! & 0xf6]);
+  };
+  if (until <= 0 || from >= ir.calls.length) return false;
+  const first = at(from);
+  for (let k = from + 1; k < from + until && k < ir.calls.length; k++) if (at(k) !== first) return true;
+  const zeroBesidesFrequency = ir.calls[from]!.sids[t.sid]!.regs.subarray(base + 2, base + 7).every((v) => v === 0);
+  return !zeroBesidesFrequency && changesWhileIdle(ir, from, t, until);
+}
+
+/** True when the voice's control register is written in every call from `from` up to its first note at row `until`. */
 function writesControlWhileIdle(ir: FrameIr, from: number, t: Track, until: number): boolean {
   if (until <= 0) return false;
-  const base = t.voice * 7;
   for (let k = from; k < from + until; k++) {
     const sid = ir.calls[k]?.sids[t.sid];
     if (!sid || sid.control[t.voice]!.length === 0) return false;
-    for (const i of [0, 1, 2, 3, 5, 6]) if (sid.regs[base + i] !== 0) return false;
   }
   return true;
 }
@@ -1309,9 +1372,10 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
 
   let tracks = extractTracks(ir, firstCall);
   // Start-up writes: the player calls before the first note of any voice are written out as `player.start` (SIDWave 1.5), and the rows begin after them.
-  const startSteps = startUpSteps(ir, firstCall, tracks);
+  const startUp = startUpSteps(ir, firstCall, tracks);
+  const startSteps = startUp.steps;
   if (startSteps.length) {
-    rowStart = firstCall + startSteps.length;
+    rowStart = firstCall + startUp.calls;
     rows = ir.calls.length - rowStart;
     tracks = extractTracks(ir, rowStart);
   }
@@ -1323,7 +1387,10 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     });
     extend("sid-address", "SID address map from the trace", "the IR numbers SIDs; their addresses are not in the trace", reproducer(ir, 1, 0, firstCall));
   }
-  const used = tracks.filter((t) => t.sid === 0 && t.ctl.some((c) => c & 1));
+  // A voice that, before its first gate (or without any gate), does what an idle player voice cannot starts with a gate-off note at row 0.
+  const firstGateOf = (t: Track): number => { const k = t.ctl.findIndex((c) => (c & 1) !== 0); return k < 0 ? t.ctl.length : k; };
+  const leading = new Set(tracks.filter((t) => t.sid === 0 && firstGateOf(t) > 0 && needsLeadNote(ir, rowStart, t, firstGateOf(t))));
+  const used = tracks.filter((t) => t.sid === 0 && (leading.has(t) || t.ctl.some((c) => c & 1)));
   const tuning = estimateTuning(used, ir.clockHz);
   // Gate-on registers that equal temperament under the measured shift does not explain get exact note registers (SIDWave 1.5 `tuning.registers`).
   const tune = buildNoteTable(tuning.counts, tuning.cents, ir.clockHz);
@@ -1341,7 +1408,7 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     });
   }
   const gaps = { unsupported: [] as Array<{ call: number; kind: string; detail: string }> };
-  const segsByTrack = used.map((t) => segmentTrack(t, tune, ir.clockHz, speed, maxSidwaveMidi(system), gaps));
+  const segsByTrack = used.map((t) => segmentTrack(t, tune, ir.clockHz, speed, maxSidwaveMidi(system), gaps, leading.has(t)));
   // A note longer than MAX_NOTE_BEATS is cut, so that every pattern stays within the 64-beat limit of the language.
   for (const segs of segsByTrack) {
     for (const seg of segs) {
@@ -1398,7 +1465,7 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
       counts.set(k, { n: (counts.get(k)?.n ?? 0) + 1, restart: s.restart });
     }
     const common = [...counts.values()].sort((a, b) => b.n - a.n)[0]?.restart ?? { calls: 2 * speed, ad: 0, sr: 0, test: false };
-    if (segs[0]) segs[0].restart = segs[0].length >= common.calls + speed ? common : { calls: 0, ad: 0, sr: 0, test: false };
+    if (segs[0] && !segs[0].lead) segs[0].restart = segs[0].length >= common.calls + speed ? common : { calls: 0, ad: 0, sr: 0, test: false };
   }
 
   // The last note may be cut by the horizon; the compiler needs its full minimum length, which lies after the horizon.
@@ -1599,10 +1666,14 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   // SIDWave 1.5 is declared only when the score needs it: a speed above 4, or a player without the soft-start volume ramp.
   // A voice that is silent at the start and has not written its frequency register yet: the player is told to write nothing for it until its first note.
   const lateVoices = used.filter((t, i) => (segsByTrack[i]![0]?.start ?? 0) > 0);
-  const idleSilent = lateVoices.length > 0 && lateVoices.every((t) => t.freq[0] === 0);
+  const lateStart = (t: Track): number => segsByTrack[used.indexOf(t)]![0]?.start ?? 0;
+  // The player writes zeros for a voice that has not played. When the chip holds something else, or the tune writes only the
+  // control register, the player is told to leave those registers alone.
+  const idleSilent = lateVoices.length > 0 && lateVoices.every((t) => !changesWhileIdle(ir, rowStart, t, lateStart(t)));
   // The original writes the control register of a voice that has not played yet in every call before its first note: the player does the same with `idle_writes: control`.
-  const idleControl = idleSilent && lateVoices.every((t) => writesControlWhileIdle(ir, rowStart, t, segsByTrack[used.indexOf(t)]![0]!.start));
+  const idleControl = idleSilent && lateVoices.every((t) => writesControlWhileIdle(ir, rowStart, t, lateStart(t)));
   const idleOff = idleSilent && !idleControl;
+  const initWrites = initResidue(ir, firstCall);
   const useTable = tune.override.size > 0;
   const usesWide = Object.values(instruments).some((y) => {
     const t = (y as { pulsetable?: { wrap?: boolean; steps: Array<{ set?: number }> } }).pulsetable;
@@ -1610,12 +1681,14 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   });
   const usesReg = Object.values(instruments).some((y) => ((y as { wavetable?: Array<Record<string, unknown>> }).wavetable ?? []).some((step) => step.reg !== undefined));
   const usesNoWave = Object.values(instruments).some((y) => ((y as { wavetable?: Array<Record<string, unknown>> }).wavetable ?? []).some((step) => step.wave === "none"));
-  const v15 = speed > 4 || softStartOff || idleOff || idleControl || startSteps.length > 0 || useTable || usesReg || usesWide || usesNoWave;
+  const v15 = speed > 4 || softStartOff || idleOff || idleControl || startSteps.length > 0 || useTable || usesReg || usesWide || usesNoWave || initWrites.length > 0;
+  const registerName = (reg: number): string => `$D4${reg.toString(16).toUpperCase().padStart(2, "0")}`;
   const playerOptions = {
+    ...(initWrites.length ? { init: initWrites.map((w) => ({ reg: registerName(w.reg), value: w.value })) } : {}),
     ...(softStartOff ? { soft_start: false } : {}),
     ...(idleOff ? { idle_writes: false } : {}),
     ...(idleControl ? { idle_writes: "control" } : {}),
-    ...(startSteps.length ? { start: startSteps.map((step) => step.map((w) => ({ reg: `$D4${w.reg.toString(16).toUpperCase().padStart(2, "0")}`, value: w.value }))) } : {}),
+    ...(startSteps.length ? { start: startSteps.map((step) => step.map((w) => ({ reg: registerName(w.reg), value: w.value }))) } : {}),
   };
   const build = (layout: Layout): Record<string, unknown> => ({
     sidwave: v15 ? "1.5" : "1.4",
@@ -1662,7 +1735,7 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   for (const v of (document.voices as Array<{ patterns: object }>)) patternCount += Object.keys(v.patterns).length;
   return {
     document, text, speed, tempo, callsPerBeat, firstCall, rows, tuningCents: tuning.cents,
-    noteCount: allSegs.filter((x) => !x.phantom).length, phantomNotes: allSegs.filter((x) => x.phantom).length, instrumentCount: finalDefs.length, patternCount,
+    noteCount: allSegs.filter((x) => !x.phantom && !x.lead).length, phantomNotes: allSegs.filter((x) => x.phantom).length, instrumentCount: finalDefs.length, patternCount,
     structure: {
       blockBars: chosen?.blockBars ?? "flat", bytes: text.length,
       alternatives: alternatives.map(({ blockBars, bytes }) => ({ blockBars, bytes })),

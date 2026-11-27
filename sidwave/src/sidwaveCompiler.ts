@@ -11,6 +11,7 @@ import type { SampleStats } from "./sidwavePcm.js";
 import { addDigiPlayer, digiCyclesPerCall, digiDataAsm, digiPeakCycles, digiPeriod, validateDigiRate } from "./sidwaveDigi.js";
 import { AssemblyError, assemblyToPrgDetailed } from "6502-toolkit/assembler";
 import { isModern, isV13, patternBeats, sectionBarBeats, type GlobalTable } from "./sidwave.js";
+import { Cpu6502 } from "./sidwaveEmulator.js";
 import { SIDWAVE_EFFECT_STEP_BYTES, effectCode, effectCyclesBound, effectFrames, effectRam, effectTables } from "./sidwaveEffects.js";
 import { SongSelect, hasSongSelect, lintSongs, mergeSampleCommands, psidSpeedBits, songDoc } from "./sidwaveSongs.js";
 import type { ParsedEffect, ParsedSidwave, SystemMode, SidwaveVoice, SidwavePattern, SidwavePatternGroove, MotifEntry, SidwaveRegisterTable, FilterModSpec, SidwaveSamples, SidwaveGrooveNote } from "./sidwave.js";
@@ -495,14 +496,45 @@ function checkMemoryFit({ streams, arrangement }: PreparedPlayer, streamStart: n
 }
 
 /** The error of a score whose play call needs more cycles than a 1 MHz C64 has, unless it declares `cpu: turbo`. */
-function checkCycleBudget(doc: ParsedSidwave, { arrangement, digiCycles, requiresTurbo, tightest }: PreparedPlayer, planned?: Arrangement): void {
-  if (!arrangement.chips) return;
+/** Calls beyond which a player is not measured; the static estimate then decides. */
+const MEASURED_MAX_CALLS = 100_000;
+/** Cycles kept free above the measured worst call: a loop can meet its table steps in a phase that the measured passes did not. */
+const MEASURED_MARGIN_CYCLES = 50;
+
+/**
+ * SIDWave 1.5: the worst call of the assembled player on the bundled 6502 emulator, over init, every call of the song and
+ * one further pass of its loop (the player has no input, so these calls are the ones it will make). Undefined for what is
+ * not measured: documents before 1.5, several songs, effects, samples, and songs longer than MEASURED_MAX_CALLS.
+ */
+function measurePlayerCycles(doc: ParsedSidwave, { arrangement, loop, streams, turboOnly }: PreparedPlayer): number | undefined {
+  if (doc.version !== "1.5" || arrangement.songs || arrangement.effects || arrangement.samples) return undefined;
+  const loopFrame = arrangement.clock?.loopFrame ?? 0;
+  const calls = arrangement.totalFrames + (loop ? arrangement.totalFrames - loopFrame : 0) + 4;
+  if (calls > MEASURED_MAX_CALLS) return undefined;
+  const prg = assemblyToPrgDetailed(buildPlayerAsm(arrangement, streams, loop, turboOnly), { fileName: "sidwave_player.asm", loadAddress: SIDWAVE_LOAD_ADDRESS }).prg;
+  const mem = new Uint8Array(0x10000);
+  mem.set(prg.subarray(2), SIDWAVE_LOAD_ADDRESS);
+  mem[1] = 0x37;
+  const cpu = new Cpu6502(mem);
+  cpu.call(SIDWAVE_INIT_ADDRESS);
+  let worst = 0;
+  for (let i = 0; i < calls; i++) worst = Math.max(worst, cpu.call(SIDWAVE_PLAY_ADDRESS));
+  return worst;
+}
+
+/** Throws when the player does not fit its call period at 1 MHz. Returns the measured worst call when only the measurement shows that it fits. */
+function checkCycleBudget(doc: ParsedSidwave, prepared: PreparedPlayer, planned?: Arrangement): number | undefined {
+  const { arrangement, digiCycles, requiresTurbo, tightest } = prepared;
+  if (!arrangement.chips) return undefined;
   const availableCycles = tightest.available;
   const required = tightest.cycles / availableCycles;
   if (!planned && requiresTurbo(arrangement.system) && !doc.cpu) {
+    const measured = measurePlayerCycles(doc, prepared);
+    if (measured !== undefined && measured + MEASURED_MARGIN_CYCLES <= availableCycles) return measured;
     throw new SidwaveValidationError("$.cpu",
       `the player needs up to ${tightest.cycles} cycles per call at speed ${tightest.speed}${digiCycles ? ` including ${digiCycles} for the CIA2 digi NMI` : ""} (${availableCycles} available at 1 MHz ${arrangement.system}); use cpu: turbo for a CPU speed of at least ${Math.ceil(required)} MHz`);
   }
+  return undefined;
 }
 
 /** True for the assembler's errors about a program that does not fit in the 64 KB address space. */
@@ -558,8 +590,12 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
   if (arrangement.samples) {
     warnings.push(`CIA2 digi playback reserves up to ${digiCycles} CPU cycles per player call and temporarily replaces the sample SID's master volume.`);
   }
+  let measuredCycles: number | undefined;
   if (arrangement.chips) {
-    checkCycleBudget(doc, prepared, planned);
+    measuredCycles = checkCycleBudget(doc, prepared, planned);
+    if (measuredCycles !== undefined) {
+      warnings.push(`the cycle estimate of ${tightest.cycles} per call exceeds the ${tightest.available} available at 1 MHz; the player was measured at ${measuredCycles} cycles in its worst call and fits.`);
+    }
     const sawtooth = sawtoothWarning(arrangement);
     if (sawtooth) warnings.push(sawtooth);
   }
@@ -607,7 +643,7 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
     sampleBytes,
     sampleDefinitions: Object.fromEntries([...(arrangement.samples?.defs ?? [])].map(([name, sample]) => [name, sample.stats])),
     bytesBelowD000: SIDWAVE_MEMORY_END - (endAddress + 3),
-    requiresTurbo: requiresTurbo(arrangement.system),
+    requiresTurbo: measuredCycles === undefined && requiresTurbo(arrangement.system),
     irqAddress: assembled.symbols.get("irq")!,
     digiNmiAddress: assembled.symbols.get("digi_nmi"),
     digiChainAddress: assembled.symbols.get("digi_chain"),
@@ -1122,6 +1158,8 @@ export interface Arrangement {
   idleControl?: boolean;
   /** SIDWave 1.5 `player.start`: the register writes of the first player calls. */
   startSteps?: Array<Array<{ reg: number; value: number }>>;
+  /** SIDWave 1.5 `player.init`: register writes at the end of init. */
+  initWrites?: Array<{ reg: number; value: number }>;
   /** SIDWave 1.5 `global_table`: per-call values of the filter and volume registers. */
   globalTable?: GlobalTable;
   /** SIDWave 1.5 `tuning`: the 96 register values C0..B7 of the document's clock; absent without a tuning. */
@@ -1336,6 +1374,7 @@ function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrange
     ...(doc.player?.idleWrites === false ? { idleSilent: true } : {}),
     ...(doc.player?.idleWrites === "control" ? { idleControl: true } : {}),
     ...(doc.player?.start ? { startSteps: doc.player.start } : {}),
+    ...(doc.player?.init ? { initWrites: doc.player.init } : {}),
     ...(doc.globalTable ? { globalTable: doc.globalTable } : {}),
     ...(doc.tuning && (doc.tuning.cents || doc.tuning.registers.length) ? { noteTable: noteTableOf(doc) } : {}),
   };
@@ -3627,6 +3666,15 @@ ${banks.join("\n")}
 `;
 }
 
+/** SIDWave 1.5 `player.init`: writes the listed registers of the first SID at the end of init, while the I/O area is mapped in. */
+function addInitWrites(code: string, writes: Array<{ reg: number; value: number }>): string {
+  const start = code.indexOf("\ninit_core:\n");
+  const end = code.indexOf("  pla\n  sta $01\n", start);
+  if (start < 0 || end < 0) throw new Error("SIDWAVE player code changed: the init write patch point was not found");
+  const stores = writes.map((w) => `  lda #$${hex2(w.value)}\n  sta $${(0xd400 + w.reg).toString(16).toUpperCase()} ; init\n`).join("");
+  return code.slice(0, end) + stores + code.slice(end);
+}
+
 /** Bytes of one `global_table` step in the player: calls, mode, $D415, $D416 or its increment, $D417, $D418. A zero call count ends the table. */
 const GLOBAL_STEP_BYTES = 6;
 
@@ -4112,6 +4160,7 @@ c_ret:
     if (arr.tuning) playerCode = addTunedLookup(playerCode, arr.tuning);
     if (arr.samples) playerCode = addDigiPlayer(playerCode, arr.samples, arr.chips, [CLOCK_HZ.PAL, CLOCK_HZ.NTSC]);
   }
+  if (arr.initWrites) playerCode = addInitWrites(playerCode, arr.initWrites);
   if (arr.globalTable) playerCode = addGlobalTable(playerCode, arr.globalTable, arr.chips![0]!.address);
   if (arr.idleControl) playerCode = playerCode.replace("  sta $D400,y ; idle control", arr.chips ? "  sta (sid_io),y" : "  sta $D400,y");
   if (songs) {

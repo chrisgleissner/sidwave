@@ -1288,6 +1288,11 @@ volume from there, so the start volume holds only until that call; set `soft_sta
 **Rejected alternative.** An `init` register list written by the init routine instead of in play calls. The original writes
 in play calls, and the F-diff compares call by call, so a write in the init call would be in the wrong call.
 
+`player.init` lists up to 32 register writes of the first SID that `init` makes after it has cleared the chip. It
+describes a tune whose init leaves values in registers that its player does not write again, such as the envelope of a
+voice that has not played. A start step may be empty (`[]`): the player then writes nothing in that call, as a tune does
+that skips writes in its first calls. Recovery emits both only for the state it observes before the first row.
+
 #### Tuning: `tuning.cents` and `tuning.registers`
 
 **Reproducer.** Gate-on frequency registers that no equal-temperament note produces under any single detune, for example
@@ -1374,6 +1379,13 @@ therefore has a first note one call shorter than the tune; later notes are exact
 SID addresses in a multi-SID score exist already (`sids[].address`), so recovery of tunes with several SIDs is a recovery
 change (the recovery emits only SID 1 today), not a language change. A table of global volume, filter and routing steps
 (`global_table`) is not implemented: 10 of 24 tunes change the filter or volume registers outside any note, and the S5d work did not reach it.
+
+#### Cycle budget
+
+The compiler's cycle estimate is a static upper bound. For a `sidwave: 1.5` score whose estimate exceeds the 1 MHz
+budget, the compiler runs the assembled player on its 6502 emulator over init, every call of the song and one further pass
+of its loop. When the worst measured call plus 50 cycles fits the budget, the score compiles without `cpu: turbo` and a
+warning gives both numbers. Documents with several songs, effects or samples keep the estimate, as do older versions.
 
 #### Global registers: `global_table`
 

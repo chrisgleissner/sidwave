@@ -20,7 +20,7 @@ const EXPECTED = {
   multispeed: ["different", ["instrument_budget", "wavetable"]],
   multispeed9: ["compile_failed", ["instrument_budget", "wavetable"]],
   twoSids: ["different", ["multi_sid", "pitch"]],
-  testBit: ["different", ["pitch"]],
+  testBit: ["state_exact", ["pitch"]],
   nmiSampler: ["call_count", ["non_periodic_writes", "pitch"]],
 };
 
