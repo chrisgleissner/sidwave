@@ -143,3 +143,31 @@ export function cpuMicros(): number {
   const u = process.cpuUsage();
   return u.user + u.system;
 }
+
+/**
+ * Indexes (counted from the aligned first call) of the calls whose register state or control-write order differs
+ * between two IRs. Only the calls both IRs have are compared. Linear in the number of calls.
+ */
+export function differingCalls(a: FrameIr, b: FrameIr, alignA = 0, alignB = 0): number[] {
+  const n = Math.min(a.calls.length - alignA, b.calls.length - alignB);
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const ca = a.calls[alignA + i]!;
+    const cb = b.calls[alignB + i]!;
+    let differs = false;
+    const sids = Math.max(ca.sids.length, cb.sids.length);
+    for (let s = 0; s < sids && !differs; s++) {
+      const x = ca.sids[s];
+      const y = cb.sids[s];
+      if (!x || !y) { differs = !!(x ?? y)!.regs.some((r) => r !== 0); continue; }
+      for (let r = 0; r < SID_REGISTER_COUNT; r++) if (x.regs[r] !== y.regs[r]) { differs = true; break; }
+      for (let v = 0; v < 3 && !differs; v++) {
+        const p = x.control[v]!;
+        const q = y.control[v]!;
+        if (p.length !== q.length || p.some((value, k) => value !== q[k])) differs = true;
+      }
+    }
+    if (differs) out.push(i);
+  }
+  return out;
+}
