@@ -17,19 +17,21 @@ const startedAt = process.cpuUsage();
 const results = new Map(); // case key -> { ok, golden, result, ms }
 const TYPED = new Set(["input", "validation", "usage", "limit_exceeded"]);
 const PER_CASE_BOUND_MS = 2000;
+// Bounds are CPU time, not wall time: the test files of the package run in parallel on shared machines.
+const cpuMs = (since) => { const u = process.cpuUsage(since); return (u.user + u.system) / 1000; };
 
 const golden = JSON.parse(fs.readFileSync(GOLDEN_FILE, "utf8"));
 
-test("every importer x exporter pair converts or fails with a typed error within 2 s", { timeout: 120_000 }, async () => {
+test("every importer x exporter pair converts or fails with a typed error within 2 s of CPU time", { timeout: 120_000 }, async () => {
   const cases = caseList({ withEngine });
   assert.ok(cases.length >= (withEngine ? 150 : 140), `only ${cases.length} cases`);
   for (const { input, target } of cases) {
     const key = caseKey(input, target);
-    const start = performance.now();
+    const start = process.cpuUsage();
     const outcome = await runCase(input, target, { verify: READABLE_TARGETS.includes(target) });
-    const ms = performance.now() - start;
+    const ms = cpuMs(start);
     results.set(key, { ...outcome, ms });
-    assert.ok(ms < PER_CASE_BOUND_MS, `${key} took ${ms.toFixed(0)} ms`);
+    assert.ok(ms < PER_CASE_BOUND_MS, `${key} used ${ms.toFixed(0)} ms of CPU`);
     if (!outcome.ok) assert.ok(TYPED.has(outcome.category), `${key}: untyped failure ${outcome.category}: ${outcome.error?.stack}`);
   }
   // Every format of the registry has been read and written by at least one case.
@@ -98,14 +100,14 @@ function damaged(bytes) {
   return out;
 }
 
-test("truncated and corrupted files of every importer give a result or a typed error within 2 s", { timeout: 120_000 }, async () => {
+test("truncated and corrupted files of every importer give a result or a typed error within 2 s of CPU time", { timeout: 120_000 }, async () => {
   const picked = inputs().filter((i) => (/fuer-elise|hand-authored/.test(i.id)) && (withEngine || !i.sid));
   assert.ok(picked.length >= 7);
   let failures = 0, runs = 0;
   for (const input of picked) {
     for (const [label, bytes] of damaged(input.bytes)) {
       for (const to of input.sid ? ["sidwave"] : ["sidwave", "goattracker", "midi"]) {
-        const start = performance.now();
+        const start = process.cpuUsage();
         try {
           await convert(bytes, { from: input.format, to, inputName: input.name, ...(input.sid ? { seconds: 2 } : {}) });
         } catch (error) {
@@ -114,8 +116,8 @@ test("truncated and corrupted files of every importer give a result or a typed e
           assert.ok(TYPED.has(report.category), `${input.id} ${label} -> ${to}: ${report.category}: ${error.stack}`);
         }
         runs++;
-        const ms = performance.now() - start;
-        assert.ok(ms < PER_CASE_BOUND_MS, `${input.id} ${label} -> ${to} took ${ms.toFixed(0)} ms`);
+        const ms = cpuMs(start);
+        assert.ok(ms < PER_CASE_BOUND_MS, `${input.id} ${label} -> ${to} used ${ms.toFixed(0)} ms of CPU`);
       }
     }
   }

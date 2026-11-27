@@ -230,7 +230,7 @@ export const SID: FormatDefinition = {
     for (const u of report.unsupported) losses.push({ stage: "read", code: `reconstruct.${u.kind}`, severity: "lost", count: 1, message: u.detail });
     if (report.languageExtensions.length) losses.push({ stage: "read", code: "reconstruct.extensions", severity: "info", count: report.languageExtensions.length, message: `${report.languageExtensions.length} constructs of the tune have no SIDWave equivalent and were approximated.` });
     if (!report.strictExact) {
-      losses.push({ stage: "read", code: "reconstruct.fdiff", severity: "approx", count: report.fdiff.differingCalls, message: `The recovered score differs from the tune in ${report.fdiff.differingCalls} of ${report.fdiff.comparedCalls} compared player calls (F-diff).` });
+      losses.push({ stage: "read", code: "reconstruct.fdiff", severity: "approx", count: report.fdiff.differingCalls, message: `F-diff: the recovered score differs from the tune in ${report.fdiff.differingCalls} register-class differences over ${report.fdiff.comparedCalls} compared player calls (a call can differ in several classes).` });
     }
     return { yaml: score, losses, report, approximate: true, fdiff: { equal: report.strictExact, differingCalls: report.fdiff.differingCalls, comparedCalls: report.fdiff.comparedCalls } };
   },

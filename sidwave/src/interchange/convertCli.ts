@@ -212,7 +212,7 @@ function humanSummary(file: string, result: ConvertResult, outputs: Array<{ kind
   const m = result.metrics;
   if (m) {
     lines.push(m.available
-      ? `quality: note F1 ${m.noteF1} (precision ${m.precision}, recall ${m.recall}), onset error mean ${m.onsetError?.meanMs} ms max ${m.onsetError?.maxMs} ms, octave shifts ${m.octaveShifted}, voices dropped ${m.voicesDropped}, instruments mapped ${m.instruments?.mapped}/${m.instruments?.used}${m.fdiff ? `, F-diff ${m.fdiff.differingCalls} differing of ${m.fdiff.comparedCalls} calls` : ""}`
+      ? `quality: note F1 ${m.noteF1} (precision ${m.precision}, recall ${m.recall}), onset error mean ${m.onsetError?.meanMs} ms max ${m.onsetError?.maxMs} ms, octave shifts ${m.octaveShifted}, voices dropped ${m.voicesDropped}, instruments mapped ${m.instruments?.mapped}/${m.instruments?.used}${m.fdiff ? `, F-diff ${m.fdiff.differingCalls} register-class differences over ${m.fdiff.comparedCalls} calls` : ""}`
       : `quality: not measured (${m.reason})`);
   }
   if (strictFailed) lines.push("--strict: a loss with severity lost was found; nothing was written");
