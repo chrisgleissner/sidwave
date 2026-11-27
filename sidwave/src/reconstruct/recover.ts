@@ -19,8 +19,9 @@
 
 import YAML from "yaml";
 import { formatSidwave } from "../format/sidwaveFormat.js";
-import { midiToHz, midiToNoteName } from "../sidwave.js";
-import { mantissaShift, sidwaveFrameRate } from "../sidwaveCompiler.js";
+import { midiToHz, midiToNoteName, parseSidwave } from "../sidwave.js";
+import { compileSidwaveBytes } from "../sidwaveOps.js";
+import { mantissaShift, maxSidwaveMidi, sidwaveFrameRate } from "../sidwaveCompiler.js";
 import { controlRegister, type FrameIr } from "./ir.js";
 
 // ---- named constants -----------------------------------------------------------------------------------------------
@@ -50,6 +51,10 @@ export const CALLS_PER_BEAT_PER_SPEED = 16;
 export const CALLS_PER_BEAT_PER_SPEED_FAST = 18;
 /** Highest tempo accepted before the finer grid is used. */
 export const TEMPO_LIMIT = 215;
+/** Longest pattern and longest groove entry of the language, in beats. */
+export const MAX_PATTERN_BEATS = 64;
+/** A note longer than this is cut (its gate then ends early) so that every pattern stays within the language limit. */
+export const MAX_NOTE_BEATS = 32;
 /** Beats per bar of the emitted score. */
 export const BEATS_PER_BAR = 4;
 /** Candidate block sizes in bars for the structure step; the size with the smallest emitted score wins. */
@@ -71,6 +76,19 @@ export const VIBRATO_DEPTH_SPAN = 0.3;
 export const VIBRATO_MAX_DELAY_CALLS = 64;
 /** At most this many distinct notes of an instrument are checked by every vibrato candidate. */
 export const VIBRATO_MAX_MEMBERS = 24;
+/** The language limits of the player, shared by all instruments of a score: distinct instrument shapes and steps per table kind. */
+export const MAX_INSTRUMENT_SHAPES = 63;
+export const MAX_TABLE_STEPS_TOTAL = 255;
+/** A gate-off span with changed ADSR before a note is a hard restart only up to this many frames; a longer span is an ordinary rest. */
+export const HARD_RESTART_MAX_FRAMES = 8;
+/** The 1.4 player ramps the volume over its first 15 frames; a tune whose volume is 15 for this many frames has no ramp. */
+export const SOFT_START_FRAMES = 20;
+/** The most leading calls skipped as start-up when the init does not write every register. */
+export const INIT_MAX_LEADING = 6;
+/** Bit of the `written` mask of an IR call for register $18 (filter mode and volume). A first call whose mask equals exactly this bit is an init that sets only the master volume. */
+const WRITTEN_VOLUME_ONLY = 1 << 24;
+/** A spacing within this share of the call period counts as regular when the start-up calls are told apart (a first note call can delay the next call by a few percent). */
+export const INIT_SPACING_TOLERANCE = 0.1;
 /** Spacing deviation (relative) up to which the call rate counts as an integer multiple of the frame rate. */
 export const CALL_RATE_TOLERANCE = 0.02;
 
@@ -150,6 +168,8 @@ interface ProgramCall {
   wave: number;
   gate: number;
   offset: number;
+  /** The exact frequency register when the call is not an equal-temperament pitch under the tuning (written as a wavetable `reg` step). */
+  reg?: number;
   pw: number;
   /** The filter state while this voice is routed through the filter; absent when it is not. */
   filt?: { cutoff: number; res: number; type: number };
@@ -184,6 +204,10 @@ export interface RecoveredScore {
   unsupported: UnsupportedFeature[];
   extensions: LanguageExtension[];
   tuningEvidence: { distinctRegisters: number; matched: number; histogramModeCents: number };
+  /** The language version of the emitted score: 1.5 only when it uses a 1.5 construct. */
+  languageVersion: "1.4" | "1.5";
+  /** True when the original has no soft-start volume ramp, so the score sets player.soft_start to false. */
+  softStartOff: boolean;
 }
 
 export interface RecoverOptions {
@@ -200,9 +224,30 @@ function gcd(a: number, b: number): number {
   return a;
 }
 
-/** Register value of an equal-temperament note with a tuning offset (the formula of the compiler's hzToSidFrequency). */
-function registerOf(midi: number, cents: number, clockHz: number): number {
-  return Math.max(0, Math.min(0xffff, Math.round((midiToHz(midi + cents / 100) * 16_777_216) / clockHz)));
+/** The note-to-register table of a recovered score: equal temperament shifted by `cents`, with exact registers for single notes (`override`, MIDI note to register; `byReg` is the inverse). */
+export interface TuningSpec {
+  cents: number;
+  override: Map<number, number>;
+  byReg: Map<number, number>;
+}
+
+const PLAIN = { cents: 0, override: new Map<number, number>(), byReg: new Map<number, number>() };
+const equalTuning = (cents: number): TuningSpec => ({ cents, override: new Map(), byReg: new Map() });
+
+/** Largest MIDI note whose equal-temperament register fits 16 bits without tuning (the compiler's playable range). */
+function maxMidiOf(clockHz: number): number {
+  let midi = MIDI_MAX;
+  while (Math.round((midiToHz(midi) * 16_777_216) / clockHz) > 0xffff) midi--;
+  return midi;
+}
+
+const etRegister = (midi: number, cents: number, clockHz: number): number => Math.round((midiToHz(midi + cents / 100) * 16_777_216) / clockHz);
+
+/** Register value of a note under the tuning: an exact override, else equal temperament with the cents shift (the formula of the compiler's hzToSidFrequency). */
+function registerOf(midi: number, tune: TuningSpec, clockHz: number): number {
+  const exact = tune.override.get(midi);
+  if (exact !== undefined) return exact;
+  return Math.max(0, Math.min(0xffff, etRegister(midi, tune.cents, clockHz)));
 }
 
 function nearestSemitone(freq: number, cents: number, clockHz: number): number {
@@ -211,13 +256,53 @@ function nearestSemitone(freq: number, cents: number, clockHz: number): number {
 }
 
 /** The semitone whose register equals `freq` exactly under the tuning, or undefined. */
-function exactSemitone(freq: number, cents: number, clockHz: number): number | undefined {
+function exactSemitone(freq: number, tune: TuningSpec, clockHz: number): number | undefined {
   if (freq <= 0) return undefined;
-  const near = nearestSemitone(freq, cents, clockHz);
+  const overridden = tune.byReg.get(freq);
+  if (overridden !== undefined) return overridden;
+  const near = nearestSemitone(freq, tune.cents, clockHz);
+  const top = maxMidiOf(clockHz);
   for (const midi of [near, near - 1, near + 1]) {
-    if (midi >= 0 && midi <= 127 && registerOf(midi, cents, clockHz) === freq) return midi;
+    // The language plays C0 (MIDI 12) up to the highest note whose register fits 16 bits, and rejects a pitch whose register under the tuning would not fit.
+    if (midi < MIDI_MIN || midi > top || tune.override.has(midi)) continue;
+    const reg = etRegister(midi, tune.cents, clockHz);
+    if (reg === freq && reg <= 0xffff) return midi;
   }
   return undefined;
+}
+
+/**
+ * Builds the exact-register overrides: every gate-on frequency register that no equal-temperament note matches under the
+ * measured shift is assigned to the nearest semitone slot that is still free (not claimed, and whose equal-temperament
+ * register is not itself played). A register that finds no slot within one semitone stays unmatched. Frequencies are
+ * taken in order of use, most used first, so that the commonest pitches claim the nearest slot; the work is linear in the
+ * number of distinct registers.
+ */
+function buildNoteTable(counts: Map<number, number>, cents: number, clockHz: number): TuningSpec {
+  const tune = equalTuning(cents);
+  const top = maxMidiOf(clockHz);
+  const playedEt = new Set<number>();
+  const unmatched: Array<[number, number]> = [];
+  for (const [freq, n] of counts) {
+    if (exactSemitone(freq, tune, clockHz) !== undefined) playedEt.add(freq);
+    else unmatched.push([freq, n]);
+  }
+  unmatched.sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  for (const [freq] of unmatched) {
+    const hz = (freq * clockHz) / 16_777_216;
+    const exact = 69 + 12 * Math.log2(hz / 440) - cents / 100;
+    const near = Math.round(exact);
+    const order = [near, exact > near ? near + 1 : near - 1, exact > near ? near - 1 : near + 1];
+    for (const midi of order) {
+      if (midi < MIDI_MIN || midi > top || tune.override.has(midi)) continue;
+      const etReg = Math.max(0, Math.min(0xffff, etRegister(midi, cents, clockHz)));
+      if (playedEt.has(etReg)) continue;
+      tune.override.set(midi, freq);
+      tune.byReg.set(freq, midi);
+      break;
+    }
+  }
+  return tune;
 }
 
 /**
@@ -232,6 +317,25 @@ export function isInitCall(ir: FrameIr, index: number): boolean {
   return true;
 }
 
+/**
+ * Number of calls at the start of the IR that are the player's start-up and not rows of the score: one init call that writes
+ * every register, or, when the init does not (it can write only the master volume), the leading calls whose spacing to
+ * the next call is irregular. At several calls per frame the first play call can follow the init by a fraction of a period,
+ * and the call after it by more than a period. At most INIT_MAX_LEADING calls are skipped.
+ */
+export function leadingCalls(ir: FrameIr): number {
+  // A call that writes every register within the first calls is the init; the calls before it are start-up too.
+  for (let i = 0; i < Math.min(INIT_MAX_LEADING, ir.calls.length); i++) if (isInitCall(ir, i)) return i + 1;
+  let skipped = 0;
+  while (skipped < INIT_MAX_LEADING && skipped + 1 < ir.calls.length) {
+    const spacing = ir.calls[skipped + 1]!.startCycle - ir.calls[skipped]!.startCycle;
+    if (Math.abs(spacing - ir.periodCycles) <= INIT_SPACING_TOLERANCE * ir.periodCycles) break;
+    if (skipped === 0 && ir.calls[0]!.sids[0]!.written !== WRITTEN_VOLUME_ONLY) break;
+    skipped++;
+  }
+  return skipped;
+}
+
 function reproducer(ir: FrameIr, sid: number, voice: number, call: number): Reproducer {
   const from = Math.max(0, call - 1);
   const calls: Reproducer["calls"] = [];
@@ -243,7 +347,7 @@ function reproducer(ir: FrameIr, sid: number, voice: number, call: number): Repr
 
 // ---- step 2: tuning ------------------------------------------------------------------------------------------------
 
-function estimateTuning(tracks: Track[], clockHz: number): { cents: number; distinct: number; matched: number; mode: number } {
+function estimateTuning(tracks: Track[], clockHz: number): { cents: number; distinct: number; matched: number; mode: number; counts: Map<number, number> } {
   const counts = new Map<number, number>();
   for (const t of tracks) {
     // Only the frequency at a gate-on edge is a note pitch; later calls of a note may be modulated.
@@ -251,7 +355,7 @@ function estimateTuning(tracks: Track[], clockHz: number): { cents: number; dist
       if (t.ctl[k]! & 1 && (k === 0 || !(t.ctl[k - 1]! & 1)) && t.freq[k]! > 0) counts.set(t.freq[k]!, (counts.get(t.freq[k]!) ?? 0) + 1);
     }
   }
-  if (!counts.size) return { cents: 0, distinct: 0, matched: 0, mode: 0 };
+  if (!counts.size) return { cents: 0, distinct: 0, matched: 0, mode: 0, counts };
   const bins = new Map<number, number>();
   for (const [freq, n] of counts) {
     const hz = (freq * clockHz) / 16_777_216;
@@ -281,7 +385,8 @@ function estimateTuning(tracks: Track[], clockHz: number): { cents: number; dist
   let bestMatched = -1;
   for (const c of candidates) {
     let matched = 0;
-    for (const [freq, n] of counts) if (exactSemitone(freq, c, clockHz) !== undefined) matched += n;
+    const trial = equalTuning(c);
+    for (const [freq, n] of counts) if (exactSemitone(freq, trial, clockHz) !== undefined) matched += n;
     if (matched > bestMatched) {
       bestMatched = matched;
       bestCents = c;
@@ -289,7 +394,7 @@ function estimateTuning(tracks: Track[], clockHz: number): { cents: number; dist
   }
   let total = 0;
   for (const n of counts.values()) total += n;
-  return { cents: bestCents, distinct: counts.size, matched: bestMatched / Math.max(1, total), mode };
+  return { cents: bestCents, distinct: counts.size, matched: bestMatched / Math.max(1, total), mode, counts };
 }
 
 // ---- step 3 and 4: segmentation and programs -----------------------------------------------------------------------
@@ -322,7 +427,7 @@ function extractTracks(ir: FrameIr, first: number): Track[] {
   return tracks;
 }
 
-function segmentTrack(track: Track, cents: number, clockHz: number, speed: number, notes: { unsupported: Array<{ call: number; kind: string; detail: string }> }): NoteSegment[] {
+function segmentTrack(track: Track, tune: TuningSpec, clockHz: number, speed: number, maxMidi: number, notes: { unsupported: Array<{ call: number; kind: string; detail: string }> }): NoteSegment[] {
   const n = track.ctl.length;
   const starts: number[] = [];
   for (let k = 0; k < n; k++) if (track.ctl[k]! & 1 && (k === 0 || !(track.ctl[k - 1]! & 1))) starts.push(k);
@@ -343,7 +448,7 @@ function segmentTrack(track: Track, cents: number, clockHz: number, speed: numbe
         while (r - 1 >= tailStart && track.ad[r - 1] === rAd && track.sr[r - 1] === rSr) r--;
         let test = false;
         for (let k = r; k < start; k++) if (track.ctl[k]! & 8) test = true;
-        restart = { calls: start - r, ad: rAd, sr: rSr, test };
+        if (start - r <= HARD_RESTART_MAX_FRAMES * speed) restart = { calls: start - r, ad: rAd, sr: rSr, test };
       }
     }
     const seg: NoteSegment = {
@@ -404,21 +509,21 @@ function segmentTrack(track: Track, cents: number, clockHz: number, speed: numbe
     const useGateEnd = viaGateOff || (seg.gateOff < end && plainTail && seg.gateOff - seg.start >= minEntry);
     seg.length = useGateEnd && !viaGateOff ? seg.gateOff - seg.start : seg.entryEnd - seg.start;
     const progEnd = useGateEnd ? seg.gateOff : end;
-    const base = exactSemitone(track.freq[seg.start]!, cents, clockHz);
+    const base = exactSemitone(track.freq[seg.start]!, tune, clockHz);
     seg.pitchApprox = base === undefined;
-    seg.midi = base ?? Math.max(MIDI_MIN, Math.min(MIDI_MAX, nearestSemitone(track.freq[seg.start]!, cents, clockHz)));
+    seg.midi = base ?? Math.max(MIDI_MIN, Math.min(maxMidi, nearestSemitone(track.freq[seg.start]!, tune.cents, clockHz)));
     // The vibrato continues through the release and the restart calls, so the whole span up to the next note is checked.
     for (let k = seg.start; k < (next ? next.start : n); k++) seg.freqs.push(track.freq[k]!);
-    seg.modulated = seg.freqs.some((f) => exactSemitone(f, cents, clockHz) === undefined);
+    seg.modulated = seg.freqs.some((f) => exactSemitone(f, tune, clockHz) === undefined);
     if (seg.modulated) notes.unsupported.push({ call: seg.start, kind: "pitch", detail: "frequency register is not an equal-temperament semitone under the measured tuning" });
     for (let k = seg.start; k < progEnd; k++) {
-      const m = exactSemitone(track.freq[k]!, cents, clockHz);
+      const m = exactSemitone(track.freq[k]!, tune, clockHz);
       if (m === undefined) {
         seg.pitchApprox = true;
       }
       seg.program.push({
         wave: track.ctl[k]! & 0xfe, gate: track.ctl[k]! & 1,
-        offset: m === undefined ? 0 : m - seg.midi, pw: track.pw[k]!,
+        offset: m === undefined ? 0 : m - seg.midi, ...(m === undefined && track.freq[k]! > 0 ? { reg: track.freq[k]! } : {}), pw: track.pw[k]!,
         ...(track.route[k]! & (1 << track.voice) ? { filt: { cutoff: track.cutoff[k]!, res: track.route[k]! >> 4, type: track.mode[k]! & 0x70 } } : {}),
       });
     }
@@ -478,9 +583,10 @@ export function simulateVibrato(ft: number, up: [number, number], down: [number,
  * every call count up to the first deviation. Returns the first exact fit, preferring a smaller delay and then a
  * depth with fewer decimals.
  */
-export function fitVibrato(members: Array<{ midi: number; freqs: number[] }>, cents: number, clockHz: number, speed: number, fps: number): VibratoFit | undefined {
+export function fitVibrato(members: Array<{ midi: number; freqs: number[] }>, tune: TuningSpec | number, clockHz: number, speed: number, fps: number): VibratoFit | undefined {
   const sample = members.slice(0, VIBRATO_MAX_MEMBERS);
-  const fts = sample.map((m) => registerOf(m.midi, cents, clockHz));
+  const spec = typeof tune === "number" ? equalTuning(tune) : tune;
+  const fts = sample.map((m) => registerOf(m.midi, spec, clockHz));
   let maxDev = 0;
   let firstDeviation = Infinity;
   sample.forEach((m, i) => {
@@ -557,12 +663,12 @@ function markSlides(seg: NoteSegment, track: Track, progEnd: number, clockHz: nu
   const register = (hz: number): number => Math.max(0, Math.min(0xffff, Math.round((hz * 16_777_216) / clockHz)));
   for (let k = seg.start + 1; k < progEnd; k++) {
     const call = seg.program[k - seg.start]!;
-    if (call.slide || exactSemitone(track.freq[k]!, 0, clockHz) !== undefined) continue;
+    if (call.slide || exactSemitone(track.freq[k]!, PLAIN, clockHz) !== undefined) continue;
     const k0 = k - 1;
-    const from = exactSemitone(track.freq[k0]!, 0, clockHz);
+    const from = exactSemitone(track.freq[k0]!, PLAIN, clockHz);
     if (from === undefined || seg.program[k0 - seg.start]!.slide) continue;
     for (let e = k + 1; e < progEnd && e - k0 < 255; e++) {
-      const to = exactSemitone(track.freq[e]!, 0, clockHz);
+      const to = exactSemitone(track.freq[e]!, PLAIN, clockHz);
       if (to === undefined) continue;
       const n = e - k0 + 1;
       let ok = true;
@@ -605,7 +711,7 @@ function isPrefix(shorter: ProgramCall[], longer: ProgramCall[]): boolean {
 }
 
 /** Run-length encodes the per-call wave, gate and offset into wavetable steps. */
-function wavetableSteps(program: ProgramCall[]): Array<Record<string, unknown>> | undefined {
+function wavetableSteps(program: ProgramCall[], regSteps: boolean): Array<Record<string, unknown>> | undefined {
   const steps: Array<Record<string, unknown>> = [];
   let i = 0;
   while (i < program.length) {
@@ -626,7 +732,8 @@ function wavetableSteps(program: ProgramCall[]): Array<Record<string, unknown>> 
       continue;
     }
     let j = i + 1;
-    while (j < program.length && !program[j]!.slide && program[j]!.wave === c.wave && program[j]!.gate === c.gate && program[j]!.offset === c.offset) j++;
+    const regOf = (x: ProgramCall): number | undefined => (regSteps ? x.reg : undefined);
+    while (j < program.length && !program[j]!.slide && program[j]!.wave === c.wave && program[j]!.gate === c.gate && program[j]!.offset === c.offset && regOf(program[j]!) === regOf(c)) j++;
     const name = waveName(c.wave);
     if (!name) return undefined;
     const step: Record<string, unknown> = { wave: name };
@@ -634,7 +741,8 @@ function wavetableSteps(program: ProgramCall[]): Array<Record<string, unknown>> 
     if (c.wave & 0x04) step.ring = true;
     if (c.wave & 0x02) step.sync = true;
     if (!c.gate) step.gate = false;
-    if (c.offset !== 0) step.note = c.offset > 0 ? `+${c.offset}` : String(c.offset);
+    if (regSteps && c.reg !== undefined) step.reg = c.reg;
+    else if (c.offset !== 0) step.note = c.offset > 0 ? `+${c.offset}` : String(c.offset);
     step.calls = Math.min(255, j - i);
     steps.push(step);
     // A run longer than 255 calls continues in a further step.
@@ -644,21 +752,27 @@ function wavetableSteps(program: ProgramCall[]): Array<Record<string, unknown>> 
   return steps;
 }
 
-/** Run-length encodes the per-call pulse width into table steps: `set` for the first call, `add` for runs of equal difference. */
-function pulseSteps(program: ProgramCall[]): Array<Record<string, unknown>> | undefined {
+/**
+ * Run-length encodes the per-call pulse width into table steps: `set` for the first call, `add` for runs of equal difference.
+ * A width of 0 or 4095, or a difference that wraps modulo 4096, cannot be written with clamping adds; the table then
+ * uses SIDWave 1.5 `wrap: true` (adds modulo 4096, width 0 allowed) and every step after the first is an `add`.
+ */
+function pulseSteps(program: ProgramCall[]): { steps: Array<Record<string, unknown>>; wrap: boolean } | undefined {
   const pw = program.map((c) => c.pw);
   if (pw.every((v) => v === pw[0])) return undefined;
-  const steps: Array<Record<string, unknown>> = [];
+  const signed = (d: number): number => ((d + 2048 + 4096 * 2) % 4096) - 2048;
+  let wrap = pw.some((v, i) => (i > 0 && (v === 0 || v === 4095)) || (i > 0 && signed(v - pw[i - 1]!) !== v - pw[i - 1]!));
   const first = pw[0]!;
-  if (first < 1 || first > 4094) return undefined;
-  steps.push({ set: first, calls: 1 });
+  if (first < 1 || first > 4094) wrap = true;
+  const steps: Array<Record<string, unknown>> = [];
+  if (first <= 4094) steps.push({ set: first, calls: 1 });
+  else steps.push({ add: signed(first - 2048), calls: 1 });
   let i = 1;
   while (i < pw.length) {
-    const d = pw[i]! - pw[i - 1]!;
+    const d = wrap ? signed(pw[i]! - pw[i - 1]!) : pw[i]! - pw[i - 1]!;
     let j = i + 1;
-    while (j < pw.length && pw[j]! - pw[j - 1]! === d) j++;
-    if (d < -2048 || d > 2047) {
-      if (pw[i]! < 1 || pw[i]! > 4094) return undefined;
+    while (j < pw.length && (wrap ? signed(pw[j]! - pw[j - 1]!) : pw[j]! - pw[j - 1]!) === d) j++;
+    if (!wrap && (d < -2048 || d > 2047)) {
       steps.push({ set: pw[i], calls: 1 });
       j = i + 1;
     } else {
@@ -667,7 +781,7 @@ function pulseSteps(program: ProgramCall[]): Array<Record<string, unknown>> | un
     }
     i = j;
   }
-  return steps;
+  return { steps, wrap };
 }
 
 
@@ -705,28 +819,62 @@ function filterSteps(program: ProgramCall[]): Array<Record<string, unknown>> | u
   return steps;
 }
 
-/** Folds a step list whose tail repeats into a shorter list with a loop index; a shorter last step still matches. */
-function foldLoop(steps: Array<Record<string, unknown>>): { steps: Array<Record<string, unknown>>; loop?: number } {
-  const key = (s: Record<string, unknown>): string => JSON.stringify({ ...s, calls: undefined });
-  const n = steps.length;
-  for (let start = 0; start < n; start++) {
-    for (let period = 1; start + 2 * period <= n && period <= (n - start) / 2; period++) {
-      let ok = true;
-      for (let t = start + period; t < n && ok; t++) {
-        const template = steps[start + ((t - start) % period)]!;
-        const s = steps[t]!;
-        const sameCalls = s.calls === template.calls;
-        const lastShort = t === n - 1 && Number(s.calls) <= Number(template.calls);
-        ok = key(s) === key(template) && (sameCalls || lastShort);
-      }
-      if (ok) return { steps: steps.slice(0, start + period), loop: start };
+/** Z-function: z[i] is the length of the longest common prefix of a and a[i..]. */
+function zFunction(a: number[]): number[] {
+  const n = a.length;
+  const z = new Array<number>(n).fill(0);
+  for (let i = 1, l = 0, r = 0; i < n; i++) {
+    if (i < r) z[i] = Math.min(r - i, z[i - l]!);
+    while (i + z[i]! < n && a[z[i]!] === a[i + z[i]!]) z[i]!++;
+    if (i + z[i]! > r) {
+      l = i;
+      r = i + z[i]!;
     }
   }
-  return { steps };
+  return z;
+}
+
+/**
+ * Folds a step list whose tail repeats into a shorter list with a loop index; a shorter last step still matches.
+ * Returns the smallest loop start and, for that start, the smallest period, in time linear in the number of steps:
+ * the steps are numbered by (key, calls), reversed, and the Z-function gives for every period the length of the
+ * matching tail. The last step may match with fewer calls, which is checked with a second Z-function of the list without it.
+ */
+export function foldLoop(steps: Array<Record<string, unknown>>): { steps: Array<Record<string, unknown>>; loop?: number } {
+  const n = steps.length;
+  const ids = new Map<string, number>();
+  const idOf = (key: string): number => {
+    let id = ids.get(key);
+    if (id === undefined) ids.set(key, (id = ids.size));
+    return id;
+  };
+  const keys = steps.map((s) => idOf(JSON.stringify({ ...s, calls: undefined })));
+  const calls = steps.map((s) => Number(s.calls));
+  const symbols = steps.map((_, i) => idOf(`${keys[i]}/${calls[i]}`));
+  const r = symbols.slice().reverse();
+  const z = zFunction(r);
+  const z1 = zFunction(r.slice(1));
+  let bestStart = Infinity;
+  let bestPeriod = 0;
+  for (let period = 1; 2 * period <= n; period++) {
+    let len = z[period]!;
+    // Step n-1 (r[0]) may match with fewer calls than the step one period before it.
+    if (r[0] !== r[period] && keys[n - 1] === keys[n - 1 - period] && calls[n - 1]! <= calls[n - 1 - period]!) len = 1 + (period < z1.length ? z1[period]! : 0);
+    const t0 = n - len;
+    const first = Math.max(t0, period);
+    if (n - first < period) continue;
+    const start = Math.max(0, t0 - period);
+    if (start < bestStart) {
+      bestStart = start;
+      bestPeriod = period;
+    }
+  }
+  if (bestPeriod === 0) return { steps };
+  return { steps: steps.slice(0, bestStart + bestPeriod), loop: bestStart };
 }
 
 function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, restart: RestartInfo, speed: number,
-  gap: { unsupported: Array<{ kind: string; detail: string }>; filterRecovered?: boolean }, vibrato?: VibratoFit): Record<string, unknown> {
+  gap: { unsupported: Array<{ kind: string; detail: string }>; filterRecovered?: boolean }, vibrato?: VibratoFit, regSteps = false): Record<string, unknown> {
   const first = program[0]!;
   const inst: Record<string, unknown> = {};
   const name = waveName(first.wave);
@@ -735,20 +883,22 @@ function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, res
   if (first.wave & 0x04) inst.ring = true;
   if (first.wave & 0x02) inst.sync = true;
   inst.adsr = [ad >> 4, ad & 15, sr >> 4, sr & 15];
-  const pulse = pulseSteps(program);
+  const pulseResult = pulseSteps(program);
+  const pulse = pulseResult?.steps;
   if (pulse) {
     const folded = foldLoop(pulse);
     const table: Record<string, unknown> = { steps: folded.steps };
     if (folded.loop !== undefined) table.loop = folded.loop;
+    if (pulseResult!.wrap) table.wrap = true;
     if (folded.steps.length > MAX_TABLE_STEPS) gap.unsupported.push({ kind: "pulsetable", detail: `${folded.steps.length} steps exceed ${MAX_TABLE_STEPS}` });
     inst.pulsetable = table;
   } else if (first.pw !== 0x800 && first.pw >= 1 && first.pw <= 4094) {
     inst.pulse_width = first.pw;
   }
-  if (!pulse && program.some((c) => c.pw !== first.pw)) {
-    gap.unsupported.push({ kind: "pulsetable", detail: "the pulse width sequence reaches 0 or 4095 or wraps; the language clamps pulse width to 1..4094" });
+  if (!pulse && first.pw === 0) {
+    // A constant width of 0 is a one-step pulse table (SIDWave 1.5 accepts `set: 0`).
+    inst.pulsetable = { steps: [{ set: 0, calls: 1 }] };
   }
-  if (!pulse && first.pw === 0) gap.unsupported.push({ kind: "pulsetable", detail: "pulse width 0 is not expressible (1..4094)" });
   const filter = filterSteps(program);
   if (filter) {
     const folded = foldLoop(filter);
@@ -759,9 +909,9 @@ function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, res
   } else if (program.some((c) => c.filt)) {
     gap.unsupported.push({ kind: "filtertable", detail: "the filter state of a routed note cannot be written as a filter table" });
   }
-  const needsWavetable = program.some((c) => c.wave !== first.wave || !c.gate || c.offset !== 0 || !!c.slide);
+  const needsWavetable = program.some((c) => c.wave !== first.wave || !c.gate || c.offset !== 0 || !!c.slide || (regSteps && c.reg !== undefined));
   if (needsWavetable) {
-    const steps = wavetableSteps(program);
+    const steps = wavetableSteps(program, regSteps);
     if (steps) {
       const folded = foldLoop(steps);
       if (folded.steps.length > MAX_TABLE_STEPS) gap.unsupported.push({ kind: "wavetable", detail: `${folded.steps.length} steps exceed ${MAX_TABLE_STEPS}` });
@@ -774,9 +924,11 @@ function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, res
   const isDefault = restart.calls === 2 * speed && restart.ad === 0 && restart.sr === 0 && !restart.test;
   if (!isDefault) {
     if (!Number.isInteger(frames)) gap.unsupported.push({ kind: "hard_restart", detail: `${restart.calls} restart calls are not a multiple of speed ${speed}` });
-    const hr: Record<string, unknown> = { frames: Math.floor(frames) };
-    if (restart.ad || restart.sr) hr.adsr = [restart.ad >> 4, restart.ad & 15, restart.sr >> 4, restart.sr & 15];
-    if (restart.test) hr.test = true;
+    // The language counts a restart in whole frames: 1 to 255, and zero disables it (then it cannot set ADSR or the test bit).
+    const wholeFrames = restart.calls === 0 ? 0 : Math.max(1, Math.min(255, Math.round(frames)));
+    const hr: Record<string, unknown> = { frames: wholeFrames };
+    if (wholeFrames > 0 && (restart.ad || restart.sr)) hr.adsr = [restart.ad >> 4, restart.ad & 15, restart.sr >> 4, restart.sr & 15];
+    if (wholeFrames > 0 && restart.test) hr.test = true;
     inst.hard_restart = hr;
   }
   return inst;
@@ -805,19 +957,21 @@ function voiceEntries(segs: NoteSegment[], rows: number): Entry[] {
 function blockEntries(entries: Entry[], block: number): Entry[][] {
   const blocks: Entry[][] = [];
   let pos = 0;
+  let blockStart = 0;
   let current: Entry[] = [];
   for (const e of entries) {
-    // A rest is split at the boundary; a note is not.
+    // A rest is split at the boundary; a note is not. The boundary is a block length after the start of the current block.
     let left = e.len;
     while (left > 0) {
-      const room = (blocks.length + 1) * block - pos;
+      const room = blockStart + block - pos;
       const take = e.kind === "rest" ? Math.min(room, left) : left;
       current.push(e.kind === "note" ? { kind: "note", seg: e.seg, len: take } : { kind: e.kind, len: take });
       pos += take;
       left -= take;
-      if (pos >= (blocks.length + 1) * block) {
+      if (pos >= blockStart + block) {
         blocks.push(current);
         current = [];
+        blockStart = pos;
       }
     }
   }
@@ -858,7 +1012,7 @@ function sequenceText(names: string[]): string {
 
 interface Layout {
   blockBars: number | "flat";
-  voices: Array<{ patterns: Record<string, { length: number; groove: unknown[] }>; sequence: string }>;
+  voices: Array<{ patterns: Record<string, { length: number; groove: unknown[] }>; sequence: string; maxBeats: number }>;
 }
 
 function layoutVoices(entriesByVoice: Entry[][], rows: number, callsPerBeat: number, instNames: string[], defaults: number[],
@@ -869,7 +1023,9 @@ function layoutVoices(entriesByVoice: Entry[][], rows: number, callsPerBeat: num
     const names: string[] = [];
     const known = new Map<string, string>();
     const patterns: Record<string, { length: number; groove: unknown[] }> = {};
+    let maxBeats = 0;
     for (const b of blocks) {
+      maxBeats = Math.max(maxBeats, b.reduce((n, e) => n + e.len, 0) / callsPerBeat);
       const key = b.map(entryKey).join("|");
       let name = known.get(key);
       if (!name) {
@@ -881,9 +1037,161 @@ function layoutVoices(entriesByVoice: Entry[][], rows: number, callsPerBeat: num
       }
       names.push(name);
     }
-    return { patterns, sequence: sequenceText(names) };
+    return { patterns, sequence: sequenceText(names), maxBeats };
   });
   return { blockBars, voices };
+}
+
+/** Removes tables and vibrato (level 1), then pulse width, ring and sync (level 2), then the hard restart (level 3). */
+function simplifyInstrument(y: Record<string, unknown>, level: number): Record<string, unknown> {
+  const out: Record<string, unknown> = { waveform: y.waveform, adsr: y.adsr };
+  if (level <= 1) {
+    for (const k of ["ring", "sync", "pulse_width", "hard_restart"]) if (y[k] !== undefined) out[k] = y[k];
+  } else if (level === 2 && y.hard_restart !== undefined) out.hard_restart = y.hard_restart;
+  return out;
+}
+
+/**
+ * True when an instrument needs exact `reg` pitch steps: some note is not an equal-temperament pitch, and every note of
+ * the instrument has the same frequency registers at each call (a pitch table of the player, not a vibrato whose phase
+ * differs from note to note).
+ */
+function usesRegSteps(def: InstrumentDef, members: NoteSegment[]): boolean {
+  if (!members.some((m) => m.modulated)) return false;
+  for (const m of members) {
+    for (let k = 0; k < m.program.length; k++) if (m.program[k]!.reg !== def.program[k]?.reg) return false;
+  }
+  return def.program.some((c) => c.reg !== undefined);
+}
+
+
+/**
+ * The compiler needs every note of an instrument to last at least the instrument's restart plus one call group (`speed`
+ * calls). The restart belongs to the instrument, so it is clamped to the shortest note that uses the instrument. The notes are
+ * measured in the emitted patterns (a note, its ties and the pattern row length), which is the length the compiler sees.
+ * Returns the number of instruments changed.
+ */
+export function clampRestarts(document: Record<string, unknown>, callsPerBeat: number, speed: number): number {
+  const instruments = document.instruments as Record<string, { hard_restart?: { frames: number; adsr?: unknown; test?: boolean } }> | undefined;
+  if (!instruments) return 0;
+  const shortest = new Map<string, number>();
+  for (const voice of (document.voices ?? []) as Array<{ instrument: string; patterns: Record<string, { length: number; groove: unknown[] }> }>) {
+    for (const pattern of Object.values(voice.patterns)) {
+      const g = pattern.groove;
+      for (let i = 0; i < g.length; i++) {
+        const entry = g[i];
+        let note = typeof entry === "object" && entry !== null ? (entry as { note?: string }).note : (entry as string);
+        if (!note || note === "-" || note === "~") continue;
+        let inst = typeof entry === "object" && entry !== null && (entry as { inst?: string }).inst ? (entry as { inst: string }).inst : voice.instrument;
+        if (typeof note === "string" && note.includes("@")) [note, inst] = note.split("@") as [string, string];
+        let len = typeof entry === "object" && entry !== null && (entry as { len?: number }).len !== undefined ? (entry as { len: number }).len : pattern.length;
+        for (let j = i + 1; j < g.length && g[j] === "~"; j++) len += pattern.length;
+        const calls = Math.floor(len * callsPerBeat + 1e-6);
+        shortest.set(inst, Math.min(shortest.get(inst) ?? Infinity, calls));
+      }
+    }
+  }
+  let changed = 0;
+  for (const [name, calls] of shortest) {
+    const hr = instruments[name]?.hard_restart;
+    if (!hr || hr.frames === 0) continue;
+    const allowed = Math.max(0, Math.floor((calls - speed) / speed));
+    if (hr.frames > allowed) {
+      hr.frames = allowed;
+      if (allowed === 0) { delete hr.adsr; delete hr.test; }
+      changed++;
+    }
+  }
+  return changed;
+}
+
+/** True when compiling the document fails only because the instrument pool or a table holds too much. */
+function exceedsBudget(document: Record<string, unknown>): boolean {
+  try {
+    compileSidwaveBytes(parseSidwave(YAML.stringify(document)), { format: "sid", loop: true });
+    return false;
+  } catch (error) {
+    return error instanceof Error && /more than 63 distinct|data exceeds 255 steps/.test(error.message);
+  }
+}
+
+/**
+ * Closed-loop budget repair. The compiler counts instrument variants (per voice, restart and routing) and table steps per
+ * instrument variant, which the recovery's own estimate does not see. When the compiler rejects the score for either limit,
+ * the least used instruments lose their tables and vibrato (level 2 keeps the hard restart, level 3 keeps only waveform and
+ * envelope) until it accepts. Search space: how many instruments, in order of fewest notes, and two levels; objective: the
+ * fewest simplified instruments (binary search, about log2(instruments) compiles per level); deterministic. Returns the
+ * number of notes that now use a simplified instrument, or 0 when nothing changed.
+ */
+function fitCompilerBudgets(document: Record<string, unknown>, usage: Map<string, number>): number {
+  if (!exceedsBudget(document)) return 0;
+  const instruments = document.instruments as Record<string, Record<string, unknown>> | undefined;
+  if (!instruments) return 0;
+  const original = JSON.parse(JSON.stringify(instruments)) as typeof instruments;
+  const names = Object.keys(original).sort((a, b) => (usage.get(a) ?? 0) - (usage.get(b) ?? 0) || a.localeCompare(b));
+  const apply = (n: number, level: number): void => {
+    for (const name of Object.keys(original)) instruments[name] = original[name]!;
+    for (const name of names.slice(0, n)) instruments[name] = simplifyInstrument(original[name]!, level);
+  };
+  for (const level of [2, 3]) {
+    apply(names.length, level);
+    if (exceedsBudget(document)) continue;
+    let lo = 1;
+    let hi = names.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      apply(mid, level);
+      if (exceedsBudget(document)) lo = mid + 1;
+      else hi = mid;
+    }
+    apply(lo, level);
+    return names.slice(0, lo).reduce((sum, name) => sum + (usage.get(name) ?? 0), 0);
+  }
+  apply(0, 3);
+  return 0;
+}
+
+/** The most player calls written out as `player.start` (the language allows 8 steps of 32 writes). */
+const START_MAX_STEPS = 8;
+const START_MAX_WRITES = 32;
+
+/**
+ * The register writes of the player calls that precede the first note of every voice, in call order and, within a call, in
+ * register order; each write of a control register is listed in the order it happened. A call with more than 32 writes ends the list.
+ */
+function startUpSteps(ir: FrameIr, first: number, tracks: Track[]): Array<Array<{ reg: number; value: number }>> {
+  let firstGate = Infinity;
+  for (const t of tracks) {
+    if (t.sid !== 0) continue;
+    for (let k = 0; k < t.ctl.length; k++) if (t.ctl[k]! & 1) { firstGate = Math.min(firstGate, k); break; }
+  }
+  if (!Number.isFinite(firstGate)) return [];
+  const steps: Array<Array<{ reg: number; value: number }>> = [];
+  for (let k = 0; k < Math.min(firstGate, START_MAX_STEPS); k++) {
+    const sid = ir.calls[first + k]!.sids[0]!;
+    const writes: Array<{ reg: number; value: number }> = [];
+    for (let r = 0; r < 25; r++) {
+      if (!(sid.written & (1 << r))) continue;
+      const voice = [4, 11, 18].indexOf(r);
+      if (voice >= 0) for (const value of sid.control[voice]!) writes.push({ reg: r, value });
+      else writes.push({ reg: r, value: sid.regs[r]! });
+    }
+    if (writes.length === 0 || writes.length > START_MAX_WRITES) break;
+    steps.push(writes);
+  }
+  return steps;
+}
+
+/** True when the voice's control register is written in every call from `from` up to its first note at row `until`, and its other registers hold zero (the value the player leaves them at). */
+function writesControlWhileIdle(ir: FrameIr, from: number, t: Track, until: number): boolean {
+  if (until <= 0) return false;
+  const base = t.voice * 7;
+  for (let k = from; k < from + until; k++) {
+    const sid = ir.calls[k]?.sids[t.sid];
+    if (!sid || sid.control[t.voice]!.length === 0) return false;
+    for (const i of [0, 1, 2, 3, 5, 6]) if (sid.regs[base + i] !== 0) return false;
+  }
+  return true;
 }
 
 // ---- the recovery --------------------------------------------------------------------------------------------------
@@ -898,8 +1206,9 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   };
 
   if (ir.calls.length < 2) throw new Error("the trace holds fewer than two player calls");
-  const firstCall = isInitCall(ir, 0) ? 1 : 0;
-  const rows = ir.calls.length - firstCall;
+  const firstCall = leadingCalls(ir);
+  let rowStart = firstCall;
+  let rows = ir.calls.length - firstCall;
   const exact = ir.callsPerFrameExact;
   const speed = Math.max(1, ir.callsPerFrame);
   if (Math.abs(exact - speed) > CALL_RATE_TOLERANCE * speed) {
@@ -924,7 +1233,15 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   if ((60 * frameRate * speed) / callsPerBeat > TEMPO_LIMIT) callsPerBeat = CALLS_PER_BEAT_PER_SPEED_FAST * speed;
   const tempo = (60 * frameRate * speed) / callsPerBeat;
 
-  const tracks = extractTracks(ir, firstCall);
+  let tracks = extractTracks(ir, firstCall);
+  // Start-up writes: the player calls before the first note of any voice are written out as `player.start` (SIDWave 1.5), and the rows begin after them.
+  const startSteps = startUpSteps(ir, firstCall, tracks);
+  if (startSteps.length) {
+    rowStart = firstCall + startSteps.length;
+    rows = ir.calls.length - rowStart;
+    tracks = extractTracks(ir, rowStart);
+  }
+  let cutNotes = 0;
   if (ir.sidCount > 1) {
     unsupported.push({
       kind: "multi_sid", detail: `${ir.sidCount} SIDs; only SID 1 is recovered`,
@@ -934,17 +1251,47 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   }
   const used = tracks.filter((t) => t.sid === 0 && t.ctl.some((c) => c & 1));
   const tuning = estimateTuning(used, ir.clockHz);
-  if (tuning.matched < TUNING_MATCH_MIN && tuning.distinct) {
+  // Gate-on registers that equal temperament under the measured shift does not explain get exact note registers (SIDWave 1.5 `tuning.registers`).
+  const tune = buildNoteTable(tuning.counts, tuning.cents, ir.clockHz);
+  let explained = 0;
+  let totalNotes = 0;
+  for (const [freq, n] of tuning.counts) {
+    totalNotes += n;
+    if (exactSemitone(freq, tune, ir.clockHz) !== undefined) explained += n;
+  }
+  const matchedShare = totalNotes ? explained / totalNotes : 1;
+  if (matchedShare < TUNING_MATCH_MIN && tuning.distinct) {
     unsupported.push({
-      kind: "tuning", detail: `only ${(tuning.matched * 100).toFixed(1)} percent of the gate-on frequency values match a tuned equal-temperament note`,
+      kind: "tuning", detail: `only ${(matchedShare * 100).toFixed(1)} percent of the gate-on frequency values match a tuned note, even with exact registers for single notes`,
       evidence: { cents: tuning.cents, mode: tuning.mode },
     });
   }
   const gaps = { unsupported: [] as Array<{ call: number; kind: string; detail: string }> };
-  const segsByTrack = used.map((t) => segmentTrack(t, tuning.cents, ir.clockHz, speed, gaps));
+  const segsByTrack = used.map((t) => segmentTrack(t, tune, ir.clockHz, speed, maxSidwaveMidi(system), gaps));
+  // A note longer than MAX_NOTE_BEATS is cut, so that every pattern stays within the 64-beat limit of the language.
+  for (const segs of segsByTrack) {
+    for (const seg of segs) {
+      if (seg.length > MAX_NOTE_BEATS * callsPerBeat) {
+        seg.length = MAX_NOTE_BEATS * callsPerBeat;
+        cutNotes++;
+      }
+    }
+  }
+  // The player needs a note to last at least one frame (`speed` calls). A gate that is on for less is dropped, and the span stays a rest.
+  let droppedNotes = 0;
+  for (const segs of segsByTrack) {
+    for (let i = segs.length - 1; i >= 0; i--) {
+      if (!segs[i]!.phantom && segs[i]!.length < speed) {
+        segs.splice(i, 1);
+        droppedNotes++;
+      }
+    }
+  }
+  if (droppedNotes) unsupported.push({ kind: "short_note", detail: `${droppedNotes} notes last less than one frame (${speed} calls) and were dropped`, evidence: {} });
+  if (cutNotes) unsupported.push({ kind: "long_note", detail: `${cutNotes} notes last more than ${MAX_NOTE_BEATS} beats and were cut`, evidence: {} });
   // Global registers: filter cutoff, resonance and routing, mode and volume.
   const globalSeen = new Map<number, Set<number>>();
-  for (let k = firstCall; k < ir.calls.length; k++) {
+  for (let k = rowStart; k < ir.calls.length; k++) {
     const regs = ir.calls[k]!.sids[0]!.regs;
     for (const r of [0x15, 0x16, 0x17, 0x18]) {
       let set = globalSeen.get(r);
@@ -954,12 +1301,16 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   }
   // The player ramps the volume up over its first calls; that start ramp is the player's, not the score's.
   const volumeRamp = (() => {
-    let k = firstCall;
+    let k = rowStart;
     let end = k;
     while (k + 1 < ir.calls.length && ir.calls[k + 1]!.sids[0]!.regs[0x18]! === ir.calls[k]!.sids[0]!.regs[0x18]! + 1) k++;
     end = k + 1;
     return end;
   })();
+  // The 1.4 player ramps the volume from 1 to 15 over its first calls. A tune that sets the full volume at once and keeps it has no ramp: soft_start is switched off.
+  const rampWindow = Math.min(ir.calls.length, rowStart + SOFT_START_FRAMES * speed);
+  let softStartOff = true;
+  for (let k = rowStart; k < rampWindow && softStartOff; k++) if ((ir.calls[k]!.sids[0]!.regs[0x18]! & 15) !== 15) softStartOff = false;
   const volumeAfterRamp = new Set<number>();
   for (let k = volumeRamp; k < ir.calls.length; k++) volumeAfterRamp.add(ir.calls[k]!.sids[0]!.regs[0x18]!);
   if (volumeAfterRamp.size) globalSeen.set(0x18, volumeAfterRamp);
@@ -982,9 +1333,22 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     if (last) last.length = Math.max(last.length, last.restart.calls + speed);
   }
 
+  // The language needs a note to last at least its hard restart plus one call group; a restart longer than that is
+  // shortened for this note so that the score compiles. The shortening is reported as an unsupported hard restart.
+  let shortenedRestarts = 0;
+  for (const segs of segsByTrack) {
+    for (const seg of segs) {
+      const room = Math.floor((seg.length - speed) / speed) * speed;
+      if (seg.restart.calls > 0 && !seg.phantom && room < seg.restart.calls) {
+        seg.restart = room > 0 ? { ...seg.restart, calls: room } : { calls: 0, ad: 0, sr: 0, test: false };
+        shortenedRestarts++;
+      }
+    }
+  }
+  if (shortenedRestarts) unsupported.push({ kind: "hard_restart", detail: `${shortenedRestarts} notes are shorter than their hard restart plus one call group; the restart was shortened`, evidence: {} });
+
   // Instruments: cluster notes by attributes, then by program prefix.
   const defs: InstrumentDef[] = [];
-  const gapInst = { unsupported: [] as Array<{ kind: string; detail: string }>, filterRecovered: false };
   const allSegs = segsByTrack.flat();
   const groups = new Map<string, NoteSegment[]>();
   for (const seg of allSegs) {
@@ -994,56 +1358,143 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     if (list) list.push(seg);
     else groups.set(key, [seg]);
   }
-  for (const list of [...groups.values()].sort((a, b) => allSegs.indexOf(a[0]!) - allSegs.indexOf(b[0]!))) {
+  const segIndex = new Map<NoteSegment, number>();
+  allSegs.forEach((seg, i) => segIndex.set(seg, i));
+  const callKey = (c: ProgramCall | undefined): string => c ? `${c.wave}:${c.gate}:${c.offset}:${c.pw}:${c.slide?.count ?? 0}:${c.filt?.cutoff ?? -1}` : "";
+  for (const list of [...groups.values()].sort((a, b) => segIndex.get(a[0]!)! - segIndex.get(b[0]!)!)) {
     const sorted = [...list].sort((a, b) => b.program.length - a.program.length);
-    const reps: Array<{ program: ProgramCall[]; defIndex: number }> = [];
+    // Representatives are bucketed by their first call: a program can only be a prefix of a representative with the same first call.
+    const reps = new Map<string, Array<{ program: ProgramCall[]; defIndex: number }>>();
     for (const seg of sorted) {
-      let rep = reps.find((r) => isPrefix(seg.program, r.program));
+      const bucketKey = callKey(seg.program[0]);
+      let bucket = reps.get(bucketKey);
+      if (!bucket) reps.set(bucketKey, (bucket = []));
+      let rep = bucket.find((r) => isPrefix(seg.program, r.program));
       if (!rep) {
         rep = { program: seg.program, defIndex: defs.length };
         defs.push({ name: "", program: seg.program, ad: seg.ad, sr: seg.sr, restart: seg.restart, yaml: {} });
-        reps.push(rep);
+        bucket.push(rep);
       }
       seg.instrument = rep.defIndex;
     }
   }
   // Names in order of first use across voices, then definitions.
   const order: number[] = [];
-  for (const seg of allSegs.sort((a, b) => a.start - b.start)) if (!order.includes(seg.instrument)) order.push(seg.instrument);
+  const seenDef = new Set<number>();
+  for (const seg of [...allSegs].sort((a, b) => a.start - b.start)) {
+    if (!seenDef.has(seg.instrument)) {
+      seenDef.add(seg.instrument);
+      order.push(seg.instrument);
+    }
+  }
   const remap = new Map(order.map((d, i) => [d, i]));
   const renamed: InstrumentDef[] = order.map((d, i) => ({ ...defs[d]!, name: `i${i + 1}` }));
   for (const seg of allSegs) seg.instrument = remap.get(seg.instrument)!;
+  const membersOf: NoteSegment[][] = renamed.map(() => []);
+  for (const seg of allSegs) if (!seg.phantom) membersOf[seg.instrument]!.push(seg);
+  // Table budget (repair): the player holds at most 63 instrument shapes and 255 steps per table kind for the whole score.
+  // Instruments are kept in full in order of use (most notes first) while the budgets hold; the others lose their tables
+  // and vibrato, and the simplified shapes that become equal share one instrument. Search space: the number of fully kept
+  // instruments and the simplification level (3 levels); objective: most notes fully kept; deterministic, no work budget needed (linear in the instruments).
+  const budgetGap = { unsupported: [] as Array<{ kind: string; detail: string }>, filterRecovered: false };
+  // An instrument with notes whose pitch no equal-temperament note explains gets exact `reg` pitch steps; a vibrato fit that succeeds later replaces them.
+  const fullYaml = renamed.map((def, i) => buildInstrumentYaml(def.program, def.ad, def.sr, def.restart, speed, budgetGap, undefined, usesRegSteps(def, membersOf[i]!)));
+  const sizes = fullYaml.map((y) => ({
+    wave: Array.isArray(y.wavetable) ? (y.wavetable as unknown[]).length : 0,
+    pulse: y.pulsetable ? ((y.pulsetable as { steps: unknown[] }).steps.length) : 0,
+    filter: y.filtertable ? ((y.filtertable as { steps: unknown[] }).steps.length) : 0,
+  }));
+  const rank = renamed.map((_, i) => i).sort((a, b) => membersOf[b]!.length - membersOf[a]!.length || a - b);
+  const keyOf = (y: Record<string, unknown>): string => JSON.stringify(y);
+  const fullKeys = fullYaml.map(keyOf);
+  let budget: { keep: Set<number>; level: number } | undefined;
+  for (let level = 1; level <= 3 && !budget; level++) {
+    const simple = renamed.map((_, i) => keyOf(simplifyInstrument(fullYaml[i]!, level)));
+    for (let k = renamed.length; k >= 0 && !budget; k--) {
+      const keep = new Set<number>();
+      const tot = { wave: 0, pulse: 0, filter: 0 };
+      for (const i of rank) {
+        if (keep.size >= k) break;
+        const z = sizes[i]!;
+        if (z.wave > MAX_TABLE_STEPS_TOTAL || z.pulse > MAX_TABLE_STEPS_TOTAL || z.filter > MAX_TABLE_STEPS_TOTAL) continue;
+        if (tot.wave + z.wave > MAX_TABLE_STEPS_TOTAL || tot.pulse + z.pulse > MAX_TABLE_STEPS_TOTAL || tot.filter + z.filter > MAX_TABLE_STEPS_TOTAL) continue;
+        keep.add(i);
+        tot.wave += z.wave; tot.pulse += z.pulse; tot.filter += z.filter;
+      }
+      const shapes = new Set<string>();
+      for (let i = 0; i < renamed.length; i++) shapes.add(keep.has(i) ? fullKeys[i]! : simple[i]!);
+      if (shapes.size <= MAX_INSTRUMENT_SHAPES) budget = { keep, level };
+      if (k > 0 && keep.size < k) k = keep.size + 1;
+    }
+  }
+  const finalYaml: Array<Record<string, unknown>> = [];
+  const finalIndex = new Map<string, number>();
+  const defToFinal: number[] = [];
+  let simplifiedCount = 0;
+  for (let i = 0; i < renamed.length; i++) {
+    const kept = budget?.keep.has(i) ?? false;
+    let y = fullYaml[i]!;
+    if (!kept) {
+      y = simplifyInstrument(y, budget?.level ?? 3);
+      simplifiedCount += membersOf[i]!.length;
+    }
+    const key = keyOf(y);
+    let index = finalIndex.get(key);
+    if (index === undefined) {
+      index = finalYaml.length;
+      finalIndex.set(key, index);
+      finalYaml.push(y);
+    }
+    defToFinal.push(index);
+  }
+  if (simplifiedCount > 0) {
+    unsupported.push({
+      kind: "instrument_budget",
+      detail: `${simplifiedCount} notes use instruments whose tables or vibrato were dropped to stay within ${MAX_INSTRUMENT_SHAPES} instrument shapes and ${MAX_TABLE_STEPS_TOTAL} table steps per kind`,
+      evidence: { instruments: renamed.length, fullyKept: budget?.keep.size ?? 0, simplificationLevel: budget?.level ?? 3 },
+    });
+  }
+  for (const seg of allSegs) seg.instrument = defToFinal[seg.instrument]!;
   const instruments: Record<string, unknown> = {};
-  for (const def of renamed) {
-    const members = allSegs.filter((x) => x.instrument === Number(def.name.slice(1)) - 1 && !x.phantom);
-    let vibrato: VibratoFit | undefined;
+  const finalDefs: InstrumentDef[] = finalYaml.map((y, i) => ({ name: `i${i + 1}`, program: [], ad: 0, sr: 0, restart: { calls: 0, ad: 0, sr: 0, test: false }, yaml: y }));
+  // Vibrato fit (a search over depth, rate and delay) only for the instruments that keep their tables, one fit per final instrument.
+  const fitted = new Set<number>();
+  for (let i = 0; i < renamed.length; i++) {
+    const fi = defToFinal[i]!;
+    if (!(budget?.keep.has(i) ?? false) || fitted.has(fi)) continue;
+    const members = allSegs.filter((x) => x.instrument === fi && !x.phantom);
     const modulated = members.find((x) => x.modulated);
-    if (modulated) {
-      vibrato = fitVibrato(members, tuning.cents, ir.clockHz, speed, frameRate * speed);
-      if (!vibrato) {
-        const track = used[segsByTrack.findIndex((list) => list.includes(modulated))]!;
-        unsupported.push({
-          kind: "pitch", detail: `instrument ${def.name}: the frequency registers of ${members.filter((x) => x.modulated).length} notes are not equal-temperament pitches and no vibrato reproduces them`,
-          evidence: { note: modulated.start, midi: modulated.midi },
-        });
-        const changes = modulated.freqs.filter((f, i) => i > 0 && f !== modulated.freqs[i - 1]).length;
-        if (changes * 3 <= modulated.freqs.length) {
-          extend("exact-frequency", "a note given as an exact frequency register value (or a per-note cents offset)",
-            "constant frequency registers that are not equal-temperament pitches under any single tuning", reproducer(ir, track.sid, track.voice, firstCall + modulated.start));
-        } else {
-          extend("pitch-table", "per-call frequency register values (pitch table, portamento or a vibrato shape the language lacks)",
-            "frequency registers deviate from the note pitch in a way no vibrato of the language reproduces", reproducer(ir, track.sid, track.voice, firstCall + modulated.start));
-        }
+    if (!modulated) continue;
+    fitted.add(fi);
+    const vibrato = fitVibrato(members, tune, ir.clockHz, speed, frameRate * speed);
+    if (vibrato) {
+      const def = renamed[i]!;
+      finalYaml[fi] = buildInstrumentYaml(def.program, def.ad, def.sr, def.restart, speed, budgetGap, vibrato, false);
+      finalDefs[fi]!.yaml = finalYaml[fi]!;
+    } else {
+      const track = used[segsByTrack.findIndex((list) => list.includes(modulated))]!;
+      unsupported.push({
+        kind: "pitch", detail: `instrument ${finalDefs[fi]!.name}: the frequency registers of ${members.filter((x) => x.modulated).length} notes are not equal-temperament pitches and no vibrato reproduces them`,
+        evidence: { note: modulated.start, midi: modulated.midi },
+      });
+      const changes = modulated.freqs.filter((f, i2) => i2 > 0 && f !== modulated.freqs[i2 - 1]).length;
+      if (changes * 3 <= modulated.freqs.length) {
+        extend("exact-frequency", "a note given as an exact frequency register value (or a per-note cents offset)",
+          "constant frequency registers that are not equal-temperament pitches under any single tuning", reproducer(ir, track.sid, track.voice, firstCall + modulated.start));
+      } else {
+        extend("pitch-table", "per-call frequency register values (pitch table, portamento or a vibrato shape the language lacks)",
+          "frequency registers deviate from the note pitch in a way no vibrato of the language reproduces", reproducer(ir, track.sid, track.voice, firstCall + modulated.start));
       }
     }
-    def.yaml = buildInstrumentYaml(def.program, def.ad, def.sr, def.restart, speed, gapInst, vibrato);
-    instruments[def.name] = def.yaml;
   }
-  for (const g of gapInst.unsupported) {
+  for (const def of finalDefs) instruments[def.name] = def.yaml;
+  for (const g of budgetGap.unsupported) {
     unsupported.push({ kind: g.kind, detail: g.detail, evidence: {} });
     extend(`table-${g.kind}`, `${g.kind} that the language cannot express`, g.detail, reproducer(ir, 0, 0, firstCall));
   }
+  const gapInst = budgetGap;
   // Filter state that a recovered per-note filter table reproduces is not reported; the F-diff shows whether it does.
+  gapInst.filterRecovered = Object.values(instruments).some((y) => !!(y as Record<string, unknown>).filtertable);
   if (changing.length && !gapInst.filterRecovered) {
     unsupported.push({
       kind: "global_state",
@@ -1056,7 +1507,7 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
       reproducer(ir, 0, 0, Math.max(firstCall, firstChange)));
   }
 
-  const instNames = renamed.map((d) => d.name);
+  const instNames = finalDefs.map((d) => d.name);
 
   // Per voice entries, structure alternatives and emission.
   const voiceIds = used.map((t) => t.voice + 1);
@@ -1071,15 +1522,37 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     for (const s of segs) counts.set(s.instrument, (counts.get(s.instrument) ?? 0) + 1);
     return [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 0;
   });
+  // SIDWave 1.5 is declared only when the score needs it: a speed above 4, or a player without the soft-start volume ramp.
+  // A voice that is silent at the start and has not written its frequency register yet: the player is told to write nothing for it until its first note.
+  const lateVoices = used.filter((t, i) => (segsByTrack[i]![0]?.start ?? 0) > 0);
+  const idleSilent = lateVoices.length > 0 && lateVoices.every((t) => t.freq[0] === 0);
+  // The original writes the control register of a voice that has not played yet in every call before its first note: the player does the same with `idle_writes: control`.
+  const idleControl = idleSilent && lateVoices.every((t) => writesControlWhileIdle(ir, rowStart, t, segsByTrack[used.indexOf(t)]![0]!.start));
+  const idleOff = idleSilent && !idleControl;
+  const useTable = tune.override.size > 0;
+  const usesWide = Object.values(instruments).some((y) => {
+    const t = (y as { pulsetable?: { wrap?: boolean; steps: Array<{ set?: number }> } }).pulsetable;
+    return !!t && (t.wrap === true || t.steps.some((st) => st.set === 0));
+  });
+  const usesReg = Object.values(instruments).some((y) => ((y as { wavetable?: Array<Record<string, unknown>> }).wavetable ?? []).some((step) => step.reg !== undefined));
+  const v15 = speed > 4 || softStartOff || idleOff || idleControl || startSteps.length > 0 || useTable || usesReg || usesWide;
+  const playerOptions = {
+    ...(softStartOff ? { soft_start: false } : {}),
+    ...(idleOff ? { idle_writes: false } : {}),
+    ...(idleControl ? { idle_writes: "control" } : {}),
+    ...(startSteps.length ? { start: startSteps.map((step) => step.map((w) => ({ reg: `$D4${w.reg.toString(16).toUpperCase().padStart(2, "0")}`, value: w.value }))) } : {}),
+  };
   const build = (layout: Layout): Record<string, unknown> => ({
-    sidwave: "1.4",
+    sidwave: v15 ? "1.5" : "1.4",
+    ...(Object.keys(playerOptions).length ? { player: playerOptions } : {}),
+    ...(useTable ? { tuning: { ...(tune.cents ? { cents: tune.cents } : {}), registers: Object.fromEntries([...tune.override].sort((a, b) => a[0] - b[0]).map(([midi, reg]) => [midiToNoteName(midi), reg])) } } : {}),
     title: options.title ?? "Reconstructed",
     tempo,
     mode: system,
     speed,
     ...(Object.keys(instruments).length ? { instruments } : {}),
     voices: layout.voices.map((v, i) => ({
-      id: voiceIds[i], ...(tuning.cents ? { detune: tuning.cents } : {}), instrument: instNames[defaults[i]!], patterns: v.patterns,
+      id: voiceIds[i], ...(tuning.cents && !useTable ? { detune: tuning.cents } : {}), instrument: instNames[defaults[i]!], patterns: v.patterns,
     })),
     timeline: [{
       section: "Song", bars,
@@ -1089,27 +1562,39 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   const alternatives: Array<{ blockBars: number | "flat"; bytes: number; document: Record<string, unknown> }> = [];
   for (const blockBars of ["flat", ...BLOCK_BARS] as const) {
     if (!entriesByVoice.length) break;
+    // A pattern lasts at most MAX_PATTERN_BEATS; a flat layout is only possible for a short tune.
+    if (blockBars === "flat" ? paddedRows / callsPerBeat > MAX_PATTERN_BEATS : blockBars * BEATS_PER_BAR > MAX_PATTERN_BEATS) continue;
     const layout = layoutVoices(entriesByVoice, paddedRows, callsPerBeat, instNames, defaults, blockBars);
+    if (layout.voices.some((v) => v.maxBeats > MAX_PATTERN_BEATS)) continue;
     const document = build(layout);
-    alternatives.push({ blockBars, bytes: formatSidwave(YAML.stringify(document)).length, document });
+    alternatives.push({ blockBars, bytes: YAML.stringify(document).length, document });
   }
   const chosen = alternatives.length ? alternatives.reduce((a, b) => (b.bytes < a.bytes ? b : a)) : undefined;
   // A tune without a gated note still needs one voice for the score to compile: a single rest.
-  const silent: Layout = { blockBars: "flat", voices: [{ patterns: { P1: { length: 1 / callsPerBeat, groove: ["-"] } }, sequence: "P1" }] };
+  const silent: Layout = { blockBars: "flat", voices: [{ patterns: { P1: { length: 1 / callsPerBeat, groove: ["-"] } }, sequence: "P1", maxBeats: 0 }] };
   if (!used.length) { voiceIds.push(1); entriesByVoice.push([]); defaults.push(0); }
   const document = chosen?.document ?? build(silent);
+  const clampedRestarts = clampRestarts(document, callsPerBeat, speed);
+  if (clampedRestarts) unsupported.push({ kind: "hard_restart", detail: `${clampedRestarts} instruments have a hard restart that was shortened to fit their shortest note`, evidence: { instruments: clampedRestarts } });
+  const usage = new Map<string, number>();
+  for (const seg of allSegs) if (!seg.phantom) usage.set(instNames[seg.instrument]!, (usage.get(instNames[seg.instrument]!) ?? 0) + 1);
+  const refitted = fitCompilerBudgets(document, usage);
+  if (refitted > 0) {
+    unsupported.push({ kind: "instrument_budget", detail: `${refitted} further notes use instruments whose tables or vibrato were dropped because the compiler's instrument-variant or table-step limit was exceeded`, evidence: { notes: refitted } });
+  }
   const text = formatSidwave(YAML.stringify(document));
   let patternCount = 0;
   for (const v of (document.voices as Array<{ patterns: object }>)) patternCount += Object.keys(v.patterns).length;
   return {
     document, text, speed, tempo, callsPerBeat, firstCall, rows, tuningCents: tuning.cents,
-    noteCount: allSegs.filter((x) => !x.phantom).length, phantomNotes: allSegs.filter((x) => x.phantom).length, instrumentCount: renamed.length, patternCount,
+    noteCount: allSegs.filter((x) => !x.phantom).length, phantomNotes: allSegs.filter((x) => x.phantom).length, instrumentCount: finalDefs.length, patternCount,
     structure: {
-      blockBars: chosen?.blockBars ?? "flat", bytes: chosen?.bytes ?? text.length,
+      blockBars: chosen?.blockBars ?? "flat", bytes: text.length,
       alternatives: alternatives.map(({ blockBars, bytes }) => ({ blockBars, bytes })),
     },
     unsupported, extensions: [...extensions.values()],
     tuningEvidence: { distinctRegisters: tuning.distinct, matched: tuning.matched, histogramModeCents: tuning.mode },
+    languageVersion: v15 ? "1.5" : "1.4", softStartOff,
   };
 }
 

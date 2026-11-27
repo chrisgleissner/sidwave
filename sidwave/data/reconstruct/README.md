@@ -33,3 +33,13 @@ Options: `--out`, `--cache`, `--sidflow DIR` (default `~/.c64bridge/sidwave-stan
 - The player signature covers only the first 512 bytes at the init and play addresses. Tunes with the same player code and different data share a signature, and a player whose routines start with different setup code does not.
 - Groups combine composer and player signature only. Tunes by different composers that use the same player, or one composer's tunes with different players, are in separate groups, so the held-out set can contain a tune that is closely related to a development tune.
 - Sample detection treats at least 32 writes to one register, each within 1,000 cycles of the previous one, as non-periodic. Slower sample rates are not detected.
+
+## Development runs (S5d)
+
+`scripts/reconstruct-corpus.mjs` reconstructs the 24 development tunes (never the held-out ones) at the design horizon, recompiles, compares call by call and, with ROM images, evaluates A1. `dev-report.json` holds no SID data and no scores; `dev-report.md` is the summary. Results and traces are cached by content under `~/.c64bridge/sidwave-standalone/recon-cache/` (key: input, subtune, horizon, settings, code and engine versions). Run it after `npm run build`:
+
+```
+HVSC_DIR=/path/to/C64Music nice -n 10 node scripts/reconstruct-corpus.mjs --label "after repair X"
+```
+
+Options: `--no-a1`, `--roms DIR` (default `~/.c64bridge/sidwave-standalone/open-roms`), `--max-horizon S` (a shorter horizon is declared per tune in the report), `--only SUBSTR[,..]`, `--workers N` (at most 4), `--force`, `--out`, `--md`.

@@ -1114,6 +1114,14 @@ export interface Arrangement {
   chips?: ChipArrangement[];
   turbo?: boolean;
   softVolume?: boolean;
+  /** SIDWave 1.5 `player.idle_writes: false`: a voice that has not played a note writes no register. */
+  idleSilent?: boolean;
+  /** SIDWave 1.5 `player.idle_writes: control`: a voice that has not played a note writes only its control register. */
+  idleControl?: boolean;
+  /** SIDWave 1.5 `player.start`: the register writes of the first player calls. */
+  startSteps?: Array<Array<{ reg: number; value: number }>>;
+  /** SIDWave 1.5 `tuning`: the 96 register values C0..B7 of the document's clock; absent without a tuning. */
+  noteTable?: number[];
   clock?: TimelineClock;
   findings?: SidwaveFindings;
   loopOffsets?: number[];
@@ -1320,8 +1328,20 @@ function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrange
       };
     }),
     turbo: doc.cpu === "turbo",
-    softVolume: isModern(doc),
+    softVolume: isModern(doc) && doc.player?.softStart !== false,
+    ...(doc.player?.idleWrites === false ? { idleSilent: true } : {}),
+    ...(doc.player?.idleWrites === "control" ? { idleControl: true } : {}),
+    ...(doc.player?.start ? { startSteps: doc.player.start } : {}),
+    ...(doc.tuning && (doc.tuning.cents || doc.tuning.registers.length) ? { noteTable: noteTableOf(doc) } : {}),
   };
+}
+
+/** The 96 register values C0..B7 of a document with a `tuning`, for its own clock. */
+function noteTableOf(doc: ParsedSidwave): number[] {
+  const { cents, registers } = doc.tuning!;
+  const table = Array.from({ length: 96 }, (_, n) => hzToSidFrequency(midiToHz(n + 12 + cents / 100), doc.song.mode));
+  for (const [midi, reg] of registers) table[midi - 12] = reg;
+  return table;
 }
 
 function arrangeSamples(doc: ParsedSidwave, timing: Arrangement, voices: Arrangement["voices"]): SidwaveSamples | undefined {
@@ -2124,7 +2144,7 @@ function scaleRegisterTable(table: SidwaveRegisterTable | undefined, speed: numb
       steps.push({ ...step, value, frames: Math.min(left, chunk), ...(cadence > 1 ? { cadence } : {}) });
     }
   }
-  return { steps, loop, reset: table.reset };
+  return { steps, loop, reset: table.reset, ...(table.wrap ? { wrap: true } : {}) };
 }
 
 function buildInstrument(voice: SidwaveVoice, fx: Record<string, any>, arp: number[], arpSpeed: number, filter: number, fps: number, modern: boolean,
@@ -2572,7 +2592,7 @@ function estimatePlayerCycles(arr: Arrangement, loop: boolean): number {
   const hasFade = arr.instruments.some((inst) => inst.vibFade);
   const bursts = new Map<number, number>();
   const add = (frame: number, cycles: number) => bursts.set(frame, (bursts.get(frame) ?? 0) + cycles);
-  let regular = 180 + (arr.softVolume ? 35 + 135 * (arr.chips?.length ?? 1) : 0) + (arr.samples ? 48 * (arr.chips?.length ?? 1) : 0); // entry, pointer/banking saves, play-once wrapper and return
+  let regular = (arr.startSteps ? 6 : 0) + 180 + (arr.softVolume ? 35 + 135 * (arr.chips?.length ?? 1) : 0) + (arr.samples ? 48 * (arr.chips?.length ?? 1) : 0); // entry, pointer/banking saves, play-once wrapper and return
   for (const chip of arr.chips ?? [{ filter: arr.filter, hasFilterTable: hasFilter }]) {
     regular += arr.chips ? 155 : 0; // base table lookup, 3-channel dispatch and unfiltered volume
     if (chip.filter.used || chip.hasFilterTable || !arr.chips) {
@@ -2590,8 +2610,9 @@ function estimatePlayerCycles(arr: Arrangement, loop: boolean): number {
     const used = [...new Set(notes.map(({ inst }) => arr.instruments[inst]!))];
     if (arr.tuning) regular += 135;
     if (arr.mirrors?.some(([source]) => source === slot)) regular += 150;
-    if (used.some((inst) => inst.wavetable?.some((step) => step.hz !== undefined))) regular += 32;
+    if (used.some((inst) => inst.wavetable?.some((step) => step.hz !== undefined || step.reg !== undefined))) regular += 32;
     if (used.some((inst) => inst.pulsetable?.steps.some((step) => step.cadence))) regular += 25;
+    if (used.some((inst) => inst.pulsetable?.wrap)) regular += 14; // wrap branch of the pulse table tick
     if (used.some((inst) => inst.filtertable?.steps.some((step) => step.cadence))) regular += 25;
     if (arr.samples) regular += 16;
     // The legacy player still runs its full register/effects path for all
@@ -2647,7 +2668,12 @@ function estimatePlayerCycles(arr: Arrangement, loop: boolean): number {
       }
     }
   }
-  return regular + [...bursts.values()].reduce((max, cycles) => Math.max(max, cycles), 0);
+  const steady = regular + [...bursts.values()].reduce((max, cycles) => Math.max(max, cycles), 0);
+  if (!arr.startSteps) return steady;
+  // A start call replaces the normal call: the dispatch chain (lda, cmp, beq, jmp: 12 cycles per skipped step), bank and
+  // sid_io save and restore, each write (immediate load and an indirect or absolute store, at most 11), the step counter and the self-modifying switch.
+  const startCall = Math.max(...arr.startSteps.map((step, k) => 12 * k + 70 + 11 * step.length + 40));
+  return Math.max(steady, startCall + 40);
 }
 
 // A single player body processes one 3-channel group at a time. Only the
@@ -3637,7 +3663,7 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
   const hasRestart = arr.voices.some(({ events }) => events.some(({ bytes }) => bytes[0] === OP.RESTART));
   const hasLegato = arr.voices.some(({ events }) => events.some((event) => event.order === ORDER.note && event.bytes[0] === OP.LEGATO));
   const hasPortamento = arr.voices.some(({ events }) => events.some((event) => event.order === ORDER.note && event.bytes.length > 2));
-  const hasRawWavePitch = insts.some((i) => i.wavetable?.some((step) => step.hz !== undefined));
+  const hasRawWavePitch = insts.some((i) => i.wavetable?.some((step) => step.hz !== undefined || step.reg !== undefined));
   const hasWavetable = insts.some((i) => i.wavetable?.length);
   const hasPulseTable = insts.some((i) => i.pulsetable?.steps?.length);
   const hasFilterTable = insts.some((i) => i.filtertable?.steps?.length);
@@ -3648,6 +3674,7 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
   const pulseCadence = insts.some((i) => i.pulsetable?.steps.some((step) => step.cadence));
   const filterCadence = insts.some((i) => i.filtertable?.steps.some((step) => step.cadence));
   const pulseReset = insts.some((i) => i.pulsetable?.reset === false);
+  const pulseWrap = insts.some((i) => i.pulsetable?.wrap);
   const filterReset = insts.some((i) => i.filtertable?.reset === false);
   const pulseVars = hasPulseTable ? ["ptpos", "ptleft", ...(pulseCadence ? ["ptclock"] : []), ...(pulseReset ? ["ptinst"] : [])] : [];
   const filterVars = hasFilterTable ? ["ftpos", "ftleft", "cutlo", "cuthi", "ftres", "fttype", "ftnewer", ...(filterCadence ? ["ftclock"] : []), ...(filterReset ? ["ftinst"] : [] )] : [];
@@ -3730,7 +3757,7 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
     addNoteHook("pt_start");
     addReleaseHook("pt_stop");
     playerCode = playerCode.replace("vr_write:\n", "vr_write:\n  jsr pt_tick\n");
-    playerCode += PULSE_TABLE_CODE + registerTableCode("pt", "pw", 1, 4094, pulseCadence);
+    playerCode += PULSE_TABLE_CODE + registerTableCode("pt", "pw", 1, 4094, pulseCadence, pulseWrap);
   }
   if (hasFilterTable) {
     addNoteHook("ft_start");
@@ -3871,6 +3898,33 @@ init_core:`);
     }
     playerCode += onceCode;
   }
+  if (arr.startSteps) {
+    // SIDWave 1.5 `player.start`: each of the first calls writes its listed registers and does nothing else; the song starts after them.
+    // The entry of the player is a jump to the start chain. The last step rewrites that jump to the normal player, so the chain costs 3 cycles per call afterwards; init restores it.
+    const label = loop ? "play" : "play_tick";
+    if (!playerCode.includes(`\n${label}:\n`) || !playerCode.includes("  sta $01\n  ldy #95\n  cpx #0\n")) throw new Error("SIDWAVE player code changed: the start patch point was not found");
+    const last = arr.startSteps.length - 1;
+    // The stores carry a trailing comment so that the later passes that rewrite `sta $D415` to `sta $D418` (the SID multiplexer, the filter
+    // route mask and the soft-start volume ramp) leave them alone: a start write reaches the first SID exactly as listed.
+    const steps = arr.startSteps.map((step, k) => `  lda st_i
+  cmp #${k}
+  beq st_run_${k}
+  jmp st_skip_${k}
+st_run_${k}:
+  lda $01
+  pha
+  lda #$36
+  sta $01
+${step.map((w) => `  lda #$${hex2(w.value)}\n  sta $${(0xd400 + w.reg).toString(16).toUpperCase()} ; start`).join("\n")}
+  pla
+  sta $01
+  inc st_i
+${k === last ? `  lda #<${label}_run\n  sta ${label}+1\n  lda #>${label}_run\n  sta ${label}+2\n` : ""}  rts
+st_skip_${k}:`).join("\n");
+    playerCode = playerCode.replace(`\n${label}:\n`, `\n${label}:\n  jmp st_chain\n${label}_run:\n`);
+    playerCode = playerCode.replace("  sta $01\n  ldy #95\n  cpx #0\n", `  sta $01\n  lda #<st_chain\n  sta ${label}+1\n  lda #>st_chain\n  sta ${label}+2\n  lda #0\n  sta st_i\n  ldy #95\n  cpx #0\n`);
+    playerCode += `\nst_chain:\n${steps}\n  jmp ${label}_run\n`;
+  }
   if (arr.streamCalls) playerCode += `
 c_call:
   jsr fetch
@@ -3904,6 +3958,13 @@ c_ret:
   sta g_sres
   jmp v_read
 `;
+  if (arr.idleSilent) {
+    playerCode = playerCode.replace("  ldy voff,x\n  lda f_lo\n  sta $D400,y", "  lda v_inst,x\n  beq vr_after_write\n  ldy voff,x\n  lda f_lo\n  sta $D400,y");
+  }
+  if (arr.idleControl) {
+    // The marked store becomes an indirect store through sid_io once the SID multiplexer has run (see below).
+    playerCode = playerCode.replace("  ldy voff,x\n  lda f_lo\n  sta $D400,y", "  lda v_inst,x\n  bne vr_full_write\n  lda voff,x\n  clc\n  adc #4\n  tay\n  lda v_ctrl,x\n  sta $D400,y ; idle control\n  jmp vr_after_write\nvr_full_write:\n  ldy voff,x\n  lda f_lo\n  sta $D400,y");
+  }
   if (arr.chips) {
     playerCode = omitUnusedVoiceEffects(playerCode, insts, hasPortamento);
     if (hasFade) playerCode = addVibratoFade(playerCode);
@@ -3917,6 +3978,7 @@ c_ret:
     if (arr.tuning) playerCode = addTunedLookup(playerCode, arr.tuning);
     if (arr.samples) playerCode = addDigiPlayer(playerCode, arr.samples, arr.chips, [CLOCK_HZ.PAL, CLOCK_HZ.NTSC]);
   }
+  if (arr.idleControl) playerCode = playerCode.replace("  sta $D400,y ; idle control", arr.chips ? "  sta (sid_io),y" : "  sta $D400,y");
   if (songs) {
     // The song selector copies each song's loop targets into loop_lo and loop_hi.
     playerCode = playerCode.replace("c_loop:\n  lda start_lo,x\n  sta ptr\n  lda start_hi,x", "c_loop:\n  lda loop_lo,x\n  sta ptr\n  lda loop_hi,x");
@@ -4049,7 +4111,7 @@ c_ret:
   col("i_slreclo", insts.map((i) => i.slideRecip & 0xff));
   col("i_slrechi", insts.map((i) => i.slideRecip >> 8));
   col("i_filt", insts.map((i) => i.filter));
-  const wt: Array<{ ctrl: number; note: number; mode: number; frames: number; hz?: number }> = [];
+  const wt: Array<{ ctrl: number; note: number; mode: number; frames: number; hz?: number; reg?: number }> = [];
   const wtStart = insts.map((inst) => {
     if (!inst.wavetable?.length) return 0;
     const start = wt.length;
@@ -4061,7 +4123,7 @@ c_ret:
       const n = s.note === undefined ? "" : String(s.note);
       const mode = !n ? 0 : /^[+-]/.test(n) ? 1 : 2;
       const note = mode === 0 ? 0 : mode === 1 ? (Number(n) & 255) : (noteNameToMidi(n)! - 12);
-      wt.push({ ctrl, note, mode: s.hz === undefined ? mode : 3, frames: Number(s.frames ?? 1), hz: s.hz });
+      wt.push({ ctrl, note, mode: s.hz === undefined && s.reg === undefined ? mode : 3, frames: Number(s.frames ?? 1), hz: s.hz, reg: s.reg });
     }
     return start;
   });
@@ -4075,7 +4137,7 @@ c_ret:
     col("wt_mode", wt.length ? wt.map((s) => s.mode) : [0]);
     col("wt_frames", wt.length ? wt.map((s) => s.frames) : [1]);
     if (hasRawWavePitch) for (const system of ["PAL", "NTSC"] as const) {
-      const freq = wt.map(({ hz }) => hz === undefined ? 0 : hzToSidFrequency(hz, system));
+      const freq = wt.map(({ hz, reg }) => reg !== undefined ? reg : hz === undefined ? 0 : hzToSidFrequency(hz, system));
       col(`wt_raw_${system.toLowerCase()}_lo`, freq.map((v) => v & 255));
       col(`wt_raw_${system.toLowerCase()}_hi`, freq.map((v) => v >> 8));
     }
@@ -4101,6 +4163,7 @@ c_ret:
     col(`${prefix}_add`, steps.map((step) => +step.add));
     col(`${prefix}_frames`, steps.map((step) => step.frames));
     if (prefix === "pt" ? pulseCadence : filterCadence) col(`${prefix}_cadence`, steps.map((step) => step.cadence ?? 1));
+    if (prefix === "pt" && pulseWrap) col("pt_wrap", steps.map((_, i) => Number(tables.some((table, t) => table?.wrap && i >= starts[t]! && i < starts[t]! + table.steps.length))));
     if (prefix === "pt" ? pulseReset : filterReset) col(`i_${prefix}reset`, tables.map((table) => Number(table?.reset !== false)));
     if (prefix === "ft") {
       col("ft_res", steps.map((step) => step.resonance === undefined ? 255 : step.resonance << 4));
@@ -4118,7 +4181,7 @@ c_ret:
 
   // Frequency tables C0..B7 for both clocks; init copies the right one into ftlo/fthi.
   for (const sys of ["PAL", "NTSC"] as const) {
-    const values = Array.from({ length: 96 }, (_, n) => hzToSidFrequency(midiToHz(n + 12), sys));
+    const values = arr.noteTable && sys === arr.system ? arr.noteTable : Array.from({ length: 96 }, (_, n) => hzToSidFrequency(midiToHz(n + 12), sys));
     col(`${sys.toLowerCase()}_lo`, values.map((v) => v & 0xff));
     col(`${sys.toLowerCase()}_hi`, values.map((v) => v >> 8));
   }
@@ -4137,6 +4200,7 @@ c_ret:
     if (arr.chips?.some((chip) => chip.owner !== undefined)) R.push("g_fthold: .res 1");
   }
   if (arr.chips?.some((chip) => chip.hasOffset)) for (const name of ["g_so0", "g_so1", "g_so2", "g_sres"]) R.push(`${name}: .res 1`);
+  if (arr.startSteps) R.push("st_i: .res 1");
   R.push(`vars_end:`);
   if (arr.effects) R.push(...effectRam(channels, arr.chips!.length, arr.effects.some((effect) => effect.steps.some((step) => step.filter === "off"))));
 
@@ -5093,7 +5157,7 @@ gl_done:
 
 // Both tables use the same cursor and signed arithmetic. A zero counter holds the
 // previous register value. A new note seeds the cursor so its first call enters row 0.
-function registerTableCode(prefix: "pt" | "ft", value: "pw" | "cut", min: number, max: number, cadence = false): string {
+function registerTableCode(prefix: "pt" | "ft", value: "pw" | "cut", min: number, max: number, cadence = false, wrap = false): string {
   return `
 ${prefix}_tick:
   lda v_${prefix}left,x
@@ -5152,7 +5216,17 @@ ft_keep_type:
   sta t_lo
   lda v_${value}hi,x
   adc ${prefix}_hi,y
-  bmi ${prefix}_min
+${wrap ? `  pha
+  lda pt_wrap,y
+  beq pt_nowrap
+  pla
+  and #$0F
+  tay
+  lda t_lo
+  jmp pt_write
+pt_nowrap:
+  pla
+` : ""}  bmi ${prefix}_min
   cmp #>${max}
   bcc ${prefix}_sum
   bne ${prefix}_max

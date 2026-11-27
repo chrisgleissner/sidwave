@@ -291,6 +291,28 @@ play:   inc $fb
         rts
 `,
   },
+  multispeed9: {
+    feature: "nine calls per PAL frame: the call rate lies above the highest speed of the language (8), so the recovered score cannot be compiled",
+    speed: 1,
+    asm:
+      prologue(`
+        lda #$f0
+        sta $d406
+        lda #$11
+        sta $d404
+        lda #$10
+        sta $d401
+        lda #<2184
+        sta $dc04
+        lda #>2184
+        sta $dc05`) +
+      `
+play:   inc $fb
+        lda $fb
+        sta $d400
+        rts
+`,
+  },
   twoSids: {
     feature: "two SIDs: SID 1 at $D400 and SID 2 at $D420 each get a frequency write per call",
     version: 3,

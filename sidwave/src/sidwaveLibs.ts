@@ -305,7 +305,7 @@ class Loader {
     for (const key of Object.keys(raw)) {
       if (!LIBRARY_KEYS.has(key)) fail(at(`$.${key}`), `not allowed in a library (a library has ${[...LIBRARY_KEYS].join(", ")} and no timeline)`);
     }
-    if (String(raw.sidwave) !== "1.4") fail(at("$.sidwave"), "a library requires sidwave: 1.4");
+    if (!["1.4", "1.5"].includes(String(raw.sidwave))) fail(at("$.sidwave"), "a library requires sidwave: 1.4 or 1.5");
     const lib = raw.library;
     if (!isMap(lib)) fail(at("$.library"), "missing library metadata (name, version, licence, provenance)");
     for (const key of Object.keys(lib)) if (!["name", "version", "licence", "provenance"].includes(key)) fail(at(`$.library.${key}`), "unknown library field");

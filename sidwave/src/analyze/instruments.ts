@@ -3,7 +3,7 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 
 // Instrument extraction: the instruments of a score, or of the reconstruction of a SID tune, written as a SIDWave
-// asset library (sidwave: 1.4, `library` header) with provenance. `checkInstrumentReuse` places an extracted instrument
+// asset library (sidwave: 1.4, or 1.5 for a 1.5 source; `library` header) with provenance. `checkInstrumentReuse` places an extracted instrument
 // in a new score and compares the register output of its voice with the same instrument defined inline.
 
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -68,6 +68,9 @@ export interface ExtractResult {
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
+/** The version of a document derived from `source`: 1.5 when the source declares 1.5, because its instruments may use 1.5 constructs, else 1.4. */
+const derivedVersion = (source: Record<string, unknown>): "1.4" | "1.5" => (String(source.sidwave) === "1.5" ? "1.5" : "1.4");
+
 function sanitize(name: string): string {
   const cleaned = name.replace(/[^A-Za-z0-9_]/g, "_");
   return /^[A-Za-z_]/.test(cleaned) ? cleaned : `_${cleaned}`;
@@ -131,7 +134,7 @@ export function extractInstrumentsFromScore(text: string, options: ExtractOption
     ? `reconstructed from SID file md5 ${provenance.source.md5} sha256 ${provenance.source.sha256}, subtune ${provenance.subtune}, horizon ${provenance.horizonSeconds} s`
     : `extracted from a SIDWave score, sha256 ${provenance.source.sha256}`;
   const library = {
-    sidwave: "1.4",
+    sidwave: derivedVersion(doc),
     library: { name: libraryName, version: "1.0.0", licence: options.licence ?? "LicenseRef-unknown", provenance: { author, source: sourceText, created } },
     instruments: Object.fromEntries(instruments.map((i) => [i.name, i.definition])),
   };
@@ -198,8 +201,8 @@ export function reuseProbes(options: Pick<ReuseOptions, "library" | "instrument"
   if (!definition) throw new Error(`the source score has no instrument ${sourceName}`);
   const notes = options.notes ?? PROBE_NOTES;
   const base = {
-    sidwave: "1.4", title: "Instrument reuse probe", tempo: 100, mode: src.mode ?? "PAL", ...(src.speed === undefined ? {} : { speed: src.speed }),
-    ...(src.sids === undefined ? {} : { sids: src.sids }),
+    sidwave: derivedVersion(src), title: "Instrument reuse probe", tempo: 100, mode: src.mode ?? "PAL", ...(src.speed === undefined ? {} : { speed: src.speed }),
+    ...(src.sids === undefined ? {} : { sids: src.sids }), ...(src.cpu === undefined ? {} : { cpu: src.cpu }),
   };
   const groove = notes.map((note) => ({ note, len: 2 }));
   const timeline = [{ section: "Probe", bars: Math.ceil((notes.length * 2) / 4), layers: { v1: "P" } }];
@@ -245,7 +248,7 @@ export function replaceWithImports(source: string, instruments: string[], librar
   const rename = (n: unknown) => (typeof n === "string" && names.has(n) ? `${namespace}.${n}` : n);
   for (const name of names) delete doc.instruments?.[name];
   if (doc.instruments && Object.keys(doc.instruments).length === 0) delete doc.instruments;
-  doc.sidwave = "1.4";
+  doc.sidwave = derivedVersion(doc);
   doc.imports = [...(Array.isArray(doc.imports) ? doc.imports : []), { as: namespace, from: libraryFile }];
   for (const voice of doc.voices ?? []) {
     voice.instrument = rename(voice.instrument);

@@ -58,11 +58,19 @@ test("sample playback and two SIDs: the trace facts that the language cannot exp
 });
 
 test("a reconstruction that the compiler rejects: musical facts come from the score text, marked as approximate in the limits", { timeout: 120_000 }, async () => {
-  const report = await analyzeSid(new Uint8Array(buildFixture("testBit").sid), { engine: sharedEngine(), seconds: 3 });
+  // Nine calls per frame is above the highest speed of the language, so the recovered score is rejected.
+  const report = await analyzeSid(new Uint8Array(buildFixture("multispeed9").sid), { engine: sharedEngine(), seconds: 3 });
   assert.ok(report.limits.some((l) => /compiler rejects the reconstruction/.test(l) && /read from the score text/.test(l)), report.limits.join("\n"));
   assert.ok(report.key && report.metre && report.form, "key, metre and form are computed from the note list read from the text");
-  assert.ok(report.techniques.some((t) => t.name === "test bit"));
+  assert.ok(report.techniques.some((t) => t.name === "multispeed"));
   assert.match(formatAnalysis(report), /Techniques/);
+});
+
+test("the test-bit tune: its reconstruction compiles, so no rejection is reported and the technique is observed", { timeout: 120_000 }, async () => {
+  const report = await analyzeSid(new Uint8Array(buildFixture("testBit").sid), { engine: sharedEngine(), seconds: 3 });
+  assert.ok(!report.limits.some((l) => /compiler rejects the reconstruction|could not be used for musical facts/.test(l)), report.limits.join("\n"));
+  assert.ok(report.key && report.metre && report.form);
+  assert.ok(report.techniques.some((t) => t.name === "test bit"));
 });
 
 test("the note list read from the score text agrees with the arranger on a reconstruction that compiles", { timeout: 120_000 }, async () => {
