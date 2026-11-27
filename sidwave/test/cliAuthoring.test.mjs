@@ -255,6 +255,18 @@ test("the default transform check finds the cycle budget and the memory size, li
   } finally { done(); }
 });
 
+test("the default transform check finds effects that do not fit below $D000, although the streams are small", () => {
+  const message = (fn) => { try { fn(); } catch (e) { return e.message; } return undefined; };
+  const score = YAML.parse(fs.readFileSync(path.join(packageRoot, "data", "sound", "examples", "learn", "07_songs_and_effects.yaml"), "utf8"));
+  const steps = Array.from({ length: 140 }, (_, i) => ({ freq: 500 + i }));
+  score.effects = Object.fromEntries(Array.from({ length: 32 }, (_, i) => [`fx${i}`, { priority: 1, steps }]));
+  const text = formatSidwave(YAML.stringify(score));
+  const size = message(() => compileSidwaveToPrg(parseSidwave(text), { loop: false }));
+  assert.match(size, /the compiled song needs/);
+  assert.equal(message(() => checkSidwaveCompiles(parseSidwave(text), { loop: false })), size);
+  assert.throws(() => setTempo(text, { bpm: 120 }), /does not compile/);
+});
+
 test("diff --git follows the external diff driver convention and always exits 0", () => {
   const { dir, done } = sandbox();
   try {
@@ -608,6 +620,30 @@ test("generate checks output directories before writing any output", { skip: pro
   }
 });
 
+test("generate --force replaces a writable file in a read-only directory and refuses a read-only file", { skip: process.getuid?.() === 0 }, () => {
+  const { dir, done } = sandbox();
+  const ro = path.join(dir, "ro");
+  fs.mkdirSync(ro);
+  const target = write(ro, "g.yaml", "old");
+  const locked = write(dir, "locked.yaml", "keep");
+  fs.chmodSync(locked, 0o444);
+  fs.chmodSync(ro, 0o555);
+  try {
+    const replaced = run(dir, "generate", "--seed", "2", "-o", "ro/g.yaml", "--force");
+    assert.equal(replaced.code, EXIT_OK, replaced.err);
+    assert.ok(parseSidwave(fs.readFileSync(target, "utf8")));
+    assert.equal(run(dir, "generate", "--seed", "2", "-o", "ro/new.yaml", "--force").code, EXIT_INPUT, "a new file needs a writable directory");
+    const refused = run(dir, "generate", "--seed", "2", "-o", "first.yaml", "--prg", "locked.yaml", "--force");
+    assert.equal(refused.code, EXIT_INPUT);
+    assert.match(refused.err, /cannot write locked\.yaml: the file is not writable/);
+    assert.equal(fs.existsSync(path.join(dir, "first.yaml")), false, "no output was written");
+    assert.equal(fs.readFileSync(locked, "utf8"), "keep");
+  } finally {
+    fs.chmodSync(ro, 0o755);
+    done();
+  }
+});
+
 test("unknown command suggestions prefer prefixes and list ambiguous matches", () => {
   assert.equal(unknownCommandMessage("gen", ["generate", "format"]), 'unknown command "gen"; did you mean generate?');
   assert.equal(unknownCommandMessage("tranform", ["transform", "format"]), 'unknown command "tranform"; did you mean transform?');
@@ -673,6 +709,7 @@ test("every authoring command has --help with at least two examples", () => {
     assert.match(help.out, /Exit codes|exit 1|Exit 0/i);
   }
   assert.match(run(".", "--help").out, /sidwave generate/);
+  assert.match(run(".", "format", "--help").out, /trailing comments can move/);
 });
 
 test("the built command line runs the authoring commands", () => {

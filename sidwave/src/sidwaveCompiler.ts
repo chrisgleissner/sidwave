@@ -505,20 +505,24 @@ function checkCycleBudget(doc: ParsedSidwave, { arrangement, digiCycles, require
   }
 }
 
-/** Streams and samples of at most this many bytes cannot reach $D000: the player and its tables of every bundled score and test score are below 18 KB. */
+/**
+ * Without effects, streams and samples of at most this many bytes cannot reach $D000: the player and its tables of every
+ * bundled score and test score are below 18 KB. The step records of effects (up to 32 effects of 255 steps, 11 bytes
+ * each) are part of the player and can exceed the whole memory, so a score with effects is always assembled.
+ */
 const MEMORY_CHECK_THRESHOLD = 20_000;
 
 /**
  * Everything compileSidwaveToPrg checks except the assembler: the score is arranged and packed, then the cycle budget
  * (`cpu: turbo`) and the memory size are checked. The size needs the assembled length of the player, so it is
- * checked here only when the streams and samples exceed 20,000 bytes; a smaller score cannot reach $D000 with any
- * player seen so far. It takes about 40 % of the time of a compile. Throws what the compile would throw, except an
- * error of the assembler itself.
+ * checked here only for a score with effects or with more than 20,000 bytes of streams and samples; any other score
+ * cannot reach $D000 with any player seen so far. Without that assembly it takes about 40 % of the time of a compile.
+ * Throws what the compile would throw, except an error of the assembler itself.
  */
 export function checkSidwaveCompiles(doc: ParsedSidwave, options: SidwaveCompileOptions = {}): void {
   const prepared = preparePlayer(doc, options);
   const sampleBytes = [...(prepared.arrangement.samples?.defs.values() ?? [])].reduce((sum, sample) => sum + sample.data.length, 0);
-  if (prepared.streams.reduce((sum, st) => sum + st.length, 0) + sampleBytes > MEMORY_CHECK_THRESHOLD) {
+  if (prepared.arrangement.effects || prepared.streams.reduce((sum, st) => sum + st.length, 0) + sampleBytes > MEMORY_CHECK_THRESHOLD) {
     const layout = assemblyToPrgDetailed(buildPlayerAsm(prepared.arrangement, prepared.streams.map(() => [OP.LOOP]), prepared.loop, prepared.turboOnly, false), {
       fileName: "sidwave_player.asm",
       loadAddress: SIDWAVE_LOAD_ADDRESS,

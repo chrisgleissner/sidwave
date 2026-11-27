@@ -126,6 +126,13 @@ export function runGenerateCli(args: string[], io: CliIo): number {
     for (const target of targets) {
       const path = resolve(io.cwd, target);
       if (target === "-" || isCharacterDevice(path)) continue;
+      // Files are written in place, so an existing file needs write access to the file itself, not to its directory.
+      if (existsSync(path)) {
+        try { accessSync(path, constants.W_OK); } catch {
+          throw new SidwaveOperationError("input", `cannot write ${target}: the file is not writable`, { file: path });
+        }
+        continue;
+      }
       // The directory is created when it is missing, so the nearest existing parent must be writable.
       let dir = dirname(path);
       while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir);

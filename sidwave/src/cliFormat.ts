@@ -15,8 +15,9 @@ Usage:
   sidwave format <score>... --write [--json]
 
 The canonical layout has a fixed key order, two-space indentation, double-quoted strings and short lists in flow
-style. Comments, anchors and aliases are kept. Formatting does not change what the score plays, and it is
-idempotent: formatting a formatted file changes nothing.
+style. Comments, anchors and aliases are kept, but trailing comments can move: for example, a comment after a key
+that starts a block moves to a line of its own below that key. Formatting does not change what the score plays, and
+it is idempotent: formatting a formatted file changes nothing.
 
 A file that is not a valid SIDWave score is an error (exit 3) and is never rewritten.
 
