@@ -183,6 +183,8 @@ leave   cmp $d012
 sidwave compile tune.yaml --target game --origin '$2000' --format asm --asm kickass -o tune.inc
 ```
 
+The KickAssembler include is not verified. The test that assembles it needs a KickAssembler installation (`KICKASS_JAR`) and is skipped in CI.
+
 `main.asm`, assembled with `java -jar KickAss.jar main.asm -o game.prg`:
 
 <!-- example: kickass main.asm -->

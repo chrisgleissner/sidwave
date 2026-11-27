@@ -2,6 +2,7 @@
 
 An assembler and a disassembler for the NMOS 6502 and 6510 (Commodore 64), written in TypeScript, with all 256 opcodes, PRG output and PETSCII text.
 
+[![npm](https://img.shields.io/npm/v/6502-toolkit)](https://www.npmjs.com/package/6502-toolkit)
 [![CI](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml/badge.svg)](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml)
 [![Codecov](https://codecov.io/gh/chrisgleissner/sidwave/graph/badge.svg?flag=6502-toolkit)](https://codecov.io/gh/chrisgleissner/sidwave)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -15,7 +16,7 @@ An assembler and a disassembler for the NMOS 6502 and 6510 (Commodore 64), writt
 - **`include` and `incbin` go through callbacks that you provide.** The package never reads a file. It imports nothing from Node.js, and a test runs the built package with `Buffer` removed and every `node:` import blocked.
 - **A symbol table, warnings and exact error locations.** `AssemblyError` carries the file name and line, also for errors in included files and macro expansions.
 - **Synchronous, pure and without dependencies.** Same input, same output. It runs on Node.js (see Versioning and support), Bun and in browsers; CI runs the tests on Node.js and Bun.
-- **Directive spellings from ACME, 64tass, ca65 and Kick Assembler,** compared with bytes that those assemblers produced, and more than 1,000 tests (1072 in the last Node run: 1070 passed, 1 skipped, 1 to do). CI enforces at least 98 % line coverage and 95 % branch coverage.
+- **Directive spellings from ACME, 64tass, ca65 and Kick Assembler,** compared with bytes that those assemblers produced, and more than 1,000 tests (1085 in the Node run for 0.9.0: 1083 passed, 1 skipped, 1 to do). CI enforces at least 98 % line coverage and 95 % branch coverage.
 
 ## Install
 
@@ -143,11 +144,11 @@ The full reference with grammar, examples and error messages is [doc/syntax.md](
 
 ## Comparison with other npm packages
 
-Facts as of 2026-11-26, taken from npm metadata and from each package's npm README. "Not documented" means that the npm README does not mention the feature; it does not mean the feature is missing.
+Facts as of 2026-11-27, taken from npm metadata and from each package's npm README. "Not documented" means that the npm README does not mention the feature; it does not mean the feature is missing.
 
 | | 6502-toolkit | [jsasm6502](https://www.npmjs.com/package/jsasm6502) | [@moonbase-machines/mos6502](https://www.npmjs.com/package/@moonbase-machines/mos6502) | [c64jasm](https://www.npmjs.com/package/c64jasm) | [js65](https://www.npmjs.com/package/js65) | [asm6502](https://www.npmjs.com/package/asm6502) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Version compared | 0.1.0 | 1.7.0 | 0.23.0 | 0.9.2 | 2.3.4 | 0.0.2 |
+| Version compared | 0.9.0 | 1.7.0 | 0.23.0 | 0.9.2 | 2.3.5 | 0.0.2 |
 | Undocumented opcodes | yes, all 105 | not documented | CPU emulator runs documented instructions; assembler syntax not documented | not documented | not documented | not documented |
 | Disassembler | yes | listing of assembled source only | yes | not documented | not documented | not documented |
 | PRG output | yes, with SYS stub | not documented | not documented | not documented | not documented (README is about NES ROMs) | not documented |
@@ -157,7 +158,7 @@ Facts as of 2026-11-26, taken from npm metadata and from each package's npm READ
 | 65C02 | no | yes | not documented | not documented | no ("no support for other cpus besides the 6502") | not documented |
 | Runtime dependencies | none | 2 | none listed | 7 | 2 | none listed |
 | Licence | MIT | MIT | MIT | MIT | MPL-2.0 | MIT |
-| Last npm release | not yet published | 2025-03-19 | 2026-11-16 | 2021-04-10 | 2026-11-25 | 2024-12-21 |
+| Last npm release | 2026-11-27 | 2025-03-19 | 2026-11-16 | 2021-04-10 | 2026-11-27 | 2024-12-21 |
 
 The README of @moonbase-machines/mos6502 describes its assembler as one "for Moonbase's own 6502 code". It is part of a package that emulates the 6502 CPU.
 
@@ -177,7 +178,7 @@ The README of @moonbase-machines/mos6502 describes its assembler as one "for Moo
 
 ## Used by
 
-[SIDWave](https://github.com/chrisgleissner/sidwave) (package `sidwave`) uses the assembler to build its music player, and [c64bridge](https://github.com/chrisgleissner/c64bridge) uses it to assemble programs for VICE and Ultimate devices.
+[SIDWave](https://github.com/chrisgleissner/sidwave) (package `sidwave`) uses the assembler to build its music player. The assembler was extracted from [c64bridge](https://github.com/chrisgleissner/c64bridge).
 
 ## Versioning and support
 

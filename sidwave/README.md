@@ -1,16 +1,21 @@
 # sidwave
 
+[![npm](https://img.shields.io/npm/v/sidwave)](https://www.npmjs.com/package/sidwave)
 [![Codecov](https://codecov.io/gh/chrisgleissner/sidwave/graph/badge.svg?flag=sidwave)](https://codecov.io/gh/chrisgleissner/sidwave)
 
 SIDWave is a music language, compiler and toolkit for the Commodore 64 SID chip. Write a score as YAML or JSON. Compile it to a self-playing C64 PRG or to a PSID file that includes the 6502 player.
 
-Status: pre-release. This package has not been published to npm yet. Build it from the [repository](https://github.com/chrisgleissner/sidwave#install-and-first-tune). Once published, the install command is:
+Install it in a project, or run the command without installing it first:
 
 ```sh
-npm install sidwave
+npm install sidwave                                   # library and command
+npx sidwave examples chiptune_drive -o .              # write an example score
+npx sidwave compile chiptune_drive.yaml               # compile it to chiptune_drive.prg
 ```
 
-Requires Node.js 20.19 or later. Runtime dependencies: `yaml` and `6502-toolkit`. Optional peer dependency: `libsidplayfp-wasm` (see Engine).
+Requires Node.js 20.19 or later. Runtime dependencies: `yaml` and `6502-toolkit`. The optional peer dependency `libsidplayfp-wasm` is needed to render, trace, verify or reconstruct SID tunes and for local playback (see [Engine](#engine)); with npx, run `npx -p sidwave -p libsidplayfp-wasm sidwave <command>`.
+
+Version 0.9.0 is the first release. Before 1.0.0, a minor version may contain breaking changes. The main limitations are listed under [Status and limitations](https://github.com/chrisgleissner/sidwave#status-and-limitations).
 
 ## Library
 
@@ -47,13 +52,35 @@ Text fields (`name`, `author`, `released`) are Windows-1252. Parsing is lenient 
 
 ```text
 sidwave validate <file> [--json] [--allow-dir <dir>]
-sidwave compile  <file> [-o <out>] [--format prg|sid] [--loop|--no-loop] [--json] [--allow-dir <dir>]
+sidwave compile  <file> [-o <out>] [--format prg|sid] [--loop|--no-loop] [--song <n>] [--json] [--allow-dir <dir>]
+sidwave compile  <file> --target game --origin <addr> [options]            (see Using the player in a game)
 sidwave lint     <file> [--loop|--no-loop] [--strict] [--json] [--allow-dir <dir>]
 sidwave examples [<name>] [-o <dir>] [--force] [--json]
 sidwave verify   <reference.sid|score> <candidate.sid|score> [--song <n>] [--seconds <s>] [--level T0|T1|A0|A1] [--tolerance-cycles <n>]
 sidwave render   <file.sid|score> [-o <out.wav>] [--song <n>] [--seconds <s>] [--rate <hz>] [--engine residfp|sidlite]
 sidwave trace    <file.sid|score> [-o <out>] [--format csv|jsonl] [--song <n>] [--seconds <s>]
 sidwave reconstruct <file.sid> [--song <n>] [--seconds <s>] [-o <score.yaml>] [--json]
+sidwave reconstruct <trace> [--from vice-dump|siddump] [--clock PAL|NTSC] [--seconds <s>] [-o <score.yaml>] [--json]
+sidwave convert  <in> [<out>] [--to <format>] [--from <format>] [options]
+sidwave formats  [--json]
+sidwave info     <file> [--from <format>] [--json]
+sidwave import   <file> [--format <format>] [-o <out.yaml>] [options]
+sidwave export   <score> [--format <format>] [-o <out>] [--driver <file>] [options]
+sidwave render   <score> --stems [-o <dir>] [options]
+sidwave format   <score>... [--check|--write]
+sidwave diff     <a> <b> [--json] [--compile]
+sidwave merge    <base> <ours> <theirs> [-o <out>]
+sidwave transform <score> <operation>... [-o <out>]
+sidwave generate [--style <s>] [--seed <n>] [--composer 1|2] [--profile <p>] [-o <score>] [--prg <f>] [--sid <f>] | --list
+sidwave complete <score> --op continue|harmonise|accompany|fill-section [options]
+sidwave retarget <score> [--clock pal|ntsc] [--model 6581|8580] [--sids <n>] [options]
+sidwave lock     <score> [-o <out>]
+sidwave bundle   <score> -o <dir> [--force]
+sidwave analyze  <file.sid|score> [--song <n>] [--seconds <s>] [--songlengths <file>] [--json]
+sidwave compare  <a> <b> [--song <n>] [--seconds <s>] [--level T0|T1|A0|A1] [--no-ladder] [--json]
+sidwave isolate  <file.sid> --voice <n> [--mute] [-o <out.wav>] [options]
+sidwave preserve <file.sid> [-o <dir>] [options] | --verify <dir>
+sidwave extract-instruments <file.sid|score> [-o <library.yaml>] [options]
 sidwave play     <file> [--target local|vice|u64] [--host <h>] [options]     (see Playing and watching)
 sidwave watch    <score> [--loop-section <name>] [--no-play] [options]
 sidwave sid info|edit|player <file.sid|dir> [options]      (sid-info is the old name of "sid info")
@@ -62,7 +89,12 @@ sidwave stil parse|query ...
 sidwave --help | --version
 ```
 
-`compile --target game` has further options, described in [Using the player in a game](#using-the-player-in-a-game).
+`sidwave --help` describes every command, and most commands have their own `--help`. `compile --target game` has further options, described in [Using the player in a game](#using-the-player-in-a-game).
+
+- `convert`, `formats`, `info`, `import` and `export` read and write other formats; `export` also writes the event list, and `render --stems` one WAV per voice. See [doc/interchange.md](doc/interchange.md).
+- `format`, `diff`, `merge`, `transform` and `generate` are described in [doc/authoring.md](doc/authoring.md); `complete` under [Composing and completing](#composing-and-completing) and `retarget` under [Retargeting](#retargeting).
+- `lock` writes the SHA-256 of each library that a SIDWave 1.4 score imports into the score; `bundle` writes the score and its libraries into one directory that compiles offline. See [Asset libraries](data/sound/sidwave.md#asset-libraries-sidwave-14).
+- `analyze`, `compare`, `isolate` and `extract-instruments` are described in [doc/analysis.md](doc/analysis.md), `preserve` in [doc/preservation.md](doc/preservation.md).
 
 - `validate` parses the score. Exit 0 when valid; exit 3 and the path of the first error (`Invalid SIDWAVE at $.voices[0].adsr: ...`) otherwise.
 - `compile` writes a PRG (default) or PSID. Without `-o` the file is named after the input, with `.prg` or `.sid`, in the current directory. A `-o` name ending in `.sid` selects PSID unless `--format` is given. `-o -` writes the bytes to standard output and the summary to standard error. `--json` prints the format, sizes, load, entry, init and play addresses, SID count, duration, frame counts and lint count. `--loop` (the default) and `--no-loop` select whether the song restarts at its end. The input file is never overwritten.
@@ -88,11 +120,11 @@ With `--json` every command prints one JSON document on standard output:
 { "ok": false, "command": "verify", "error": { "category": "input", "message": "cannot read b.yaml: ENOENT", "details": { "file": "b.yaml" } } }
 ```
 
-`ok` is false for a failed verdict (verify below the requested level, `lint --strict` with findings); such a document has a `result` and no `error`. An operational failure has an `error` and no `result`.
+`ok` is false for a failed verdict (for example verify below the requested level, or `lint --strict` with findings); such a document has a `result` and no `error`. An operational failure has an `error` and no `result`.
 
 | Category | Exit | Meaning |
 | --- | --- | --- |
-| (none, failed verdict) | 1 | `verify` did not reach the requested level, or `lint --strict` found a problem |
+| (none, failed verdict) | 1 | the check that a command was asked to make failed, for example `verify` below the requested level, `lint --strict` findings, differences found by `diff`, `compare` or `format --check`, `merge` conflicts, an inexact `reconstruct`, or an infeasible `retarget` budget |
 | `usage` | 2 | unknown command or option, missing or invalid argument, refusing to overwrite an input file |
 | `input` | 3 | unreadable or invalid file (including SID files), unwritable output path |
 | `validation` | 3 | the score is invalid; `details.path` is the JSON path of the first error |
@@ -121,7 +153,7 @@ sidwave watch song.yaml --no-play --json                # check only, one JSON o
 | --- | --- | --- |
 | `local` (default) | The libsidplayfp engine renders in 20 ms slices into `paplay`, `pw-play`, `aplay`, `ffplay`, `mpv` or sox `play`, the first one on `PATH`. `--player` or `SIDWAVE_PLAYER` names another program, which receives a WAV stream on standard input. | Needs the optional package `libsidplayfp-wasm`. Plays at most 3 SIDs. Does not play digi samples; the other voices of such a score are played. |
 | `vice` | `vsid` for a SID file, else `x64sc` or `x64` with the PRG, without a window. `--vice` or `SIDWAVE_VICE` names the program, `--vice-arg` passes arguments to it. | Needed for digi samples (PRG) and 4 SIDs. Your VICE settings apply; they are not saved. |
-| `u64` | The Ultimate REST API: upload and run (`runners:sidplay`, or `runners:run_prg` for a score with samples, more than 3 SIDs or `cpu: turbo`), and `machine:reset` to stop. | Only with `--target u64 --host <h>`. The network password is read from `SIDWAVE_U64_PASSWORD`. Redirects are refused. Under Bun, nothing is sent while a proxy variable applies to the host, because Bun would send the password to the proxy. `--detach` leaves the machine playing. The command does not change the device configuration. |
+| `u64` | Not tested on hardware. The Ultimate REST API: upload and run (`runners:sidplay`, or `runners:run_prg` for a score with samples, more than 3 SIDs or `cpu: turbo`), and `machine:reset` to stop. | Only with `--target u64 --host <h>`. The network password is read from `SIDWAVE_U64_PASSWORD`. Redirects are refused. Under Bun, nothing is sent while a proxy variable applies to the host, because Bun would send the password to the proxy. `--detach` leaves the machine playing. The command does not change the device configuration. |
 
 Behaviour:
 
@@ -249,7 +281,7 @@ The three songs compile to 3188 bytes as one player, against 6485 bytes as three
 
 ### Sound effects (SIDWave 1.4)
 
-A score can define sound effects that the game starts at run time, over the music. An effect is a short list of steps (frequency, waveform, pulse width, envelope, gate, filter routing and the number of play calls each step lasts) with a priority from 0 to 15 and the voices of the first SID it may use. While an effect owns a voice, the music keeps running but writes that voice into a shadow instead of the SID; when the effect ends, the shadow goes to the SID in the same play call and the music continues where it is. [`raster_bars.yaml`](examples/game/raster_bars.yaml) has one effect:
+A score can define sound effects that the game starts at run time, over the music. An effect is a short list of steps (frequency, waveform, pulse width, envelope, gate, filter routing and the number of play calls each step lasts) with a priority from 0 to 15 and the voices of the first SID it may use. While an effect owns a voice, the music keeps running but writes that voice into a shadow instead of the SID; when the effect ends, the shadow goes to the SID in the same play call and the music continues where it is. [`raster_bars.yaml`](https://github.com/chrisgleissner/sidwave/blob/main/sidwave/examples/game/raster_bars.yaml) has one effect:
 
 ```yaml
 effects:
@@ -277,7 +309,7 @@ In a PRG the entry is `$0816`: `POKE 780,0: POKE 782,255: SYS 2070` from BASIC, 
 
 ### Example game programs
 
-[`examples/game`](examples/game) has two small games-in-miniature. Each is a SIDWave score with effects (`.yaml`) and a 6502 program (`.asm`) that the build script assembles with 6502-toolkit behind the player into one PRG:
+[`examples/game`](https://github.com/chrisgleissner/sidwave/tree/main/sidwave/examples/game) in the repository has two small games-in-miniature. Each is a SIDWave score with effects (`.yaml`) and a 6502 program (`.asm`) that the build script assembles with 6502-toolkit behind the player into one PRG:
 
 | Program | What it does |
 | --- | --- |
@@ -294,12 +326,13 @@ The build compiles the score at the first page behind the program, passes the AC
 
 ## What you get
 
-- The player as a library for games and demos: any origin, separate data, symbol files and a documented contract (see [Using the player in a game](#using-the-player-in-a-game)).
-- Language versions 1.0 to 1.4: songs and sound effects (1.4), wave, pulse and filter tables, hard restart, sync and ring, echo, unison, follower voices, multispeed, sections, up to 10 SIDs and 30 voices in a PRG (PSID: up to 3 SIDs), CIA2 volume digis in a PRG.
+- The player as a library for games and demos: any origin, separate data, symbol files or an assembler include, a relocation table and a documented contract (see [Using the player in a game](#using-the-player-in-a-game)). The KickAssembler include is not verified.
+- Language versions 1.0 to 1.5: player options, exact note registers and a table for the filter and volume registers (1.5), songs, sound effects and asset libraries (1.4), wave, pulse and filter tables, hard restart, sync and ring, echo, unison, follower voices, multispeed, sections, up to 10 SIDs and 30 voices in a PRG (PSID: up to 3 SIDs), CIA2 volume digis in a PRG.
 - Lint checks and error messages that name the failing path in the score.
-- 15 example scores in [`data/sound/examples`](data/sound/examples).
-
-Planned and not yet available: reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
+- 15 example scores in [`data/sound/examples`](data/sound/examples) and the eight scores of the [tutorial](doc/tutorial.md).
+- Conversion between scores, MIDI, MusicXML, ABC, GoatTracker, Furnace, CheeseCutter, SID Factory II (driver 11), SID-Wizard, ProTracker MOD, JCH NewPlayer 20.G (import, approximate), register traces, PRG, PSID, WAV and BASIC; not every format can be both read and written (`sidwave formats`).
+- Reconstruction of SID tunes into scores. It is approximate: none of the 24 development tunes is reproduced exactly.
+- Analysis, comparison, voice isolation, preservation bundles and HVSC tools.
 
 ## Composing and completing
 
@@ -379,13 +412,13 @@ setTempo(up.text, { bpm: 90 }).report.changed; // ["/tempo"]
 
 ## Engine
 
-`sidwave/engine` renders and traces SID files with [libsidplayfp-wasm](https://www.npmjs.com/package/libsidplayfp-wasm) (reSIDfp or SIDLite). `sidwave/verify` compares the SID register writes of two tunes (levels T0 and T1) and, with a SIDLite engine, their PCM (level A0). The package is an optional peer dependency (`^1.1.1`): install it yourself when you use these two entry points.
+`sidwave/engine` renders and traces SID files with [libsidplayfp-wasm](https://www.npmjs.com/package/libsidplayfp-wasm) (reSIDfp or SIDLite). `sidwave/verify` compares the SID register writes of two tunes (levels T0 and T1) and, with a SIDLite engine, their PCM (level A0). The package is an optional peer dependency (`^1.1.1`): install it yourself (also for `render`, `trace`, `verify`, `reconstruct` of a SID file, local playback and the other commands that emulate the SID).
 
 ```bash
 npm install libsidplayfp-wasm
 ```
 
-Without it, `createLibsidplayfpEngine(...).render()` and `.trace()` throw `SidEngineUnavailableError` with a message that names the package and this install command; the original error is in `cause`. The rest of sidwave does not need the package. `engine.version` is the installed package version and reads "unknown" until the first render or trace has loaded it.
+Without it, `createLibsidplayfpEngine(...).render()` and `.trace()` throw `SidEngineUnavailableError` with a message that names the package and this install command; the original error is in `cause`. The command line then exits 4. Parsing, linting and compiling do not need the package. `engine.version` is the installed package version and reads "unknown" until the first render or trace has loaded it.
 
 ```ts
 import { createLibsidplayfpEngine } from "sidwave/engine";
@@ -469,7 +502,8 @@ The thresholds come from `data/verify/a1-rules.json`, which `scripts/calibrate-a
 
 ## More
 
-- [Repository README](https://github.com/chrisgleissner/sidwave#readme): overview, examples, roadmap
+- [Repository README](https://github.com/chrisgleissner/sidwave#readme): overview, examples, status and limitations
+- [Tutorial](doc/tutorial.md), [authoring commands](doc/authoring.md), [interchange formats](doc/interchange.md), [analysis](doc/analysis.md), [preservation bundles](doc/preservation.md), [HVSC tools](doc/hvsc.md)
 - [Language specification](data/sound/sidwave.md) and [JSON Schema](data/sound/sidwave.schema.json)
 - [Licensing notes](doc/licensing.md): read this before releasing a tune or embedding the player in a game
 

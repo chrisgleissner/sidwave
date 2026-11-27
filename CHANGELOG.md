@@ -9,12 +9,14 @@ This file lists repository-level changes (CI, licences, documentation of the rep
 
 ## Unreleased
 
+## 0.9.0 - 2026-11-27
+
 ### Added
 
 - Standalone repository for SIDWave, extracted from c64bridge with the history of the moved files.
-- CI runs the tests on the oldest supported Node.js version and on Node.js 24, and on Bun 1.3.1. CI also type-checks a consumer project that imports every exported subpath of the packed packages, and runs `npx sidwave --help` after `npm ci` and `npm run build`.
+- CI runs the tests on the oldest supported Node.js version and on Node.js 24, and on Bun 1.4.5 (the coverage gate uses Bun 1.3.1). CI also type-checks a consumer project that imports every exported subpath of the packed packages, and runs `npx sidwave --help` after `npm ci` and `npm run build`.
 - `scripts/check-types-consumer.mjs` (`npm run check:types`) and `scripts/check-fresh-clone.mjs` (`npm run check:fresh-clone`).
-- Documentation drafts: repository README, package READMEs, licensing notes.
+- Documentation: repository README, package READMEs, licensing notes.
 - `.github/workflows/release.yaml`, started only by a tag `6502-toolkit@<version>` or `sidwave@<version>`. See "Releases" in the README.
 
 ### Changed

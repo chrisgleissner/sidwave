@@ -1,12 +1,12 @@
 {
   "name": "sidwave",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "description": "SIDWave music format for the SID chip: parser, compiler to C64 PRG and PSID, linter, generator and offline analysis",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "sidwave": "./bin/sidwave.js"
+    "sidwave": "bin/sidwave.js"
   },
   "exports": {
     ".": {
@@ -131,6 +131,9 @@
     "data/**",
     "doc/licensing.md",
     "doc/tutorial.md",
+    "doc/authoring.md",
+    "doc/hvsc.md",
+    "doc/performance.md",
     "doc/interchange.md",
     "doc/analysis.md",
     "doc/preservation.md",
@@ -165,7 +168,7 @@
     "node": ">=20.19"
   },
   "dependencies": {
-    "6502-toolkit": "^0.1.0",
+    "6502-toolkit": "^0.9.0",
     "yaml": "^2.9.0"
   },
   "homepage": "https://github.com/chrisgleissner/sidwave/tree/main/sidwave#readme",

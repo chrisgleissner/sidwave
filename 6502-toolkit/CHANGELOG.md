@@ -4,9 +4,13 @@ All notable changes to `6502-toolkit` are listed here. The format follows [Keep 
 
 ## Unreleased
 
+## 0.9.0 - 2026-11-27
+
+First npm release.
+
 ### Added
 
-- npm package `6502-toolkit`: 6502 assembler and disassembler, extracted from c64bridge. It is not published yet.
+- npm package `6502-toolkit`: 6502 assembler and disassembler, extracted from c64bridge.
 - Documentation: a package README with install, quick start, API overview, syntax summary, Commodore support, a comparison with other npm 6502 assemblers and limitations; `doc/syntax.md`, `doc/api.md`, `doc/commodore.md` and a generated `doc/opcodes.md` (all 256 opcodes). The code examples in these pages are run by the test suite, and `doc` is included in the published package.
 - Tests: one generated test per opcode for assembling, disassembling and round trip, tables for every addressing mode, directive spelling, PRG rule and PETSCII token, and exact error messages.
 - A test that runs the built package in a child process with `Buffer` removed and every `node:` import blocked, and assembles and disassembles a program.
