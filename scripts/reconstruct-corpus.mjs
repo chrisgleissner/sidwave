@@ -13,6 +13,7 @@
 // versions. Output: dev-report.json (no SID data, no scores) and dev-report.md. Run it after `npm run build`.
 
 import { createHash } from "node:crypto";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
@@ -76,6 +77,10 @@ function loadRomsDir(dir) {
   return Object.keys(roms).length === 3 ? roms : undefined;
 }
 
+let versionsMemo;
+function versions() {
+  return (versionsMemo ??= codeVersion());
+}
 const hvsc = process.env.HVSC_DIR;
 const manifest = JSON.parse(readFileSync(args.manifest, "utf8"));
 const maxHorizon = args["max-horizon"] ? Number(args["max-horizon"]) : DESIGN_HORIZON;
@@ -107,6 +112,35 @@ function classify(report) {
 
 // ---- one tune (child process) -------------------------------------------------------------------------------------
 
+/**
+ * Engine wrapper that caches the trace of the original tune on disk. The original trace depends only on the SID,
+ * the subtune, the horizon, the clock and the engine version, so it is reused across repair batches. Traces of
+ * recompiled scores are never cached.
+ */
+function cachingEngine(engine, original, engineVersion) {
+  return {
+    id: engine.id, version: engine.version,
+    render: (req) => engine.render(req),
+    async trace(req) {
+      if (req.sid !== original) return engine.trace(req);
+      const key = sha256(JSON.stringify({ sid: sha256(original), song: req.song ?? null, seconds: req.seconds, clock: req.clock ?? null, engineVersion, t: 1 })).slice(0, 32);
+      const meta = path.join(args.cache, "traces", `${key}.json`);
+      const data = path.join(args.cache, "traces", `${key}.f64.gz`);
+      if (existsSync(meta) && existsSync(data)) {
+        const m = JSON.parse(readFileSync(meta, "utf8"));
+        const buf = gunzipSync(readFileSync(data));
+        const records = new Float64Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+        return { ...m, records, samples: new Int16Array(0) };
+      }
+      const r = await engine.trace(req);
+      const { records, samples, ...rest } = r;
+      writeAtomic(data, gzipSync(Buffer.from(records.buffer, records.byteOffset, records.byteLength), { level: 1 }));
+      writeAtomic(meta, JSON.stringify(rest));
+      return r;
+    },
+  };
+}
+
 async function runOne(tune) {
   const sidPath = path.join(hvsc, tune.path);
   const sidBytes = new Uint8Array(readFileSync(sidPath));
@@ -117,7 +151,8 @@ async function runOne(tune) {
   const md5 = md5ForSonglengths(sidBytes);
   if (md5 !== tune.md5) throw new Error(`MD5 of ${tune.path} is ${md5}, the manifest has ${tune.md5}`);
   const horizon = horizonOf(tune);
-  const engine = createLibsidplayfpEngine({ emulation: "sidlite" });
+  const rawEngine = createLibsidplayfpEngine({ emulation: "sidlite" });
+  const engine = cachingEngine(rawEngine, sidBytes, versions().engine);
   const started = Date.now();
   const { score, report, compiled, timings } = await reconstructSid(sidBytes, { engine, song: tune.subtune, seconds: horizon.usedSeconds, title: "Reconstructed" });
   const result = {

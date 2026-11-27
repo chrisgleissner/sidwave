@@ -294,7 +294,9 @@ export interface ParsedSong {
 }
 
 export interface ParsedSidwave {
-  version: "1.0" | "1.1" | "1.2" | "1.3" | "1.4";
+  version: "1.0" | "1.1" | "1.2" | "1.3" | "1.4" | "1.5";
+  /** SIDWave 1.5: player options; absent when the document sets none. */
+  player?: { softStart: boolean };
   song: Required<Pick<SidwaveSongMeta, "title" | "tempo" | "mode">> & {
     author?: string;
     length_bars: number;
@@ -337,12 +339,12 @@ export interface ParsedSidwave {
 
 /** SIDWave 1.2, 1.3 and 1.4 share the modern compiler path; a 1.2 document compiles to the same bytes under 1.3 and 1.4. */
 export function isModern(doc: Pick<ParsedSidwave, "version">): boolean {
-  return doc.version === "1.2" || doc.version === "1.3" || doc.version === "1.4";
+  return doc.version === "1.2" || doc.version === "1.3" || doc.version === "1.4" || doc.version === "1.5";
 }
 
 /** True for SIDWave 1.3 and later, which accept the 1.3 fields. */
 export function isV13(doc: Pick<ParsedSidwave, "version">): boolean {
-  return doc.version === "1.3" || doc.version === "1.4";
+  return doc.version === "1.3" || doc.version === "1.4" || doc.version === "1.5";
 }
 
 /** Raised for SIDWave documents that cannot be played as written. The message names the offending path. */
@@ -361,7 +363,7 @@ export const SIDWAVE_TEMPO_RANGE = { min: 30, max: 220 } as const;
 /** MIDI numbers of C0 and B7, the note range of the player's frequency table. */
 export const SIDWAVE_NOTE_RANGE = { min: 12, max: 107 } as const;
 
-const TOP_LEVEL_KEYS = new Set(["sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs", "effects"]);
+const TOP_LEVEL_KEYS = new Set(["player", "sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs", "effects"]);
 const LEGACY_KEYS = new Set(["song", "voices", "timeline"]);
 const LEGACY_SONG_KEYS = new Set(["title", "author", "tempo", "mode", "length_bars", "global_fx"]);
 const VOICE_KEYS = new Set(["id", "sid", "channel", "name", "waveform", "pulse_width", "adsr", "patterns", "instrument", "echo", "unison", "detune", "level", "role", "center"]);
@@ -400,7 +402,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     throw new SidwaveValidationError("$.library", "this file is a library (it has no voices or timeline); import it from a score with imports instead of compiling it");
   }
   if (obj.imports !== undefined && obj.song === undefined) {
-    if (obj.sidwave !== 1.4 && obj.sidwave !== "1.4") throw new SidwaveValidationError("$.imports", "imports require sidwave: 1.4");
+    if (obj.sidwave !== 1.4 && obj.sidwave !== "1.4" && obj.sidwave !== 1.5 && obj.sidwave !== "1.5") throw new SidwaveValidationError("$.imports", "imports require sidwave: 1.4 or later");
     if (!options.imports) throw new SidwaveValidationError("$.imports", "this score imports libraries, which needs a library resolver; the sidwave command provides one, and library users pass imports in the read options");
     const resolved = options.imports(obj as Record<string, unknown>);
     obj = resolved.score;
@@ -415,13 +417,15 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     checkKeys(obj.song, LEGACY_SONG_KEYS, "$.song");
   } else {
     checkKeys(obj, TOP_LEVEL_KEYS, "$");
-    if (obj.sidwave !== undefined && !["1", "1.0", "1.1", "1.2", "1.3", "1.4"].includes(scalarText(obj.sidwave, "$.sidwave"))) {
-      throw new SidwaveValidationError("$.sidwave", `unsupported version ${describeValue(obj.sidwave)}; use 1.0, 1.1, 1.2, 1.3 or 1.4`);
+    if (obj.sidwave !== undefined && !["1", "1.0", "1.1", "1.2", "1.3", "1.4", "1.5"].includes(scalarText(obj.sidwave, "$.sidwave"))) {
+      throw new SidwaveValidationError("$.sidwave", `unsupported version ${describeValue(obj.sidwave)}; use 1.0, 1.1, 1.2, 1.3, 1.4 or 1.5`);
     }
   }
   // SIDWave 1.3 accepts everything that 1.2 accepts and compiles it to the same bytes. 1.4 does the same for 1.3.
-  const v14 = obj.sidwave === 1.4 || obj.sidwave === "1.4";
+  const v15 = obj.sidwave === 1.5 || obj.sidwave === "1.5";
+  const v14 = obj.sidwave === 1.4 || obj.sidwave === "1.4" || v15;
   const v13 = obj.sidwave === 1.3 || obj.sidwave === "1.3" || v14;
+  if (obj.player !== undefined && !v15) throw new SidwaveValidationError("$.player", "player options require sidwave: 1.5; the document declares " + (obj.sidwave === undefined ? "no version" : `sidwave: ${scalarText(obj.sidwave, "$.sidwave")}`));
   if (obj.songs !== undefined && !v14) throw new SidwaveValidationError("$.songs", "songs require sidwave: 1.4");
   if (obj.effects !== undefined && !v14) throw new SidwaveValidationError("$.effects", "effects require sidwave: 1.4");
   const modern = obj.sidwave === 1.2 || obj.sidwave === "1.2" || v13;
@@ -453,7 +457,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   if (obj.voices.filter((v: any) => v?.digi === undefined).length > capacity) {
     throw new SidwaveValidationError("$.voices", `the SID${sids.length > 1 ? " map" : ""} has ${capacity} voices; ${obj.voices.length} were given`);
   }
-  const instruments = normalizeInstruments(obj.instruments, "$.instruments", modern, v13);
+  const instruments = normalizeInstruments(obj.instruments, "$.instruments", modern, v13, v15);
   // SIDWave 1.1 (c64bridge 1.3.1) accepted hard_restart in an instrument without using it. Keep accepting
   // it so that such documents still compile, and report it as ignored.
   const ignoredFields = !modern && obj.instruments && typeof obj.instruments === "object"
@@ -570,7 +574,8 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   const speed = songs ? songs[0]!.speed : obj.speed === undefined ? 1 : requireNumber(obj.speed, "$.speed", { min: 1, max: 4, integer: true });
   if (obj.cpu !== undefined && obj.cpu !== "turbo") throw new SidwaveValidationError("$.cpu", "expected turbo");
   const declaredVersion = String(obj.sidwave);
-  const version = declaredVersion === "1.1" || declaredVersion === "1.2" || declaredVersion === "1.3" || declaredVersion === "1.4" ? declaredVersion : "1.0";
+  const version = declaredVersion === "1.1" || declaredVersion === "1.2" || declaredVersion === "1.3" || declaredVersion === "1.4" || declaredVersion === "1.5" ? declaredVersion : "1.0";
+  const player = obj.player === undefined ? undefined : parsePlayer(obj.player);
   for (const [chip, sid] of sids.entries()) {
     const owner = sid.filter?.owner;
     if (owner === undefined) continue;
@@ -579,7 +584,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     sid.filter!.route ??= [slot % 3 + 1];
   }
   const effects = obj.effects === undefined ? undefined : parseEffects(obj.effects);
-  return { version, song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,
+  return { version, ...(player ? { player } : {}), song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,
     accent, swing, swingUnit, loopTo, end, layout, digiVoices, ...(effects?.length ? { effects } : {}), ...(songs ? { songs, definedSections: isPlainObject(obj.sections) ? Object.keys(obj.sections) : [] } : {}), ...(ignoredFields.length ? { ignoredFields } : {}), ...(libraries ? { libraries } : {}) };
 
 }
@@ -788,7 +793,7 @@ function normalizeSamples(raw: unknown, sids: SidMapEntry[], modern: boolean, st
   return { rate, defs, triggers };
 }
 
-function normalizeInstruments(raw: unknown, path: string, modern: boolean, v13 = false): Record<string, Record<string, any>> {
+function normalizeInstruments(raw: unknown, path: string, modern: boolean, v13 = false, v15 = false): Record<string, Record<string, any>> {
   if (raw === undefined) return Object.create(null);
   if (!isPlainObject(raw)) throw new SidwaveValidationError(path, "expected a mapping of instrument names to instruments");
   const result: Record<string, Record<string, any>> = Object.create(null);
@@ -854,7 +859,7 @@ function normalizeInstruments(raw: unknown, path: string, modern: boolean, v13 =
       }
       inst.hard_restart = { frames, adsr, test: restart.test === true };
     }
-    if (inst.pulsetable !== undefined) inst.pulsetable = normalizeRegisterTable(inst.pulsetable, inst.loop, `${ip}.pulsetable`, "set", modern);
+    if (inst.pulsetable !== undefined) inst.pulsetable = normalizeRegisterTable(inst.pulsetable, inst.loop, `${ip}.pulsetable`, "set", modern, v15);
     if (inst.filtertable !== undefined) inst.filtertable = normalizeRegisterTable(inst.filtertable, inst.loop, `${ip}.filtertable`, "cutoff", modern);
     result[name] = inst;
   }
@@ -878,13 +883,19 @@ export interface SidwaveRegisterTable {
   steps: Array<{ value: number; add: boolean; frames: number; resonance?: number; type?: number; calls?: number; hz?: string; cadence?: number }>;
   loop?: number;
   reset?: boolean;
+  /** SIDWave 1.5, pulse tables: an `add` wraps modulo 4096 instead of clamping to 1..4094. */
+  wrap?: boolean;
 }
 
 function normalizeRegisterTable(
-  raw: unknown, instrumentLoop: unknown, path: string, setKey: "set" | "cutoff", modern = false,
+  raw: unknown, instrumentLoop: unknown, path: string, setKey: "set" | "cutoff", modern = false, v15 = false,
 ): SidwaveRegisterTable {
   const mapped = isPlainObject(raw);
-  if (mapped) checkKeys(raw, new Set(["steps", "loop", ...(modern ? ["reset"] : [])]), path);
+  if (mapped) checkKeys(raw, new Set(["steps", "loop", ...(modern ? ["reset"] : []), ...(setKey === "set" ? ["wrap"] : [])]), path);
+  if (mapped && raw.wrap !== undefined) {
+    if (!v15) throw new SidwaveValidationError(path + ".wrap", "requires sidwave: 1.5");
+    if (typeof raw.wrap !== "boolean") throw new SidwaveValidationError(path + ".wrap", "expected boolean");
+  }
   if (mapped && raw.reset !== undefined && typeof raw.reset !== "boolean") throw new SidwaveValidationError(path + ".reset", "expected boolean");
   const list = mapped ? raw.steps : raw;
   const stepPath = mapped ? `${path}.steps` : path;
@@ -917,10 +928,11 @@ function normalizeRegisterTable(
       value = typeof cutoff === "number" ? cutoff : 0;
     } else {
       const set = requireNumber(step.set, `${sp}.set`, { min: 0, max: 4094 });
-      if (set === 0 || (set > 1 && !Number.isInteger(set))) {
+      // SIDWave 1.5 accepts the integer 0 (a pulse width of zero); earlier versions reject it.
+      if ((set === 0 && !v15) || (set > 1 && !Number.isInteger(set))) {
         throw new SidwaveValidationError(`${sp}.set`, "expected fraction 0 < x <= 1 or integer 1..4094");
       }
-      value = set <= 1 ? fractionToPulseWidth(set) : set;
+      value = set === 0 ? 0 : set <= 1 ? fractionToPulseWidth(set) : set;
     }
     const resonance = step.resonance === undefined ? undefined
       : requireNumber(step.resonance, `${sp}.resonance`, { min: 0, max: 15, integer: true });
@@ -933,7 +945,7 @@ function normalizeRegisterTable(
     }
     return { value, add, frames, resonance, type, ...(calls === undefined ? {} : { calls }), ...(hz ? { hz } : {}) };
   });
-  return { steps, loop, ...(mapped && raw.reset !== undefined ? { reset: raw.reset as boolean } : {}) };
+  return { steps, loop, ...(mapped && raw.reset !== undefined ? { reset: raw.reset as boolean } : {}), ...(mapped && raw.wrap === true ? { wrap: true } : {}) };
 }
 
 function parseTempo(value: unknown, path: string): number {
@@ -1508,6 +1520,13 @@ export const SIDWAVE_MAX_EFFECT_STEPS = 255;
 export const SIDWAVE_MAX_EFFECT_HZ = 3848;
 const EFFECT_KEYS = new Set(["priority", "voices", "steps"]);
 const EFFECT_STEP_KEYS = new Set(["freq", "wave", "pulse", "adsr", "gate", "filter", "wait"]);
+
+/** SIDWave 1.5: parses `player`, the player options. `soft_start: false` removes the volume ramp that the player runs over its first calls (default true). */
+function parsePlayer(raw: unknown): { softStart: boolean } {
+  const value = requireObject(raw, "$.player", ["soft_start"]);
+  if (value.soft_start !== undefined && typeof value.soft_start !== "boolean") throw new SidwaveValidationError("$.player.soft_start", "expected true or false");
+  return { softStart: value.soft_start !== false };
+}
 
 /**
  * SIDWave 1.4: parses `effects`, a mapping from effect name to `{ priority, voices?, steps }`. An empty mapping

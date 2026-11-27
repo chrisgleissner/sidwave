@@ -1320,7 +1320,7 @@ function arrangeAll(doc: ParsedSidwave, endTail: number, onPart?: (part: Arrange
       };
     }),
     turbo: doc.cpu === "turbo",
-    softVolume: isModern(doc),
+    softVolume: isModern(doc) && doc.player?.softStart !== false,
   };
 }
 
@@ -2124,7 +2124,7 @@ function scaleRegisterTable(table: SidwaveRegisterTable | undefined, speed: numb
       steps.push({ ...step, value, frames: Math.min(left, chunk), ...(cadence > 1 ? { cadence } : {}) });
     }
   }
-  return { steps, loop, reset: table.reset };
+  return { steps, loop, reset: table.reset, ...(table.wrap ? { wrap: true } : {}) };
 }
 
 function buildInstrument(voice: SidwaveVoice, fx: Record<string, any>, arp: number[], arpSpeed: number, filter: number, fps: number, modern: boolean,
@@ -3648,6 +3648,7 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
   const pulseCadence = insts.some((i) => i.pulsetable?.steps.some((step) => step.cadence));
   const filterCadence = insts.some((i) => i.filtertable?.steps.some((step) => step.cadence));
   const pulseReset = insts.some((i) => i.pulsetable?.reset === false);
+  const pulseWrap = insts.some((i) => i.pulsetable?.wrap);
   const filterReset = insts.some((i) => i.filtertable?.reset === false);
   const pulseVars = hasPulseTable ? ["ptpos", "ptleft", ...(pulseCadence ? ["ptclock"] : []), ...(pulseReset ? ["ptinst"] : [])] : [];
   const filterVars = hasFilterTable ? ["ftpos", "ftleft", "cutlo", "cuthi", "ftres", "fttype", "ftnewer", ...(filterCadence ? ["ftclock"] : []), ...(filterReset ? ["ftinst"] : [] )] : [];
@@ -3730,7 +3731,7 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
     addNoteHook("pt_start");
     addReleaseHook("pt_stop");
     playerCode = playerCode.replace("vr_write:\n", "vr_write:\n  jsr pt_tick\n");
-    playerCode += PULSE_TABLE_CODE + registerTableCode("pt", "pw", 1, 4094, pulseCadence);
+    playerCode += PULSE_TABLE_CODE + registerTableCode("pt", "pw", 1, 4094, pulseCadence, pulseWrap);
   }
   if (hasFilterTable) {
     addNoteHook("ft_start");
@@ -4101,6 +4102,7 @@ c_ret:
     col(`${prefix}_add`, steps.map((step) => +step.add));
     col(`${prefix}_frames`, steps.map((step) => step.frames));
     if (prefix === "pt" ? pulseCadence : filterCadence) col(`${prefix}_cadence`, steps.map((step) => step.cadence ?? 1));
+    if (prefix === "pt" && pulseWrap) col("pt_wrap", steps.map((_, i) => Number(tables.some((table, t) => table?.wrap && i >= starts[t]! && i < starts[t]! + table.steps.length))));
     if (prefix === "pt" ? pulseReset : filterReset) col(`i_${prefix}reset`, tables.map((table) => Number(table?.reset !== false)));
     if (prefix === "ft") {
       col("ft_res", steps.map((step) => step.resonance === undefined ? 255 : step.resonance << 4));
@@ -5093,7 +5095,7 @@ gl_done:
 
 // Both tables use the same cursor and signed arithmetic. A zero counter holds the
 // previous register value. A new note seeds the cursor so its first call enters row 0.
-function registerTableCode(prefix: "pt" | "ft", value: "pw" | "cut", min: number, max: number, cadence = false): string {
+function registerTableCode(prefix: "pt" | "ft", value: "pw" | "cut", min: number, max: number, cadence = false, wrap = false): string {
   return `
 ${prefix}_tick:
   lda v_${prefix}left,x
@@ -5152,7 +5154,17 @@ ft_keep_type:
   sta t_lo
   lda v_${value}hi,x
   adc ${prefix}_hi,y
-  bmi ${prefix}_min
+${wrap ? `  pha
+  lda pt_wrap,y
+  beq pt_nowrap
+  pla
+  and #$0F
+  tay
+  lda t_lo
+  jmp pt_write
+pt_nowrap:
+  pla
+` : ""}  bmi ${prefix}_min
   cmp #>${max}
   bcc ${prefix}_sum
   bne ${prefix}_max
