@@ -1,30 +1,32 @@
 {
   "schema": 1,
-  "label": "S5d part 3: turbo surfaced, start-up writes, idle control writes, staged verification",
+  "label": "S5d part 3 final",
   "note": "Development tunes only. No SID data, no scores. Held-out tunes are not run.",
   "manifestSha256": "a555e5955e28c138177036629f2a56739d4ac8121e19a6e9bbbb1567e879f491",
   "versions": {
-    "code": "ae0a2c304c2716e0",
+    "code": "fcb20655cf529d3c",
     "engine": "1.1.1",
-    "distFiles": 94
+    "distFiles": 100
   },
   "settings": {
     "maxHorizon": 180,
     "a1": true,
-    "scriptVersion": 3
+    "verify": "staged",
+    "scriptVersion": 4
   },
   "source": {
-    "commit": "1f38d6be9589d9770e714e1f53a5cbfb189ed362",
-    "dirty": true
+    "commit": "331ae838f89cefbbf853cacb95ca89961b16ed54",
+    "dirty": false
   },
   "cacheKeyInputs": {
-    "scriptVersion": 3,
+    "scriptVersion": 4,
     "settings": {
       "maxHorizon": 180,
       "a1": true,
-      "scriptVersion": 3
+      "verify": "staged",
+      "scriptVersion": 4
     },
-    "codeSha256Prefix": "ae0a2c304c2716e0",
+    "codeSha256Prefix": "fcb20655cf529d3c",
     "engine": "1.1.1",
     "key": "sha256(sid sha256, subtune, horizon, settings, versions)"
   },
@@ -56,11 +58,14 @@
       "ADSR": 1,
       "unsupported": 1
     },
-    "differingCalls": 380847,
+    "differingCalls": 380824,
     "scoreBytes": 2187194,
     "musicMinutes": 52.3,
-    "reconstructCpuSecondsPerMusicMinute": 1.47,
-    "recoverMsPerMusicMinute": 851.4
+    "probeOnly": 23,
+    "fullVerifyCpuSecondsPerMusicMinute": 7.88,
+    "callZeroFirstDifferences": 12,
+    "reconstructCpuSecondsPerMusicMinute": 1.71,
+    "recoverMsPerMusicMinute": 1602.2
   },
   "tunes": [
     {
@@ -80,6 +85,10 @@
       "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 6960,
@@ -334,30 +343,30 @@
       ],
       "scoreBytes": 68240,
       "scoreSha256": "af767ae0f38aefbe05e49243b50a077b036be65ebfbeea9a70007c037df00c55",
-      "compiledBytes": 8093,
+      "compiledBytes": 8124,
       "timing": {
-        "wallSeconds": 2.39,
-        "cpuSeconds": 2.33,
+        "wallSeconds": 3.48,
+        "cpuSeconds": 2.79,
         "phasesMs": {
-          "trace": 17,
-          "ir": 329,
-          "recover": 738,
-          "compile": 449,
-          "retrace": 862,
+          "trace": 20,
+          "ir": 536,
+          "recover": 1499,
+          "compile": 302,
+          "retrace": 1119,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.01,
-        "recoverMsPerMusicMinute": 318.7
+        "reconstructCpuPerMusicMinute": 1.2,
+        "recoverMsPerMusicMinute": 647
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 13030,
-        "badWindows": 5519,
+        "badWindows": 5513,
         "lagMs": 12,
-        "wallSeconds": 121.7
+        "wallSeconds": 128.7
       },
-      "finishedAt": "2026-11-27T10:37:37.516Z"
+      "finishedAt": "2026-11-27T11:24:13.096Z"
     },
     {
       "path": "MUSICIANS/M/Mythus/Odd_Jam.sid",
@@ -376,6 +385,10 @@
       "why": "first difference in timing",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 7672,
@@ -3374,30 +3387,30 @@
       ],
       "scoreBytes": 148742,
       "scoreSha256": "964c4ef4bacb0331e550f55f4202d07240fbc77f1d9ae8ced1c13fbf4cd14ded",
-      "compiledBytes": 16401,
+      "compiledBytes": 16432,
       "timing": {
-        "wallSeconds": 3.17,
-        "cpuSeconds": 3.18,
+        "wallSeconds": 5.41,
+        "cpuSeconds": 4.11,
         "phasesMs": {
-          "trace": 20,
-          "ir": 345,
-          "recover": 1306,
-          "compile": 706,
-          "retrace": 790,
+          "trace": 19,
+          "ir": 493,
+          "recover": 3390,
+          "compile": 550,
+          "retrace": 953,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.24,
-        "recoverMsPerMusicMinute": 511.6
+        "reconstructCpuPerMusicMinute": 1.61,
+        "recoverMsPerMusicMinute": 1327.7
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 14363,
-        "badWindows": 12966,
+        "badWindows": 12987,
         "lagMs": 0,
-        "wallSeconds": 135.2
+        "wallSeconds": 131.9
       },
-      "finishedAt": "2026-11-27T10:37:37.520Z"
+      "finishedAt": "2026-11-27T11:24:13.082Z"
     },
     {
       "path": "MUSICIANS/D/Dr_Piotr/Defibrylacja.sid",
@@ -3416,11 +3429,15 @@
       "why": "first difference in filter",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": true,
       "turboMessage": "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers",
       "scoreIncludesTurbo": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 4985 cycles per call at speed 4 (4139 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 4991 cycles per call at speed 4 (4139 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 36043,
       "callRate": {
         "periodCycles": 4931,
@@ -4145,26 +4162,26 @@
       ],
       "scoreBytes": 80742,
       "scoreSha256": "2d5f2525328010459eb5bd729881e01fff87c4021db5b29df864a4c7da7797e6",
-      "compiledBytes": 12575,
+      "compiledBytes": 12606,
       "timing": {
-        "wallSeconds": 4.43,
-        "cpuSeconds": 4.29,
+        "wallSeconds": 6.97,
+        "cpuSeconds": 4.95,
         "phasesMs": {
-          "trace": 128,
-          "ir": 949,
-          "recover": 1616,
-          "compile": 698,
-          "retrace": 1041,
+          "trace": 90,
+          "ir": 1485,
+          "recover": 2287,
+          "compile": 1663,
+          "retrace": 1445,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.43,
-        "recoverMsPerMusicMinute": 538.7
+        "reconstructCpuPerMusicMinute": 1.65,
+        "recoverMsPerMusicMinute": 762.2
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T10:37:37.587Z"
+      "finishedAt": "2026-11-27T11:24:13.064Z"
     },
     {
       "path": "MUSICIANS/W/Wijnhoven_Joachim/Bomb_Jack_Title_Deluxe_2SID.sid",
@@ -4183,6 +4200,10 @@
       "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 2494,
@@ -4656,30 +4677,30 @@
       ],
       "scoreBytes": 33699,
       "scoreSha256": "74aa86c7ef3b3aece922a5efd3b303b67427c34cf20502363f11642f5ddd08a7",
-      "compiledBytes": 5793,
+      "compiledBytes": 5824,
       "timing": {
-        "wallSeconds": 2.14,
-        "cpuSeconds": 1.97,
+        "wallSeconds": 3.05,
+        "cpuSeconds": 2.45,
         "phasesMs": {
-          "trace": 30,
-          "ir": 361,
-          "recover": 493,
-          "compile": 316,
-          "retrace": 943,
+          "trace": 19,
+          "ir": 405,
+          "recover": 1045,
+          "compile": 311,
+          "retrace": 1265,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.37,
-        "recoverMsPerMusicMinute": 594.5
+        "reconstructCpuPerMusicMinute": 2.95,
+        "recoverMsPerMusicMinute": 1259.1
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 4667,
-        "badWindows": 3609,
+        "badWindows": 3646,
         "lagMs": 0,
-        "wallSeconds": 68.8
+        "wallSeconds": 62.6
       },
-      "finishedAt": "2026-11-27T10:37:37.563Z"
+      "finishedAt": "2026-11-27T11:24:13.074Z"
     },
     {
       "path": "MUSICIANS/N/Nordischsound/Ninjas_Delight.sid",
@@ -4698,6 +4719,10 @@
       "why": "first difference in timing",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 22247,
@@ -4708,7 +4733,7 @@
         "irregularShare": 0.00008990380293086398
       },
       "fdiff": {
-        "differingCalls": 8940,
+        "differingCalls": 8939,
         "callsWithDifference": 1497,
         "comparedCalls": 1504,
         "expectedCalls": 1505,
@@ -4752,13 +4777,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 40,
-            "matchShare": 0.973404
+            "differingCalls": 39,
+            "matchShare": 0.974069
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 8929,
+        "differingCalls": 8928,
         "first": {
           "class": "timing",
           "call": 1,
@@ -4797,8 +4822,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 40,
-            "matchShare": 0.973404
+            "differingCalls": 39,
+            "matchShare": 0.974069
           }
         }
       },
@@ -6656,30 +6681,30 @@
       ],
       "scoreBytes": 75725,
       "scoreSha256": "ee397d9ea6cd81b0f72aa30125f20593f17bd9c3e84051d0e3da9dc512355a17",
-      "compiledBytes": 12025,
+      "compiledBytes": 12056,
       "timing": {
-        "wallSeconds": 3.53,
-        "cpuSeconds": 3.32,
+        "wallSeconds": 5.69,
+        "cpuSeconds": 3.97,
         "phasesMs": {
-          "trace": 50,
-          "ir": 633,
-          "recover": 1331,
-          "compile": 509,
-          "retrace": 1009,
+          "trace": 161,
+          "ir": 1375,
+          "recover": 2275,
+          "compile": 207,
+          "retrace": 1674,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.35,
-        "recoverMsPerMusicMinute": 539.3
+        "reconstructCpuPerMusicMinute": 1.61,
+        "recoverMsPerMusicMinute": 921.6
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 13886,
-        "badWindows": 9899,
+        "badWindows": 9981,
         "lagMs": 2,
-        "wallSeconds": 154.4
+        "wallSeconds": 135.3
       },
-      "finishedAt": "2026-11-27T10:37:42.440Z"
+      "finishedAt": "2026-11-27T11:24:21.227Z"
     },
     {
       "path": "MUSICIANS/B/Beggerow_Alan/Meet_Me_in_St_Louis.sid",
@@ -6698,6 +6723,10 @@
       "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 1219,
@@ -6765,7 +6794,7 @@
           "call": 1,
           "timeSeconds": 0.2946103896738817,
           "expected": 301306,
-          "observed": 16835,
+          "observed": 16836,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -6864,30 +6893,30 @@
       "languageExtensions": [],
       "scoreBytes": 74234,
       "scoreSha256": "a8f910d9b54382189fbd5bc99d0fb664e1b2e949d40518592712de13df85777f",
-      "compiledBytes": 6092,
+      "compiledBytes": 6123,
       "timing": {
-        "wallSeconds": 3.3,
-        "cpuSeconds": 1.85,
+        "wallSeconds": 4.03,
+        "cpuSeconds": 2.24,
         "phasesMs": {
-          "trace": 2,
-          "ir": 55,
-          "recover": 1037,
-          "compile": 1013,
-          "retrace": 1192,
+          "trace": 3,
+          "ir": 127,
+          "recover": 2362,
+          "compile": 522,
+          "retrace": 1012,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 0.82,
-        "recoverMsPerMusicMinute": 457.5
+        "reconstructCpuPerMusicMinute": 0.99,
+        "recoverMsPerMusicMinute": 1042.3
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 12747,
-        "badWindows": 11725,
-        "lagMs": 2,
-        "wallSeconds": 187.1
+        "badWindows": 11765,
+        "lagMs": -18,
+        "wallSeconds": 146.1
       },
-      "finishedAt": "2026-11-27T10:38:48.786Z"
+      "finishedAt": "2026-11-27T11:25:20.155Z"
     },
     {
       "path": "MUSICIANS/H/Hubbard_Rob/Skate_or_Die_intro.sid",
@@ -6906,6 +6935,10 @@
       "why": "first difference in volume",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 9012,
@@ -6916,7 +6949,7 @@
         "irregularShare": 0.07679502829874597
       },
       "fdiff": {
-        "differingCalls": 2031,
+        "differingCalls": 2030,
         "callsWithDifference": 502,
         "comparedCalls": 502,
         "expectedCalls": 502,
@@ -6960,13 +6993,13 @@
             "matchShare": 0.001992
           },
           "timing": {
-            "differingCalls": 41,
-            "matchShare": 0.918327
+            "differingCalls": 40,
+            "matchShare": 0.920319
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 2031,
+        "differingCalls": 2030,
         "first": {
           "class": "volume",
           "call": 0,
@@ -7005,8 +7038,8 @@
             "matchShare": 0.001992
           },
           "timing": {
-            "differingCalls": 41,
-            "matchShare": 0.918327
+            "differingCalls": 40,
+            "matchShare": 0.920319
           }
         }
       },
@@ -7098,30 +7131,30 @@
       ],
       "scoreBytes": 80009,
       "scoreSha256": "992d418740619fdc15adc0135b5ac4b4153334b62dbdf5e4f371bd91c172faef",
-      "compiledBytes": 10630,
+      "compiledBytes": 10661,
       "timing": {
-        "wallSeconds": 4.54,
-        "cpuSeconds": 3.21,
+        "wallSeconds": 5.96,
+        "cpuSeconds": 3.85,
         "phasesMs": {
-          "trace": 267,
-          "ir": 1258,
-          "recover": 1372,
-          "compile": 522,
-          "retrace": 1124,
+          "trace": 620,
+          "ir": 2138,
+          "recover": 1870,
+          "compile": 650,
+          "retrace": 687,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.07,
-        "recoverMsPerMusicMinute": 457.4
+        "reconstructCpuPerMusicMinute": 1.28,
+        "recoverMsPerMusicMinute": 623.2
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 16874,
-        "badWindows": 12664,
+        "badWindows": 12673,
         "lagMs": 16,
-        "wallSeconds": 241.7
+        "wallSeconds": 294.7
       },
-      "finishedAt": "2026-11-27T10:39:42.091Z"
+      "finishedAt": "2026-11-27T11:26:26.155Z"
     },
     {
       "path": "MUSICIANS/T/Toggle/Cheers_and_Tributes.sid",
@@ -7140,6 +7173,10 @@
       "why": "first difference in timing",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 18024,
@@ -8248,26 +8285,26 @@
       ],
       "scoreBytes": 89751,
       "scoreSha256": "75e13293eb3c3e002d920a1d7a4c108734deb46eba2570f5806609b60a12881f",
-      "compiledBytes": 12310,
+      "compiledBytes": 12341,
       "timing": {
-        "wallSeconds": 4.36,
-        "cpuSeconds": 3.56,
+        "wallSeconds": 5.7,
+        "cpuSeconds": 3.91,
         "phasesMs": {
-          "trace": 103,
-          "ir": 1123,
-          "recover": 1544,
-          "compile": 470,
-          "retrace": 1119,
+          "trace": 56,
+          "ir": 575,
+          "recover": 2573,
+          "compile": 822,
+          "retrace": 1674,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.19,
-        "recoverMsPerMusicMinute": 514.7
+        "reconstructCpuPerMusicMinute": 1.3,
+        "recoverMsPerMusicMinute": 857.7
       },
       "a1": {
         "status": "error",
         "error": "Invalid SID write at record 1"
       },
-      "finishedAt": "2026-11-27T10:39:56.225Z"
+      "finishedAt": "2026-11-27T11:26:31.091Z"
     },
     {
       "path": "MUSICIANS/Z/Zonzo/Xcellent_part_3.sid",
@@ -8286,6 +8323,10 @@
       "why": "first difference in volume",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 9013,
@@ -8485,20 +8526,20 @@
       ],
       "scoreBytes": 27166,
       "scoreSha256": "1ae006dbf72e5c307094a1d1be6058cc8704e174f1099c40f82f8d044c36365e",
-      "compiledBytes": 2968,
+      "compiledBytes": 2999,
       "timing": {
-        "wallSeconds": 15.15,
-        "cpuSeconds": 2.01,
+        "wallSeconds": 3.17,
+        "cpuSeconds": 2.3,
         "phasesMs": {
-          "trace": 448,
-          "ir": 2396,
-          "recover": 4330,
-          "compile": 1992,
-          "retrace": 5981,
+          "trace": 164,
+          "ir": 793,
+          "recover": 1062,
+          "compile": 115,
+          "retrace": 1036,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 0.67,
-        "recoverMsPerMusicMinute": 1443.4
+        "reconstructCpuPerMusicMinute": 0.77,
+        "recoverMsPerMusicMinute": 353.9
       },
       "a1": {
         "level": "fail",
@@ -8506,9 +8547,9 @@
         "windows": 16874,
         "badWindows": 16746,
         "lagMs": 12,
-        "wallSeconds": 193.9
+        "wallSeconds": 248.5
       },
-      "finishedAt": "2026-11-27T10:40:21.630Z"
+      "finishedAt": "2026-11-27T11:26:42.828Z"
     },
     {
       "path": "MUSICIANS/S/SIDwave/Electro_Mechanica.sid",
@@ -8527,11 +8568,15 @@
       "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": true,
       "turboMessage": "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers",
       "scoreIncludesTurbo": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 2921 cycles per call at speed 6 (2592 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 2927 cycles per call at speed 6 (2592 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 49928,
       "callRate": {
         "periodCycles": 3276,
@@ -8540,11 +8585,11 @@
         "irregularShare": 0.6876439601818656
       },
       "fdiff": {
-        "differingCalls": 15082,
+        "differingCalls": 15138,
         "callsWithDifference": 2911,
         "comparedCalls": 2912,
         "expectedCalls": 2912,
-        "observedCalls": 2972,
+        "observedCalls": 2971,
         "standardAlignment": false,
         "first": {
           "class": "pitch",
@@ -8557,24 +8602,24 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 2365,
-            "matchShare": 0.187843
+            "differingCalls": 2363,
+            "matchShare": 0.18853
           },
           "gate": {
-            "differingCalls": 1497,
-            "matchShare": 0.48592
+            "differingCalls": 1523,
+            "matchShare": 0.476992
           },
           "waveform": {
-            "differingCalls": 2285,
-            "matchShare": 0.215316
+            "differingCalls": 2286,
+            "matchShare": 0.214973
           },
           "pulse": {
             "differingCalls": 2905,
             "matchShare": 0.002404
           },
           "adsr": {
-            "differingCalls": 972,
-            "matchShare": 0.666209
+            "differingCalls": 1004,
+            "matchShare": 0.65522
           },
           "filter": {
             "differingCalls": 2906,
@@ -8585,13 +8630,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2152,
-            "matchShare": 0.260989
+            "differingCalls": 2151,
+            "matchShare": 0.261332
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 15027,
+        "differingCalls": 15089,
         "first": {
           "class": "pitch",
           "call": 1,
@@ -8603,24 +8648,24 @@
         },
         "classes": {
           "pitch": {
-            "differingCalls": 2365,
-            "matchShare": 0.187843
+            "differingCalls": 2363,
+            "matchShare": 0.18853
           },
           "gate": {
-            "differingCalls": 1450,
-            "matchShare": 0.50206
+            "differingCalls": 1482,
+            "matchShare": 0.491071
           },
           "waveform": {
-            "differingCalls": 2277,
-            "matchShare": 0.218063
+            "differingCalls": 2278,
+            "matchShare": 0.21772
           },
           "pulse": {
             "differingCalls": 2905,
             "matchShare": 0.002404
           },
           "adsr": {
-            "differingCalls": 972,
-            "matchShare": 0.666209
+            "differingCalls": 1004,
+            "matchShare": 0.65522
           },
           "filter": {
             "differingCalls": 2906,
@@ -8631,8 +8676,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2152,
-            "matchShare": 0.260989
+            "differingCalls": 2151,
+            "matchShare": 0.261332
           }
         }
       },
@@ -12102,26 +12147,26 @@
       ],
       "scoreBytes": 222452,
       "scoreSha256": "e6c007af4dbac8313f6fe8002e3d5747ca843f296cec5a3131d9a9ea9261d088",
-      "compiledBytes": 17225,
+      "compiledBytes": 17256,
       "timing": {
-        "wallSeconds": 14.57,
-        "cpuSeconds": 6.02,
+        "wallSeconds": 15.13,
+        "cpuSeconds": 6.62,
         "phasesMs": {
-          "trace": 658,
-          "ir": 6269,
-          "recover": 4258,
-          "compile": 1556,
-          "retrace": 1824,
+          "trace": 133,
+          "ir": 2468,
+          "recover": 7042,
+          "compile": 2436,
+          "retrace": 3048,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.01,
-        "recoverMsPerMusicMinute": 1419.4
+        "reconstructCpuPerMusicMinute": 2.21,
+        "recoverMsPerMusicMinute": 2347.4
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T10:40:43.654Z"
+      "finishedAt": "2026-11-27T11:26:54.264Z"
     },
     {
       "path": "MUSICIANS/L/Linus/Your_Time_Is_Running_Thin.sid",
@@ -12140,11 +12185,15 @@
       "why": "first difference in timing",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": true,
       "turboMessage": "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers",
       "scoreIncludesTurbo": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 2557 cycles per call at speed 8 (1819 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 2563 cycles per call at speed 8 (1819 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 24542,
       "callRate": {
         "periodCycles": 2457,
@@ -12153,7 +12202,7 @@
         "irregularShare": 0.2500713092376024
       },
       "fdiff": {
-        "differingCalls": 9419,
+        "differingCalls": 9372,
         "callsWithDifference": 2450,
         "comparedCalls": 2455,
         "expectedCalls": 4012,
@@ -12197,13 +12246,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2346,
-            "matchShare": 0.044399
+            "differingCalls": 2299,
+            "matchShare": 0.063544
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 9367,
+        "differingCalls": 9320,
         "first": {
           "class": "timing",
           "call": 2,
@@ -12242,8 +12291,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2346,
-            "matchShare": 0.044399
+            "differingCalls": 2299,
+            "matchShare": 0.063544
           }
         }
       },
@@ -13365,26 +13414,26 @@
       ],
       "scoreBytes": 117562,
       "scoreSha256": "d16e11293e5d2e32985f1b642d213fe5859847fc2adf2b36cecd4af5ab4182f0",
-      "compiledBytes": 8620,
+      "compiledBytes": 8651,
       "timing": {
-        "wallSeconds": 14.41,
-        "cpuSeconds": 4.36,
+        "wallSeconds": 11.83,
+        "cpuSeconds": 4.73,
         "phasesMs": {
-          "trace": 87,
-          "ir": 1833,
-          "recover": 5644,
-          "compile": 2136,
-          "retrace": 4715,
+          "trace": 829,
+          "ir": 4149,
+          "recover": 3607,
+          "compile": 1175,
+          "retrace": 2074,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 4.26,
-        "recoverMsPerMusicMinute": 5524.9
+        "reconstructCpuPerMusicMinute": 4.63,
+        "recoverMsPerMusicMinute": 3531.3
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T10:40:59.468Z"
+      "finishedAt": "2026-11-27T11:27:10.161Z"
     },
     {
       "path": "MUSICIANS/H/Hancock_John/Die_Hard_2_Die_Harder.sid",
@@ -13403,6 +13452,10 @@
       "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 676,
@@ -13595,18 +13648,18 @@
       "scoreSha256": "ce95c568ded93ca52f48c993af5d8020066de4ee3d663c302e39a4e70898e887",
       "compiledBytes": 3823,
       "timing": {
-        "wallSeconds": 4.53,
-        "cpuSeconds": 1.35,
+        "wallSeconds": 2.36,
+        "cpuSeconds": 1.57,
         "phasesMs": {
-          "trace": 2,
-          "ir": 76,
-          "recover": 541,
-          "compile": 553,
-          "retrace": 3358,
+          "trace": 4,
+          "ir": 57,
+          "recover": 943,
+          "compile": 182,
+          "retrace": 1171,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.02,
-        "recoverMsPerMusicMinute": 811.3
+        "reconstructCpuPerMusicMinute": 2.35,
+        "recoverMsPerMusicMinute": 1413.9
       },
       "a1": {
         "level": "fail",
@@ -13614,9 +13667,9 @@
         "windows": 3749,
         "badWindows": 2744,
         "lagMs": 8,
-        "wallSeconds": 53.4
+        "wallSeconds": 47
       },
-      "finishedAt": "2026-11-27T10:41:16.050Z"
+      "finishedAt": "2026-11-27T11:27:22.427Z"
     },
     {
       "path": "MUSICIANS/D/Dgazz/Icy_Slide.sid",
@@ -13635,11 +13688,15 @@
       "why": "first difference in timing",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": true,
       "turboMessage": "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers",
       "scoreIncludesTurbo": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 3538 cycles per call at speed 5 (3211 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 3544 cycles per call at speed 5 (3211 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 45056,
       "callRate": {
         "periodCycles": 3931,
@@ -13648,7 +13705,7 @@
         "irregularShare": 0.41569193208300964
       },
       "fdiff": {
-        "differingCalls": 8726,
+        "differingCalls": 8659,
         "callsWithDifference": 2501,
         "comparedCalls": 2507,
         "expectedCalls": 2508,
@@ -13659,7 +13716,7 @@
           "call": 4,
           "timeSeconds": 0.01595841859105525,
           "expected": 3870,
-          "observed": 3943,
+          "observed": 3944,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -13692,19 +13749,19 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 946,
-            "matchShare": 0.622657
+            "differingCalls": 879,
+            "matchShare": 0.649382
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 8726,
+        "differingCalls": 8659,
         "first": {
           "class": "timing",
           "call": 4,
           "timeSeconds": 0.01595841859105525,
           "expected": 3870,
-          "observed": 3943,
+          "observed": 3944,
           "detail": "call spacing in cycles"
         },
         "classes": {
@@ -13737,8 +13794,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 946,
-            "matchShare": 0.622657
+            "differingCalls": 879,
+            "matchShare": 0.649382
           }
         }
       },
@@ -17824,26 +17881,26 @@
       ],
       "scoreBytes": 222612,
       "scoreSha256": "bf30ef0128264f4addfffca840f81eaa003f664efbaa2b5a94a674e6985d609d",
-      "compiledBytes": 17959,
+      "compiledBytes": 17990,
       "timing": {
-        "wallSeconds": 6.76,
-        "cpuSeconds": 6.16,
+        "wallSeconds": 17.3,
+        "cpuSeconds": 6.98,
         "phasesMs": {
-          "trace": 139,
-          "ir": 1110,
-          "recover": 2518,
-          "compile": 1691,
-          "retrace": 1302,
+          "trace": 757,
+          "ir": 2224,
+          "recover": 8132,
+          "compile": 3150,
+          "retrace": 3033,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.05,
-        "recoverMsPerMusicMinute": 839.3
+        "reconstructCpuPerMusicMinute": 2.33,
+        "recoverMsPerMusicMinute": 2710.8
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T10:41:59.584Z"
+      "finishedAt": "2026-11-27T11:27:51.446Z"
     },
     {
       "path": "MUSICIANS/P/PCH/Music_Dream.sid",
@@ -17862,6 +17919,10 @@
       "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 25780,
@@ -18494,30 +18555,30 @@
       ],
       "scoreBytes": 161921,
       "scoreSha256": "737ba6f6c84d634e3600944118741eb1205ce8bebad36701827688b51e046879",
-      "compiledBytes": 15607,
+      "compiledBytes": 15638,
       "timing": {
-        "wallSeconds": 6.12,
-        "cpuSeconds": 4.17,
+        "wallSeconds": 8.68,
+        "cpuSeconds": 5.07,
         "phasesMs": {
-          "trace": 74,
-          "ir": 1959,
-          "recover": 2257,
-          "compile": 756,
-          "retrace": 1073,
+          "trace": 271,
+          "ir": 1290,
+          "recover": 4362,
+          "compile": 1249,
+          "retrace": 1508,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.43,
-        "recoverMsPerMusicMinute": 1315
+        "reconstructCpuPerMusicMinute": 2.95,
+        "recoverMsPerMusicMinute": 2541.1
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 9655,
-        "badWindows": 5767,
+        "badWindows": 5762,
         "lagMs": 4,
-        "wallSeconds": 102.6
+        "wallSeconds": 170.8
       },
-      "finishedAt": "2026-11-27T10:42:07.041Z"
+      "finishedAt": "2026-11-27T11:28:09.459Z"
     },
     {
       "path": "DEMOS/UNKNOWN/Music_Shop/At_the_Hop.sid",
@@ -18536,6 +18597,10 @@
       "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": true,
       "turboMessage": "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers",
@@ -18775,24 +18840,24 @@
       "scoreSha256": "872926e1523bfe630187a227950790047243663aae842b0e50730c50c3f1eabd",
       "compiledBytes": 5068,
       "timing": {
-        "wallSeconds": 2.23,
-        "cpuSeconds": 1.92,
+        "wallSeconds": 4.01,
+        "cpuSeconds": 2.05,
         "phasesMs": {
           "trace": 3,
-          "ir": 137,
-          "recover": 717,
-          "compile": 332,
-          "retrace": 1040,
+          "ir": 138,
+          "recover": 1303,
+          "compile": 320,
+          "retrace": 2248,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.35,
-        "recoverMsPerMusicMinute": 877.7
+        "reconstructCpuPerMusicMinute": 2.51,
+        "recoverMsPerMusicMinute": 1595.4
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T10:42:14.245Z"
+      "finishedAt": "2026-11-27T11:28:13.214Z"
     },
     {
       "path": "MUSICIANS/B/Bakewell_Dwayne/Experiment_2.sid",
@@ -18811,6 +18876,10 @@
       "why": "first difference in adsr",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 44988,
@@ -18821,7 +18890,7 @@
         "irregularShare": 0.6789072398692956
       },
       "fdiff": {
-        "differingCalls": 16170,
+        "differingCalls": 16251,
         "callsWithDifference": 2503,
         "comparedCalls": 2505,
         "expectedCalls": 2508,
@@ -18866,13 +18935,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 1804,
-            "matchShare": 0.27984
+            "differingCalls": 1885,
+            "matchShare": 0.247505
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 16170,
+        "differingCalls": 16251,
         "first": {
           "class": "adsr",
           "call": 0,
@@ -18912,8 +18981,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 1804,
-            "matchShare": 0.27984
+            "differingCalls": 1885,
+            "matchShare": 0.247505
           }
         }
       },
@@ -20815,30 +20884,30 @@
       ],
       "scoreBytes": 233240,
       "scoreSha256": "78a0979e5154ae4dda45a918f879aab0d39a51df20b2147887a80822c2a41a84",
-      "compiledBytes": 15579,
+      "compiledBytes": 15610,
       "timing": {
-        "wallSeconds": 7.62,
-        "cpuSeconds": 5.27,
+        "wallSeconds": 13.76,
+        "cpuSeconds": 6.53,
         "phasesMs": {
-          "trace": 84,
-          "ir": 1593,
-          "recover": 2288,
-          "compile": 1035,
-          "retrace": 2619,
+          "trace": 171,
+          "ir": 2927,
+          "recover": 6150,
+          "compile": 1834,
+          "retrace": 2679,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.76,
-        "recoverMsPerMusicMinute": 762.6
+        "reconstructCpuPerMusicMinute": 2.18,
+        "recoverMsPerMusicMinute": 2050
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 16874,
-        "badWindows": 14165,
-        "lagMs": -12,
-        "wallSeconds": 197.1
+        "badWindows": 14072,
+        "lagMs": -20,
+        "wallSeconds": 338.7
       },
-      "finishedAt": "2026-11-27T10:42:16.829Z"
+      "finishedAt": "2026-11-27T11:28:17.715Z"
     },
     {
       "path": "DEMOS/A-F/City_of_New_Orleans.sid",
@@ -20857,6 +20926,10 @@
       "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": true,
       "turboMessage": "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers",
@@ -21183,24 +21256,24 @@
       "scoreSha256": "82a8e0af00ffe4f697edb93095adca25e912c657e8ea573e6b5f5e6d95634b21",
       "compiledBytes": 6661,
       "timing": {
-        "wallSeconds": 4.76,
-        "cpuSeconds": 2.67,
+        "wallSeconds": 16.68,
+        "cpuSeconds": 3.14,
         "phasesMs": {
-          "trace": 17,
-          "ir": 478,
-          "recover": 1065,
-          "compile": 695,
-          "retrace": 2506,
+          "trace": 72,
+          "ir": 973,
+          "recover": 2908,
+          "compile": 4180,
+          "retrace": 8549,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.01,
-        "recoverMsPerMusicMinute": 401.9
+        "reconstructCpuPerMusicMinute": 1.19,
+        "recoverMsPerMusicMinute": 1097.5
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T10:43:48.731Z"
+      "finishedAt": "2026-11-27T11:30:55.370Z"
     },
     {
       "path": "MUSICIANS/S/Sad/Pahos.sid",
@@ -21219,11 +21292,15 @@
       "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": true,
       "turboMessage": "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers",
       "scoreIncludesTurbo": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 4162 cycles per call at speed 5 (3211 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 4168 cycles per call at speed 5 (3211 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 28033,
       "callRate": {
         "periodCycles": 3931,
@@ -21232,7 +21309,7 @@
         "irregularShare": 0.2971603881278539
       },
       "fdiff": {
-        "differingCalls": 4589,
+        "differingCalls": 4573,
         "callsWithDifference": 2504,
         "comparedCalls": 2504,
         "expectedCalls": 2504,
@@ -21277,13 +21354,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 1321,
-            "matchShare": 0.472444
+            "differingCalls": 1305,
+            "matchShare": 0.478834
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 4587,
+        "differingCalls": 4571,
         "first": {
           "class": "gate",
           "call": 0,
@@ -21323,8 +21400,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 1321,
-            "matchShare": 0.472444
+            "differingCalls": 1305,
+            "matchShare": 0.478834
           }
         }
       },
@@ -21544,26 +21621,26 @@
       ],
       "scoreBytes": 97308,
       "scoreSha256": "d94e9ba531e2f33404b620250c93368f682fe33cdaae3f57edd0695de59ce216",
-      "compiledBytes": 8724,
+      "compiledBytes": 8755,
       "timing": {
-        "wallSeconds": 7.16,
-        "cpuSeconds": 3.94,
+        "wallSeconds": 12.95,
+        "cpuSeconds": 4.48,
         "phasesMs": {
-          "trace": 164,
-          "ir": 1285,
-          "recover": 2919,
-          "compile": 847,
-          "retrace": 1946,
+          "trace": 105,
+          "ir": 943,
+          "recover": 2435,
+          "compile": 3160,
+          "retrace": 6304,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 2.11,
-        "recoverMsPerMusicMinute": 1563.8
+        "reconstructCpuPerMusicMinute": 2.4,
+        "recoverMsPerMusicMinute": 1304.4
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T10:43:51.109Z"
+      "finishedAt": "2026-11-27T11:31:09.735Z"
     },
     {
       "path": "MUSICIANS/Z/Zirias/EX_Beach.sid",
@@ -21582,6 +21659,10 @@
       "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 3333,
@@ -22022,30 +22103,30 @@
       ],
       "scoreBytes": 20480,
       "scoreSha256": "af83533bcc5a362e8b22a36d536003cab2440bd72c9a30d911f0d750dc980c7f",
-      "compiledBytes": 5214,
+      "compiledBytes": 5245,
       "timing": {
-        "wallSeconds": 2.76,
-        "cpuSeconds": 1.72,
+        "wallSeconds": 12.83,
+        "cpuSeconds": 1.99,
         "phasesMs": {
-          "trace": 20,
-          "ir": 382,
-          "recover": 599,
-          "compile": 193,
-          "retrace": 1569,
-          "fdiff": 1
+          "trace": 102,
+          "ir": 795,
+          "recover": 4264,
+          "compile": 1967,
+          "retrace": 5592,
+          "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.55,
-        "recoverMsPerMusicMinute": 540.4
+        "reconstructCpuPerMusicMinute": 1.8,
+        "recoverMsPerMusicMinute": 3844.5
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 6238,
-        "badWindows": 4586,
+        "badWindows": 4583,
         "lagMs": -16,
-        "wallSeconds": 76.6
+        "wallSeconds": 145
       },
-      "finishedAt": "2026-11-27T10:43:54.363Z"
+      "finishedAt": "2026-11-27T11:31:13.332Z"
     },
     {
       "path": "MUSICIANS/A/Avory_Sarah_Jane/Soul_Force.sid",
@@ -22064,6 +22145,10 @@
       "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 3349,
@@ -22702,30 +22787,30 @@
       ],
       "scoreBytes": 40482,
       "scoreSha256": "10f4b4f97772b81503a13c5cc10da262a8782dab4a7380272a75581bb5e61233",
-      "compiledBytes": 6271,
+      "compiledBytes": 6302,
       "timing": {
-        "wallSeconds": 2.28,
-        "cpuSeconds": 1.9,
+        "wallSeconds": 11.36,
+        "cpuSeconds": 2.19,
         "phasesMs": {
-          "trace": 21,
-          "ir": 272,
-          "recover": 765,
-          "compile": 283,
-          "retrace": 940,
+          "trace": 75,
+          "ir": 1575,
+          "recover": 6835,
+          "compile": 174,
+          "retrace": 2702,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.7,
-        "recoverMsPerMusicMinute": 684.6
+        "reconstructCpuPerMusicMinute": 1.96,
+        "recoverMsPerMusicMinute": 6117.5
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 6283,
-        "badWindows": 4024,
+        "badWindows": 4017,
         "lagMs": 0,
-        "wallSeconds": 91.1
+        "wallSeconds": 137.7
       },
-      "finishedAt": "2026-11-27T10:43:56.369Z"
+      "finishedAt": "2026-11-27T11:31:24.456Z"
     },
     {
       "path": "MUSICIANS/C/Chiummo_Gaetano/A_Walk_in_the_Countryside_3SID.sid",
@@ -22744,6 +22829,10 @@
       "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 9012,
@@ -23091,20 +23180,20 @@
       ],
       "scoreBytes": 16404,
       "scoreSha256": "9cb639869ec97ec42522d0d5ed4956950a3d5d1b86f320e6a2bf78fbbc14cf9d",
-      "compiledBytes": 15039,
+      "compiledBytes": 15070,
       "timing": {
-        "wallSeconds": 4.96,
-        "cpuSeconds": 2.41,
+        "wallSeconds": 12.13,
+        "cpuSeconds": 2.98,
         "phasesMs": {
-          "trace": 113,
-          "ir": 1436,
-          "recover": 884,
-          "compile": 1373,
-          "retrace": 1152,
+          "trace": 608,
+          "ir": 2374,
+          "recover": 4494,
+          "compile": 1835,
+          "retrace": 2815,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 0.8,
-        "recoverMsPerMusicMinute": 294.6
+        "reconstructCpuPerMusicMinute": 0.99,
+        "recoverMsPerMusicMinute": 1497.9
       },
       "a1": {
         "level": "fail",
@@ -23112,9 +23201,9 @@
         "windows": 16874,
         "badWindows": 16874,
         "lagMs": 20,
-        "wallSeconds": 266.3
+        "wallSeconds": 740.5
       },
-      "finishedAt": "2026-11-27T10:43:58.861Z"
+      "finishedAt": "2026-11-27T11:31:32.120Z"
     },
     {
       "path": "MUSICIANS/P/PRI/Hit_n_Run.sid",
@@ -23133,6 +23222,7 @@
       "why": "recovered score did not compile: Invalid SIDWAVE at $.timeline[0].layers.v1: the note needs at least 10 frames including its hard restart",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": null,
       "compileOk": false,
       "turbo": false,
       "compileError": "Invalid SIDWAVE at $.timeline[0].layers.v1: the note needs at least 10 frames including its hard restart",
@@ -24850,24 +24940,24 @@
       "scoreSha256": "253d40c0bdbf216b776d9a0b5aa6ad8610c34f95ce8cade8c1a8b7ad626f0045",
       "compiledBytes": null,
       "timing": {
-        "wallSeconds": 4.36,
-        "cpuSeconds": 2.96,
+        "wallSeconds": 7.07,
+        "cpuSeconds": 3.31,
         "phasesMs": {
-          "trace": 206,
-          "ir": 1415,
-          "recover": 2235,
+          "trace": 675,
+          "ir": 2561,
+          "recover": 2971,
           "compile": 0,
           "retrace": 0,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.12,
-        "recoverMsPerMusicMinute": 848.8
+        "reconstructCpuPerMusicMinute": 1.26,
+        "recoverMsPerMusicMinute": 1128.1
       },
       "a1": {
         "status": "not evaluated",
         "reason": "recompiled score missing"
       },
-      "finishedAt": "2026-11-27T10:45:14.872Z"
+      "finishedAt": "2026-11-27T11:33:52.586Z"
     },
     {
       "path": "MUSICIANS/A/Avory_Sarah_Jane/Soul_Force.sid",
@@ -24886,6 +24976,10 @@
       "why": "first difference in pitch",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": false,
       "calls": 4448,
@@ -25464,30 +25558,30 @@
       ],
       "scoreBytes": 28360,
       "scoreSha256": "ac2ac5c3df5b1afa54f0bf0dbcd940df4178a974655d54f7908c329feb42b7d5",
-      "compiledBytes": 6029,
+      "compiledBytes": 6060,
       "timing": {
-        "wallSeconds": 3.79,
-        "cpuSeconds": 1.82,
+        "wallSeconds": 5.02,
+        "cpuSeconds": 1.98,
         "phasesMs": {
-          "trace": 9,
-          "ir": 457,
-          "recover": 1780,
-          "compile": 283,
-          "retrace": 1259,
-          "fdiff": 4
+          "trace": 153,
+          "ir": 634,
+          "recover": 1944,
+          "compile": 368,
+          "retrace": 1924,
+          "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.23,
-        "recoverMsPerMusicMinute": 1200
+        "reconstructCpuPerMusicMinute": 1.34,
+        "recoverMsPerMusicMinute": 1311
       },
       "a1": {
         "level": "fail",
         "status": "approximate",
         "windows": 8340,
-        "badWindows": 7799,
+        "badWindows": 7803,
         "lagMs": 18,
-        "wallSeconds": 84.4
+        "wallSeconds": 221.2
       },
-      "finishedAt": "2026-11-27T10:45:19.981Z"
+      "finishedAt": "2026-11-27T11:33:54.639Z"
     },
     {
       "path": "MUSICIANS/S/SIDwave/Gnumpf_Espresso.sid",
@@ -25506,11 +25600,15 @@
       "why": "first difference in gate",
       "strictExact": false,
       "registerStateExact": false,
+      "verification": {
+        "mode": "probe",
+        "seconds": 10
+      },
       "compileOk": true,
       "turbo": true,
       "turboMessage": "does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers",
       "scoreIncludesTurbo": true,
-      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 3065 cycles per call at speed 6 (2592 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
+      "cycleBudgetExceeded": "Invalid SIDWAVE at $.cpu: the player needs up to 3071 cycles per call at speed 6 (2592 available at 1 MHz PAL); use cpu: turbo for a CPU speed of at least 2 MHz",
       "calls": 49555,
       "callRate": {
         "periodCycles": 3276,
@@ -25519,7 +25617,7 @@
         "irregularShare": 0.6262259353432619
       },
       "fdiff": {
-        "differingCalls": 18286,
+        "differingCalls": 18258,
         "callsWithDifference": 2977,
         "comparedCalls": 2978,
         "expectedCalls": 2995,
@@ -25564,13 +25662,13 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2635,
-            "matchShare": 0.115178
+            "differingCalls": 2607,
+            "matchShare": 0.12458
           }
         }
       },
       "fdiffState": {
-        "differingCalls": 17997,
+        "differingCalls": 17969,
         "first": {
           "class": "pitch",
           "call": 1,
@@ -25610,8 +25708,8 @@
             "matchShare": 1
           },
           "timing": {
-            "differingCalls": 2635,
-            "matchShare": 0.115178
+            "differingCalls": 2607,
+            "matchShare": 0.12458
           }
         }
       },
@@ -26077,26 +26175,26 @@
       ],
       "scoreBytes": 126232,
       "scoreSha256": "1d31ceab7b3926e2b27c67bf270c5e8f9c786950c773b74e69fbdd90ba41195c",
-      "compiledBytes": 11215,
+      "compiledBytes": 11246,
       "timing": {
-        "wallSeconds": 7.77,
-        "cpuSeconds": 4.57,
+        "wallSeconds": 15.85,
+        "cpuSeconds": 5.49,
         "phasesMs": {
-          "trace": 66,
-          "ir": 1554,
-          "recover": 2290,
-          "compile": 953,
-          "retrace": 2904,
+          "trace": 313,
+          "ir": 2026,
+          "recover": 8040,
+          "compile": 2833,
+          "retrace": 2634,
           "fdiff": 0
         },
-        "reconstructCpuPerMusicMinute": 1.64,
-        "recoverMsPerMusicMinute": 822.8
+        "reconstructCpuPerMusicMinute": 1.97,
+        "recoverMsPerMusicMinute": 2888.5
       },
       "a1": {
         "status": "not evaluated",
         "reason": "turbo fallback: the score does not run at 1 MHz"
       },
-      "finishedAt": "2026-11-27T10:45:30.148Z"
+      "finishedAt": "2026-11-27T11:34:00.756Z"
     }
   ]
 }
