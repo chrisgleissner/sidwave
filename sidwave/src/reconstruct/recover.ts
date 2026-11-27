@@ -83,6 +83,8 @@ export const MAX_TABLE_STEPS_TOTAL = 255;
 export const HARD_RESTART_MAX_FRAMES = 8;
 /** The 1.4 player ramps the volume over its first 15 frames; a tune whose volume is 15 for this many frames has no ramp. */
 export const SOFT_START_FRAMES = 20;
+/** Calls after the first row at which the volume of a further SID is read. */
+export const SID_VOLUME_CALLS = 8;
 /** The most leading calls skipped as start-up when the init does not write every register. */
 export const INIT_MAX_LEADING = 6;
 /** Bit of the `written` mask of an IR call for register $18 (filter mode and volume). A first call whose mask equals exactly this bit is an init that sets only the master volume. */
@@ -1722,7 +1724,8 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     mode: system,
     speed,
     ...(sidMap ? { sids: sidMap.map((sid, i) => {
-      const volume = (ir.calls[rowStart]?.sids[i]?.regs[0x18] ?? 15) & 15;
+      // The volume the tune holds shortly after the rows begin: a SID may receive it one or two calls later.
+      const volume = (ir.calls[Math.min(ir.calls.length - 1, rowStart + SID_VOLUME_CALLS)]?.sids[i]?.regs[0x18] ?? 15) & 15;
       return { id: `sid${i + 1}`, address: `$${sid.address.toString(16).toUpperCase()}`, ...(sid.model ? { model: sid.model } : {}), ...(volume !== 15 ? { volume } : {}) };
     }) } : {}),
     ...(Object.keys(instruments).length ? { instruments } : {}),
