@@ -8,3 +8,4 @@ export * from "./analysis.js";
 export * from "./instruments.js";
 export * from "./compare.js";
 export * from "./isolate.js";
+export * from "./preserve.js";
