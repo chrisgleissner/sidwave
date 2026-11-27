@@ -303,45 +303,78 @@
    }
   ]
  },
- "sidwave:chiptune-drive -> basic": {
+ "sidwave:chiptune-drive -> cheesecutter": {
   "ok": true,
   "losses": [
    {
     "stage": "plan",
-    "code": "metadata.dropped",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 20,
+    "message": "18 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "tempo.constant",
     "severity": "info",
     "count": 1,
-    "message": "The title and the author are not stored in the target."
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
    },
    {
     "stage": "write",
-    "code": "basic.modulation.dropped",
+    "code": "filter.dropped",
     "severity": "lost",
-    "count": 102,
-    "message": "102 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
    },
    {
     "stage": "write",
-    "code": "basic.filter.sampled",
+    "code": "pulse.modulation",
     "severity": "approx",
-    "count": 299,
-    "message": "299 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+    "count": 2,
+    "message": "Pulse width modulation is described per instrument but not exported as events. | Pulse tables are not exported; an instrument keeps its fixed pulse width."
    },
    {
     "stage": "write",
-    "code": "basic.timing.jiffy",
-    "severity": "approx",
-    "count": 79,
-    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 11 ms mean, 83 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 68 gate-offs shortly before the next note of a voice are written together with that note."
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
    },
    {
     "stage": "write",
-    "code": "basic.timing.dense",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 18,
+    "message": "18 glides and portamento notes are exported as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
     "severity": "approx",
-    "count": 7,
-    "message": "7 events are too dense for BASIC V2 and are delayed by more than 25 ms, at most 83 ms (predicted). --voices 2 or 1 writes fewer registers."
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
    }
   ]
+ },
+ "sidwave:chiptune-drive -> sf2": {
+  "ok": false,
+  "category": "limit_exceeded",
+  "message": "the score runs the player more than once per frame; SID Factory II driver 11 updates once per frame"
  },
  "sidwave:chiptune-drive -> sidwizard": {
   "ok": true,

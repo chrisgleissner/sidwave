@@ -304,9 +304,84 @@
    }
   ]
  },
- "sidwave:digi-groove -> basic": {
+ "sidwave:digi-groove -> cheesecutter": {
   "ok": true,
   "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 26,
+    "message": "24 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "samples.digi",
+    "severity": "lost",
+    "count": 1,
+    "message": "Digi sample playback (CIA2 NMI samples) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "approx",
+    "count": 2,
+    "message": "Pulse width modulation is described per instrument but not exported as events. | Pulse tables are not exported; an instrument keeps its fixed pulse width."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 24,
+    "message": "24 glides and portamento notes are exported as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:digi-groove -> sf2": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 26,
+    "message": "24 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
    {
     "stage": "plan",
     "code": "metadata.dropped",
@@ -316,31 +391,59 @@
    },
    {
     "stage": "write",
-    "code": "basic.modulation.dropped",
-    "severity": "lost",
-    "count": 251,
-    "message": "251 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
-   },
-   {
-    "stage": "write",
-    "code": "basic.filter.sampled",
-    "severity": "approx",
-    "count": 2006,
-    "message": "2006 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
-   },
-   {
-    "stage": "write",
-    "code": "basic.digi.dropped",
+    "code": "samples.digi",
     "severity": "lost",
     "count": 1,
-    "message": "Digi samples are not played by the BASIC program."
+    "message": "Digi sample playback (CIA2 NMI samples) is not exported."
    },
    {
     "stage": "write",
-    "code": "basic.timing.jiffy",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
     "severity": "approx",
-    "count": 1055,
-    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 24 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 292 gate-offs shortly before the next note of a voice are written together with that note."
+    "count": 2,
+    "message": "Pulse width modulation is described per instrument but not exported as events. | Pulse tables are not exported; an instrument keeps its fixed pulse width."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 24,
+    "message": "24 glides and portamento notes are exported as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
    }
   ]
  },

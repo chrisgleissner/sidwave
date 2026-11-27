@@ -46,6 +46,7 @@ Options:
   --mode PAL|NTSC      Clock of imported scores (default PAL).
   --seconds <s>        Horizon of a .sid read, length of a WAV render, end of a BASIC program.
   --model 6581|8580    SID model of a WAV render (default 6581).
+  --driver <file>      Driver for a CheeseCutter or SID Factory II output: an existing song of that format or a driver binary.
   --keep-score <file>  Also write the intermediate SIDWave score.
   --report <file>|-    Write the full report (detection, chain, losses, metrics) as JSON; - prints it.
   --strict             Exit 1, and write nothing, when any loss has severity lost.
@@ -59,7 +60,7 @@ Losses have a severity: info (nothing musical lost), approx (close, not equal) a
 Exit codes: 0 success; 1 --strict found a lost loss; 2 usage; 3 unreadable or ambiguous input; 4 engine unavailable; 5 limit.
 `;
 
-const VALUED = ["-o", "--output", "--to", "--from", "--song", "--voices", "--grid", "--mode", "--seconds", "--model", "--keep-score", "--report", "--title", "--allow-dir", "--sids"];
+const VALUED = ["-o", "--output", "--to", "--from", "--song", "--voices", "--grid", "--mode", "--seconds", "--model", "--keep-score", "--report", "--title", "--allow-dir", "--sids", "--driver"];
 const BARE = ["--strict", "--dry-run", "--verify", "--force", "--json", "-h", "--help"];
 
 const stem = (file: string): string => basename(file, extname(file)).replace(/\.sidwave$/i, "");
@@ -137,6 +138,10 @@ async function convertCommandInner(args: string[], io: CliIo): Promise<number> {
   const seconds = numberFlag(a, "--seconds");
   if (seconds !== undefined && !(seconds > 0)) throw new UsageError("--seconds needs a number above 0");
   const mode = choice(a, "--mode", ["PAL", "NTSC"] as const);
+  const driverFile = a.flags.get("--driver");
+  if (driverFile !== undefined && typeof driverFile !== "string") throw new UsageError("--driver needs a file");
+  if (driverFile !== undefined && target.id !== "cheesecutter" && target.id !== "sf2") throw new UsageError("--driver applies to a cheesecutter or sf2 output only");
+  const driver = typeof driverFile === "string" ? readBounded(io, driverFile).bytes : undefined;
   const model = choice(a, "--model", ["6581", "8580"] as const);
   const from = a.flags.get("--from") as string | undefined;
   if (from !== undefined && !findFormat(from)) throw new InterchangeUsageError(`unknown format "${from}" for --from; run "sidwave formats"`);
@@ -155,6 +160,7 @@ async function convertCommandInner(args: string[], io: CliIo): Promise<number> {
     inputName: file, ...(from === undefined ? {} : { from }), to: target.id,
     ...(song === undefined ? {} : { song }), ...(voices === undefined ? {} : { voices }), ...(sids === undefined ? {} : { sids }), ...(grid === undefined ? {} : { grid }),
     ...(mode ? { mode } : {}), ...(model ? { model } : {}), ...(seconds === undefined ? {} : { seconds }), ...(title === undefined ? {} : { title }),
+    ...(driver ? { driver } : {}),
     verify: a.flags.has("--verify"),
     readOptions: confinedReadOptions(io.cwd, a.allowDirs, path),
     ...(io.createEngine ? { createEngine: io.createEngine } : {}), ...(io.signal ? { signal: io.signal } : {}),

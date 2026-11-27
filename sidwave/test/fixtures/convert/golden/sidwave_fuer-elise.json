@@ -196,7 +196,40 @@
    }
   ]
  },
- "sidwave:fuer-elise -> basic": {
+ "sidwave:fuer-elise -> cheesecutter": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "write",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:fuer-elise -> sf2": {
   "ok": true,
   "losses": [
    {
@@ -208,10 +241,31 @@
    },
    {
     "stage": "write",
-    "code": "basic.timing.jiffy",
+    "code": "tempo.constant",
+    "severity": "info",
+    "count": 1,
+    "message": "Legacy (pre-1.2) scores have a constant tempo and metre."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
     "severity": "approx",
-    "count": 32,
-    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 8 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 37 gate-offs shortly before the next note of a voice are written together with that note."
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
    }
   ]
  },

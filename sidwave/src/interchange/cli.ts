@@ -12,6 +12,10 @@ import { InterchangeUsageError } from "./errors.js";
 import { exportEvents } from "./events.js";
 import { exportGoatTracker } from "./goattrackerExport.js";
 import { exportMidi } from "./midiExport.js";
+import { exportCheeseCutter } from "./cheesecutterExport.js";
+import { importCheeseCutter } from "./cheesecutterImport.js";
+import { exportSf2 } from "./sf2Export.js";
+import { importSf2 } from "./sf2Import.js";
 import { exportFurnace } from "./furnaceExport.js";
 import { importFurnace } from "./furnaceImport.js";
 import { importGoatTracker } from "./goattrackerImport.js";
@@ -142,18 +146,19 @@ const asyncExporters = new Map<string, AsyncExporter>();
 export function registerAsyncExporter(format: string, handler: AsyncExporter): void { asyncExporters.set(format, handler); }
 
 function exportCommand(args: string[], io: CliIo): number | Promise<number> {
-  const a = parseFlags(args, ["-o", "--output", "--format", "--song", "--ppq", "--seconds", "--instrument", "--pattern-rows", "--allow-dir"], ["--bend", "--json"]);
+  const a = parseFlags(args, ["-o", "--output", "--format", "--song", "--ppq", "--seconds", "--instrument", "--pattern-rows", "--driver", "--allow-dir"], ["--bend", "--json"]);
   if (a.positional.length !== 1) throw new UsageError("export needs exactly one score file");
   const file = a.positional[0]!;
   const output = (a.flags.get("-o") ?? a.flags.get("--output")) as string | undefined;
   const ext = output === undefined ? "" : extname(output).toLowerCase();
-  const format = (a.flags.get("--format") as string | undefined) ?? (ext === ".dump" ? "vice-dump" : ext === ".swm" ? "swm" : ext === ".swi" ? "swi" : ext === ".mid" || ext === ".midi" ? "midi" : ext === ".musicxml" || ext === ".xml" ? "musicxml" : ext === ".sng" ? "goattracker" : ext === ".fur" ? "furnace" : "events");
+  const format = (a.flags.get("--format") as string | undefined) ?? (ext === ".dump" ? "vice-dump" : ext === ".swm" ? "swm" : ext === ".swi" ? "swi" : ext === ".mid" || ext === ".midi" ? "midi" : ext === ".musicxml" || ext === ".xml" ? "musicxml" : ext === ".sng" ? "goattracker" : ext === ".fur" ? "furnace" : ext === ".ct" ? "cheesecutter" : ext === ".sf2" ? "sf2" : "events");
   if (format === "swm" || format === "swi") return swmExportCommand(format, file, a, io);
   const asyncExporter = asyncExporters.get(format);
   if (asyncExporter) return asyncExporter(file, a, io, a.flags.has("--json"));
-  if (!["events", "midi", "musicxml", "goattracker", "furnace"].includes(format)) throw new UsageError(`--format must be events, midi, musicxml, goattracker, furnace${[...asyncExporters.keys()].map((k) => `, ${k}`).join("")}, not ${format}`);
+  if (!["events", "midi", "musicxml", "goattracker", "furnace", "cheesecutter", "sf2"].includes(format)) throw new UsageError(`--format must be events, midi, musicxml, goattracker, furnace, cheesecutter, sf2${[...asyncExporters.keys()].map((k) => `, ${k}`).join("")}, not ${format}`);
   if (a.flags.has("--seconds")) throw new UsageError("--seconds applies to --format vice-dump only");
   if (a.flags.has("--instrument") || a.flags.has("--pattern-rows")) throw new UsageError("--instrument and --pattern-rows apply to --format swi and swm only");
+  if (a.flags.has("--driver") && format !== "cheesecutter" && format !== "sf2") throw new UsageError("--driver applies to --format cheesecutter and --format sf2 only");
   if (format !== "midi" && a.flags.has("--bend")) throw new UsageError("--bend applies to --format midi only");
   const { bytes, path } = readBounded(io, file);
   const song = numberFlag(a, "--song");
@@ -190,6 +195,30 @@ function exportCommand(args: string[], io: CliIo): number | Promise<number> {
       const written = writeOutput(io, path, target, result.bytes);
       const { bytes: _bytes, ...info } = result;
       return done({ file, format, output: written, bytes: result.bytes.length, ...info }, `${written}: GoatTracker GTS5, ${result.voices} channels, ${result.rows} rows, ${result.ticksPerRow} calls per row`);
+    }
+    if (format === "cheesecutter") {
+      const driverFile = a.flags.get("--driver");
+      if (typeof driverFile !== "string") throw new UsageError("--format cheesecutter needs --driver <file>: a .ct file or the CheeseCutter player binary (SIDWave does not ship the player)");
+      const driver = readBounded(io, driverFile).bytes;
+      const result = exportCheeseCutter(doc, { ...common, driver });
+      const target = output ?? `${stem(file)}.ct`;
+      for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
+      if (target === "-") { io.outBytes(result.bytes); return 0; }
+      const written = writeOutput(io, path, target, result.bytes);
+      const { bytes: _bytes, ...info } = result;
+      return done({ file, format, output: written, bytes: result.bytes.length, ...info }, `${written}: CheeseCutter song, ${result.voices} voices, ${result.rows} rows, ${result.framesPerRow} frames per row`);
+    }
+    if (format === "sf2") {
+      const driverFile = a.flags.get("--driver");
+      if (typeof driverFile !== "string") throw new UsageError("--format sf2 needs --driver <file>: an .sf2 file or a driver file such as sf2driver11_05.prg from the SID Factory II distribution (SIDWave does not ship the driver)");
+      const driver = readBounded(io, driverFile).bytes;
+      const result = exportSf2(doc, { ...common, driver });
+      const target = output ?? `${stem(file)}.sf2`;
+      for (const warning of result.warnings) io.err(`warning: ${warning}\n`);
+      if (target === "-") { io.outBytes(result.bytes); return 0; }
+      const written = writeOutput(io, path, target, result.bytes);
+      const { bytes: _bytes, ...info } = result;
+      return done({ file, format, output: written, bytes: result.bytes.length, ...info }, `${written}: SID Factory II song (driver ${result.driver}), ${result.voices} tracks, ${result.rows} rows, ${result.framesPerRow} frames per row`);
     }
     if (format === "furnace") {
       const result = exportFurnace(doc, common);
@@ -287,7 +316,39 @@ importers.set("furnace", (bytes, a) => {
   return importFurnace(bytes, { ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}), ...(mode ? { mode } : {}), validate: !a.flags.has("--no-validate") });
 });
 
+importers.set("cheesecutter", (bytes, a) => {
+  const song = numberFlag(a, "--song");
+  const mode = a.flags.get("--mode") as string | undefined;
+  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
+  try {
+    return importCheeseCutter(bytes, {
+      ...(song === undefined ? {} : { song }), ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}),
+      ...(mode ? { mode } : {}), validate: !a.flags.has("--no-validate"),
+    });
+  } catch (error) {
+    if (error instanceof RangeError) throw new UsageError(error.message);
+    throw error;
+  }
+});
+
+importers.set("sf2", (bytes, a) => {
+  const song = numberFlag(a, "--song");
+  const mode = a.flags.get("--mode") as string | undefined;
+  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
+  try {
+    return importSf2(bytes, {
+      ...(song === undefined ? {} : { song }), ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}),
+      ...(mode ? { mode } : {}), validate: !a.flags.has("--no-validate"),
+    });
+  } catch (error) {
+    if (error instanceof RangeError) throw new UsageError(error.message);
+    throw error;
+  }
+});
+
 const detect = (file: string, bytes: Buffer): string | undefined => {
+  if ((bytes[2] === 0x37 && bytes[3] === 0x13) || extname(file).toLowerCase() === ".sf2") return "sf2";
+  if (bytes.subarray(0, 3).toString("latin1") === "CC2" || extname(file).toLowerCase() === ".ct") return "cheesecutter";
   if (bytes.subarray(0, 4).toString("latin1") === "MThd") return "midi";
   const ext = extname(file).toLowerCase();
   const id = bytes.subarray(2, 6).toString("latin1");
@@ -342,7 +403,7 @@ function importCommand(args: string[], io: CliIo): number {
   const file = a.positional[0]!;
   const { bytes, path } = readBounded(io, file);
   const format = (a.flags.get("--format") as string | undefined) ?? detect(file, bytes);
-  if (format === undefined) throw new UsageError(`cannot tell the format of ${file}; pass --format midi, musicxml, goattracker, furnace, mod, jch, swm or swi`);
+  if (format === undefined) throw new UsageError(`cannot tell the format of ${file}; pass --format midi, musicxml, goattracker, furnace, cheesecutter, sf2, mod, jch, swm or swi`);
   if (a.flags.get("-o") === "-" || a.flags.get("--output") === "-") {
     if (a.flags.has("--json")) throw new UsageError("import -o - writes the YAML to stdout; --json cannot be combined with it");
   }
@@ -369,10 +430,14 @@ export const INTERCHANGE_HELP = `  Examples (the format is detected from the fil
     sidwave export score.yaml -o score.swm         SID-Wizard module for the expressible subset (losses are printed)
     sidwave export score.yaml -o run.dump          VICE -sounddev dump text of the compiled score
     sidwave reconstruct run.dump                   score from a VICE dump or a siddump table (SID files work as before)
-  sidwave export <file> [--format events|midi|musicxml|goattracker|furnace|vice-dump|swm|swi] [--instrument <name|n>] [--pattern-rows 16|32|64] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--seconds <s>] [--json]
+  sidwave export <file> [--format events|midi|musicxml|goattracker|furnace|cheesecutter|sf2|vice-dump|swm|swi] [--instrument <name|n>] [--pattern-rows 16|32|64] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--driver <file>] [--seconds <s>] [--json]
   sidwave reconstruct <trace> [--from vice-dump|siddump] [--clock PAL|NTSC] [--seconds <s>] [--title <text>] [-o <score.yaml>] [--json]
-  sidwave import <file> [--format midi|musicxml|goattracker|furnace|mod|jch|swm|swi] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>] [--subtune <n>] [--sids 1-10] [--transpose <n>] [--quality]
+  sidwave import <file> [--format midi|musicxml|goattracker|furnace|cheesecutter|sf2|mod|jch|swm|swi] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>] [--subtune <n>] [--sids 1-10] [--transpose <n>] [--quality]
                         [--no-drums] [--no-bend] [--title <text>] [--mode PAL|NTSC] [--no-validate] [--force] [--json]
+  CheeseCutter: sidwave import song.ct                                  (found by the CC2 magic or the .ct extension; --song <n> picks a subtune)
+                sidwave export score.yaml --driver song.ct -o out.ct    (--driver: any .ct file or the CheeseCutter player binary; SIDWave does not ship the player)
+  SID Factory II: sidwave import song.sf2                               (driver 11.xx; found by the 0x1337 id or the .sf2 extension; --song <n> picks a song)
+                sidwave export score.yaml --driver sf2driver11_05.prg -o out.sf2   (--driver: an .sf2 file or a driver 11 PRG from the SID Factory II distribution)
 `;
 
 /** Commands handled here; `cli.ts` hands the arguments after the command name to the matching function. */

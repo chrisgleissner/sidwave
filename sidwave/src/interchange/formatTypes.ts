@@ -47,6 +47,8 @@ export interface WriteContext {
   song: number;
   seconds?: number;
   model?: "6581" | "8580";
+  /** Bytes of a driver file the target needs (CheeseCutter, SID Factory II). */
+  driver?: Uint8Array;
   createEngine?: (emulation: SidEmulation) => SidEngine;
   signal?: AbortSignal;
 }

@@ -373,7 +373,54 @@
    }
   ]
  },
- "mod:four-channel -> basic": {
+ "mod:four-channel -> cheesecutter": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Channels 3 are not imported because the score has 3 voices (channel 3: 32 notes); use --sids to keep more channels."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "The song ends at the end of the order list without a jump back."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "mod:four-channel -> sf2": {
   "ok": true,
   "losses": [
    {
@@ -406,24 +453,31 @@
    },
    {
     "stage": "write",
-    "code": "basic.modulation.dropped",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "wavetable.dropped",
     "severity": "lost",
-    "count": 64,
-    "message": "64 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
+    "count": 1,
+    "message": "Wavetable steps of an instrument are not exported (the instrument plays its waveform; arpeggios are kept)."
    },
    {
     "stage": "write",
-    "code": "basic.filter.sampled",
+    "code": "instrument.simplified",
     "severity": "approx",
-    "count": 13,
-    "message": "13 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
    },
    {
     "stage": "write",
-    "code": "basic.timing.jiffy",
+    "code": "timing.row-grid",
     "severity": "approx",
-    "count": 129,
-    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 8 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 94 gate-offs shortly before the next note of a voice are written together with that note."
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
    }
   ]
  },

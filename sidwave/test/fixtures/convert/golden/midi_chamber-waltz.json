@@ -235,7 +235,7 @@
    }
   ]
  },
- "midi:chamber-waltz -> basic": {
+ "midi:chamber-waltz -> cheesecutter": {
   "ok": true,
   "losses": [
    {
@@ -247,6 +247,53 @@
    },
    {
     "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 6,
+    "message": "6 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:chamber-waltz -> sf2": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 6,
+    "message": "6 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "plan",
     "code": "metadata.dropped",
     "severity": "info",
     "count": 1,
@@ -254,17 +301,24 @@
    },
    {
     "stage": "write",
-    "code": "basic.filter.sampled",
-    "severity": "approx",
-    "count": 13,
-    "message": "13 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
    },
    {
     "stage": "write",
-    "code": "basic.timing.jiffy",
+    "code": "instrument.simplified",
     "severity": "approx",
-    "count": 397,
-    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 8 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 626 gate-offs shortly before the next note of a voice are written together with that note."
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
    }
   ]
  },

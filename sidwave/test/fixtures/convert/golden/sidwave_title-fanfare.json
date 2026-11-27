@@ -242,7 +242,7 @@
    }
   ]
  },
- "sidwave:title-fanfare -> basic": {
+ "sidwave:title-fanfare -> cheesecutter": {
   "ok": true,
   "losses": [
    {
@@ -255,6 +255,67 @@
    },
    {
     "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "0 glides and 4 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Only the first three voices of the first SID are exported (the score has 3 voices)."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:title-fanfare -> sf2": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "0 glides and 4 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "plan",
     "code": "metadata.dropped",
     "severity": "info",
     "count": 1,
@@ -262,38 +323,38 @@
    },
    {
     "stage": "write",
-    "code": "basic.sid.moved",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Only the 3 tracks of the driver are exported; the score has voices on SID 2 and the driver has 1 SID. Use a multi-SID driver such as sf2driver11_05_2sid.prg for more."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
     "severity": "approx",
     "count": 1,
-    "message": "Voices of other SIDs play on the SID at $D400, with one filter and one volume for all voices."
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
    },
    {
     "stage": "write",
-    "code": "basic.modulation.dropped",
-    "severity": "lost",
-    "count": 28,
-    "message": "28 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
-   },
-   {
-    "stage": "write",
-    "code": "basic.filter.sampled",
+    "code": "timing.row-grid",
     "severity": "approx",
-    "count": 361,
-    "message": "361 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
-   },
-   {
-    "stage": "write",
-    "code": "basic.timing.jiffy",
-    "severity": "approx",
-    "count": 53,
-    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 7 ms mean, 66 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 67 gate-offs shortly before the next note of a voice are written together with that note."
-   },
-   {
-    "stage": "write",
-    "code": "basic.timing.dense",
-    "severity": "approx",
-    "count": 4,
-    "message": "4 events are too dense for BASIC V2 and are delayed by more than 25 ms, at most 66 ms (predicted). --voices 2 or 1 writes fewer registers."
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
    }
   ]
  },
