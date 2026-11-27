@@ -13,6 +13,10 @@ import { editSidHeader } from "../src/sidEdit.ts";
 import { parseStil, queryStil } from "../src/stil.ts";
 import { songlengthsKey, writeSonglengthsEntry } from "../src/songlengthsFile.ts";
 import { identifyPlayerInData, parseSidIdConfig } from "../src/sidId.ts";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { runCli } from "../src/cli.ts";
 import { resolveCutoff } from "../src/sidwaveFilterModel.ts";
 import { convert } from "../src/interchange/convert.ts";
 
@@ -197,5 +201,31 @@ test("convert of a score to MIDI and to GoatTracker, with --verify, stays within
     const op = Math.min(...runs);
     if (process.env.SIDWAVE_PERF_REPORT) console.log(`convert ${to}: ${op.toFixed(1)} ms = ${(op / reference).toFixed(1)} x reference (${reference.toFixed(2)} ms), limit ${multiple} x`);
     assert.ok(op <= multiple * reference, `convert to ${to} took ${op.toFixed(1)} ms CPU, over ${(multiple * reference).toFixed(1)} ms (${multiple} x the reference loop of ${reference.toFixed(2)} ms)`);
+  }
+});
+
+// The authoring commands, run in the process (startup of node is not part of them). Each one reads its input files,
+// does the work of the library function and writes its result, so the budgets include the file system calls.
+test("the authoring commands of the command line stay within their budgets", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sidwave-perf-"));
+  try {
+    const file = (name, content) => { fs.writeFileSync(path.join(dir, name), content); return name; };
+    const base = file("base.yaml", text);
+    const ours = file("ours.yaml", text.replace(/tempo: *(\d+)/, (_, t) => `tempo: ${Number(t) + 1}`));
+    const theirs = file("theirs.yaml", text.replace(/^title:.*$/m, 'title: "Other"'));
+    const formatted = file("formatted.yaml", formatSidwave(text));
+    const cli = (...args) => {
+      const code = runCli(args, { cwd: dir, out() {}, err() {}, outBytes() {} });
+      if (code > 1) throw new Error(`sidwave ${args.join(" ")} exited ${code}`);
+    };
+    within("cli format --check", () => cli("format", formatted, "--check"), 8);
+    within("cli diff", () => cli("diff", base, ours), 50, 3);
+    within("cli transform --transpose --validate parse", () => cli("transform", base, "--transpose", "2", "--validate", "parse"), 10, 3);
+    within("cli merge", () => cli("merge", base, ours, theirs), 30, 3);
+    within("cli transform --transpose", () => cli("transform", base, "--transpose", "2"), 35, 3);
+    within("cli generate (composer 2)", () => cli("generate", "--seed", "3"), 6, 3);
+    within("cli generate --prg --sid", () => cli("generate", "--seed", "3", "--prg", path.join(dir, "g.prg"), "--sid", path.join(dir, "g.sid"), "--force"), 12, 3);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
