@@ -11,6 +11,8 @@ import { parseSidwave } from "../../src/sidwave.ts";
 import { compileSidwaveBytes } from "../../src/sidwaveOps.ts";
 import { gts } from "./gtFixtures.mjs";
 import { fur228 } from "./furFixtures.mjs";
+import { ctFile, smallSong } from "./ctFixtures.mjs";
+import { smallSf2 } from "./sf2Fixtures.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const FIXTURE_DIR = path.join(root, "test/fixtures/convert");
@@ -40,11 +42,13 @@ const FIXTURES = {
   sidwizard: [["fuer-elise", () => generated("fuer-elise.swm")], ["hand-built", () => read("test/fixtures/sidwizard/hand-built.swm")]],
   jch: [["hand-built", () => read("test/fixtures/jch/hand-built.prg")]],
   mod: [["four-channel", () => read("test/fixtures/mod/four-channel.mod")], ["effects", () => read("test/fixtures/mod/effects.mod")]],
+  cheesecutter: [["small-song", () => Buffer.from(ctFile(smallSong()))]],
+  sf2: [["small-song", () => Buffer.from(smallSf2())]],
   sid: [["fuer-elise", () => Buffer.from(compileSidwaveBytes(parseSidwave(read("test/fixtures/sidwave-1.0/fuer-elise.yaml").toString("utf8")), { format: "sid" }).bytes)]],
   "vice-dump": [["fur-elise", () => read("test/fixtures/traces/fur-elise.vice-dump.txt")]],
   siddump: [["fur-elise", () => read("test/fixtures/traces/fur-elise.siddump.txt")]],
 };
-const EXTENSION = { sidwave: ".yaml", midi: ".mid", musicxml: ".musicxml", abc: ".abc", goattracker: ".sng", furnace: ".fur", sidwizard: ".swm", mod: ".mod", jch: ".bin", sid: ".sid", "vice-dump": ".dump", siddump: ".siddump" };
+const EXTENSION = { sidwave: ".yaml", midi: ".mid", musicxml: ".musicxml", abc: ".abc", goattracker: ".sng", furnace: ".fur", sidwizard: ".swm", mod: ".mod", jch: ".bin", cheesecutter: ".ct", sf2: ".sf2", sid: ".sid", "vice-dump": ".dump", siddump: ".siddump" };
 
 export const FORMATS = listFormats();
 /** Formats with a reader. Their fixtures are the inputs of the matrix. */
@@ -72,8 +76,13 @@ export function inputs() {
 }
 
 /** Options of one conversion in the matrix. Short horizons keep the engine-based cases fast. */
+/** Targets that embed a driver: the matrix hands them a small song built by the test helpers (SIDWave never ships a real driver). */
+const DRIVERS = { cheesecutter: () => Uint8Array.from(ctFile(smallSong())), sf2: () => Uint8Array.from(smallSf2()) };
+
+export const driverOptions = (target) => (DRIVERS[target] ? { driver: DRIVERS[target]() } : {});
+
 export function caseOptions(input, target) {
-  return { inputName: input.name, to: target, ...(input.engine ? { seconds: 4 } : {}), ...(ENGINE_TARGETS.includes(target) ? { seconds: 1 } : {}) };
+  return { ...driverOptions(target), inputName: input.name, to: target, ...(input.engine ? { seconds: 4 } : {}), ...(ENGINE_TARGETS.includes(target) ? { seconds: 1 } : {}) };
 }
 
 /** Runs one conversion; the result is what the golden file stores. Never throws. */

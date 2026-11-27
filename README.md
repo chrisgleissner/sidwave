@@ -234,7 +234,7 @@ SIDWave is being extracted from [c64bridge](https://github.com/chrisgleissner/c6
 - Formatter and diff for scores.
 - A relocatable player and sound effects for games.
 - Reconstruction of existing SID tunes into editable scores.
-- Import from MIDI, MusicXML and tracker formats (GoatTracker, Furnace).
+- Import from MIDI, MusicXML and tracker formats (GoatTracker, Furnace, CheeseCutter, SID Factory II); export to the same formats (CheeseCutter and SID Factory II with a driver file you supply).
 - Preservation bundles.
 
 Known limitations of the language: no per-note velocity, no multiple subtunes, no arbitrary register writes. No human listening sign-off exists for the examples, and some hardware comparisons are open (for example `stereo_echo`).

@@ -35,6 +35,8 @@ export interface ConvertOptions {
   /** Seconds: the horizon of a reconstruct and the length of a WAV render. */
   seconds?: number;
   model?: "6581" | "8580";
+  /** Driver file for a target that embeds one (CheeseCutter, SID Factory II): an existing song of that format or a driver binary. */
+  driver?: Uint8Array;
   /** Re-import the output and compare it with the input score. */
   verify?: boolean;
   /** Onset tolerance of the verification, in seconds. Default 0.075. */
@@ -173,7 +175,7 @@ export async function convert(bytes: Uint8Array, options: ConvertOptions = {}): 
   const writeStart = now();
   const written = await target.write!({
     doc, yaml: read.yaml, plan, song: song0,
-    ...(options.seconds === undefined ? {} : { seconds: options.seconds }), ...(options.model ? { model: options.model } : {}),
+    ...(options.seconds === undefined ? {} : { seconds: options.seconds }), ...(options.model ? { model: options.model } : {}), ...(options.driver ? { driver: options.driver } : {}),
     ...(options.createEngine ? { createEngine: options.createEngine } : {}), ...(options.signal ? { signal: options.signal } : {}),
   });
   const writeMs = now() - writeStart;

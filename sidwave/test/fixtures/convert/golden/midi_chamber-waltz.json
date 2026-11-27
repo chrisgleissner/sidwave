@@ -268,6 +268,93 @@
    }
   ]
  },
+ "midi:chamber-waltz -> cheesecutter": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 6,
+    "message": "6 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "midi:chamber-waltz -> sf2": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "tempo.quantised",
+    "severity": "approx",
+    "count": 15,
+    "message": "15 tempo change(s) fall inside a bar; SIDWave tempo changes at section starts, so each takes effect at the next bar line."
+   },
+   {
+    "stage": "plan",
+    "code": "tempo.folded",
+    "severity": "approx",
+    "count": 6,
+    "message": "6 tempo changes cannot be stored: the target has one tempo and the row grid carries the timing."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
  "midi:chamber-waltz -> sidwizard": {
   "ok": false,
   "category": "limit_exceeded",

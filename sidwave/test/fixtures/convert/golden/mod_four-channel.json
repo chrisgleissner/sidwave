@@ -427,6 +427,107 @@
    }
   ]
  },
+ "mod:four-channel -> cheesecutter": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Channels 3 are not imported because the score has 3 voices (channel 3: 32 notes); use --sids to keep more channels."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "The song ends at the end of the order list without a jump back."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "mod:four-channel -> sf2": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Channels 3 are not imported because the score has 3 voices (channel 3: 32 notes); use --sids to keep more channels."
+   },
+   {
+    "stage": "read",
+    "code": "mod.samples.approx",
+    "severity": "approx",
+    "count": 1,
+    "message": "Sample waveforms are not reproduced: each sample becomes a SID waveform and ADSR chosen from its harmonics, loop and envelope (approximate). Panning, sample offsets, finetune changes, tremolo, retrigger and per-tick volume are not imported."
+   },
+   {
+    "stage": "read",
+    "code": "warning",
+    "severity": "approx",
+    "count": 1,
+    "message": "The song ends at the end of the order list without a jump back."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
  "mod:four-channel -> sidwizard": {
   "ok": true,
   "losses": [

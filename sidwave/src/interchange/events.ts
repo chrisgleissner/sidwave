@@ -3,7 +3,7 @@
 // See LICENSE-EXCEPTION.md for the SIDWave Player Exception.
 // Structured event export: a parsed score as a JSON event list. The MIDI and MusicXML exporters build on it.
 
-import type { ParsedSidwave } from "../sidwave.js";
+import { noteNameToMidi, type ParsedSidwave } from "../sidwave.js";
 import { songDoc } from "../sidwaveSongs.js";
 import { arrangeSidwave, type ArrangedNote, type Arrangement, type Instrument } from "../sidwaveCompiler.js";
 
@@ -30,6 +30,23 @@ export interface ExportedInstrument {
   filterRouted: boolean;
   /** True when a wavetable (more than one step, or a step that changes pitch, ring or sync; a single step that only restates the waveform is not), pulse table or filter table changes the sound after the note starts. */
   tables: { wave: boolean; pulse: boolean; filter: boolean };
+  /** The wavetable program, when `tables.wave` is true: one entry per step, in player calls (a step holds its values for `calls` calls; the last step, or the step `waveLoop`, repeats). */
+  wavetable?: ExportedWaveStep[];
+  /** Index of the step the program loops back to; the program stays on its last step when absent. */
+  waveLoop?: number;
+}
+export interface ExportedWaveStep {
+  /** Waveform name as in `ExportedInstrument.waveform`; absent: the instrument's own waveform. */
+  waveform?: string;
+  ring?: boolean;
+  sync?: boolean;
+  test?: boolean;
+  gate: boolean;
+  /** Semitones added to the note. */
+  offset?: number;
+  /** Absolute MIDI note. */
+  absolute?: number;
+  calls: number;
 }
 
 export interface ExportedNoteEffects {
@@ -136,7 +153,7 @@ function vibratoDepth(mantissa: number, shift: number): number {
   return round6(12 * Math.log2(1 + k));
 }
 
-function describeInstrument(inst: Instrument, index: number, fps: number, name: string | undefined): ExportedInstrument {
+function describeInstrument(inst: Instrument, index: number, fps: number, name: string | undefined, speedOf = 1): ExportedInstrument {
   const out: ExportedInstrument = {
     index,
     ...(name ? { name } : {}),
@@ -148,6 +165,18 @@ function describeInstrument(inst: Instrument, index: number, fps: number, name: 
     tables: { wave: (inst.wavetable?.length ?? 0) > 1 || !!inst.wavetable?.some((step) => step.note !== undefined || step.ring !== undefined || step.sync !== undefined), pulse: !!inst.pulsetable?.steps.length, filter: !!inst.filtertable?.steps.length },
   };
   if (inst.wave & 0x40) out.pulseWidth = inst.pw;
+  if (out.tables.wave && inst.wavetable) {
+    out.wavetable = inst.wavetable.map((step): ExportedWaveStep => {
+      const text = step.note === undefined ? undefined : String(step.note);
+      return {
+        ...(step.wave === undefined ? {} : { waveform: String(step.wave) }), ...(step.ring ? { ring: true } : {}), ...(step.sync ? { sync: true } : {}), ...(step.test ? { test: true } : {}),
+        gate: step.gate !== false,
+        ...(text === undefined ? {} : /^[+-]/.test(text) ? { offset: Number(text) } : { absolute: noteNameToMidi(text)! }),
+        calls: step.calls ?? (step.frames ?? 1) * speedOf,
+      };
+    });
+    if (inst.waveloop !== undefined) out.waveLoop = inst.waveloop;
+  }
   if (inst.vibRate) {
     out.vibrato = { depthSemitones: vibratoDepth(inst.vibUp[0], inst.vibUp[1]), rateHz: round6(inst.vibRate * fps / 256), delayCalls: inst.vibDelay };
   }
@@ -362,7 +391,7 @@ function buildEvents(doc: ParsedSidwave, options: EventExportOptions): ExportedS
     for (let i = tempoMap.length - 1; i > 0; i--) if (tempoMap[i]!.bpm === tempoMap[i - 1]!.bpm) tempoMap.splice(i, 1);
   }
 
-  const instruments = [...used].sort((a, b) => a - b).map((index) => describeInstrument(arr.instruments[index]!, index, fps, instrumentNames.get(index)));
+  const instruments = [...used].sort((a, b) => a - b).map((index) => describeInstrument(arr.instruments[index]!, index, fps, instrumentNames.get(index), doc.speed));
 
   // Flat event list.
   const events: ExportedEvent[] = [];

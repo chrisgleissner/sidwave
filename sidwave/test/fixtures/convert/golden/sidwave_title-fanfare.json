@@ -297,6 +297,122 @@
    }
   ]
  },
+ "sidwave:title-fanfare -> cheesecutter": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 2,
+    "where": "v4,v3",
+    "message": "2 voices dropped to fit 3 voices (22 notes): kept v1, v2, v5, ranked by notes x pitch range."
+   },
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "0 glides and 4 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Only the first three voices of the first SID are exported (the score has 3 voices)."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:title-fanfare -> sf2": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 4,
+    "message": "0 glides and 4 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "voices.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Only the 3 tracks of the driver are exported; the score has voices on SID 2 and the driver has 1 SID. Use a multi-SID driver such as sf2driver11_05_2sid.prg for more."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
  "sidwave:title-fanfare -> sidwizard": {
   "ok": true,
   "losses": [

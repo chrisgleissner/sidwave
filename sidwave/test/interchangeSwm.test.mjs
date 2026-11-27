@@ -18,10 +18,11 @@ import { irOfTrace } from "../src/reconstruct/reconstruct.js";
 import { runCli } from "../src/cli.js";
 import { HAND, HAND_SWS, HAND_SWI, buildSwm, instrumentBytes, P1, P2 } from "./helpers/swmKit.mjs";
 import { fuzz, cpuMs } from "./helpers/formatKit.mjs";
+import { homeDirectory } from "./helpers/home.mjs";
 
 const fixtures = new URL("./fixtures/sidwizard/", import.meta.url);
 const traces = new URL("./fixtures/traces/", import.meta.url);
-const SW_DIR = process.env.SIDWAVE_SIDWIZARD_DIR ?? path.join(os.homedir(), ".c64bridge/sidwave-standalone/research-src/anarkiwi_sid-wizard");
+const SW_DIR = process.env.SIDWAVE_SIDWIZARD_DIR ?? path.join(homeDirectory(), ".c64bridge/sidwave-standalone/research-src/anarkiwi_sid-wizard");
 const EXAMPLES = path.join(SW_DIR, "native/examples");
 const haveExamples = fs.existsSync(path.join(EXAMPLES, "echo-test.swm"));
 

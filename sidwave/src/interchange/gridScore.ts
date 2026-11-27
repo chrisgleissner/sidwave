@@ -5,7 +5,7 @@
 
 import yaml, { isMap, isScalar, isSeq } from "yaml";
 import { SidwaveValidationError, midiToNoteName, parseSidwave } from "../sidwave.js";
-import { compileSidwaveToPrg } from "../sidwaveCompiler.js";
+import { arrangeSidwave, compileSidwaveToPrg } from "../sidwaveCompiler.js";
 import { InterchangeInputError } from "./errors.js";
 import { IMPORT_DRUMS } from "./gm.js";
 
@@ -24,6 +24,11 @@ export interface GridCell {
   inst?: string;
   /** Glide to a pitch `to` semitones away over `frames` player calls. */
   bend?: { to: number; frames: number };
+  /** Slide in register units per video frame (signed); resolved to a `bend` by `resolveMotion` once the length of the note is known. */
+  slideRate?: number;
+  /** Portamento in register units per video frame from the note of pitch `portaFrom`; resolved to `portamento` frames by `resolveMotion`. */
+  portaRate?: number;
+  portaFrom?: number;
   /** Glide from the previous note of the voice over `portamento` player calls without a new gate (`legato`). */
   portamento?: number;
   legato?: boolean;
@@ -45,7 +50,8 @@ export interface GridScoreInput {
   instruments: Record<string, Record<string, unknown>>;
   /** Comment lines at the top of the file (without the leading #). */
   header: string[];
-  validate: boolean;
+  /** true: parse and compile the result; "parse": parse and arrange the score (every timing and pitch check of the compiler, without assembling the player; see `needsCompile`); false: no check. */
+  validate: boolean | "parse";
   /** Player calls per video frame (SIDWave `speed`), default 1. */
   speed?: number;
   /** SIDs of a multi-SID score. Voices fill them three at a time in order. */
@@ -144,7 +150,7 @@ export function buildGridScore(input: GridScoreInput): string {
   });
   const text = `${input.header.map((line) => `# ${line}`).join("\n")}\n${document.toString({ lineWidth: 0, flowCollectionPadding: false })}`;
   if (input.validate) {
-    try { compileSidwaveToPrg(parseSidwave(text)); } catch (error) {
+    try { const parsed = parseSidwave(structuredClone(doc)); if (input.validate === true) compileSidwaveToPrg(parsed); else arrangeSidwave(parsed); } catch (error) {
       if (error instanceof SidwaveValidationError) throw new GridScoreError(`the imported score is not accepted by SIDWave (${error.message})`, text);
       throw error;
     }
@@ -212,6 +218,121 @@ export function reduceMonophonic(notes: QuantisedNote[], totalCells: number, bas
     if (pitch !== n.pitch) out.octaveShifted++;
     out.cells[n.s] = { kind: "note", pitch, level: Math.max(1, Math.min(15, Math.round(15 * n.vel / 127))), ...(n.inst ? { inst: n.inst } : {}) };
     for (let c = n.s + 1; c < end; c++) out.cells[c] = { kind: "tie" };
+  }
+  return out;
+}
+
+/**
+ * True when the compiler could reject the score for table size: the compiled player holds at most 255 wavetable, pulse and
+ * filter steps over all instrument variants, and a voice that uses an instrument gets its own variant. When every voice
+ * stays below that worst case, parsing the score is enough as a check and the (slower) compile is skipped.
+ */
+export function needsCompile(voices: GridVoice[], instruments: Record<string, Record<string, unknown>>): boolean {
+  const size = (def: Record<string, unknown> | undefined, key: string): number => {
+    const v = def?.[key];
+    if (Array.isArray(v)) return v.length;
+    if (v && typeof v === "object" && Array.isArray((v as { steps?: unknown }).steps)) return (v as { steps: unknown[] }).steps.length;
+    return 0;
+  };
+  const total = { wavetable: 0, pulsetable: 0, filtertable: 0 };
+  for (const voice of voices) {
+    const used = new Set<string>();
+    for (const c of voice.cells) if (c.inst) used.add(c.inst);
+    for (const name of used) for (const key of Object.keys(total) as Array<keyof typeof total>) total[key] += size(instruments[name], key);
+  }
+  return total.wavetable > 200 || total.pulsetable > 200 || total.filtertable > 200 || voices.reduce((n, v) => n + new Set(v.cells.map((c) => c.inst).filter(Boolean)).size, 0) > 50;
+}
+
+/** SID frequency register value of a MIDI note (equal temperament, A4 = 440 Hz). */
+export const registerOfMidi = (midi: number, mode: "PAL" | "NTSC"): number => (440 * 2 ** ((midi - 69) / 12) * 16777216) / (mode === "PAL" ? 985248 : 1022727);
+
+/**
+ * Target note of a slide that adds `perFrame` register units per video frame for `frames` frames to `pitch`, as a SIDWave
+ * `bend` target. Undefined when the slide moves less than half a semitone (SIDWave bends to whole semitones).
+ */
+export function slideTarget(pitch: number, perFrame: number, frames: number, mode: "PAL" | "NTSC", maxMidi: number): number | undefined {
+  if (!perFrame || frames < 1) return undefined;
+  const from = registerOfMidi(pitch, mode), to = from + perFrame * frames;
+  if (to <= 0) return maxMidi - pitch > 48 ? undefined : Math.max(12, pitch - 48);
+  const semis = Math.max(-48, Math.min(48, Math.round(12 * Math.log2(to / from))));
+  const target = Math.max(12, Math.min(maxMidi, pitch + semis));
+  return target === pitch ? undefined : target;
+}
+
+/** Video frames a portamento of `perFrame` register units per frame needs from one note to the next (1..255). */
+export function portamentoFrames(from: number, to: number, perFrame: number, mode: "PAL" | "NTSC"): number {
+  if (perFrame <= 0) return 0;
+  return Math.max(1, Math.min(255, Math.ceil(Math.abs(registerOfMidi(to, mode) - registerOfMidi(from, mode)) / perFrame)));
+}
+
+/**
+ * SIDWave rejects a bend on an instrument whose wavetable sets pitches. Removes those bends and returns how many were removed.
+ * Call after the instrument names of the cells are final.
+ */
+export function dropBendsOnPitchTables(voices: GridVoice[], instruments: Record<string, Record<string, unknown>>): number {
+  let dropped = 0;
+  const pitched = (name: string): boolean => {
+    const wt = instruments[name]?.wavetable;
+    return Array.isArray(wt) && wt.some((step) => step && typeof step === "object" && "note" in step);
+  };
+  for (const voice of voices) for (const c of voice.cells) if (c.bend && (!c.inst || pitched(c.inst))) { delete c.bend; dropped++; }
+  return dropped;
+}
+
+/**
+ * Number of legato notes whose instrument differs from the one that is sounding. A SIDWave legato note keeps the sounding
+ * instrument, so such a change (a tracker command on a continuing note) is not heard.
+ */
+export function ignoredInstrumentChanges(voices: GridVoice[]): number {
+  let ignored = 0;
+  for (const voice of voices) {
+    let sounding: string | undefined;
+    for (const c of voice.cells) {
+      if (c.kind === "rest") sounding = undefined;
+      else if (c.kind === "note") {
+        if (c.legato && sounding !== undefined) { if (c.inst !== sounding) ignored++; } else sounding = c.inst;
+      }
+    }
+  }
+  return ignored;
+}
+
+/**
+ * Turns slide and portamento rates into SIDWave `bend` and `portamento` once the grid is final. A bend or glide has to reach
+ * its target while the note sounds, so its length is limited to the frames of the note (ties included) minus the two frames
+ * of the hard restart and two more of margin (SIDWave requires the glide to end before the note does). `frameStart[k]` is the video frame at which tick k starts. Bends on instruments whose wavetable
+ * sets pitches are dropped, because SIDWave rejects them. Returns the numbers of bends dropped for that reason.
+ */
+export function resolveMotion(voices: GridVoice[], frameStart: number[], instruments: Record<string, Record<string, unknown>>, mode: "PAL" | "NTSC", maxMidi: number): { pitchedBends: number; tooSmall: number } {
+  const out = { pitchedBends: 0, tooSmall: 0 };
+  const pitched = (name: string | undefined): boolean => {
+    const wt = name ? instruments[name]?.wavetable : undefined;
+    return Array.isArray(wt) && wt.some((step) => step && typeof step === "object" && "note" in step);
+  };
+  const ticks = frameStart.length - 1;
+  for (const voice of voices) {
+    const cells = voice.cells;
+    // A legato note keeps the sounding instrument, so that is the instrument a bend on it plays on.
+    let sounding: string | undefined;
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i]!;
+      if (c.kind === "rest") sounding = undefined;
+      else if (c.kind === "note" && !(c.legato && sounding !== undefined)) sounding = c.inst;
+      if (c.slideRate === undefined && c.portaRate === undefined) continue;
+      let j = i + 1;
+      while (j < cells.length && cells[j]!.kind === "tie") j++;
+      const duration = Math.min(255, frameStart[Math.min(j, ticks)]! - frameStart[Math.min(i, ticks)]! - 4);
+      if (c.portaRate !== undefined && c.portaFrom !== undefined && duration >= 1) {
+        const n = Math.min(portamentoFrames(c.portaFrom, c.pitch!, c.portaRate, mode), duration);
+        if (n >= 1) c.portamento = n;
+      } else if (c.slideRate !== undefined && duration >= 1) {
+        const onPitchTable = pitched(c.inst) || pitched(sounding);
+        const target = onPitchTable ? undefined : slideTarget(c.pitch!, c.slideRate, duration, mode, maxMidi);
+        if (target !== undefined) c.bend = { to: target - c.pitch!, frames: duration };
+        else if (onPitchTable) out.pitchedBends++; else out.tooSmall++;
+      }
+      delete c.slideRate; delete c.portaRate; delete c.portaFrom;
+    }
   }
   return out;
 }

@@ -1,0 +1,541 @@
+{
+ "cheesecutter:small-song -> sidwave": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> sid": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> midi": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend is not written (use --bend); glides, slides and vibrato are lost."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation and sync are not written; each instrument becomes a General MIDI program."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> musicxml": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.mapped",
+    "severity": "approx",
+    "count": 1,
+    "message": "ADSR envelopes, waveforms, pulse width, ring modulation, sync, filter and wavetables are not written; each instrument becomes a General MIDI program in the part list."
+   },
+   {
+    "stage": "write",
+    "code": "bend.not-written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitch bend, glides, slides and vibrato are not written."
+   },
+   {
+    "stage": "write",
+    "code": "notation.durations",
+    "severity": "info",
+    "count": 1,
+    "message": "Durations are written in ticks without a note type (quarter, eighth); a notation program engraves them from the duration."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> goattracker": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, ring and sync partners, hard restart settings, level and chip volume changes are not exported; every instrument uses GoatTracker's default hard restart of 2 calls."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> furnace": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Filter, pulse width modulation, vibrato, slides, level and chip volume changes, wavetable steps (arpeggio is kept as a macro) and the hard restart settings are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> wav": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "audio.rendered",
+    "severity": "lost",
+    "count": 1,
+    "message": "The score is rendered to 1 s of audio; no notes, instruments or tempo remain in the file."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> prg": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> events": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "info",
+    "count": 1,
+    "message": "Pulse width modulation is described per instrument but not exported as events."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> basic": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "basic.modulation.dropped",
+    "severity": "lost",
+    "count": 8,
+    "message": "8 notes change pitch, waveform or pulse width while sounding (wavetable, vibrato, arpeggio, glide, pulse sweep); the program holds one value of each per note."
+   },
+   {
+    "stage": "write",
+    "code": "basic.filter.sampled",
+    "severity": "approx",
+    "count": 12,
+    "message": "12 changes of the filter or volume registers between note starts are not written; the values are updated at note starts only."
+   },
+   {
+    "stage": "write",
+    "code": "basic.timing.jiffy",
+    "severity": "approx",
+    "count": 10,
+    "message": "Records are timed with TI (60 Hz, 16.7 ms steps) and the interpreter writes one register about every 10 ms: predicted note start error 4 ms mean, 8 ms maximum; the phase of TI adds up to 17 ms, and gate-offs are less exact than note starts. 10 gate-offs shortly before the next note of a voice are written together with that note."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> cheesecutter": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "approx",
+    "count": 2,
+    "message": "Pulse width modulation is described per instrument but not exported as events. | Pulse tables are not exported; an instrument keeps its fixed pulse width."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> sf2": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "approx",
+    "count": 2,
+    "message": "Pulse width modulation is described per instrument but not exported as events. | Pulse tables are not exported; an instrument keeps its fixed pulse width."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> sidwizard": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "approx",
+    "count": 1,
+    "message": "Instrument i00: pulse table (the first pulse width is written) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "expression.dropped",
+    "severity": "approx",
+    "count": 1,
+    "message": "Note velocities (2 distinct values) are not exported; the module plays at full volume."
+   }
+  ]
+ },
+ "cheesecutter:small-song -> vice-dump": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "read",
+    "code": "rows.padded",
+    "severity": "info",
+    "count": 1,
+    "message": "The voices have 16, 16, 2 ticks in their first pass; shorter voices are padded with rests."
+   },
+   {
+    "stage": "read",
+    "code": "timing.approximated",
+    "severity": "approx",
+    "count": 1,
+    "message": "The waveform of the first frame of a note (the hard restart waveform), master volume, the exact frame offsets inside a row and the global filter are approximated."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 2,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "trace.cycles",
+    "severity": "info",
+    "count": 1,
+    "message": "Cycle numbers are those of SIDWave's engine; a real VICE run of the same SID file starts with its own power-on delay."
+   }
+  ]
+ }
+}

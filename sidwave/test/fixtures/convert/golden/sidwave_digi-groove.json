@@ -344,6 +344,142 @@
    }
   ]
  },
+ "sidwave:digi-groove -> cheesecutter": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 26,
+    "message": "24 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "samples.digi",
+    "severity": "lost",
+    "count": 1,
+    "message": "Digi sample playback (CIA2 NMI samples) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "approx",
+    "count": 2,
+    "message": "Pulse width modulation is described per instrument but not exported as events. | Pulse tables are not exported; an instrument keeps its fixed pulse width."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 24,
+    "message": "24 glides and portamento notes are exported as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "vibrato.dropped",
+    "severity": "lost",
+    "count": 1,
+    "message": "Vibrato is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes are not exported; every instrument uses a two-call hard restart with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
+ "sidwave:digi-groove -> sf2": {
+  "ok": true,
+  "losses": [
+   {
+    "stage": "plan",
+    "code": "bend.dropped",
+    "severity": "lost",
+    "count": 26,
+    "message": "24 glides and 2 instruments with vibrato or slides are written as plain notes."
+   },
+   {
+    "stage": "plan",
+    "code": "metadata.dropped",
+    "severity": "info",
+    "count": 1,
+    "message": "The title and the author are not stored in the target."
+   },
+   {
+    "stage": "write",
+    "code": "samples.digi",
+    "severity": "lost",
+    "count": 1,
+    "message": "Digi sample playback (CIA2 NMI samples) is not exported."
+   },
+   {
+    "stage": "write",
+    "code": "filter.dropped",
+    "severity": "lost",
+    "count": 2,
+    "message": "Filter settings, cutoff sweeps and resonance are not exported. | Filter settings and filter tables are not exported."
+   },
+   {
+    "stage": "write",
+    "code": "pulse.modulation",
+    "severity": "approx",
+    "count": 2,
+    "message": "Pulse width modulation is described per instrument but not exported as events. | Pulse tables are not exported; an instrument keeps its fixed pulse width."
+   },
+   {
+    "stage": "write",
+    "code": "pitch.written",
+    "severity": "info",
+    "count": 1,
+    "message": "Pitches are the written notes; vibrato, arpeggio wavetables and slides are described per instrument."
+   },
+   {
+    "stage": "write",
+    "code": "glide.dropped",
+    "severity": "lost",
+    "count": 24,
+    "message": "24 glides and portamento notes are exported as plain notes."
+   },
+   {
+    "stage": "write",
+    "code": "instrument.simplified",
+    "severity": "approx",
+    "count": 1,
+    "message": "Pulse width modulation, hard restart settings, level and chip volume changes and the title and author are not exported; every instrument uses the hard restart of table row 0 with zero ADSR."
+   },
+   {
+    "stage": "write",
+    "code": "timing.row-grid",
+    "severity": "approx",
+    "count": 1,
+    "message": "Rows are whole multiples of the row length; note starts and ends are moved to the nearest row."
+   }
+  ]
+ },
  "sidwave:digi-groove -> sidwizard": {
   "ok": false,
   "category": "limit_exceeded",
