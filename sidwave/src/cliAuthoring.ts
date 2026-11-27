@@ -192,3 +192,21 @@ export function brief(value: unknown, max = 70): string {
   const text = JSON.stringify(value) ?? "undefined";
   return text.length > max ? `${text.slice(0, max - 3)}...` : text;
 }
+
+/** Edit distance of two short words. */
+function distance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return row[b.length]!;
+}
+
+/** The message for an unknown command, with the closest known command when one is near enough ("did you mean transform?"). */
+export function unknownCommandMessage(word: string, known: readonly string[]): string {
+  const ranked = known.map((name) => ({ name, d: distance(word.toLowerCase(), name) })).sort((x, y) => x.d - y.d)[0];
+  const near = ranked !== undefined && ranked.d <= Math.max(2, Math.floor(ranked.name.length / 3));
+  return `unknown command "${word}"${near ? `; did you mean ${ranked.name}?` : ""}`;
+}

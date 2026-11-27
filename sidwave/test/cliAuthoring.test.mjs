@@ -592,6 +592,15 @@ test("generate --list names the styles and every profile; bad values are usage e
   } finally { done(); }
 });
 
+test("an unknown command suggests the closest one", () => {
+  assert.match(run(".", "tranform", "x").err, /unknown command "tranform"; did you mean transform\?/);
+  assert.match(run(".", "mrege").err, /did you mean merge\?/);
+  assert.match(run(".", "fromat").err, /did you mean format\?/);
+  assert.match(run(".", "diif").err, /did you mean diff\?/);
+  assert.doesNotMatch(run(".", "zzzzzzzz").err, /did you mean/);
+  assert.equal(run(".", "tranform").code, EXIT_USAGE);
+});
+
 test("every authoring command has --help with at least two examples", () => {
   for (const command of ["transform", "format", "diff", "merge", "generate"]) {
     const help = run(".", command, "--help");
@@ -613,5 +622,36 @@ test("the built command line runs the authoring commands", () => {
     assert.equal(result.status, 0);
     assert.match(result.stdout, /semantically identical/);
     assert.equal(spawnSync(process.execPath, [binJs, "format", "s.yaml", "--check"], { cwd: dir }).status, 1);
+  } finally { done(); }
+});
+
+// Cold process: node start-up, module loading and cold code paths, which the in-process budgets do not see. The CPU
+// time of the finished child is read from /proc (Linux only; the resolution is 10 ms).
+function childCpuMs() {
+  const fields = fs.readFileSync("/proc/self/stat", "utf8").slice(fs.readFileSync("/proc/self/stat", "utf8").lastIndexOf(")") + 2).split(" ");
+  return (Number(fields[13]) + Number(fields[14])) * 10;
+}
+
+test("the authoring commands start fast in a new process", { skip: process.platform !== "linux" && "needs /proc" }, () => {
+  assert.ok(fs.existsSync(binJs), `${binJs} is missing: run "npm run build" before the tests`);
+  const { dir, done } = sandbox();
+  try {
+    write(dir, "s.yaml", SCORE);
+    write(dir, "t.yaml", withTempo(SCORE, 99));
+    const cold = (...args) => {
+      const before = childCpuMs();
+      const result = spawnSync(process.execPath, [binJs, ...args], { cwd: dir, encoding: "utf8" });
+      assert.ok(result.status === 0 || result.status === 1, `${args.join(" ")}: ${result.stderr}`);
+      return childCpuMs() - before;
+    };
+    const cases = [
+      [["--version"], 400], [["format", "--help"], 600], [["format", "s.yaml", "--check"], 1200], [["diff", "s.yaml", "t.yaml"], 1500],
+      [["merge", "s.yaml", "t.yaml", "s.yaml"], 2200], [["transform", "s.yaml", "--tempo", "99"], 2500], [["generate", "--seed", "3"], 1200],
+    ];
+    for (const [args, limit] of cases) {
+      const used = Math.min(cold(...args), cold(...args));
+      if (process.env.SIDWAVE_PERF_REPORT) console.log(`cold ${args.join(" ")}: ${used} ms CPU, limit ${limit}`);
+      assert.ok(used <= limit, `sidwave ${args.join(" ")} used ${used} ms CPU in a new process, over ${limit} ms`);
+    }
   } finally { done(); }
 });

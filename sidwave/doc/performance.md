@@ -67,6 +67,8 @@ average of 20 to 30 on 8 cores, so it is closer to a worst case than to a best c
 | `sidwave merge` (in the process) | 400 ms | 90-310 ms | the `yaml` package, then parse of the result |
 | `sidwave transform` (in the process) | 250 ms; `--validate compile` 400 ms; `--validate parse` 200 ms | 110-200 ms; 170-390 ms; 40-190 ms | the arrange step of the compiler on the result |
 | `sidwave generate` (composer 2) | 100 ms; with `--prg` and `--sid` 300 ms | 38 ms; 170 ms | the composer; then two compiles |
+| CLI cold start: `--version` | 60 ms CPU | 30 ms | Node start-up (it does not load the commands) |
+| CLI cold start: `format --help`, `generate`, `diff`, `format --check` | 150, 300, 700, 500 ms CPU | 100, 220-260, 350-600, 270-470 ms | the commands load only their own modules; the rest is cold code |
 | CLI cold start: `--help` | 200 ms wall | 120-175 ms | Node start-up and module loading |
 | CLI cold start: `validate` | 400 ms wall | 300-370 ms | module loading, then a cold parse |
 | CLI cold start: `compile` | 1 s wall | 0.7-0.85 s | cold code paths of the compiler |
