@@ -31,7 +31,7 @@ const { values: args } = parseArgs({
 /** The fields of a tune result that must reproduce. */
 export function comparable(r) {
   return {
-    strictExact: r.strictExact, registerStateExact: r.registerStateExact, compileOk: r.compileOk, turbo: r.turbo ?? false,
+    strictExact: r.strictExact, registerStateExact: r.registerStateExact, verification: r.verification?.mode ?? null, compileOk: r.compileOk, turbo: r.turbo ?? false,
     calls: r.calls, differingCalls: r.fdiff?.differingCalls, callsWithDifference: r.fdiff?.callsWithDifference,
     comparedCalls: r.fdiff?.comparedCalls, first: r.fdiff?.first ?? null, scoreSha256: r.scoreSha256,
   };

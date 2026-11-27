@@ -2,7 +2,9 @@
 // start-up differences with the register named, a likely cause from the class of the first difference, and the turbo fallback.
 import test from "#test/runner";
 import assert from "#test/assert";
-import { plainSummary, summaryLine } from "../src/cliReconstruct.ts";
+import { classifyError } from "../src/cliCore.ts";
+import { EXIT_CODES } from "../src/cliCore.ts";
+import { failOnInternalError, plainSummary, summaryLine } from "../src/cliReconstruct.ts";
 import { withTurbo, TURBO_MESSAGE } from "../src/reconstruct/reconstruct.ts";
 import { parseSidwave } from "../src/sidwave.ts";
 import { roundTrip } from "./helpers/reconstructRoundTrip.mjs";
@@ -97,4 +99,24 @@ test("a recovered score that exceeds the cycle budget is saved with cpu: turbo, 
   assert.equal(parseSidwave(result.score).cpu, "turbo");
   compileSidwaveBytes(parseSidwave(result.score), { format: "sid", loop: true });
   assert.match(plainSummary(result.report), /does not run at 1 MHz; the saved file needs `cpu: turbo` and Ultimate Turbo Registers/);
+});
+
+test("an internal error of the recovery maps to the internal category (exit 70) with the field in the details", () => {
+  const bad = report({ compile: { ok: false, error: "Invalid SIDWAVE at $.voices[2].patterns.P6.length: -1 is below the minimum" }, internalError: { field: "$.voices[2].patterns.P6.length", message: "-1 is below the minimum" } });
+  assert.doesNotThrow(() => failOnInternalError(report(), "t.sid"));
+  let caught;
+  try { failOnInternalError(bad, "t.sid"); } catch (e) { caught = e; }
+  const classified = classifyError(caught);
+  assert.equal(classified.category, "internal");
+  assert.equal(EXIT_CODES[classified.category], 70);
+  assert.equal(classified.details.field, "$.voices[2].patterns.P6.length");
+  assert.match(plainSummary(bad), /Internal error: .*\$\.voices\[2\]/);
+});
+
+test("a probe-only verification says that only the first seconds were compared", () => {
+  const r = different({ class: "pitch", call: 5, timeSeconds: 0.1, voice: 2, register: 7, expected: 3, observed: 4 }, { verification: { mode: "probe", seconds: 10 }, horizon: { seconds: 90, cycles: 0, calls: 4500, clock: "PAL", song: 1 } });
+  assert.match(plainSummary(r), /40 of 1000 player calls differ.*compared the first 10 s only, not the whole 90 s/);
+  assert.match(summaryLine(r), /compared the first 10 s only/);
+  const full = different({ class: "pitch", call: 5, timeSeconds: 0.1, voice: 2, register: 7, expected: 3, observed: 4 }, { verification: { mode: "full", seconds: 90 } });
+  assert.ok(!/compared the first/.test(plainSummary(full)));
 });

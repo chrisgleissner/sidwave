@@ -19,7 +19,8 @@
 
 import YAML from "yaml";
 import { formatSidwave } from "../format/sidwaveFormat.js";
-import { midiToHz, midiToNoteName } from "../sidwave.js";
+import { midiToHz, midiToNoteName, parseSidwave } from "../sidwave.js";
+import { compileSidwaveBytes } from "../sidwaveOps.js";
 import { mantissaShift, maxSidwaveMidi, sidwaveFrameRate } from "../sidwaveCompiler.js";
 import { controlRegister, type FrameIr } from "./ir.js";
 
@@ -1064,6 +1065,52 @@ function usesRegSteps(def: InstrumentDef, members: NoteSegment[]): boolean {
 }
 
 
+/** True when compiling the document fails only because the instrument pool or a table holds too much. */
+function exceedsBudget(document: Record<string, unknown>): boolean {
+  try {
+    compileSidwaveBytes(parseSidwave(YAML.stringify(document)), { format: "sid", loop: true });
+    return false;
+  } catch (error) {
+    return error instanceof Error && /more than 63 distinct|data exceeds 255 steps/.test(error.message);
+  }
+}
+
+/**
+ * Closed-loop budget repair. The compiler counts instrument variants (per voice, restart and routing) and table steps per
+ * instrument variant, which the recovery's own estimate does not see. When the compiler rejects the score for either limit,
+ * the least used instruments lose their tables and vibrato (level 2 keeps the hard restart, level 3 keeps only waveform and
+ * envelope) until it accepts. Search space: how many instruments, in order of fewest notes, and two levels; objective: the
+ * fewest simplified instruments (binary search, about log2(instruments) compiles per level); deterministic. Returns the
+ * number of notes that now use a simplified instrument, or 0 when nothing changed.
+ */
+function fitCompilerBudgets(document: Record<string, unknown>, usage: Map<string, number>): number {
+  if (!exceedsBudget(document)) return 0;
+  const instruments = document.instruments as Record<string, Record<string, unknown>> | undefined;
+  if (!instruments) return 0;
+  const original = JSON.parse(JSON.stringify(instruments)) as typeof instruments;
+  const names = Object.keys(original).sort((a, b) => (usage.get(a) ?? 0) - (usage.get(b) ?? 0) || a.localeCompare(b));
+  const apply = (n: number, level: number): void => {
+    for (const name of Object.keys(original)) instruments[name] = original[name]!;
+    for (const name of names.slice(0, n)) instruments[name] = simplifyInstrument(original[name]!, level);
+  };
+  for (const level of [2, 3]) {
+    apply(names.length, level);
+    if (exceedsBudget(document)) continue;
+    let lo = 1;
+    let hi = names.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      apply(mid, level);
+      if (exceedsBudget(document)) lo = mid + 1;
+      else hi = mid;
+    }
+    apply(lo, level);
+    return names.slice(0, lo).reduce((sum, name) => sum + (usage.get(name) ?? 0), 0);
+  }
+  apply(0, 3);
+  return 0;
+}
+
 /** The most player calls written out as `player.start` (the language allows 8 steps of 32 writes). */
 const START_MAX_STEPS = 8;
 const START_MAX_WRITES = 32;
@@ -1487,6 +1534,12 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   const silent: Layout = { blockBars: "flat", voices: [{ patterns: { P1: { length: 1 / callsPerBeat, groove: ["-"] } }, sequence: "P1", maxBeats: 0 }] };
   if (!used.length) { voiceIds.push(1); entriesByVoice.push([]); defaults.push(0); }
   const document = chosen?.document ?? build(silent);
+  const usage = new Map<string, number>();
+  for (const seg of allSegs) if (!seg.phantom) usage.set(instNames[seg.instrument]!, (usage.get(instNames[seg.instrument]!) ?? 0) + 1);
+  const refitted = fitCompilerBudgets(document, usage);
+  if (refitted > 0) {
+    unsupported.push({ kind: "instrument_budget", detail: `${refitted} further notes use instruments whose tables or vibrato were dropped because the compiler's instrument-variant or table-step limit was exceeded`, evidence: { notes: refitted } });
+  }
   const text = formatSidwave(YAML.stringify(document));
   let patternCount = 0;
   for (const v of (document.voices as Array<{ patterns: object }>)) patternCount += Object.keys(v.patterns).length;

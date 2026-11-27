@@ -99,3 +99,33 @@ test("eight steps of 32 writes assemble (the branches over a long step are in ra
   const ir = await trace(text, 1);
   assert.equal(ir.calls[8].sids[0].written > 0, true);
 });
+
+test("player.start: exact writes of 8 steps x 32, cycles within the estimate, no dispatch cost after the start, and a second init restarts it", async () => {
+  const { playDoc } = await import("./helpers/sidwaveEmulator.mjs");
+  const steps = Array.from({ length: 8 }, (_, k) => Array.from({ length: 32 }, (_, i) => ({ reg: 0xd400 + ((i * 7 + k) % 25), value: (k * 32 + i) & 255 })));
+  const text = (start) => `sidwave: "1.5"
+title: T
+tempo: 120
+cpu: turbo
+player: { soft_start: false${start ? `, start: ${JSON.stringify(steps.map((s) => s.map((w) => ({ reg: w.reg, value: w.value }))))}` : ""} }
+voices:
+  - { id: 1, instrument: lead, patterns: { a: { length: 1, bars: 1, groove: "A4 - C5 -" } } }
+instruments:
+  lead: { waveform: pulse, adsr: [0, 4, 12, 3] }
+timeline:
+  - { section: Main, bars: 4, layers: { v1: a } }
+`;
+  const run = playDoc(text(true), 14);
+  const plain = playDoc(text(false), 14);
+  for (let k = 0; k < 8; k++) {
+    assert.deepEqual(run.calls[k].writes.map((w) => [w.addr, w.value]), steps[k].map((w) => [w.reg, w.value]), `start step ${k}`);
+  }
+  const peak = Math.max(...run.calls.map((c) => c.cycles));
+  assert.ok(peak <= run.compiled.worstCaseCyclesPerCall, `peak ${peak} within estimate ${run.compiled.worstCaseCyclesPerCall}`);
+  // after the start the dispatch chain is not run: a steady-state call costs at most 6 cycles (the jump) more than without start
+  for (let k = 8; k < 14; k++) assert.ok(run.calls[k].cycles - plain.calls[k - 8].cycles <= 6, `call ${k}: ${run.calls[k].cycles} vs ${plain.calls[k - 8].cycles}`);
+  // a second init restores the start phase
+  run.cpu.call(run.compiled.initAddress);
+  const first = run.calls[0].cycles;
+  assert.equal(run.cpu.call(run.compiled.playAddress), first, `the first call after a second init is start step 0 again`);
+});

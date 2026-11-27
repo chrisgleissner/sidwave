@@ -39,7 +39,7 @@ export function summaryLine(report: ReconstructReport): string {
   const turbo = report.compile?.turboFallback ? ", turbo fallback (not run at 1 MHz)" : "";
   return `horizon ${report.horizon.seconds} s (${report.horizon.calls} calls), ${report.recovery.noteCount} notes, ${report.recovery.instrumentCount} instruments, `
     + `strict ${report.strictExact ? "exact" : "not exact"}, register state ${report.registerStateExact ? "exact" : "differs"}${turbo}, `
-    + `F-diff: ${report.fdiff.callsWithDifference} of ${report.fdiff.comparedCalls} calls differ, ${state} differing calls in register-state classes, ${f.classes.timing.differingCalls} in call timing, ${report.languageExtensions.length} language-extension candidates`;
+    + `F-diff: ${report.fdiff.callsWithDifference} of ${report.fdiff.comparedCalls} calls differ${report.verification?.mode === "probe" ? ` (compared the first ${report.verification.seconds} s only)` : ""}, ${state} differing calls in register-state classes, ${f.classes.timing.differingCalls} in call timing, ${report.languageExtensions.length} language-extension candidates`;
 }
 
 const VOICE_REGISTERS = ["frequency low", "frequency high", "pulse width low", "pulse width high", "control", "attack/decay", "sustain/release"];
@@ -83,7 +83,8 @@ export function plainSummary(report: ReconstructReport): string {
     const f = report.fdiff;
     if (f.callsWithDifference > 0 || !report.registerStateExact) {
       const share = f.comparedCalls ? ` (${((100 * f.callsWithDifference) / f.comparedCalls).toFixed(1)} %)` : "";
-      lines.push(`${f.callsWithDifference} of ${f.comparedCalls} player calls differ${share}.`);
+      const scope = report.verification?.mode === "probe" ? ` (compared the first ${report.verification.seconds} s only, not the whole ${report.horizon.seconds} s)` : "";
+      lines.push(`${f.callsWithDifference} of ${f.comparedCalls} player calls differ${share}${scope}.`);
     }
     const first = f.first;
     if (first && !report.registerStateExact) {
@@ -113,6 +114,14 @@ export function plainSummary(report: ReconstructReport): string {
   return `${lines.join("\n")}\n`;
 }
 
+/** An invalid recovered score is a defect of the recovery: the `internal` category (exit 70), with the field path in the details. */
+export function failOnInternalError(report: ReconstructReport, file: string): void {
+  if (!report.internalError) return;
+  throw new SidwaveOperationError("internal", `the recovered score is not valid${report.internalError.field ? ` at ${report.internalError.field}` : ""}: ${report.internalError.message}`, {
+    file, ...(report.internalError.field ? { field: report.internalError.field } : {}),
+  });
+}
+
 export async function reconstructCommand(io: CliIo, options: ReconstructOptions): Promise<number> {
   if (options.positional.length !== 1) throw new UsageError("reconstruct needs exactly one SID file");
   const file = options.positional[0]!;
@@ -132,6 +141,7 @@ export async function reconstructCommand(io: CliIo, options: ReconstructOptions)
       throw new SidwaveOperationError("input", `cannot write ${target}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { file: target });
     }
   }
+  failOnInternalError(report, file);
   const ok = reconstructPassed(report);
   if (options.json) io.out(`${JSON.stringify(envelope("reconstruct", ok, { result: { file, output: target ?? null, score, summary: plainSummary(report).trimEnd().split("\n"), report } }), null, 2)}\n`);
   else {

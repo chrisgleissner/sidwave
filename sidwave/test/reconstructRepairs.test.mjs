@@ -243,16 +243,15 @@ test("trimIr keeps the calls that start within the given seconds of the alignmen
   assert.equal(trimIr(ir, 0, 100).calls.length, 10);
 });
 
-test("compiled examples reconstructed at 20 s and 60 s never return a score that fails validation without an internal error naming the field", { timeout: 600_000 }, async () => {
+test("compiled examples reconstructed at 20 s and 60 s always return a score that compiles (instrument and table budgets are applied in recovery)", { timeout: 900_000 }, async () => {
   const { readSidwaveExample } = await import("../src/sidwaveExamples.ts");
-  for (const name of ["fuer_elise", "chamber_waltz", "title_fanfare", "arp_ballad"]) {
+  for (const name of ["fuer_elise", "chamber_waltz", "title_fanfare", "arp_ballad", "ambient_filter"]) {
     const bytes = new Uint8Array(compileSidwaveBytes(parseSidwave(readSidwaveExample(name)), { format: "sid", loop: true }).bytes);
     for (const seconds of [20, 60]) {
       const { score, report } = await reconstructSid(bytes, { engine: sharedEngine(), seconds, verify: "staged" });
-      parseSidwave(score); // never a negative length or another field error
-      if (report.compile?.ok) continue;
-      assert.ok(report.internalError, `${name} ${seconds} s: compile failed without an internal error: ${report.compile?.error}`);
-      assert.match(report.internalError.field ?? "", /^\$/, `${name} ${seconds} s: ${report.internalError.message}`);
+      parseSidwave(score);
+      assert.equal(report.compile?.ok, true, `${name} ${seconds} s: ${report.compile?.error}`);
+      assert.equal(report.internalError, undefined, `${name} ${seconds} s`);
     }
   }
 });

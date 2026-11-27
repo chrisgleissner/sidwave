@@ -2592,7 +2592,7 @@ function estimatePlayerCycles(arr: Arrangement, loop: boolean): number {
   const hasFade = arr.instruments.some((inst) => inst.vibFade);
   const bursts = new Map<number, number>();
   const add = (frame: number, cycles: number) => bursts.set(frame, (bursts.get(frame) ?? 0) + cycles);
-  let regular = 180 + (arr.softVolume ? 35 + 135 * (arr.chips?.length ?? 1) : 0) + (arr.samples ? 48 * (arr.chips?.length ?? 1) : 0); // entry, pointer/banking saves, play-once wrapper and return
+  let regular = (arr.startSteps ? 6 : 0) + 180 + (arr.softVolume ? 35 + 135 * (arr.chips?.length ?? 1) : 0) + (arr.samples ? 48 * (arr.chips?.length ?? 1) : 0); // entry, pointer/banking saves, play-once wrapper and return
   for (const chip of arr.chips ?? [{ filter: arr.filter, hasFilterTable: hasFilter }]) {
     regular += arr.chips ? 155 : 0; // base table lookup, 3-channel dispatch and unfiltered volume
     if (chip.filter.used || chip.hasFilterTable || !arr.chips) {
@@ -2668,7 +2668,12 @@ function estimatePlayerCycles(arr: Arrangement, loop: boolean): number {
       }
     }
   }
-  return regular + [...bursts.values()].reduce((max, cycles) => Math.max(max, cycles), 0);
+  const steady = regular + [...bursts.values()].reduce((max, cycles) => Math.max(max, cycles), 0);
+  if (!arr.startSteps) return steady;
+  // A start call replaces the normal call: the dispatch chain (lda, cmp, beq, jmp: 12 cycles per skipped step), bank and
+  // sid_io save and restore, each write (immediate load and an indirect or absolute store, at most 11), the step counter and the self-modifying switch.
+  const startCall = Math.max(...arr.startSteps.map((step, k) => 12 * k + 70 + 11 * step.length + 40));
+  return Math.max(steady, startCall + 40);
 }
 
 // A single player body processes one 3-channel group at a time. Only the
@@ -3895,8 +3900,10 @@ init_core:`);
   }
   if (arr.startSteps) {
     // SIDWave 1.5 `player.start`: each of the first calls writes its listed registers and does nothing else; the song starts after them.
-    const label = loop ? "play:\n" : "play_tick:\n";
-    if (!playerCode.includes(`\n${label}`)) throw new Error("SIDWAVE player code changed: the start patch point was not found");
+    // The entry of the player is a jump to the start chain. The last step rewrites that jump to the normal player, so the chain costs 3 cycles per call afterwards; init restores it.
+    const label = loop ? "play" : "play_tick";
+    if (!playerCode.includes(`\n${label}:\n`) || !playerCode.includes("  sta $01\n  ldy #95\n  cpx #0\n")) throw new Error("SIDWAVE player code changed: the start patch point was not found");
+    const last = arr.startSteps.length - 1;
     const steps = arr.startSteps.map((step, k) => `  lda st_i
   cmp #${k}
   beq st_run_${k}
@@ -3910,9 +3917,11 @@ ${arr.chips && step.some((w) => w.reg >= 0x15) ? "  lda sid_io\n  pha\n  lda sid
 ${arr.chips && step.some((w) => w.reg >= 0x15) ? "  pla\n  sta sid_io+1\n  pla\n  sta sid_io\n" : ""}  pla
   sta $01
   inc st_i
-  rts
+${k === last ? `  lda #<${label}_run\n  sta ${label}+1\n  lda #>${label}_run\n  sta ${label}+2\n` : ""}  rts
 st_skip_${k}:`).join("\n");
-    playerCode = playerCode.replace(`\n${label}`, `\n${label}${steps}\n`);
+    playerCode = playerCode.replace(`\n${label}:\n`, `\n${label}:\n  jmp st_chain\n${label}_run:\n`);
+    playerCode = playerCode.replace("  sta $01\n  ldy #95\n  cpx #0\n", `  sta $01\n  lda #<st_chain\n  sta ${label}+1\n  lda #>st_chain\n  sta ${label}+2\n  lda #0\n  sta st_i\n  ldy #95\n  cpx #0\n`);
+    playerCode += `\nst_chain:\n${steps}\n  jmp ${label}_run\n`;
   }
   if (arr.streamCalls) playerCode += `
 c_call:

@@ -27,7 +27,7 @@ const dist = path.join(root, "sidwave", "dist");
 const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 const MAX_WORKERS = 4;
 const DESIGN_HORIZON = 180;
-const SCRIPT_VERSION = 3;
+const SCRIPT_VERSION = 4;
 
 const { values: args } = parseArgs({
   options: {
@@ -44,6 +44,10 @@ const { values: args } = parseArgs({
     force: { type: "boolean", default: false },
     label: { type: "string", default: "" },
     "one": { type: "string" },
+    // "staged" (default): verify the first 10 s, the whole horizon only when the probe is state-exact. "full": always the whole horizon.
+    verify: { type: "string", default: "staged" },
+    // JSON of a run with --verify full: its CPU figure is recorded next to the staged one.
+    "full-report": { type: "string" },
   },
 });
 
@@ -96,7 +100,7 @@ function versions() {
 const hvsc = process.env.HVSC_DIR;
 const manifest = JSON.parse(readFileSync(args.manifest, "utf8"));
 const maxHorizon = args["max-horizon"] ? Number(args["max-horizon"]) : DESIGN_HORIZON;
-const settings = { maxHorizon, a1: !args["no-a1"], scriptVersion: SCRIPT_VERSION };
+const settings = { maxHorizon, a1: !args["no-a1"], verify: args.verify, scriptVersion: SCRIPT_VERSION };
 
 function horizonOf(tune) {
   const design = Math.min(tune.lengthSeconds, DESIGN_HORIZON);
@@ -166,7 +170,7 @@ async function runOne(tune) {
   const rawEngine = createLibsidplayfpEngine({ emulation: "sidlite" });
   const engine = cachingEngine(rawEngine, sidBytes, versions().engine);
   const started = Date.now();
-  const { score, report, compiled, timings } = await reconstructSid(sidBytes, { engine, song: tune.subtune, seconds: horizon.usedSeconds, title: "Reconstructed" });
+  const { score, report, compiled, timings } = await reconstructSid(sidBytes, { engine, song: tune.subtune, seconds: horizon.usedSeconds, title: "Reconstructed", verify: args.verify });
   const result = {
     path: tune.path, md5: tune.md5, subtune: tune.subtune, lengthSeconds: tune.lengthSeconds,
     horizon,
@@ -174,6 +178,7 @@ async function runOne(tune) {
     ...classify(report),
     strictExact: report.strictExact,
     registerStateExact: report.registerStateExact,
+    verification: report.verification ?? null,
     compileOk: report.compile?.ok === true,
     // The recovered score does not run at 1 MHz: it was saved with `cpu: turbo` and is excluded from the A1 counts.
     turbo: Boolean(report.compile?.turboFallback),
@@ -310,6 +315,7 @@ function passThrough() {
   const out = ["--cache", args.cache, "--roms", args.roms, "--manifest", args.manifest];
   if (args["no-a1"]) out.push("--no-a1");
   if (args["max-horizon"]) out.push("--max-horizon", args["max-horizon"]);
+  out.push("--verify", args.verify);
   return out;
 }
 
@@ -343,6 +349,9 @@ function buildReport(results, versions) {
       differingCalls: sum((r) => r.fdiff?.differingCalls ?? 0),
       scoreBytes: sum((r) => r.scoreBytes ?? 0),
       musicMinutes: Number(music.toFixed(2)),
+      probeOnly: results.filter((r) => r.verification?.mode === "probe").length,
+      fullVerifyCpuSecondsPerMusicMinute: args["full-report"] && existsSync(args["full-report"]) ? JSON.parse(readFileSync(args["full-report"], "utf8")).summary.reconstructCpuSecondsPerMusicMinute : null,
+      callZeroFirstDifferences: results.filter((r) => r.fdiff?.first?.call === 0).length,
       reconstructCpuSecondsPerMusicMinute: music ? Number((sum((r) => r.timing.cpuSeconds) / music).toFixed(2)) : null,
       recoverMsPerMusicMinute: music ? Number((sum((r) => r.timing.phasesMs.recover) / music).toFixed(1)) : null,
     },
@@ -361,18 +370,20 @@ function markdown(report) {
   L.push(`- A1 pass (approximate status): ${s.a1Pass} of ${s.a1Evaluated} evaluated (turbo-fallback tunes are not evaluated)`);
   L.push(`- Turbo fallback: ${s.turbo} of ${s.tunes}. Each of these recovered scores does not run at 1 MHz; the saved file needs \`cpu: turbo\` and Ultimate Turbo Registers. The saved score includes \`cpu: turbo\` with a warning comment. They are never strict matches and are excluded from the A1 counts.`);
   L.push(`- Horizon shorter than the design horizon: ${s.horizonReduced}`);
-  L.push(`- Reconstruct CPU time: ${s.reconstructCpuSecondsPerMusicMinute} s per minute of music (traces of both the tune and the recompiled score included); recovery step alone ${s.recoverMsPerMusicMinute} ms per minute of music`, "");
+  L.push(`- Verification: ${s.tunes - s.probeOnly} of ${s.tunes} tunes were verified over the whole horizon; ${s.probeOnly} were compared over the first 10 s only because their 10 s probe was not register-state exact. "Calls that differ" for those tunes counts the first 10 s only.`);
+  L.push(`- First difference at call 0 (start-up): ${s.callZeroFirstDifferences} of ${s.tunes}`);
+  L.push(`- Reconstruct CPU time: ${s.reconstructCpuSecondsPerMusicMinute} s per minute of music with ${settings.verify} verification (traces of both the tune and the recompiled score included). This figure includes the saving from skipping the full retrace of tunes that fail the 10 s probe.${s.fullVerifyCpuSecondsPerMusicMinute !== null ? ` With full verification of every tune (--verify full): ${s.fullVerifyCpuSecondsPerMusicMinute} s per minute of music.` : ""} Recovery step alone: ${s.recoverMsPerMusicMinute} ms per minute of music.`, "");
   if (s.turboTunes.length) L.push("Turbo-fallback tunes:", "", ...s.turboTunes.map((t) => `- ${t}`), "");
   L.push(`Source revision ${report.source.commit.slice(0, 12)}${report.source.dirty ? " (working tree with uncommitted changes)" : ""}; \`scripts/check-reconstruct-repro.mjs\` reruns tunes with an empty cache and compares them with this report.`, "");
   L.push("## Root-cause classes (first material difference)", "");
   L.push("| Class | Tunes |", "| --- | ---: |");
   for (const [k, v] of Object.entries(s.rootCauseCounts)) L.push(`| ${k} | ${v} |`);
   L.push("", "## Tunes", "");
-  L.push("| Tune | Horizon s | Strict | State | Turbo | A1 | Class | First difference | Calls that differ | Score bytes | CPU s/min |", "| --- | ---: | :-: | :-: | :-: | :-: | --- | --- | ---: | ---: | ---: |");
+  L.push("| Tune | Horizon s | Verified | Strict | State | Turbo | A1 | Class | First difference | Calls that differ | Score bytes | CPU s/min |", "| --- | ---: | :-: | :-: | :-: | :-: | :-: | --- | --- | ---: | ---: | ---: |");
   for (const r of report.tunes) {
     const f = r.fdiff?.first;
     const first = r.error ? `error: ${r.error}` : f ? `${f.class}${f.call === 0 ? " (start-up)" : ""} call ${f.call} (${f.timeSeconds.toFixed(2)} s)${f.voice !== undefined ? ` voice ${f.voice}` : ""}${f.register !== undefined ? ` reg $${f.register.toString(16)}` : ""}${f.expected !== undefined ? ` ${f.expected}->${f.observed}` : ""}` : r.compileOk === false ? `no compile: ${(r.compileError ?? "").slice(0, 60)}` : "none";
-    L.push(`| ${r.path}:${r.subtune} | ${r.horizon.usedSeconds}${r.horizon.reduced ? " (reduced)" : ""} | ${r.strictExact ? "yes" : "no"} | ${r.registerStateExact ? "yes" : "no"} | ${r.turbo ? "yes" : "no"} | ${r.turbo ? "excluded" : r.a1?.level ?? r.a1?.status ?? "-"} | ${r.rootCause} | ${first} | ${r.fdiff ? `${r.fdiff.callsWithDifference ?? "?"} of ${r.fdiff.comparedCalls}` : "-"} | ${r.scoreBytes ?? "-"} | ${r.timing?.reconstructCpuPerMusicMinute ?? "-"} |`);
+    L.push(`| ${r.path}:${r.subtune} | ${r.horizon.usedSeconds}${r.horizon.reduced ? " (reduced)" : ""} | ${r.verification ? (r.verification.mode === "probe" ? `first ${r.verification.seconds} s` : "whole") : "-"} | ${r.strictExact ? "yes" : "no"} | ${r.registerStateExact ? "yes" : "no"} | ${r.turbo ? "yes" : "no"} | ${r.turbo ? "excluded" : r.a1?.level ?? r.a1?.status ?? "-"} | ${r.rootCause} | ${first} | ${r.fdiff ? `${r.fdiff.callsWithDifference ?? "?"} of ${r.fdiff.comparedCalls}` : "-"} | ${r.scoreBytes ?? "-"} | ${r.timing?.reconstructCpuPerMusicMinute ?? "-"} |`);
   }
   L.push("", "## Unsupported features and language-extension candidates", "");
   const kinds = {};
