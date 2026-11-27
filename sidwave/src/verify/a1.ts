@@ -153,7 +153,8 @@ const binPower = new Float64Array(TOP_BIN + 1);
  *
  * The window is real, so its spectrum comes from one complex FFT of half the length: the even samples are the real
  * parts and the odd samples the imaginary parts, and the two spectra are separated afterwards. The squared magnitude
- * of each bin is formed directly instead of through `Math.hypot`, which is much slower.
+ * of each bin is formed directly instead of through `Math.hypot`, which is much slower. The band energies matched the
+ * full-size implementation on every fixture tested; the arithmetic order differs, so last-digit differences are possible.
  */
 function windowFeatures(samples: Int16Array, start: number, out: Float32Array, offset: number): number {
   let sumSquares = 0;

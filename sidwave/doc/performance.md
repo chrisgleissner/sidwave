@@ -62,7 +62,7 @@ average of 20 to 30 on 8 cores, so it is closer to a worst case than to a best c
 
 Why these values: the YAML package is the floor for parsing, formatting and merging; the budgets for those leave room
 above what it needs. Compiling has no external floor, so its budget is the measured cost with a margin, and the
-regression test below fails when it grows by more than about two times. The analysis budgets follow what the algorithms
+regression test below fails when it grows by more than about five times its measured ratio. The analysis budgets follow what the algorithms
 need (the number of FFTs is fixed by the window and hop sizes) and can only move by a better FFT.
 
 ## What was changed to reach them
@@ -78,7 +78,7 @@ need (the number of FFTs is fixed by the window and hop sizes) and can only move
 - **Semantic diff**: values are compared in place, not by serialising both sides at every level, and when both texts hold
   equal data only one of them is compiled.
 - **A1**: each window is real, so its spectrum is computed with one complex FFT of half the length, and the band powers
-  are formed without `Math.hypot`. The band energies are bit-identical to the previous implementation.
+  are formed without `Math.hypot`. The band energies were identical to the previous implementation on all fixtures tested (the arithmetic order differs, so a last-digit difference is possible in principle).
 - **Fidelity, quality and similarity**: FFT twiddle factors and the bit-reversal table are computed once per size (same
   values as the recurrence used before), the chroma tables and the mono mix are reused, and each chroma frame uses a
   half-size FFT. Reports differ from the previous ones by less than 1e-13 relative.
@@ -102,7 +102,8 @@ The compiler output, PSID files, the game build and the example fixtures are byt
 ## Regression tests
 
 `test/performanceBudgets.test.mjs` measures parse, compile, format, diff, cutoff resolution, Songlengths parsing, trace
-comparison, trace IR and A1 as the smallest CPU time of several runs, divided by the smallest CPU time of a fixed loop
-measured alternately in the same process. The bounds are several times the typical ratio, so they flag a complexity
-regression (a quadratic scan, a repeated parse) and do not flake with machine speed. Run with
+comparison, trace IR and A1 as the smallest CPU time of several runs, divided by the smallest CPU time of a fixed workload
+measured alternately in the same process (a mixed allocation, sort and JSON workload; a tight arithmetic loop was
+rejected because it ran 5 times slower in some processes). The bounds are about five times the measured ratio, so they
+flag a complexity regression (a quadratic scan, a repeated parse). Run with
 `SIDWAVE_PERF_REPORT=1` to print the measured ratios.

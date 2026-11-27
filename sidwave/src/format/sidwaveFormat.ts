@@ -59,13 +59,13 @@ function classify(path: string): ChangeClass {
 }
 function esc(s: string) { return s.replace(/~/g, "~0").replace(/\//g, "~1"); }
 /**
- * Whether two parsed YAML values serialise to the same JSON text: same types, same key order, same array contents,
- * with numbers that JSON cannot represent (NaN, infinities) all reading as null. It compares in place and stops at the
- * first difference instead of serialising both values at every level of the walk.
+ * Whether two parsed YAML values are the same: same types, same key order, same array contents, numbers compared with
+ * Object.is after the identity check (so NaN equals NaN, and .inf, -.inf and .nan are three different values). It
+ * compares in place and stops at the first difference instead of serialising both values at every level of the walk.
  */
 function equal(a: unknown, b: unknown): boolean {
   if (a === b) return true;
-  if (typeof a === "number" && typeof b === "number") return !Number.isFinite(a) && !Number.isFinite(b);
+  if (typeof a === "number" && typeof b === "number") return Object.is(a, b);
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
