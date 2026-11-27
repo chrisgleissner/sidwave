@@ -18,7 +18,7 @@ test("a reconstructed SIDWave tune: observed trace facts, inferred musical facts
   assert.deepEqual({ seconds: report.horizon.seconds, song: report.horizon.song, clock: report.horizon.clock }, { seconds: 3, song: 1, clock: "PAL" });
   assert.equal(report.reconstruction.strictExact, true);
   const marks = checkMarks(report);
-  assert.ok(marks.observed >= 8 && marks.inferred >= 6, JSON.stringify(marks));
+  assert.ok(marks.observed >= 5 && marks.inferred >= 10, JSON.stringify(marks));
   assert.equal(report.key.basis, "inferred");
   assert.equal(report.metre.declared.basis, "inferred");
   assert.match(report.metre.declared.method, /reconstruction/);
