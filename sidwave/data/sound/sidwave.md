@@ -1208,6 +1208,117 @@ unchanged, and a document with `effects: {}` compiles to the same PRG and game b
 key (`test/sidwave14Effects`). A document with `sidwave: 1.3` (or 1.2, or none) that contains `effects` is rejected with
 `effects require sidwave: 1.4` (`$.effects`).
 
+## SIDWave 1.5
+
+A `sidwave: 1.5` document accepts everything that 1.4 accepts and compiles a document that uses no 1.5 construct to the
+same PRG and PSID bytes as under 1.4 (test/sidwave15Extensions: the same score as 1.4 and 1.5, with and without a pulse
+table, gives equal bytes). Every 1.5 construct is rejected in an older document with an error that names the version and
+the field, for example `$.player: player options require sidwave: 1.5; the document declares sidwave: 1.4`.
+
+The extensions come from reconstructing real SID tunes (`sidwave reconstruct`, S5d). The counts below are over the 24
+development tunes of `data/reconstruct/corpus-manifest.json`; no tune is named, and no recovery rule refers to one.
+
+### Why a language change
+
+#### Player options: `player.soft_start`
+
+**Reproducer.** A tune that sets the master volume to 15 in its first call and keeps it there. Recovered as a 1.4 score
+and compiled, the 1.4 player writes volume 1, 2, ... 15 over its first 15 frames (`$D418`), so every call of the first
+15 frames differs in the volume class.
+
+**Why 1.4 cannot express it.** The soft-start ramp is part of every modern player (`softVolume`); no field switches it off.
+
+**Evidence.** All 24 development tunes start at volume 15 without a ramp, so 24 of 24 differ at the first volume write.
+
+**Design.** `player: { soft_start: false }` removes the ramp code; the default is `true`, which keeps the 1.4 bytes. The
+player writes the chip volume of the song from its first call.
+
+**Rejected alternative.** A volume ramp length in frames. No tune needs a ramp of a different length, and a ramp table is the
+trace dump that the language avoids.
+
+#### Tuning: `tuning.cents` and `tuning.registers`
+
+**Reproducer.** Gate-on frequency registers that no equal-temperament note produces under any single detune, for example
+a player whose own note table holds values a few units away from the 16-bit equal-temperament registers.
+
+**Why 1.4 cannot express it.** A voice `detune` shifts all notes of one voice by the same cents. A note table that is not
+equal temperament (every entry off by its own amount) needs one register per note. Per-voice detune cannot express it, and a
+score-level cents shift cannot either.
+
+**Evidence.** The baseline run reports an exact-frequency candidate for 24 of 24 tunes.
+
+**Design.** A top-level `tuning` with `cents` (-100 to 100, a shift of every note) and `registers`, a mapping from note
+names (C0 to B7) to exact 16-bit register values (integer or `$hhhh`). Both replace entries of the 96-entry note table that
+the player copies at init, for the clock of the document's `mode`. Nothing else in the player changes. Arpeggios, wavetable
+note steps and the vibrato base use the same table. `tuning: {}` or an absent field keeps the equal-temperament table.
+
+```yaml
+sidwave: 1.5
+tuning:
+  cents: -12
+  registers: { A4: $1CD6, C5: 0x2222 }
+```
+
+**Deviation from the S5 design.** The design proposed a note literal `f$1CD6` wherever a note name is accepted. A literal would
+add a per-note payload to the stream and to the player's note start; the observed need is a player's note table, which a
+table override expresses with no player change and no per-note cost. The literal is not implemented. A per-call exact
+register is available as the wavetable step `reg` below.
+
+**Rejected alternative.** Free tuning in cents per score only: it cannot express a table whose entries are not a constant
+distance from equal temperament.
+
+#### Wavetable step `reg`
+
+**Reproducer.** A percussion note whose frequency steps through values that are not notes (for example `$10C3`, `$430F`,
+`$2187`, `$191E`) on consecutive calls.
+
+**Why 1.4 cannot express it.** A wavetable step has a note (absolute or relative) or a linear `slide_to`; neither can write
+an arbitrary register value.
+
+**Evidence.** 21 of 24 tunes report a pitch-table candidate.
+
+**Design.** A wavetable step may carry `reg: $hhhh` (or an integer 0 to 65535) instead of `note`. It reuses the raw-pitch
+path that `slide_to` already uses, so the player code is unchanged; the value is the same on PAL and NTSC. `reg` cannot be
+combined with `note` or `slide_to`.
+
+**Rejected alternative.** A free-form per-call pitch list: it is a register dump, and the wavetable already has the step
+structure.
+
+#### Pulse tables: width 0 and `wrap`
+
+**Reproducer.** A pulse table that sets the width to 0, or whose `add` steps leave 1..4094 and continue modulo 4096.
+
+**Why 1.4 cannot express it.** `set` accepts 1 to 4094 and fractions above 0, and `add` clamps to 1..4094.
+
+**Evidence.** 20 of 24 tunes report a pulse-table construct the language cannot write.
+
+**Design.** In 1.5, `set: 0` is accepted. A pulse table in mapping form may set `wrap: true`; its `add` steps then wrap
+modulo 4096 instead of clamping. The player gains a short wrap branch only when a table uses `wrap`.
+
+**Rejected alternative.** Explicit per-call widths: they are a dump of the trace.
+
+#### Speed up to 8 and rows of 1/128 beat
+
+**Reproducer.** A tune whose player runs five or six times per frame (CIA timer set to a fraction of the frame).
+
+**Why 1.4 cannot express it.** `speed` is limited to 1 to 4, and a pattern length or `len` is at least 1/64 beat, which at
+speed 5 or more is less than one player call at tempos up to 220.
+
+**Evidence.** 10 of 24 tunes call their player more than 4.5 times per frame (speeds 5, 6 and 8).
+
+**Design.** In 1.5, `speed` is 1 to 8 and pattern length and groove `len` are at least 1/128 beat. A note still lasts at least
+one frame (`speed` calls). The compiler's cycle budget check still applies: at the higher speeds the 1.4 player needs more cycles per
+call than one call period holds at 1 MHz, and such a score is rejected with `use cpu: turbo`. Five of the ten tunes are
+rejected for that reason, so the recovered score does not compile for them.
+
+**Rejected alternative.** Mapping a multi-speed tune onto a slower grid: the call timing then differs.
+
+#### Not designed here
+
+SID addresses in a multi-SID score exist already (`sids[].address`), so recovery of tunes with several SIDs is a recovery
+change (the recovery emits only SID 1 today), not a language change. A table of global volume, filter and routing steps
+(`global_table`) is not implemented: 10 of 24 tunes change the filter or volume registers outside any note, and the S5d work did not reach it.
+
 ## Playable examples
 
 Open the composition index and use the names with `c64_sound` `play_preset`.
