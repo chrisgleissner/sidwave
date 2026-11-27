@@ -82,6 +82,9 @@ need (the number of FFTs is fixed by the window and hop sizes) and can only move
 - **Fidelity, quality and similarity**: FFT twiddle factors and the bit-reversal table are computed once per size (same
   values as the recurrence used before), the chroma tables and the mono mix are reused, and each chroma frame uses a
   half-size FFT. Reports differ from the previous ones by less than 1e-13 relative.
+- **Samples** (`resamplePcm`): for an integer ratio between the work rate and the sample rate the interpolation kernel is
+  computed once for the integers it is evaluated at, and not for every tap of every output sample. Parsing
+  `digi_groove` went from about 400 ms to about 165 ms.
 - **Trace validation** (`traceWrites`, `buildIr`): no temporary arrays per record.
 
 The compiler output, PSID files, the game build and the example fixtures are byte-identical to the previous version
