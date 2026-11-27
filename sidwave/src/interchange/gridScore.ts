@@ -24,6 +24,13 @@ export interface GridCell {
   inst?: string;
   /** Glide to a pitch `to` semitones away over `frames` player calls. */
   bend?: { to: number; frames: number };
+  /** Glide from the previous note of the voice over `portamento` player calls without a new gate (`legato`). */
+  portamento?: number;
+  legato?: boolean;
+  /** Player calls before the written end of the note at which the gate closes (SIDWave `gate_off`). */
+  gateOff?: number;
+  /** Per-note vibrato (SIDWave 1.3). */
+  vibrato?: { depth: number; rate: number; delay?: number };
 }
 export interface GridVoice { name: string; role?: "bass"; drum?: boolean; cells: GridCell[] }
 export interface GridBar { cells: number; /** SIDWave metre text such as "4/4". */ sig: string; tempo: number }
@@ -41,6 +48,10 @@ export interface GridScoreInput {
   validate: boolean;
   /** Player calls per video frame (SIDWave `speed`), default 1. */
   speed?: number;
+  /** SIDs of a multi-SID score. Voices fill them three at a time in order. */
+  sids?: Array<{ id: string; address: string }>;
+  /** Extra top-level keys, for example `samples` of a score with digi drums. */
+  extra?: Record<string, unknown>;
 }
 
 type Token = string | Record<string, unknown>;
@@ -52,8 +63,12 @@ function tokens(cells: GridCell[], voiceLevel: number, voiceInst: string | undef
     const name = midiToNoteName(cell.pitch!);
     const level = cell.level !== undefined && cell.level !== voiceLevel ? cell.level : undefined;
     const inst = cell.inst !== undefined && cell.inst !== voiceInst ? cell.inst : undefined;
-    if (level === undefined && !cell.bend && inst === undefined) return name;
-    return { note: name, ...(inst === undefined ? {} : { inst }), ...(level === undefined ? {} : { level }), ...(cell.bend ? { bend: cell.bend } : {}) };
+    if (level === undefined && !cell.bend && inst === undefined && cell.portamento === undefined && !cell.legato && cell.gateOff === undefined && !cell.vibrato) return name;
+    return {
+      note: name, ...(inst === undefined ? {} : { inst }), ...(level === undefined ? {} : { level }), ...(cell.bend ? { bend: cell.bend } : {}),
+      ...(cell.legato ? { legato: true } : {}), ...(cell.portamento === undefined ? {} : { portamento: cell.portamento }),
+      ...(cell.gateOff === undefined ? {} : { gate_off: cell.gateOff }), ...(cell.vibrato ? { vibrato: cell.vibrato } : {}),
+    };
   });
   return items.every((item) => typeof item === "string") ? (items as string[]).join(" ") : items;
 }
@@ -112,6 +127,7 @@ export function buildGridScore(input: GridScoreInput): string {
     sidwave: 1.3, title: input.title.slice(0, 80) || "Imported", ...(input.author ? { author: input.author.slice(0, 80) } : {}),
     tempo: firstTempo, mode: input.mode, ...(songSig === "4/4" ? {} : { meter: songSig === "3/4" ? 3 : songSig }),
     ...(input.speed && input.speed > 1 ? { speed: input.speed } : {}),
+    ...(input.sids ? { sids: input.sids } : {}), ...(input.extra ?? {}),
     ...(Object.keys(input.instruments).length ? { instruments: input.instruments } : {}),
     voices: voiceDefs, timeline,
   };
@@ -119,7 +135,7 @@ export function buildGridScore(input: GridScoreInput): string {
   yaml.visit(document, {
     Pair(_key, pair) {
       const key = isScalar(pair.key) ? pair.key.value : undefined;
-      if (key !== "groove" && key !== "adsr" && key !== "bend") return;
+      if (key !== "groove" && key !== "adsr" && key !== "bend" && key !== "vibrato") return;
       const flow = (node: unknown): void => {
         if (isSeq(node)) { node.flow = true; node.items.forEach(flow); } else if (isMap(node)) { node.flow = true; node.items.forEach((item) => flow(item.value)); }
       };

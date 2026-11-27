@@ -15,6 +15,8 @@ import { exportMidi } from "./midiExport.js";
 import { exportFurnace } from "./furnaceExport.js";
 import { importFurnace } from "./furnaceImport.js";
 import { importGoatTracker } from "./goattrackerImport.js";
+import { importMod } from "./modImport.js";
+import { looksLikeMod } from "./mod.js";
 import { importMidi } from "./midiImport.js";
 import { exportMusicXml } from "./musicxmlExport.js";
 import { importMusicXml } from "./musicxmlImport.js";
@@ -219,8 +221,8 @@ export type ImportHandler = (bytes: Buffer, args: InterchangeArgs) => ImportResu
 const importers = new Map<string, ImportHandler>();
 export function registerImporter(format: string, handler: ImportHandler): void { importers.set(format, handler); }
 /** Importer flags registered by other modules (valued, bare). */
-export const IMPORT_VALUED = ["-o", "--output", "--format", "--grid", "--voices", "--title", "--mode", "--song", "--subtune", "--allow-dir"];
-export const IMPORT_BARE = ["--no-drums", "--no-bend", "--no-validate", "--json", "--force"];
+export const IMPORT_VALUED = ["-o", "--output", "--format", "--grid", "--voices", "--title", "--mode", "--song", "--subtune", "--allow-dir", "--sids", "--transpose"];
+export const IMPORT_BARE = ["--no-drums", "--no-bend", "--no-validate", "--json", "--force", "--quality"];
 
 importers.set("musicxml", (bytes, a) => {
   const grid = numberFlag(a, "--grid");
@@ -254,6 +256,23 @@ importers.set("goattracker", (bytes, a) => {
   }
 });
 
+importers.set("mod", (bytes, a) => {
+  const sids = numberFlag(a, "--sids");
+  const transpose = numberFlag(a, "--transpose");
+  const mode = a.flags.get("--mode") as string | undefined;
+  if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
+  try {
+    const result = importMod(bytes, {
+      ...(sids === undefined ? {} : { sids }), ...(transpose === undefined ? {} : { transpose }),
+      ...(typeof a.flags.get("--title") === "string" ? { title: a.flags.get("--title") as string } : {}), ...(mode ? { mode } : {}), validate: !a.flags.has("--no-validate"), quality: a.flags.has("--quality"),
+    });
+    return { yaml: result.yaml, report: result.report };
+  } catch (error) {
+    if (error instanceof RangeError) throw new UsageError(error.message);
+    throw error;
+  }
+});
+
 importers.set("furnace", (bytes, a) => {
   const mode = a.flags.get("--mode") as string | undefined;
   if (mode !== undefined && mode !== "PAL" && mode !== "NTSC") throw new UsageError("--mode must be PAL or NTSC");
@@ -269,6 +288,7 @@ const detect = (file: string, bytes: Buffer): string | undefined => {
   if (ext === ".musicxml" || ext === ".xml") return "musicxml";
   if (ext === ".mxl") return "musicxml";
   if (bytes.subarray(0, 4).toString("latin1") === "GTS5" || bytes.subarray(0, 4).toString("latin1") === "GTS4" || bytes.subarray(0, 4).toString("latin1") === "GTS3" || bytes.subarray(0, 4).toString("latin1") === "GTS2" || ext === ".sng") return "goattracker";
+  if (ext === ".mod" || looksLikeMod(bytes)) return "mod";
   if (ext === ".fur" || bytes[0] === 0x78 || bytes.subarray(0, 16).toString("latin1").startsWith("-Furnace module-")) return "furnace";
   return undefined;
 };
@@ -313,7 +333,7 @@ function importCommand(args: string[], io: CliIo): number {
   const file = a.positional[0]!;
   const { bytes, path } = readBounded(io, file);
   const format = (a.flags.get("--format") as string | undefined) ?? detect(file, bytes);
-  if (format === undefined) throw new UsageError(`cannot tell the format of ${file}; pass --format midi, musicxml, goattracker, furnace, swm or swi`);
+  if (format === undefined) throw new UsageError(`cannot tell the format of ${file}; pass --format midi, musicxml, goattracker, furnace, mod, swm or swi`);
   if (a.flags.get("-o") === "-" || a.flags.get("--output") === "-") {
     if (a.flags.has("--json")) throw new UsageError("import -o - writes the YAML to stdout; --json cannot be combined with it");
   }
@@ -342,7 +362,7 @@ export const INTERCHANGE_HELP = `  Examples (the format is detected from the fil
     sidwave reconstruct run.dump                   score from a VICE dump or a siddump table (SID files work as before)
   sidwave export <file> [--format events|midi|musicxml|goattracker|furnace|vice-dump|swm|swi] [--instrument <name|n>] [--pattern-rows 16|32|64] [-o <out>] [--song <n>] [--ppq <n>] [--bend] [--seconds <s>] [--json]
   sidwave reconstruct <trace> [--from vice-dump|siddump] [--clock PAL|NTSC] [--seconds <s>] [--title <text>] [-o <score.yaml>] [--json]
-  sidwave import <file> [--format midi|musicxml|goattracker|furnace|swm|swi] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>] [--subtune <n>]
+  sidwave import <file> [--format midi|musicxml|goattracker|furnace|mod|swm|swi] [-o <out.yaml>] [--grid <beats>] [--voices 1-3] [--song <n>] [--subtune <n>] [--sids 1-10] [--transpose <n>] [--quality]
                         [--no-drums] [--no-bend] [--title <text>] [--mode PAL|NTSC] [--no-validate] [--force] [--json]
 `;
 
