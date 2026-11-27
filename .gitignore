@@ -6,3 +6,6 @@ artifacts/
 *.log
 .DS_Store
 .env
+
+# Built example game programs (npm run examples:game in sidwave/)
+/sidwave/examples/game/out/

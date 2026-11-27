@@ -54,7 +54,7 @@ test("ACME, KickAssembler and ca65 files carry the contract as comments; the VIC
     "entry points: init $1000, play $1003, stop $1006, sfx $1009 (3 bytes each)",
     "init: A = subtune index, 0-based (only 0 exists; the value is ignored); X = clock: 0 PAL, 1 NTSC, $FF reads the KERNAL flag at $02A6; clobbers A, X, Y",
     "play, stop: no input; clobber A, X, Y",
-    "sfx: a stub that returns at once (sound effects come later); the registers and the carry flag are unchanged",
+    "sfx: a stub that returns at once (the score has no effects); the registers and the carry flag are unchanged",
     "flags: the interrupt and decimal flags are never changed; the other flags are undefined on return",
     "$01: saved on entry and restored on return; set to $36 (I/O and KERNAL visible, BASIC ROM off) while the routine runs",
     "zero page: ptr $FB-$FC (saved and restored)",

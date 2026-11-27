@@ -132,7 +132,7 @@ A score with multispeed (`speed` above 1) needs `speed` play calls per video fra
 
 | Item | Guarantee |
 | --- | --- |
-| Entry points | `origin+0` init, `+3` play, `+6` stop, `+9` sfx. Each is a three byte jump. `sfx` is a one byte `rts` stub until sound effects exist; the table never changes its layout. |
+| Entry points | `origin+0` init, `+3` play, `+6` stop, `+9` sfx. Each is a three byte jump. `sfx` is a one byte `rts` stub unless the score defines `effects` (SIDWave 1.4), when it is a jump to the effect entry; the table never changes its layout. |
 | `init` input | `A` = song index, 0-based. A score without `songs` has only song 0 and ignores other values; with `songs` (SIDWave 1.4), an index beyond the last song plays song 0 (see [Songs](#songs-sidwave-14)). `X` = clock: 0 PAL, 1 NTSC (any other value counts as NTSC), `$FF` reads the KERNAL flag at `$02A6` (nonzero on PAL); do not place the player over `$02A6` if you pass `$FF` (the build warns). `init` silences the SID registers and resets the song. |
 | `play`, `stop` input | None. Call `play` once per play period. |
 | Registers | `init`, `play` and `stop` clobber A, X and Y. The interrupt and decimal flags are never changed; the other flags are undefined on return. |
@@ -162,14 +162,59 @@ songs:
 
 The three songs compile to 3188 bytes as one player, against 6485 bytes as three separate PRGs. The game build starts a song when you call `sidwave_init` with its index in `A` (`lda #1 : ldx #0 : jsr sidwave_init`); `init` resets the player, so any song can start at any time. A song with `loop: false` stops writing registers when it ends. `contract.songs` lists the play calls per frame, the loop behaviour and the length of every song, and the cycles are measured for each song. A PRG plays song 0 (or the song given as the `song` option of `compileSidwaveToPrg`); a PSID records the song count and takes the song in `A` as the PSID format defines. At most 32 songs, and songs times voice channels (3 per SID) at most 255. The language rules are in [`sidwave.md`](data/sound/sidwave.md#sidwave-14).
 
+### Sound effects (SIDWave 1.4)
+
+A score can define sound effects that the game starts at run time, over the music. An effect is a short list of steps (frequency, waveform, pulse width, envelope, gate, filter routing and the number of play calls each step lasts) with a priority from 0 to 15 and the voices of the first SID it may use. While an effect owns a voice, the music keeps running but writes that voice into a shadow instead of the SID; when the effect ends, the shadow goes to the SID in the same play call and the music continues where it is. [`raster_bars.yaml`](examples/game/raster_bars.yaml) has one effect:
+
+```yaml
+effects:
+  pew:
+    priority: 8
+    voices: [3]
+    steps:
+      - { freq: 2400, wave: pulse, pulse: 0.25, adsr: [0, 0, 15, 6] }
+      - { freq: 1800 }
+      - { freq: 1300 }
+      - { freq: 900 }
+      - { freq: 600 }
+      - { gate: false, wait: 3 }
+```
+
+The entry `sfx` (`origin+9`) takes the effect index in `A` (the position in the mapping; the symbol file defines `sidwave_fx_<name>`) and the voice in `Y` (1 to 3, or `$FF` for any voice the effect allows). It returns carry clear when the effect started and carry set when it was rejected: no free voice or only voices that play an effect of equal or higher priority, a voice the effect does not allow, an unknown effect, or a play-once song that has ended. The effect begins with the next `play` call. A voice that no effect plays is free; otherwise the lowest-priority effect below the new one is replaced, and the same effect restarts on its own voice. `sfx` disables interrupts while it runs and restores the interrupt flag, so the main program may call it while a raster interrupt calls `play`.
+
+```asm
+        lda #sidwave_fx_pew              ; effect index
+        ldy #$ff                         ; any allowed voice
+        jsr sidwave_sfx                  ; carry clear: started
+```
+
+In a PRG the entry is `$0816`: `POKE 780,0: POKE 782,255: SYS 2070` from BASIC, `lda #0 : ldy #$ff : jsr $0816` from machine code. A PSID has the same entry but no standard way to call it. Costs: 604 bytes of engine, 4 bytes per effect and 11 per step; up to about 790 more cycles in a play call with three effects stepping at once (the game build's `cycles.withEffects` measures it). Limits: 32 effects of 255 steps, 1 to 3 voices of the first SID, no centred voices. The rules, the allocation order, the measurements and the tests are in [`sidwave.md`](data/sound/sidwave.md#effects).
+
+### Example game programs
+
+[`examples/game`](examples/game) has two small games-in-miniature. Each is a SIDWave score with effects (`.yaml`) and a 6502 program (`.asm`) that the build script assembles with 6502-toolkit behind the player into one PRG:
+
+| Program | What it does |
+| --- | --- |
+| `raster_bars` | A raster interrupt plays the music, starts the effect `pew` on voice 3 when the fire button of joystick port 2 goes down, and draws 64 lines of scrolling raster bars. |
+| `sprite_bounce` | A sprite moves across the screen (joystick port 2 steers it) and bounces off the edges. The effect `bounce` plays on a hit at the left or right edge and `thud` on a hit at the top or bottom edge; a corner hit plays both. |
+
+```sh
+npm run build
+npm run examples:game          # writes examples/game/out/raster_bars.prg and sprite_bounce.prg
+x64sc -autostart examples/game/out/raster_bars.prg
+```
+
+The build compiles the score at the first page behind the program, passes the ACME symbol file to the assembler as `music.acme`, and assembles the program twice because its size does not depend on the player's address but the symbol values do. The tests (`test/sidwaveGameDemos.test.mjs`) run both programs on the bundled emulator for 600 and 900 frames with scripted joystick input in `$DC00` and a raster position that follows the cycle count: the effect starts in the frame after the press or the hit, the voices that no effect owns write exactly what the plain score writes, the voice gets its music back, the bars and the sprite registers match a model, and the cycles of one frame stay below the PAL budget of 63 x 312 = 19656 cycles. In the frame where player and program together take the most, `raster_bars` spends 2341 cycles in the player, 2419 in its own code and 4304 in the loop that waits for the raster lines of the bars (9064 in all). Without the wait loop it leaves 19656 - 2341 - 2419 = 14896 cycles of every frame for a game; `sprite_bounce` takes 2026 for the player and 174 for its own code, and leaves 17456.
+
 ## What you get
 
 - The player as a library for games and demos: any origin, separate data, symbol files and a documented contract (see [Using the player in a game](#using-the-player-in-a-game)).
-- Language versions 1.0 to 1.4: wave, pulse and filter tables, hard restart, sync and ring, echo, unison, follower voices, multispeed, sections, up to 10 SIDs and 30 voices in a PRG (PSID: up to 3 SIDs), CIA2 volume digis in a PRG.
+- Language versions 1.0 to 1.4: songs and sound effects (1.4), wave, pulse and filter tables, hard restart, sync and ring, echo, unison, follower voices, multispeed, sections, up to 10 SIDs and 30 voices in a PRG (PSID: up to 3 SIDs), CIA2 volume digis in a PRG.
 - Lint checks and error messages that name the failing path in the score.
 - 15 example scores in [`data/sound/examples`](data/sound/examples).
 
-Planned and not yet available: `sidwave verify`, sound effects for games, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
+Planned and not yet available: `sidwave verify`, reconstruction of SID tunes into scores, MIDI/MusicXML/tracker import.
 
 ## Formatting, diff and merge
 

@@ -5,7 +5,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { parseSidwave, SidwaveValidationError, type ParsedSidwave } from "./sidwave.js";
-import { compileSidwaveToPrg, compileSidwaveToSid, type CompileResult } from "./sidwaveCompiler.js";
+import { compileSidwaveToPrg, compileSidwaveToSid, type CompileResult, type EffectSummary } from "./sidwaveCompiler.js";
 import { SIDWAVE_SCORE_RESOURCES, readSidwaveExample } from "./sidwaveExamples.js";
 import { formatFinding, isInfoCode, type SidwaveFinding } from "./sidwaveLint.js";
 import type { SidwaveFileReader, SidwaveReadOptions } from "./sidwavePcm.js";
@@ -81,6 +81,9 @@ export interface CompileSummary {
   worstCaseCyclesPerCall: number;
   lintFindings: number;
   warnings: string[];
+  /** SIDWave 1.4, a score with `effects`: the address of the `sfx` entry and the effects with their indexes. */
+  sfxAddress?: number;
+  effects?: EffectSummary[];
 }
 
 export interface CompiledScore {
@@ -111,6 +114,7 @@ export function compileSidwaveBytes(doc: ParsedSidwave, options: { format?: Sidw
     worstCaseCyclesPerCall: result.worstCaseCyclesPerCall,
     lintFindings: (result.lint ?? []).length,
     warnings: result.warnings,
+    ...(result.effects ? { sfxAddress: result.sfxAddress, effects: result.effects } : {}),
   };
   return { bytes, summary, result };
 }

@@ -34,6 +34,16 @@ export interface SidwaveGameOptions {
   measure?: boolean;
 }
 
+/** SIDWave 1.4, a score with effects: the play calls of a run that keeps all three voices busy with effects. */
+export interface SidwaveGameEffectCycles {
+  /** Highest cycle count of one play call while effects run (every call starts, restarts or steals an effect); null without measurement. */
+  worst: number | null;
+  average: number | null;
+  /** Highest cycle count of one `sfx` call; null without measurement. */
+  sfxWorst: number | null;
+  calls: number;
+}
+
 export interface SidwaveGameCycles {
   /** Highest cycle count of one play call (entry jump included) over the measured run; null without measurement. */
   worst: number | null;
@@ -47,6 +57,8 @@ export interface SidwaveGameCycles {
   measuredCalls: number;
   /** Which values were measured on the emulator and which are computed. */
   kinds: { worst: "measured"; average: "measured"; estimatedWorst: "estimated" };
+  /** SIDWave 1.4, a score with effects: the measured values while effects run. `estimatedWorst` bounds these too. */
+  withEffects?: SidwaveGameEffectCycles;
   /** SIDWave 1.4, several songs: the measured values of each song. `worst` and `average` above cover all songs. */
   songs?: Array<{ name: string; worst: number | null; average: number | null; calls: number; estimatedWorst: number }>;
 }
@@ -63,6 +75,19 @@ export interface SidwaveGameSongContract {
   /** Play calls of one pass of the song. */
   frames: number;
   durationSeconds: number;
+}
+
+/** What the contract says about one sound effect. */
+export interface SidwaveGameEffectContract {
+  /** The value of A for the `sfx` entry. */
+  index: number;
+  name: string;
+  priority: number;
+  /** Voices of the first SID the effect may use. */
+  voices: number[];
+  steps: number;
+  /** Play calls the effect lasts when nothing interrupts it. */
+  frames: number;
 }
 
 export interface SidwaveGameContract {
@@ -97,6 +122,8 @@ export interface SidwaveGameContract {
   playCallsPerFrame: number;
   /** Present when the document has more than one song: `init` selects the song with A. */
   songs?: SidwaveGameSongContract[];
+  /** Present when the document defines effects: the effects behind the `sfx` entry. */
+  effects?: SidwaveGameEffectContract[];
   /** Play calls per second of music and the clock the score was written for. */
   playCallsPerSecond: number;
   system: SystemMode;
@@ -139,7 +166,9 @@ function publicLabels(image: SidwaveGameImage): Array<[string, number, string]> 
       : "init: A = subtune (0), X = clock (0 PAL, 1 NTSC, $FF read $02A6)"],
     ["sidwave_play", image.origin + SIDWAVE_GAME_ENTRY.play, "play: one call per play period"],
     ["sidwave_stop", image.origin + SIDWAVE_GAME_ENTRY.stop, "stop: silence all voices"],
-    ["sidwave_sfx", image.origin + SIDWAVE_GAME_ENTRY.sfx, "sfx: stub (rts) until sound effects exist"],
+    ["sidwave_sfx", image.origin + SIDWAVE_GAME_ENTRY.sfx, image.effects
+      ? "sfx: A = effect index, Y = voice 1-3 or $FF (automatic); carry clear = started, carry set = rejected"
+      : "sfx: stub (rts); the score has no effects"],
     ["sidwave_ram", sym("game_image_end"), "start of the variable block behind the image"],
     ["sidwave_ram_end", image.ramEnd, "first address behind the variable block"],
   ];
@@ -150,6 +179,12 @@ function publicLabels(image: SidwaveGameImage): Array<[string, number, string]> 
   if (image.zeroPageRanges.length > 1) labels.push(["sidwave_zp_sid_io", image.zeroPage + 2, "zero page: SID pointer (2 bytes)"]);
   labels.push(["sidwave_play_calls_per_frame", image.playCallsPerFrame, image.songs ? "play calls per video frame of song 0 (see the contract for the others)" : "play calls per video frame"]);
   if (image.songs) labels.push(["sidwave_songs", image.songs.length, "number of songs"]);
+  if (image.effects) {
+    labels.push(["sidwave_effects", image.effects.length, "number of effects"]);
+    for (const effect of image.effects) {
+      labels.push([`sidwave_fx_${effect.name}`, effect.index, `effect index: priority ${effect.priority}, voices ${effect.voices.join(",")}, ${effect.frames} play calls`]);
+    }
+  }
   return labels;
 }
 
@@ -162,6 +197,7 @@ function contractLines(contract: SidwaveGameContract, build: { cycles: SidwaveGa
     ...(contract.songs ? contract.songs.map((song) => `song ${song.index} "${song.name}": ${song.playCallsPerFrame} play call(s) per frame, ${song.loop ? "loops" : "plays once"}, ${song.frames} calls, ${song.durationSeconds.toFixed(1)} s`) : []),
     `play, stop: no input; clobber ${contract.registers.play.clobbers.join(", ")}`,
     `sfx: ${contract.registers.sfx.note}`,
+    ...(contract.effects ? contract.effects.map((fx) => `effect ${fx.index} "${fx.name}": priority ${fx.priority}, voices ${fx.voices.join(",")}, ${fx.steps} step(s), ${fx.frames} play call(s)`) : []),
     `flags: ${contract.flags}`,
     `$01: ${contract.port01}`,
     `zero page: ${contract.zeroPage.map((z) => `${z.label} ${addr(z.address)}-${addr(z.address + z.bytes - 1)}`).join(", ")} (saved and restored)`,
@@ -172,6 +208,7 @@ function contractLines(contract: SidwaveGameContract, build: { cycles: SidwaveGa
     `interrupts: ${contract.interrupts}`,
     `stack: ${contract.maxStackBytes === null ? "not measured" : `${contract.maxStackBytes} bytes (measured)`}`,
     `play calls per frame: ${contract.playCallsPerFrame}; ${contract.playCallsPerSecond} per second; written for ${contract.system}`,
+    ...(build.cycles.withEffects?.worst != null ? [`cycles per play call with effects: worst ${build.cycles.withEffects.worst} (measured), sfx call worst ${build.cycles.withEffects.sfxWorst} (measured)`] : []),
     `cycles per play call: ${build.cycles.worst === null ? "not measured" : `worst ${build.cycles.worst} (measured), average ${build.cycles.average!.toFixed(1)} (measured)`}, upper bound ${build.cycles.estimatedWorst} (estimated)`,
   ];
   if (contract.data) lines.push(`data: ${contract.data.bytes} bytes at $${hex(contract.data.origin)}, SHA-256 ${contract.data.sha256} (not verified at run time)`);
@@ -202,7 +239,11 @@ function symbolFile(format: SidwaveSymbolFormat, entries: Array<[string, number,
 }
 
 /** Runs the compiled score on the bundled emulator: init, every play call of the song plus one loop, then stop. */
-interface Measured { worst: number; average: number; calls: number; stack: number; songs?: Array<{ worst: number; average: number; calls: number }> }
+interface Measured {
+  worst: number; average: number; calls: number; stack: number;
+  songs?: Array<{ worst: number; average: number; calls: number }>;
+  effects?: { worst: number; average: number; calls: number; sfxWorst: number };
+}
 
 function measure(image: SidwaveGameImage): Measured {
   const mem = new Uint8Array(0x10000);
@@ -230,7 +271,35 @@ function measure(image: SidwaveGameImage): Measured {
     ? image.songs.map((song, k) => run(k, song.totalFrames, song.loop, song.loopFrame))
     : [run(0, image.totalFrames, image.loop, image.loopFrame)];
   const calls = runs.reduce((sum, r) => sum + r.calls, 0);
+  // With effects: every song again, and on every play call one effect starts, restarts or takes over a voice, cycling
+  // through the effects and through the requested voices (1, 2, 3 and automatic), so all three voices are busy.
+  let effects: Measured["effects"];
+  if (image.effects) {
+    const count = image.effects.length;
+    const songs = image.songs ?? [{ totalFrames: image.totalFrames, loop: image.loop }];
+    let worst = 0;
+    let total = 0;
+    let n = 0;
+    let sfxWorst = 0;
+    songs.forEach((song, k) => {
+      cpu.call(image.origin + SIDWAVE_GAME_ENTRY.init, { a: k, x: clock });
+      const length = Math.min(song.totalFrames + 4, 3000);
+      for (let i = 0; i < length; i++) {
+        const voice = i % 4 === 3 ? 0xff : 1 + (i % 3);
+        sfxWorst = Math.max(sfxWorst, cpu.call(image.origin + SIDWAVE_GAME_ENTRY.sfx, { a: i % count, y: voice }));
+        stack = Math.max(stack, cpu.lastStackDepth);
+        const cycles = cpu.call(image.origin + SIDWAVE_GAME_ENTRY.play);
+        worst = Math.max(worst, cycles);
+        total += cycles;
+        n += 1;
+        stack = Math.max(stack, cpu.lastStackDepth);
+      }
+      cpu.call(image.origin + SIDWAVE_GAME_ENTRY.stop);
+    });
+    effects = { worst, average: total / n, calls: n, sfxWorst };
+  }
   return {
+    ...(effects ? { effects } : {}),
     worst: Math.max(...runs.map((r) => r.worst)),
     average: runs.reduce((sum, r) => sum + r.average * r.calls, 0) / calls,
     calls,
@@ -264,8 +333,8 @@ export function compileSidwave(doc: ParsedSidwave, options: SidwaveGameOptions):
     warnings.push("The player covers $02A6, the KERNAL PAL/NTSC flag; pass the clock to init in X instead of $FF.");
   }
   const measured = options.measure === false ? undefined : measure(image);
-  if (measured && measured.worst > image.estimatedWorstCycles) {
-    throw new Error(`SIDWAVE compiler defect: the measured worst case of ${measured.worst} cycles per play call exceeds the estimate of ${image.estimatedWorstCycles}`);
+  if (measured && Math.max(measured.worst, measured.effects?.worst ?? 0) > image.estimatedWorstCycles) {
+    throw new Error(`SIDWAVE compiler defect: the measured worst case of ${Math.max(measured.worst, measured.effects?.worst ?? 0)} cycles per play call exceeds the estimate of ${image.estimatedWorstCycles}`);
   }
   const cycles: SidwaveGameCycles = {
     worst: measured?.worst ?? null,
@@ -276,6 +345,10 @@ export function compileSidwave(doc: ParsedSidwave, options: SidwaveGameOptions):
       : measured.calls / image.framesPerSecond) : null,
     measuredCalls: measured?.calls ?? 0,
     kinds: { worst: "measured", average: "measured", estimatedWorst: "estimated" },
+    ...(image.effects ? { withEffects: {
+      worst: measured?.effects?.worst ?? null, average: measured?.effects?.average ?? null,
+      sfxWorst: measured?.effects?.sfxWorst ?? null, calls: measured?.effects?.calls ?? 0,
+    } } : {}),
     ...(image.songs ? { songs: image.songs.map((song, k) => ({
       name: song.name, worst: measured?.songs?.[k]!.worst ?? null, average: measured?.songs?.[k]!.average ?? null,
       calls: measured?.songs?.[k]!.calls ?? 0, estimatedWorst: song.worstCaseCycles,
@@ -300,7 +373,13 @@ export function compileSidwave(doc: ParsedSidwave, options: SidwaveGameOptions):
       },
       play: { in: "none", clobbers },
       stop: { in: "none; silences all voices and leaves interrupts alone (call init to start again)", clobbers },
-      sfx: { in: "none yet", clobbers: [], note: "a stub that returns at once (sound effects come later); the registers and the carry flag are unchanged" },
+      sfx: image.effects
+        ? {
+          in: "A = effect index (0-" + (image.effects.length - 1) + "), Y = voice 1-3 of the first SID or $FF for automatic",
+          clobbers: ["A", "X", "Y", "flags"],
+          note: "starts an effect at the next play call (latency at most one play period). Returns carry clear when the effect was started and carry set when it was rejected (index out of range, voice not allowed for the effect, no voice free or of lower priority, or a play-once song that has ended). It disables interrupts while it runs and restores the interrupt flag; call it from the main program or from the interrupt that calls play (after play), not from an interrupt that can run inside play.",
+        }
+        : { in: "none", clobbers: [], note: "a stub that returns at once (the score has no effects); the registers and the carry flag are unchanged" },
     },
     flags: "the interrupt and decimal flags are never changed; the other flags are undefined on return",
     port01: "saved on entry and restored on return; set to $36 (I/O and KERNAL visible, BASIC ROM off) while the routine runs",
@@ -320,6 +399,7 @@ export function compileSidwave(doc: ParsedSidwave, options: SidwaveGameOptions):
       index, name: song.name, playCallsPerFrame: song.speed, playCallsPerSecond: song.framesPerSecond, loop: song.loop,
       frames: song.totalFrames, durationSeconds: song.durationSeconds,
     })) } : {}),
+    ...(image.effects ? { effects: image.effects } : {}),
     playCallsPerSecond: image.framesPerSecond,
     system: image.system,
     ...(image.data ? { data: { origin: image.dataOrigin!, bytes: image.data.length, sha256: createHash("sha256").update(image.data).digest("hex") } } : {}),

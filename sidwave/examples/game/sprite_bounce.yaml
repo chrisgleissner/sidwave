@@ -1,0 +1,46 @@
+# Sprite bounce | 110 BPM | 4/4 | A minor | 1 SID | SIDWave 1.4 with two sound effects
+# Techniques: a looping tune under a sprite that bounces off the screen edges. The program starts "bounce" when the sprite hits the left or right edge and "thud" when it hits the top or bottom edge.
+# Learn: "bounce" (priority 6) is limited to voice 3. "thud" (priority 5) may use voices 2 and 3, so a corner hit plays both: the bounce takes voice 3 and the thud takes voice 2.
+sidwave: 1.4
+title: Sprite Bounce
+tempo: 107.41
+mode: PAL
+instruments:
+  lead: { waveform: pulse, adsr: [1, 5, 10, 4], pulse_width: 0.4 }
+  arp: { waveform: pulse, adsr: [0, 4, 8, 3], pulse_width: 0.25 }
+  bass: { waveform: sawtooth, adsr: [0, 5, 9, 3] }
+voices:
+  - id: 1
+    name: Lead
+    instrument: lead
+    patterns:
+      theme: { length: 1, bars: 2, groove: "A4 C5 E5 D5 | C5 B4 A4 ~" }
+  - id: 2
+    name: Arpeggio
+    instrument: arp
+    patterns:
+      am: { length: 0.5, bars: 1, groove: "A3 C4 E4 C4 A3 C4 E4 C4" }
+      f: { length: 0.5, bars: 1, groove: "F3 A3 C4 A3 F3 A3 C4 A3" }
+  - id: 3
+    name: Bass
+    instrument: bass
+    patterns:
+      root: { length: 1, bars: 1, groove: "A2 ~ A2 ~" }
+      fa: { length: 1, bars: 1, groove: "F2 ~ F2 ~" }
+sections:
+  main: { bars: 2, layers: { v1: theme, v2: "am f", v3: "root fa" } }
+timeline: [main]
+effects:
+  bounce:
+    priority: 6
+    voices: [3]
+    steps:
+      - { freq: A4, wave: triangle, adsr: [0, 4, 0, 3], wait: 3 }
+      - { freq: E5, wait: 3 }
+      - { gate: false, wait: 2 }
+  thud:
+    priority: 5
+    voices: [2, 3]
+    steps:
+      - { freq: 90, wave: noise, adsr: [0, 5, 0, 4], wait: 5 }
+      - { gate: false, wait: 3 }

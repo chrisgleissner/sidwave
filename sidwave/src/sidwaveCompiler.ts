@@ -11,8 +11,9 @@ import type { SampleStats } from "./sidwavePcm.js";
 import { addDigiPlayer, digiCyclesPerCall, digiDataAsm, digiPeakCycles, digiPeriod, validateDigiRate } from "./sidwaveDigi.js";
 import { AssemblyError, assemblyToPrgDetailed } from "6502-toolkit/assembler";
 import { isModern, isV13, patternBeats, sectionBarBeats } from "./sidwave.js";
+import { SIDWAVE_EFFECT_STEP_BYTES, effectCode, effectCyclesBound, effectFrames, effectRam, effectTables } from "./sidwaveEffects.js";
 import { SongSelect, hasSongSelect, lintSongs, mergeSampleCommands, psidSpeedBits, songDoc } from "./sidwaveSongs.js";
-import type { ParsedSidwave, SystemMode, SidwaveVoice, SidwavePattern, SidwavePatternGroove, MotifEntry, SidwaveRegisterTable, FilterModSpec, SidwaveSamples, SidwaveGrooveNote } from "./sidwave.js";
+import type { ParsedEffect, ParsedSidwave, SystemMode, SidwaveVoice, SidwavePattern, SidwavePatternGroove, MotifEntry, SidwaveRegisterTable, FilterModSpec, SidwaveSamples, SidwaveGrooveNote } from "./sidwave.js";
 import {
   SidwaveValidationError,
   isRestToken,
@@ -32,6 +33,8 @@ export const SIDWAVE_PRG_ENTRY = 0x080d;
 export const SIDWAVE_INIT_ADDRESS = 0x0810;
 /** PSID play routine, called once per video frame. */
 export const SIDWAVE_PLAY_ADDRESS = 0x0813;
+/** SIDWave 1.4, a PRG or PSID with `effects`: the sound effect entry (`JMP sfx`; A = effect index, Y = voice 1-3 or $FF). */
+export const SIDWAVE_SFX_ADDRESS = 0x0816;
 export const SIDWAVE_LOAD_ADDRESS = 0x0801;
 /** The player and its data must end below the I/O area at $D000. */
 export const SIDWAVE_MEMORY_END = 0xd000;
@@ -117,6 +120,29 @@ export interface CompileResult {
   songs?: SongSummary[];
   /** SIDWave 1.4: the song the PRG plays (0-based). */
   startSong?: number;
+  /** SIDWave 1.4, a document with `effects`: address of the sound effect entry ({@link SIDWAVE_SFX_ADDRESS}). */
+  sfxAddress?: number;
+  /** SIDWave 1.4: the effects of the document in index order (the index is the value in A of the `sfx` entry). */
+  effects?: EffectSummary[];
+}
+
+/** What the compile result says about one sound effect. */
+export interface EffectSummary {
+  index: number;
+  name: string;
+  priority: number;
+  /** Voices of the first SID the effect may use (1 to 3). */
+  voices: number[];
+  steps: number;
+  /** Play calls the effect lasts when nothing interrupts it. */
+  frames: number;
+}
+
+/** The effects of the document with their indexes, or undefined. */
+export function summarizeEffects(effects: ParsedEffect[] | undefined): EffectSummary[] | undefined {
+  return effects?.map((effect, index) => ({
+    index, name: effect.name, priority: effect.priority, voices: effect.voices, steps: effect.steps.length, frames: effectFrames(effect),
+  }));
 }
 
 /** What the compile result says about one song of a document with songs. */
@@ -209,7 +235,39 @@ export interface SidwaveCompileOptions {
 }
 
 /** Arranges the score, packs the voice streams and estimates the cycles per call; shared by the PRG and the game build. */
-function preparePlayer(doc: ParsedSidwave, { loop = true, compress = true, song = 0 }: SidwaveCompileOptions,
+function preparePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions, planned?: Arrangement): PreparedPlayer {
+  const prepared = preparePlayerCore(doc, options, planned);
+  if (!doc.effects?.length || planned) return prepared;
+  // SIDWave 1.4 effects: the engine adds its own worst case to every play call and takes part in the budget check.
+  const { arrangement } = prepared;
+  // A centred voice sounds on a second channel that the effect engine does not write, so it cannot carry effects.
+  const centred = new Set((arrangement.mirrors ?? []).map(([source]) => source).filter((source) => source < 3));
+  arrangement.effects = doc.effects.map((effect) => {
+    const blocked = effect.voices.filter((voice) => centred.has(voice - 1));
+    if (blocked.length && effect.voicesListed) {
+      throw new SidwaveValidationError(`$.effects.${effect.name}.voices`, `voice ${blocked.join(", ")} of the first SID is centred (it also sounds on a second channel) and cannot carry effects; list the other voices`);
+    }
+    const voices = effect.voices.filter((voice) => !centred.has(voice - 1));
+    if (!voices.length) {
+      throw new SidwaveValidationError(`$.effects.${effect.name}`, "all three voices of the first SID are centred; the effect has no voice to play on");
+    }
+    return { ...effect, voices };
+  });
+  const extra = effectCyclesBound(arrangement.chips!.length * 3, doc.effects.some((e) => e.steps.some((s) => s.filter === "off")));
+  // Each song's own estimate includes the engine as well, so every per-song figure bounds a run with effects.
+  arrangement.songs?.forEach((part) => { part.worstCaseCycles += extra; });
+  const requiresTurbo = (system: SystemMode) => prepared.requiresTurbo(system)
+    || prepared.worstCaseCyclesPerCall + extra > prepared.budgetAt(system);
+  return {
+    ...prepared,
+    worstCaseCyclesPerCall: prepared.worstCaseCyclesPerCall + extra,
+    requiresTurbo,
+    turboOnly: Number(requiresTurbo("PAL")) | (Number(requiresTurbo("NTSC")) << 1),
+    tightest: { ...prepared.tightest, cycles: prepared.tightest.cycles + extra },
+  };
+}
+
+function preparePlayerCore(doc: ParsedSidwave, { loop = true, compress = true, song = 0 }: SidwaveCompileOptions,
   planned?: Arrangement): PreparedPlayer {
   if (song !== 0 && !hasSongSelect(doc)) {
     throw new SidwaveValidationError("$.song", `song ${song} does not exist; the document has one song`);
@@ -458,7 +516,8 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
   const assembled = assemblyToPrgDetailed(asm, { fileName: "sidwave_player.asm", loadAddress: SIDWAVE_LOAD_ADDRESS });
   const prg = Buffer.from(assembled.prg);
   const endAddress = SIDWAVE_LOAD_ADDRESS + prg.length - 2;
-  for (const [label, expected] of [["install", SIDWAVE_PRG_ENTRY], ["init_vec", SIDWAVE_INIT_ADDRESS], ["play_vec", SIDWAVE_PLAY_ADDRESS], ["prg_end", endAddress]] as const) {
+  for (const [label, expected] of [["install", SIDWAVE_PRG_ENTRY], ["init_vec", SIDWAVE_INIT_ADDRESS], ["play_vec", SIDWAVE_PLAY_ADDRESS],
+    ...(arrangement.effects ? [["sfx_vec", SIDWAVE_SFX_ADDRESS] as const] : []), ["prg_end", endAddress]] as const) {
     if (assembled.symbols.get(label) !== expected) throw new Error(`SIDWAVE player layout error: ${label} is not at $${expected.toString(16)}`);
   }
   // After the PRG's SYS returns, BASIC's program and variables start right behind the player.
@@ -487,6 +546,7 @@ function compilePlayer(doc: ParsedSidwave, options: SidwaveCompileOptions,
     arrangement: planned ? undefined : songsReport(doc, arrangement),
     lint: arrangement.findings?.list(),
     ...(arrangement.songs ? { songs: summarizeSongs(arrangement), startSong: arrangement.startSong } : {}),
+    ...(arrangement.effects ? { sfxAddress: SIDWAVE_SFX_ADDRESS, effects: summarizeEffects(arrangement.effects) } : {}),
 
     basicFreeBytes,
     warnings,
@@ -557,6 +617,8 @@ export interface SidwaveGameImage {
   arrangement?: string[];
   lint?: SidwaveFinding[];
   warnings: string[];
+  /** SIDWave 1.4: the sound effects behind the `sfx` entry, in index order. */
+  effects?: EffectSummary[];
 }
 
 function hex4(n: number): string {
@@ -714,6 +776,7 @@ export function compileSidwaveGameImage(doc: ParsedSidwave, layout: SidwaveGameL
     framesPerSecond: arrangement.fps,
     playCallsPerFrame: arrangement.speed,
     estimatedWorstCycles: worstCaseCyclesPerCall,
+    ...(arrangement.effects ? { effects: summarizeEffects(arrangement.effects) } : {}),
     streamBytes: streams.map((stream) => stream.length),
     arrangement: songsReport(doc, arrangement),
     lint: arrangement.findings?.list(),
@@ -998,6 +1061,8 @@ export interface Arrangement {
   findings?: SidwaveFindings;
   loopOffsets?: number[];
   explicitEnd?: boolean;
+  /** SIDWave 1.4: the sound effects built into the player. */
+  effects?: ParsedEffect[];
   /** SIDWave 1.4, several songs: every song's own arrangement and stream layout. The other fields are the union of the songs. */
   songs?: ArrangedSong[];
   /** SIDWave 1.4: the song the PRG plays and the PSID starts with (0-based). */
@@ -3428,6 +3493,41 @@ ${banks.join("\n")}
 `;
 }
 
+/** ANDs the value written to $D417 (route bits and resonance) with the first SID's effect mask, at every write. */
+function maskFilterRoute(code: string): string {
+  const site = "  ldy #$17\n  sta (sid_io),y\n";
+  return code.split(site).join(`  ldy chip_index\n  and sfx_fm,y\n${site}`);
+}
+
+/**
+ * SIDWave 1.4 effects: hooks the effect engine into the player. The music's register write of a voice that an effect
+ * owns goes to a shadow instead of the SID, `play` runs the effects after the music, `init` and `stop` cancel them,
+ * and the end of a play-once song stops them. Without effects none of this is present, so the bytes do not change.
+ */
+function addEffectEngine(code: string, arr: Arrangement, ended: boolean): string {
+  const filterOff = arr.effects!.some((effect) => effect.steps.some((step) => step.filter === "off"));
+  const channels = arr.voices.length;
+  const chips = arr.chips!.length;
+  const patch = (old: string, replacement: string) => {
+    if (!code.includes(old)) throw new Error(`SIDWAVE player code changed: the effect patch point ${JSON.stringify(old.slice(0, 40))} was not found`);
+    code = code.replace(old, () => replacement);
+  };
+  patch("play_chips_done:\n  pla\n  sta sid_io+1\n  pla\n  sta sid_io", "play_chips_done:\n  pla\n  sta sid_io+1\n  pla\n  sta sid_io\n  jsr sfx_tick");
+  const write = code.indexOf("vr_write:\n");
+  const block = write < 0 ? -1 : code.indexOf("  ldy voff,x\n  lda f_lo\n", write);
+  if (block < 0) throw new Error("SIDWAVE player code changed: the voice register write was not found");
+  code = `${code.slice(0, block)}  lda sfx_eff,x\n  beq vr_live\n  jmp vr_sfx_shadow\nvr_live:\n${code.slice(block)}`;
+  patch("init_core:\n", "init_core:\n  sta sfx_clock\n  jsr sfx_reset\n  lda sfx_clock\n");
+  if (code.includes("soft_release:\n")) patch("soft_release:\n", "soft_release:\n  jsr sfx_stopall\n");
+  if (code.includes("finish_song:\n")) patch("finish_song:\n", "finish_song:\n  jsr sfx_stopall\n");
+  if (code.includes("game_stop:\n")) patch("game_stop:\n", "game_stop:\n  jsr sfx_reset\n");
+  if (filterOff) {
+    // The route bits of the first SID are masked at every write of $D417 (the filter routing and resonance register).
+    code = maskFilterRoute(code);
+  }
+  return code + effectCode(arr.effects!.length, channels, chips, arr.chips![0]!.address, ended, filterOff);
+}
+
 function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean, turboOnly: number, includeSamples = true,
   game?: SidwaveGameLayout): string {
   const L: string[] = [];
@@ -3479,9 +3579,13 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
     L.push(`  jmp game_init`);
     L.push(`  jmp play`);
     L.push(`  jmp game_stop`);
-    L.push(`  rts`);
-    L.push(`  nop`);
-    L.push(`  nop`);
+    if (arr.effects) {
+      L.push(`  jmp sfx`);
+    } else {
+      L.push(`  rts`);
+      L.push(`  nop`);
+      L.push(`  nop`);
+    }
   } else {
     L.push(`ptr = $FB`);
     if (arr.chips) L.push(`sid_io = $FD`);
@@ -3493,6 +3597,10 @@ function buildPlayerAsm(arr: Arrangement, streams: StreamByte[][], loop: boolean
     L.push(`  jmp init`);
     L.push(`play_vec:`);
     L.push(`  jmp play`);
+    if (arr.effects) {
+      L.push(`sfx_vec:`);
+      L.push(`  jmp sfx`);
+    }
   }
   let playerCode = PLAYER_CODE;
   if (!hasWavetable) {
@@ -3717,6 +3825,7 @@ c_ret:
     L.push(`loop_hi: .byte ${targets.map((t) => ">" + t).join(",")}`);
   }
   if (game) playerCode = toGamePlayer(playerCode, arr, loop, !!songs);
+  if (arr.effects) playerCode = addEffectEngine(playerCode, arr, !loop);
   L.push(playerCode);
   // Constants
   if (!game) {
@@ -3927,7 +4036,12 @@ c_ret:
   }
   if (arr.chips?.some((chip) => chip.hasOffset)) for (const name of ["g_so0", "g_so1", "g_so2", "g_sres"]) R.push(`${name}: .res 1`);
   R.push(`vars_end:`);
+  if (arr.effects) R.push(...effectRam(channels, arr.chips!.length, arr.effects.some((effect) => effect.steps.some((step) => step.filter === "off"))));
 
+  if (arr.effects) {
+    effectTables({ effects: arr.effects, filterOff: arr.effects.some((effect) => effect.steps.some((step) => step.filter === "off")), hzToRegister: hzToSidFrequency, midiToHz },
+      (label, items) => pushByteRows(T, label, items, SIDWAVE_EFFECT_STEP_BYTES), (text) => T.push(text));
+  }
   streams.forEach((s, i) => pushByteRows(T, `stream${i}`, s.map((b) => typeof b === "string" ? b : `$${hex2(b)}`)));
   if (arr.samples) L.push(includeSamples ? digiDataAsm(arr.samples) :
     [...arr.samples.defs.keys()].map((_, i) => `digi_data${i}:`).join("\n"));
@@ -4497,6 +4611,7 @@ vr_write:
   lda v_ctrl,x
   sta $D404,y
 
+vr_after_write:
 ; ---- advance modulators for the next frame ----
   ldy v_inst,x
   lda i_arplen,y

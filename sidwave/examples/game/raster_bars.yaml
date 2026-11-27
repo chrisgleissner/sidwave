@@ -1,0 +1,45 @@
+# Raster bars | 125 BPM | 4/4 | E minor | 1 SID | SIDWave 1.4 with one sound effect
+# Techniques: a looping three-voice tune under a raster bar program, and the effect "pew" that the program starts when the joystick fire button is pressed.
+# Learn: effects are part of the score. The effect is limited to voice 3 (the bass), so the lead and the arpeggio keep playing when it fires; the bass returns when the effect ends.
+sidwave: 1.4
+title: Raster Bars
+tempo: 125.31
+mode: PAL
+instruments:
+  lead: { waveform: pulse, adsr: [1, 4, 9, 3], pulse_width: 0.35 }
+  arp: { waveform: sawtooth, adsr: [0, 3, 6, 2] }
+  bass: { waveform: triangle, adsr: [0, 5, 10, 3] }
+voices:
+  - id: 1
+    name: Lead
+    instrument: lead
+    patterns:
+      theme: { length: 1, bars: 2, groove: "E5 G5 B5 G5 | A5 G5 E5 ~" }
+      answer: { length: 1, bars: 2, groove: "D5 F#5 A5 F#5 | G5 F#5 D5 ~" }
+  - id: 2
+    name: Arpeggio
+    instrument: arp
+    patterns:
+      em: { length: 0.5, bars: 1, groove: "E3 G3 B3 G3 E3 G3 B3 G3" }
+      d: { length: 0.5, bars: 1, groove: "D3 F#3 A3 F#3 D3 F#3 A3 F#3" }
+  - id: 3
+    name: Bass
+    instrument: bass
+    patterns:
+      root: { length: 1, bars: 1, groove: "E2 ~ E2 ~" }
+      low: { length: 1, bars: 1, groove: "D2 ~ D2 ~" }
+sections:
+  verse: { bars: 2, level: mp, layers: { v1: theme, v2: "em d", v3: "root low" } }
+  turn: { bars: 2, level: f, layers: { v1: answer, v2: "d em", v3: "low root" } }
+timeline: [verse, turn]
+effects:
+  pew:
+    priority: 8
+    voices: [3]
+    steps:
+      - { freq: 2400, wave: pulse, pulse: 0.25, adsr: [0, 0, 15, 6] }
+      - { freq: 1800 }
+      - { freq: 1300 }
+      - { freq: 900 }
+      - { freq: 600 }
+      - { gate: false, wait: 3 }

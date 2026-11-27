@@ -608,7 +608,7 @@ test("the documented 1.4 section exists in the language specification and the sc
 
 test("every YAML example in the 1.4 chapter of the specification compiles to a document with songs", () => {
   const spec = fs.readFileSync(path.join(here, "..", "data", "sound", "sidwave.md"), "utf8");
-  const chapter = spec.slice(spec.indexOf("## SIDWave 1.4"), spec.indexOf("## Playable examples"));
+  const chapter = spec.slice(spec.indexOf("## SIDWave 1.4"), spec.indexOf("### Effects"));
   const examples = [...chapter.matchAll(/```yaml\n([\s\S]*?)```/g)].map((m) => m[1]);
   assert.ok(examples.length >= 1);
   for (const source of examples) {

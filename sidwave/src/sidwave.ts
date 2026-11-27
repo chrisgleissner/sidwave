@@ -252,6 +252,33 @@ export interface SidwaveDocument {
   };
 }
 
+/** SIDWave 1.4: one step of a sound effect, as written. `wait` defaults to 1 frame. */
+export interface ParsedEffectStep {
+  /** Pitch: a MIDI note number from a note name, or an exact frequency in Hz. */
+  freq?: { midi: number } | { hz: number };
+  /** Waveform name as for instruments: pulse, sawtooth, triangle, noise or a combination such as tri+saw. */
+  wave?: string;
+  /** Pulse width register value, 1 to 4094. */
+  pulse?: number;
+  adsr?: [number, number, number, number];
+  gate?: boolean;
+  filter?: "off" | "keep";
+  /** Play calls the step lasts, 1 to 255. */
+  wait: number;
+}
+
+/** SIDWave 1.4: a sound effect that the game starts at run time. */
+export interface ParsedEffect {
+  name: string;
+  /** 0 to 15; a new effect may take over a voice only from an effect of lower priority. */
+  priority: number;
+  /** Voices of the first SID (1 to 3) the effect may use, in ascending order; all three when the document lists none. */
+  voices: number[];
+  /** True when the document lists `voices` (a centred voice that is listed is an error; one that is not listed is left out). */
+  voicesListed: boolean;
+  steps: ParsedEffectStep[];
+}
+
 /** SIDWave 1.4: one song of a document with `songs`, resolved against the document defaults. */
 export interface ParsedSong {
   name: string;
@@ -291,6 +318,8 @@ export interface ParsedSidwave {
    * `song.tempo` then describe song 0, so code that knows only one song still sees a complete score.
    */
   songs?: ParsedSong[];
+  /** SIDWave 1.4: sound effects the game triggers with the `sfx` entry; absent when the document defines none. */
+  effects?: ParsedEffect[];
   /** SIDWave 1.4, documents with songs only: the names of the `sections` definitions, for the lint. */
   definedSections?: string[];
   accent?: number;
@@ -330,7 +359,7 @@ export const SIDWAVE_TEMPO_RANGE = { min: 30, max: 220 } as const;
 /** MIDI numbers of C0 and B7, the note range of the player's frequency table. */
 export const SIDWAVE_NOTE_RANGE = { min: 12, max: 107 } as const;
 
-const TOP_LEVEL_KEYS = new Set(["sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs"]);
+const TOP_LEVEL_KEYS = new Set(["sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs", "effects"]);
 const LEGACY_KEYS = new Set(["song", "voices", "timeline"]);
 const LEGACY_SONG_KEYS = new Set(["title", "author", "tempo", "mode", "length_bars", "global_fx"]);
 const VOICE_KEYS = new Set(["id", "sid", "channel", "name", "waveform", "pulse_width", "adsr", "patterns", "instrument", "echo", "unison", "detune", "level", "role", "center"]);
@@ -379,6 +408,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   const v14 = obj.sidwave === 1.4 || obj.sidwave === "1.4";
   const v13 = obj.sidwave === 1.3 || obj.sidwave === "1.3" || v14;
   if (obj.songs !== undefined && !v14) throw new SidwaveValidationError("$.songs", "songs require sidwave: 1.4");
+  if (obj.effects !== undefined && !v14) throw new SidwaveValidationError("$.effects", "effects require sidwave: 1.4");
   const modern = obj.sidwave === 1.2 || obj.sidwave === "1.2" || v13;
   const header = (legacy ? obj.song : obj) as Record<string, unknown>;
   const headerPath = legacy ? "$.song" : "$";
@@ -533,8 +563,9 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
     if (slot === undefined || Math.floor(slot / 3) !== chip) throw new SidwaveValidationError(layout ? `$.sids.overrides.${sid.id}.filter.owner` : `$.sids[${chip}].filter.owner`, "must name a declared voice of this SID");
     sid.filter!.route ??= [slot % 3 + 1];
   }
+  const effects = obj.effects === undefined ? undefined : parseEffects(obj.effects);
   return { version, song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,
-    accent, swing, swingUnit, loopTo, end, layout, digiVoices, ...(songs ? { songs, definedSections: isPlainObject(obj.sections) ? Object.keys(obj.sections) : [] } : {}), ...(ignoredFields.length ? { ignoredFields } : {}) };
+    accent, swing, swingUnit, loopTo, end, layout, digiVoices, ...(effects?.length ? { effects } : {}), ...(songs ? { songs, definedSections: isPlainObject(obj.sections) ? Object.keys(obj.sections) : [] } : {}), ...(ignoredFields.length ? { ignoredFields } : {}) };
 
 }
 
@@ -1452,6 +1483,94 @@ export function parseLayerSequence(ref: string, patterns: string[], path: string
   const items = read(false);
   if (pos !== tokens.length || !items.length) throw new SidwaveValidationError(path, "unmatched sequence parenthesis");
   return { items, sequence };
+}
+
+/** The most effects one document can define: the player holds one table row per effect and `sfx` takes the index in A. */
+export const SIDWAVE_MAX_EFFECTS = 32;
+/** The most steps of one effect. */
+export const SIDWAVE_MAX_EFFECT_STEPS = 255;
+/** Highest effect frequency in Hz that both the PAL and the NTSC frequency register can hold. */
+export const SIDWAVE_MAX_EFFECT_HZ = 3848;
+const EFFECT_KEYS = new Set(["priority", "voices", "steps"]);
+const EFFECT_STEP_KEYS = new Set(["freq", "wave", "pulse", "adsr", "gate", "filter", "wait"]);
+
+/**
+ * SIDWave 1.4: parses `effects`, a mapping from effect name to `{ priority, voices?, steps }`. An empty mapping
+ * defines no effects and is the same as leaving `effects` out.
+ */
+function parseEffects(raw: unknown): ParsedEffect[] {
+  if (!isPlainObject(raw)) throw new SidwaveValidationError("$.effects", "expected a mapping from effect name to { priority, voices, steps }");
+  const entries = Object.entries(raw);
+  if (entries.length > SIDWAVE_MAX_EFFECTS) {
+    throw new SidwaveValidationError("$.effects", `at most ${SIDWAVE_MAX_EFFECTS} effects are supported; ${entries.length} were given`);
+  }
+  return entries.map(([name, value]) => {
+    const path = `$.effects.${name}`;
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,31}$/.test(name)) {
+      throw new SidwaveValidationError(path, "an effect name starts with a letter or underscore and has at most 32 letters, digits or underscores");
+    }
+    if (!isPlainObject(value)) throw new SidwaveValidationError(path, "expected a mapping with priority and steps");
+    checkKeys(value, EFFECT_KEYS, path);
+    if (value.priority === undefined) throw new SidwaveValidationError(path + ".priority", "missing priority (0 to 15)");
+    const priority = requireNumber(value.priority, path + ".priority", { min: 0, max: 15, integer: true });
+    let voices = [1, 2, 3];
+    if (value.voices !== undefined) {
+      if (!Array.isArray(value.voices) || value.voices.length === 0) {
+        throw new SidwaveValidationError(path + ".voices", "expected a list of one to three voice numbers (1 to 3, the voices of the first SID)");
+      }
+      voices = value.voices.map((voice: unknown, i: number) => requireNumber(voice, `${path}.voices[${i}]`, { min: 1, max: 3, integer: true }));
+      if (new Set(voices).size !== voices.length) throw new SidwaveValidationError(path + ".voices", "a voice is listed more than once");
+      voices.sort((a, b) => a - b);
+    }
+    if (!Array.isArray(value.steps) || value.steps.length === 0) {
+      throw new SidwaveValidationError(path + ".steps", "missing steps (expected a list of at least one step)");
+    }
+    if (value.steps.length > SIDWAVE_MAX_EFFECT_STEPS) {
+      throw new SidwaveValidationError(path + ".steps", `at most ${SIDWAVE_MAX_EFFECT_STEPS} steps are supported; ${value.steps.length} were given`);
+    }
+    const steps = value.steps.map((step: unknown, k: number) => parseEffectStep(step, `${path}.steps[${k}]`));
+    if (steps[0]!.freq === undefined) throw new SidwaveValidationError(`${path}.steps[0].freq`, "the first step needs a freq");
+    return { name, priority, voices, voicesListed: value.voices !== undefined, steps };
+  });
+}
+
+function parseEffectStep(raw: unknown, path: string): ParsedEffectStep {
+  if (!isPlainObject(raw)) throw new SidwaveValidationError(path, "expected a step mapping such as { freq: C5, wait: 2 }");
+  checkKeys(raw, EFFECT_STEP_KEYS, path);
+  const step: ParsedEffectStep = { wait: 1 };
+  if (raw.freq !== undefined) {
+    const text = typeof raw.freq === "string" ? raw.freq.trim() : undefined;
+    const midi = text === undefined ? undefined : noteNameToMidi(text);
+    if (midi !== undefined) {
+      if (midi < SIDWAVE_NOTE_RANGE.min || midi > SIDWAVE_NOTE_RANGE.max) throw new SidwaveValidationError(path + ".freq", `note ${raw.freq} is outside the supported range C0..B7`);
+      step.freq = { midi };
+    } else {
+      const number = text !== undefined && /^[0-9.]+\s*hz$/i.test(text) ? text.replace(/\s*hz$/i, "") : raw.freq;
+      if (typeof number === "boolean" || number === null) throw new SidwaveValidationError(path + ".freq", "expected a note name such as C5 or a frequency in Hz");
+      const hz = typeof number === "string" && !/^[0-9.]+$/.test(number) ? Number.NaN : requireNumber(number, path + ".freq", { min: 1, max: SIDWAVE_MAX_EFFECT_HZ });
+      if (!Number.isFinite(hz)) throw new SidwaveValidationError(path + ".freq", `invalid note or frequency ${describeValue(raw.freq)}; use names such as C4 or F#2, or Hz such as 440 or "880Hz"`);
+      step.freq = { hz };
+    }
+  }
+  if (raw.wave !== undefined) {
+    const wave = requireText(raw.wave, path + ".wave").toLowerCase();
+    if (!WAVEFORMS.has(wave) && !/^(?:tri\+pulse|tri\+saw|saw\+pulse|tri\+saw\+pulse)$/.test(wave)) {
+      throw new SidwaveValidationError(path + ".wave", `unknown waveform ${describeValue(raw.wave)}; use pulse, sawtooth, triangle, noise or tri+saw, tri+pulse, saw+pulse, tri+saw+pulse`);
+    }
+    step.wave = wave;
+  }
+  if (raw.pulse !== undefined) step.pulse = parsePulseWidth(raw.pulse, path + ".pulse", "modern");
+  if (raw.adsr !== undefined) step.adsr = parseAdsr(raw.adsr, path + ".adsr");
+  if (raw.gate !== undefined) {
+    if (typeof raw.gate !== "boolean") throw new SidwaveValidationError(path + ".gate", "expected true or false");
+    step.gate = raw.gate;
+  }
+  if (raw.filter !== undefined) {
+    if (raw.filter !== "off" && raw.filter !== "keep") throw new SidwaveValidationError(path + ".filter", "expected off (the voice bypasses the filter while the effect plays) or keep");
+    step.filter = raw.filter;
+  }
+  if (raw.wait !== undefined) step.wait = requireNumber(raw.wait, path + ".wait", { min: 1, max: 255, integer: true });
+  return step;
 }
 
 /** The most songs one document can hold: the PSID speed field has one bit per song. */
