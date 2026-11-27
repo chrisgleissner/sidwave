@@ -8,6 +8,7 @@
 // SHA-256 of every file. The original SID is stored only when the caller asserts that redistribution is permitted.
 // `verifyPreservation` recompiles the score offline and checks every hash, the trace fingerprint and the verdict.
 
+import { STIL_MAX_CHARS, lookupStil } from "../stil.js";
 import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { SidwaveOperationError } from "../cliCore.js";
@@ -124,20 +125,7 @@ function packageIdentity(): { name: string; version: string } {
   return { name: manifest.name, version: manifest.version };
 }
 
-/** Longest STIL entry copied into a manifest, in characters. */
-export const STIL_MAX_CHARS = 16_384;
-
-/** The STIL block of an HVSC path: the lines from the path line to the next path line. */
-export function lookupStil(stilText: string, hvscPath: string): { path: string; text: string } | undefined {
-  const wanted = hvscPath.startsWith("/") ? hvscPath : `/${hvscPath}`;
-  const lines = stilText.split(/\r?\n/);
-  const start = lines.findIndex((l) => l.trim() === wanted);
-  if (start < 0) return undefined;
-  let end = start + 1;
-  while (end < lines.length && !lines[end]!.startsWith("/") ) end++;
-  const text = lines.slice(start + 1, end).join("\n").trim();
-  return { path: wanted, text: text.length > STIL_MAX_CHARS ? `${text.slice(0, STIL_MAX_CHARS)}\n[truncated at ${STIL_MAX_CHARS} characters]` : text };
-}
+export { STIL_MAX_CHARS, lookupStil };
 
 function ambiguitiesOf(report: ReconstructReport): PreservationManifest["ambiguities"] {
   const out: PreservationManifest["ambiguities"] = [];

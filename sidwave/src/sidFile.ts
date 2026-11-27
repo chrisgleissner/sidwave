@@ -141,6 +141,11 @@ function encodeString(text: string, field: string): Uint8Array {
   return Uint8Array.from(out);
 }
 
+/** The 32 byte header string field as text (Windows-1252, up to the first zero byte). */
+export const decodeSidHeaderString = (bytes: Uint8Array): string => decodeString(bytes).text;
+/** Text as a header string field of 1 to 32 bytes, without the zero padding. Throws SidFileError for unencodable text. */
+export const encodeSidHeaderString = (text: string, field: string): Uint8Array => encodeString(text, field);
+
 // ---- helpers ---------------------------------------------------------------------------
 export function isValidSidAddressByte(b: number): boolean {
   return b % 2 === 0 && ((b >= 0x42 && b <= 0x7f) || (b >= 0xe0 && b <= 0xfe));
