@@ -363,6 +363,11 @@ export const SIDWAVE_TEMPO_RANGE = { min: 30, max: 220 } as const;
 /** MIDI numbers of C0 and B7, the note range of the player's frequency table. */
 export const SIDWAVE_NOTE_RANGE = { min: 12, max: 107 } as const;
 
+/** SIDWave 1.5: the highest `speed` (player calls per frame); 1.4 allows 4. */
+export const SIDWAVE_MAX_SPEED_15 = 8;
+/** The shortest pattern length and groove `len` in beats: 1/64 up to 1.4, 1/128 in 1.5 (a call at speed 8 is 1/128 beat). Set at the start of every parseSidwave call. */
+let rowMinimum = 1 / 64;
+
 const TOP_LEVEL_KEYS = new Set(["player", "sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs", "effects"]);
 const LEGACY_KEYS = new Set(["song", "voices", "timeline"]);
 const LEGACY_SONG_KEYS = new Set(["title", "author", "tempo", "mode", "length_bars", "global_fx"]);
@@ -378,6 +383,7 @@ const GLOBAL_FX_KEYS = new Set(["reverb_sim", "filter_env"]);
 const WAVEFORMS = new Set(["pulse", "sawtooth", "saw", "triangle", "tri", "noise"]);
 
 export function parseSidwave(input: string | object, options: SidwaveReadOptions = {}): ParsedSidwave {
+  rowMinimum = 1 / 64;
   let obj: any;
   if (typeof input === "string") {
     try {
@@ -423,6 +429,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   }
   // SIDWave 1.3 accepts everything that 1.2 accepts and compiles it to the same bytes. 1.4 does the same for 1.3.
   const v15 = obj.sidwave === 1.5 || obj.sidwave === "1.5";
+  rowMinimum = v15 ? 1 / 128 : 1 / 64;
   const v14 = obj.sidwave === 1.4 || obj.sidwave === "1.4" || v15;
   const v13 = obj.sidwave === 1.3 || obj.sidwave === "1.3" || v14;
   if (obj.player !== undefined && !v15) throw new SidwaveValidationError("$.player", "player options require sidwave: 1.5; the document declares " + (obj.sidwave === undefined ? "no version" : `sidwave: ${scalarText(obj.sidwave, "$.sidwave")}`));
@@ -571,7 +578,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   const samples = normalizeSamples(obj.samples, sids, modern, barStartBeats(timeline, length_bars, meter), digiVoices.length > 0, options);
   const song: ParsedSidwave["song"] = { title, tempo: songs ? songs[0]!.tempo : tempo, mode, length_bars, meter, global_fx, ...(meterSig ? { meterSig } : {}) };
   if (author !== undefined) song.author = author;
-  const speed = songs ? songs[0]!.speed : obj.speed === undefined ? 1 : requireNumber(obj.speed, "$.speed", { min: 1, max: 4, integer: true });
+  const speed = songs ? songs[0]!.speed : obj.speed === undefined ? 1 : requireNumber(obj.speed, "$.speed", { min: 1, max: v15 ? SIDWAVE_MAX_SPEED_15 : 4, integer: true });
   if (obj.cpu !== undefined && obj.cpu !== "turbo") throw new SidwaveValidationError("$.cpu", "expected turbo");
   const declaredVersion = String(obj.sidwave);
   const version = declaredVersion === "1.1" || declaredVersion === "1.2" || declaredVersion === "1.3" || declaredVersion === "1.4" || declaredVersion === "1.5" ? declaredVersion : "1.0";
@@ -1088,7 +1095,7 @@ function validatePattern(raw: unknown, path: string, modern: boolean, meter: num
     delete p.motif;
     delete p.root;
   }
-  if (p.length !== undefined) p.length = requireNumber(p.length, `${path}.length`, { min: 1 / 64, max: 64 });
+  if (p.length !== undefined) p.length = requireNumber(p.length, `${path}.length`, { min: rowMinimum, max: 64 });
   if (p.transpositions !== undefined) {
     if (!Array.isArray(p.transpositions) || p.transpositions.length === 0) {
       throw new SidwaveValidationError(`${path}.transpositions`, "expected a non-empty list of semitone offsets");
@@ -1148,7 +1155,7 @@ function validatePattern(raw: unknown, path: string, modern: boolean, meter: num
         }
         if (entry.inst !== undefined && typeof entry.inst !== "string") throw new SidwaveValidationError(`${path}.groove[${i}].inst`, "expected an instrument name");
         if (entry.level !== undefined) entry.level = parseLevel(entry.level, np + ".level");
-        if (entry.len !== undefined) entry.len = requireNumber(entry.len, `${path}.groove[${i}].len`, { min: 1 / 64, max: 64 });
+        if (entry.len !== undefined) entry.len = requireNumber(entry.len, `${path}.groove[${i}].len`, { min: rowMinimum, max: 64 });
         if (entry.legato !== undefined && typeof entry.legato !== "boolean") throw new SidwaveValidationError(`${path}.groove[${i}].legato`, "expected a boolean");
         if (entry.portamento !== undefined) entry.portamento = requireNumber(entry.portamento, `${path}.groove[${i}].portamento`, { min: 0, max: 255, integer: true });
         if (entry.slide_from !== undefined) requireNote(entry.slide_from, `${path}.groove[${i}].slide_from`);

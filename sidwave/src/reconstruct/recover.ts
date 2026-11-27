@@ -50,6 +50,10 @@ export const CALLS_PER_BEAT_PER_SPEED = 16;
 export const CALLS_PER_BEAT_PER_SPEED_FAST = 18;
 /** Highest tempo accepted before the finer grid is used. */
 export const TEMPO_LIMIT = 215;
+/** Longest pattern and longest groove entry of the language, in beats. */
+export const MAX_PATTERN_BEATS = 64;
+/** A note longer than this is cut (its gate then ends early) so that every pattern stays within the language limit. */
+export const MAX_NOTE_BEATS = 32;
 /** Beats per bar of the emitted score. */
 export const BEATS_PER_BAR = 4;
 /** Candidate block sizes in bars for the structure step; the size with the smallest emitted score wins. */
@@ -220,7 +224,8 @@ function exactSemitone(freq: number, cents: number, clockHz: number): number | u
   if (freq <= 0) return undefined;
   const near = nearestSemitone(freq, cents, clockHz);
   for (const midi of [near, near - 1, near + 1]) {
-    if (midi >= 0 && midi <= 127 && registerOf(midi, cents, clockHz) === freq) return midi;
+    // The language plays C0 (MIDI 12) to B7 and rejects a pitch whose register would not fit 16 bits under the tuning.
+    if (midi >= MIDI_MIN && midi <= MIDI_MAX && registerOf(midi, cents, clockHz) === freq && Math.round((midiToHz(midi + cents / 100) * 16_777_216) / clockHz) <= 0xffff) return midi;
   }
   return undefined;
 }
@@ -710,24 +715,38 @@ function filterSteps(program: ProgramCall[]): Array<Record<string, unknown>> | u
   return steps;
 }
 
-/** Folds a step list whose tail repeats into a shorter list with a loop index; a shorter last step still matches. */
+/**
+ * Folds a step list whose tail repeats into a shorter list with a loop index; a shorter last step still matches.
+ * Returns the smallest loop start and, for that start, the smallest period. Step keys are computed once and each
+ * period is checked from the end of the list, so a failing period stops at its first mismatch.
+ */
 function foldLoop(steps: Array<Record<string, unknown>>): { steps: Array<Record<string, unknown>>; loop?: number } {
-  const key = (s: Record<string, unknown>): string => JSON.stringify({ ...s, calls: undefined });
   const n = steps.length;
-  for (let start = 0; start < n; start++) {
-    for (let period = 1; start + 2 * period <= n && period <= (n - start) / 2; period++) {
-      let ok = true;
-      for (let t = start + period; t < n && ok; t++) {
-        const template = steps[start + ((t - start) % period)]!;
-        const s = steps[t]!;
-        const sameCalls = s.calls === template.calls;
-        const lastShort = t === n - 1 && Number(s.calls) <= Number(template.calls);
-        ok = key(s) === key(template) && (sameCalls || lastShort);
-      }
-      if (ok) return { steps: steps.slice(0, start + period), loop: start };
+  const keys = steps.map((s) => JSON.stringify({ ...s, calls: undefined }));
+  const calls = steps.map((s) => Number(s.calls));
+  let bestStart = Infinity;
+  let bestPeriod = 0;
+  for (let period = 1; 2 * period <= n; period++) {
+    // The tail from t0 repeats with this period when every step t >= t0 equals the step one period before it.
+    let t0 = n;
+    while (t0 - 1 >= period) {
+      const t = t0 - 1;
+      const same = keys[t] === keys[t - period];
+      const sameCalls = calls[t] === calls[t - period];
+      const lastShort = t === n - 1 && calls[t]! <= calls[t - period]!;
+      if (!(same && (sameCalls || lastShort))) break;
+      t0--;
+    }
+    const first = Math.max(t0, period);
+    if (n - first < period) continue;
+    const start = Math.max(0, t0 - period);
+    if (start < bestStart) {
+      bestStart = start;
+      bestPeriod = period;
     }
   }
-  return { steps };
+  if (bestPeriod === 0) return { steps };
+  return { steps: steps.slice(0, bestStart + bestPeriod), loop: bestStart };
 }
 
 function buildInstrumentYaml(program: ProgramCall[], ad: number, sr: number, restart: RestartInfo, speed: number,
@@ -867,7 +886,7 @@ function sequenceText(names: string[]): string {
 
 interface Layout {
   blockBars: number | "flat";
-  voices: Array<{ patterns: Record<string, { length: number; groove: unknown[] }>; sequence: string }>;
+  voices: Array<{ patterns: Record<string, { length: number; groove: unknown[] }>; sequence: string; maxBeats: number }>;
 }
 
 function layoutVoices(entriesByVoice: Entry[][], rows: number, callsPerBeat: number, instNames: string[], defaults: number[],
@@ -878,7 +897,9 @@ function layoutVoices(entriesByVoice: Entry[][], rows: number, callsPerBeat: num
     const names: string[] = [];
     const known = new Map<string, string>();
     const patterns: Record<string, { length: number; groove: unknown[] }> = {};
+    let maxBeats = 0;
     for (const b of blocks) {
+      maxBeats = Math.max(maxBeats, b.reduce((n, e) => n + e.len, 0) / callsPerBeat);
       const key = b.map(entryKey).join("|");
       let name = known.get(key);
       if (!name) {
@@ -890,7 +911,7 @@ function layoutVoices(entriesByVoice: Entry[][], rows: number, callsPerBeat: num
       }
       names.push(name);
     }
-    return { patterns, sequence: sequenceText(names) };
+    return { patterns, sequence: sequenceText(names), maxBeats };
   });
   return { blockBars, voices };
 }
@@ -943,6 +964,7 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   const tempo = (60 * frameRate * speed) / callsPerBeat;
 
   const tracks = extractTracks(ir, firstCall);
+  let cutNotes = 0;
   if (ir.sidCount > 1) {
     unsupported.push({
       kind: "multi_sid", detail: `${ir.sidCount} SIDs; only SID 1 is recovered`,
@@ -978,6 +1000,8 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     end = k + 1;
     return end;
   })();
+  // The 1.4 player ramps the volume from 1 to 15 over its first calls. A tune that sets the full volume at once and keeps it has no ramp: soft_start is switched off.
+  const softStartOff = volumeRamp === firstCall + 1 && (ir.calls[firstCall]!.sids[0]!.regs[0x18]! & 15) === 15;
   const volumeAfterRamp = new Set<number>();
   for (let k = volumeRamp; k < ir.calls.length; k++) volumeAfterRamp.add(ir.calls[k]!.sids[0]!.regs[0x18]!);
   if (volumeAfterRamp.size) globalSeen.set(0x18, volumeAfterRamp);
@@ -1025,15 +1049,22 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     if (list) list.push(seg);
     else groups.set(key, [seg]);
   }
-  for (const list of [...groups.values()].sort((a, b) => allSegs.indexOf(a[0]!) - allSegs.indexOf(b[0]!))) {
+  const segIndex = new Map<NoteSegment, number>();
+  allSegs.forEach((seg, i) => segIndex.set(seg, i));
+  const callKey = (c: ProgramCall | undefined): string => c ? `${c.wave}:${c.gate}:${c.offset}:${c.pw}:${c.slide?.count ?? 0}:${c.filt?.cutoff ?? -1}` : "";
+  for (const list of [...groups.values()].sort((a, b) => segIndex.get(a[0]!)! - segIndex.get(b[0]!)!)) {
     const sorted = [...list].sort((a, b) => b.program.length - a.program.length);
-    const reps: Array<{ program: ProgramCall[]; defIndex: number }> = [];
+    // Representatives are bucketed by their first call: a program can only be a prefix of a representative with the same first call.
+    const reps = new Map<string, Array<{ program: ProgramCall[]; defIndex: number }>>();
     for (const seg of sorted) {
-      let rep = reps.find((r) => isPrefix(seg.program, r.program));
+      const bucketKey = callKey(seg.program[0]);
+      let bucket = reps.get(bucketKey);
+      if (!bucket) reps.set(bucketKey, (bucket = []));
+      let rep = bucket.find((r) => isPrefix(seg.program, r.program));
       if (!rep) {
         rep = { program: seg.program, defIndex: defs.length };
         defs.push({ name: "", program: seg.program, ad: seg.ad, sr: seg.sr, restart: seg.restart, yaml: {} });
-        reps.push(rep);
+        bucket.push(rep);
       }
       seg.instrument = rep.defIndex;
     }
@@ -1180,8 +1211,11 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     for (const s of segs) counts.set(s.instrument, (counts.get(s.instrument) ?? 0) + 1);
     return [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 0;
   });
+  // SIDWave 1.5 is declared only when the score needs it: a speed above 4, or a player without the soft-start volume ramp.
+  const v15 = speed > 4 || softStartOff;
   const build = (layout: Layout): Record<string, unknown> => ({
-    sidwave: "1.4",
+    sidwave: v15 ? "1.5" : "1.4",
+    ...(softStartOff ? { player: { soft_start: false } } : {}),
     title: options.title ?? "Reconstructed",
     tempo,
     mode: system,
@@ -1198,13 +1232,16 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
   const alternatives: Array<{ blockBars: number | "flat"; bytes: number; document: Record<string, unknown> }> = [];
   for (const blockBars of ["flat", ...BLOCK_BARS] as const) {
     if (!entriesByVoice.length) break;
+    // A pattern lasts at most MAX_PATTERN_BEATS; a flat layout is only possible for a short tune.
+    if (blockBars === "flat" ? paddedRows / callsPerBeat > MAX_PATTERN_BEATS : blockBars * BEATS_PER_BAR > MAX_PATTERN_BEATS) continue;
     const layout = layoutVoices(entriesByVoice, paddedRows, callsPerBeat, instNames, defaults, blockBars);
+    if (layout.voices.some((v) => v.maxBeats > MAX_PATTERN_BEATS)) continue;
     const document = build(layout);
-    alternatives.push({ blockBars, bytes: formatSidwave(YAML.stringify(document)).length, document });
+    alternatives.push({ blockBars, bytes: YAML.stringify(document).length, document });
   }
   const chosen = alternatives.length ? alternatives.reduce((a, b) => (b.bytes < a.bytes ? b : a)) : undefined;
   // A tune without a gated note still needs one voice for the score to compile: a single rest.
-  const silent: Layout = { blockBars: "flat", voices: [{ patterns: { P1: { length: 1 / callsPerBeat, groove: ["-"] } }, sequence: "P1" }] };
+  const silent: Layout = { blockBars: "flat", voices: [{ patterns: { P1: { length: 1 / callsPerBeat, groove: ["-"] } }, sequence: "P1", maxBeats: 0 }] };
   if (!used.length) { voiceIds.push(1); entriesByVoice.push([]); defaults.push(0); }
   const document = chosen?.document ?? build(silent);
   const text = formatSidwave(YAML.stringify(document));
@@ -1214,7 +1251,7 @@ export function recoverScore(ir: FrameIr, options: RecoverOptions = {}): Recover
     document, text, speed, tempo, callsPerBeat, firstCall, rows, tuningCents: tuning.cents,
     noteCount: allSegs.filter((x) => !x.phantom).length, phantomNotes: allSegs.filter((x) => x.phantom).length, instrumentCount: finalDefs.length, patternCount,
     structure: {
-      blockBars: chosen?.blockBars ?? "flat", bytes: chosen?.bytes ?? text.length,
+      blockBars: chosen?.blockBars ?? "flat", bytes: text.length,
       alternatives: alternatives.map(({ blockBars, bytes }) => ({ blockBars, bytes })),
     },
     unsupported, extensions: [...extensions.values()],
