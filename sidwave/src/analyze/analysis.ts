@@ -76,6 +76,8 @@ export interface AnalyzeScoreOptions {
   engine?: SidEngine;
   /** Horizon of the trace in seconds. Default: one pass of the score, at most 180. */
   seconds?: number;
+  /** Set to false to skip the compilation that provides the size and cycle bound of `resources.compiled`. The compiler arranges the score a second time, which costs about as much as the whole analysis of a large score. Needed for `engine`. Default true. */
+  resources?: boolean;
 }
 
 export interface AnalyzeSidOptions {
@@ -156,27 +158,27 @@ function musicSections(model: ScoreModel, doc: ParsedSidwave | undefined, basis:
 export async function analyzeScore(text: string, options: AnalyzeScoreOptions = {}): Promise<AnalysisReport> {
   const doc = parseSidwave(text, options.read ?? {});
   const parts = musicSections(modelOfScore(doc), doc, "observed");
-  const compiled = compileSidwaveBytes(doc, { format: "prg" });
-  const s = compiled.summary;
+  const compiled = options.resources === false && !options.engine ? undefined : compileSidwaveBytes(doc, { format: "prg" });
+  const s = compiled?.summary;
   const report: AnalysisReport = {
     schema: ANALYSIS_SCHEMA,
     source: { kind: "score", sha256: sha256(text), title: doc.song.title, ...(doc.song.author ? { author: doc.song.author } : {}) },
     key: parts.key, metre: parts.metre, form: parts.form, motifs: parts.motifs, voices: parts.voices,
     techniques: techniquesFromScore(parts.model),
-    resources: {
+    resources: s ? {
       compiled: {
         basis: "inferred", method: "static worst-case cycle bound of the SIDWave player computed by the compiler",
         outputBytes: s.outputBytes, prgBytes: s.prgBytes, streamBytes: s.streamBytes, loadAddress: s.loadAddress, endAddress: s.endAddress,
         worstCaseCyclesPerCall: s.worstCaseCyclesPerCall, sidCount: s.sidCount,
       },
-    },
+    } : {},
     limits: [
       "Key, metre, form, motifs and roles are inferred from the score by the named methods; they are not part of the score.",
       "Techniques are read from the instrument definitions; a technique that an instrument defines but the voices never trigger is not listed.",
     ],
   };
   if (options.engine) {
-    const seconds = Math.min(options.seconds ?? s.durationSeconds, DEFAULT_HORIZON_SECONDS);
+    const seconds = Math.min(options.seconds ?? s!.durationSeconds, DEFAULT_HORIZON_SECONDS);
     const bytes = new Uint8Array(compileSidwaveBytes(doc, { format: "sid" }).bytes);
     const trace = await options.engine.trace({ sid: bytes, seconds, clock: doc.song.mode });
     const ir = irOfTrace(trace);
