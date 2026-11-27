@@ -36,8 +36,8 @@ const SPEC: FlagSpec = { values: ["--stil", "--hvsc", "--subtune"], switches: ["
 function stilFile(io: CliIo, flags: ParsedFlags, near: string | undefined, positional?: string): { path: string; root?: string } {
   const explicit = one(flags, "--stil") ?? positional;
   let root = resolveHvscRoot(io.cwd, one(flags, "--hvsc"));
-  if (explicit !== undefined) return { path: resolve(io.cwd, explicit), ...(root === undefined ? {} : { root }) };
   if (root === undefined && near !== undefined) root = findHvscRootAbove(near);
+  if (explicit !== undefined) return { path: resolve(io.cwd, explicit), ...(root === undefined ? {} : { root }) };
   if (root === undefined) throw new UsageError("no STIL file given. Pass --stil <STIL.txt> or --hvsc <root>, or set HVSC_ROOT");
   const path = hvscDatabases(root).stil;
   if (path === undefined) throw new SidwaveOperationError("input", `no STIL.txt in ${root}/DOCUMENTS; pass the file with --stil`);

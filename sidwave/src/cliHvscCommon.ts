@@ -42,8 +42,11 @@ export function parseFlags(args: readonly string[], spec: FlagSpec): ParsedFlags
     if (arg === "-h" || arg === "--help") { out.help = true; continue; }
     arg = spec.aliases?.[arg] ?? arg;
     if (spec.values.includes(arg)) {
-      const value = inline ?? args[++i];
-      if (value === undefined) throw new UsageError(`${arg} needs a value`);
+      const next = args[i + 1];
+      // A value that is itself one of the flags means the value was left out.
+      const missing = inline === undefined && (next === undefined || (next.startsWith("--") && (spec.values.includes(spec.aliases?.[next] ?? next) || spec.switches.includes(spec.aliases?.[next] ?? next) || next === "--help")));
+      if (missing) throw new UsageError(`${arg} needs a value`);
+      const value = inline ?? args[++i]!;
       const list = out.values.get(arg);
       if (list) list.push(value); else out.values.set(arg, [value]);
     } else if (spec.switches.includes(arg)) {
