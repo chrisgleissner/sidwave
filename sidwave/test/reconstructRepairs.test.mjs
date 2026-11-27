@@ -197,3 +197,25 @@ test("a recovered score that exceeds the cycle budget is compiled for a faster C
   if (result.report.compile?.cycleBudgetExceeded) assert.equal(result.report.strictExact, false);
   assert.equal(result.report.compile?.ok, true, result.report.compile?.error);
 });
+
+test("foldLoop takes linear time for constant and periodic step lists of 16000 steps", () => {
+  for (const make of [() => ({ add: 1, calls: 1 }), (i) => ({ add: i % 3, calls: 1 })]) {
+    const steps = Array.from({ length: 16000 }, (_, i) => make(i));
+    const started = process.cpuUsage();
+    const folded = foldLoop(steps);
+    const used = process.cpuUsage(started);
+    assert.ok(folded.loop === 0 && folded.steps.length <= 3);
+    assert.ok((used.user + used.system) / 1000 < 400, `${(used.user + used.system) / 1000} ms of CPU`);
+  }
+});
+
+test("1.5 constructs in a 1.4 document name the version: pulse width 0, wavetable reg, speed 5, rows below 1/64 beat, songs speed", () => {
+  const base = (version, extra = "", inst = "{ waveform: pulse }", len = 1) => `sidwave: "${version}"\ntitle: T\ntempo: 120\n${extra}voices:\n  - { id: 1, instrument: lead, patterns: { a: { length: ${len}, bars: 1, groove: "A4 - C5 -" } } }\ninstruments:\n  lead: ${inst}\ntimeline:\n  - { section: Main, bars: 4, layers: { v1: a } }\n`;
+  assert.throws(() => parseSidwave(base("1.4", "", "{ waveform: pulse, pulsetable: [{ set: 0 }] }")), /sidwave: 1\.5/);
+  assert.throws(() => parseSidwave(base("1.4", "", "{ waveform: pulse, wavetable: [{ reg: 4000 }] }")), /reg.*sidwave: 1\.5/);
+  assert.throws(() => parseSidwave(base("1.4", "speed: 5\n")), /\$\.speed.*sidwave: 1\.5/);
+  assert.throws(() => parseSidwave(base("1.4", "", "{ waveform: pulse }", 0.01)), /sidwave: 1\.5/);
+  const songs = (version, speed) => `sidwave: "${version}"\ntitle: T\ntempo: 120\nspeed: ${speed}\nvoices:\n  - { id: 1, instrument: lead, patterns: { a: { length: 1, bars: 1, groove: "A4 - C5 -" } } }\ninstruments:\n  lead: { waveform: pulse }\nsections:\n  s: { bars: 1, layers: { v1: a } }\nsongs:\n  - { name: one, timeline: [{ section: s, bars: 1, layers: { v1: a } }], speed: ${speed} }\n`;
+  assert.throws(() => parseSidwave(songs("1.4", 6)), /speed/);
+  assert.equal(parseSidwave(songs("1.5", 6)).songs[0].speed, 6);
+});

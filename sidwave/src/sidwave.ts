@@ -369,6 +369,8 @@ export const SIDWAVE_NOTE_RANGE = { min: 12, max: 107 } as const;
 export const SIDWAVE_MAX_SPEED_15 = 8;
 /** The shortest pattern length and groove `len` in beats: 1/64 up to 1.4, 1/128 in 1.5 (a call at speed 8 is 1/128 beat). Set at the start of every parseSidwave call. */
 let rowMinimum = 1 / 64;
+/** The highest speed of the document being parsed: 4, or 8 in 1.5. Set at the start of every parseSidwave call. */
+let speedMaximum = 4;
 
 const TOP_LEVEL_KEYS = new Set(["player", "tuning", "sidwave", "title", "author", "tempo", "mode", "length_bars", "global_fx", "voices", "timeline", "instruments", "speed", "meter", "sids", "cpu", "samples", "kit", "sections", "loop_to", "accent", "end", "swing", "swing_unit", "songs", "effects"]);
 const LEGACY_KEYS = new Set(["song", "voices", "timeline"]);
@@ -386,6 +388,7 @@ const WAVEFORMS = new Set(["pulse", "sawtooth", "saw", "triangle", "tri", "noise
 
 export function parseSidwave(input: string | object, options: SidwaveReadOptions = {}): ParsedSidwave {
   rowMinimum = 1 / 64;
+  speedMaximum = 4;
   let obj: any;
   if (typeof input === "string") {
     try {
@@ -432,6 +435,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   // SIDWave 1.3 accepts everything that 1.2 accepts and compiles it to the same bytes. 1.4 does the same for 1.3.
   const v15 = obj.sidwave === 1.5 || obj.sidwave === "1.5";
   rowMinimum = v15 ? 1 / 128 : 1 / 64;
+  speedMaximum = v15 ? SIDWAVE_MAX_SPEED_15 : 4;
   const v14 = obj.sidwave === 1.4 || obj.sidwave === "1.4" || v15;
   const v13 = obj.sidwave === 1.3 || obj.sidwave === "1.3" || v14;
   if (obj.player !== undefined && !v15) throw new SidwaveValidationError("$.player", "player options require sidwave: 1.5; the document declares " + (obj.sidwave === undefined ? "no version" : `sidwave: ${scalarText(obj.sidwave, "$.sidwave")}`));
@@ -581,6 +585,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   const samples = normalizeSamples(obj.samples, sids, modern, barStartBeats(timeline, length_bars, meter), digiVoices.length > 0, options);
   const song: ParsedSidwave["song"] = { title, tempo: songs ? songs[0]!.tempo : tempo, mode, length_bars, meter, global_fx, ...(meterSig ? { meterSig } : {}) };
   if (author !== undefined) song.author = author;
+  if (!v15 && typeof obj.speed === "number" && obj.speed > 4 && obj.speed <= SIDWAVE_MAX_SPEED_15) throw new SidwaveValidationError("$.speed", "a speed above 4 requires sidwave: 1.5");
   const speed = songs ? songs[0]!.speed : obj.speed === undefined ? 1 : requireNumber(obj.speed, "$.speed", { min: 1, max: v15 ? SIDWAVE_MAX_SPEED_15 : 4, integer: true });
   if (obj.cpu !== undefined && obj.cpu !== "turbo") throw new SidwaveValidationError("$.cpu", "expected turbo");
   const declaredVersion = String(obj.sidwave);
@@ -841,6 +846,7 @@ function normalizeInstruments(raw: unknown, path: string, modern: boolean, v13 =
       inst.wavetable = inst.wavetable.map((step: any, i: number) => {
         const sp = `${path}.${name}.wavetable[${i}]`;
         if (!isPlainObject(step)) throw new SidwaveValidationError(sp, "expected a step mapping");
+        if (step.reg !== undefined && !v15) throw new SidwaveValidationError(sp + ".reg", "requires sidwave: 1.5");
         checkKeys(step, new Set(["wave", "test", "gate", "ring", "sync", "note", "frames", ...(modern ? ["calls", "slide_to"] : []), ...(v15 ? ["reg"] : [])]), sp);
         if (step.reg !== undefined) {
           const text = typeof step.reg === "string" ? step.reg.trim() : step.reg;
@@ -947,7 +953,8 @@ function normalizeRegisterTable(
     } else {
       const set = requireNumber(step.set, `${sp}.set`, { min: 0, max: 4094 });
       // SIDWave 1.5 accepts the integer 0 (a pulse width of zero); earlier versions reject it.
-      if ((set === 0 && !v15) || (set > 1 && !Number.isInteger(set))) {
+      if (set === 0 && !v15) throw new SidwaveValidationError(`${sp}.set`, "a pulse width of 0 requires sidwave: 1.5");
+      if ((set > 1 && !Number.isInteger(set))) {
         throw new SidwaveValidationError(`${sp}.set`, "expected fraction 0 < x <= 1 or integer 1..4094");
       }
       value = set === 0 ? 0 : set <= 1 ? fractionToPulseWidth(set) : set;
@@ -1099,6 +1106,7 @@ function validatePattern(raw: unknown, path: string, modern: boolean, meter: num
     delete p.motif;
     delete p.root;
   }
+  if (p.length !== undefined) rowNeedsV15(p.length, `${path}.length`);
   if (p.length !== undefined) p.length = requireNumber(p.length, `${path}.length`, { min: rowMinimum, max: 64 });
   if (p.transpositions !== undefined) {
     if (!Array.isArray(p.transpositions) || p.transpositions.length === 0) {
@@ -1159,6 +1167,7 @@ function validatePattern(raw: unknown, path: string, modern: boolean, meter: num
         }
         if (entry.inst !== undefined && typeof entry.inst !== "string") throw new SidwaveValidationError(`${path}.groove[${i}].inst`, "expected an instrument name");
         if (entry.level !== undefined) entry.level = parseLevel(entry.level, np + ".level");
+        if (entry.len !== undefined) rowNeedsV15(entry.len, `${path}.groove[${i}].len`);
         if (entry.len !== undefined) entry.len = requireNumber(entry.len, `${path}.groove[${i}].len`, { min: rowMinimum, max: 64 });
         if (entry.legato !== undefined && typeof entry.legato !== "boolean") throw new SidwaveValidationError(`${path}.groove[${i}].legato`, "expected a boolean");
         if (entry.portamento !== undefined) entry.portamento = requireNumber(entry.portamento, `${path}.groove[${i}].portamento`, { min: 0, max: 255, integer: true });
@@ -1539,6 +1548,12 @@ export const SIDWAVE_MAX_EFFECT_HZ = 3848;
 const EFFECT_KEYS = new Set(["priority", "voices", "steps"]);
 const EFFECT_STEP_KEYS = new Set(["freq", "wave", "pulse", "adsr", "gate", "filter", "wait"]);
 
+/** A row length between 1/128 and 1/64 beat is a 1.5 feature: name the version instead of reporting a bare range error. */
+function rowNeedsV15(value: unknown, path: string): void {
+  const n = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+  if (rowMinimum === 1 / 64 && typeof n === "number" && n >= 1 / 128 && n < 1 / 64) throw new SidwaveValidationError(path, "a row shorter than 1/64 beat requires sidwave: 1.5");
+}
+
 /**
  * SIDWave 1.5: parses `tuning`: `cents` shifts every note (-100 to 100) and `registers` maps note names (C0 to B7) to
  * exact 16-bit frequency register values, as integers or `$hhhh`. Both replace entries of the note table that the
@@ -1670,7 +1685,7 @@ function parseSongs(raw: unknown, definitions: unknown, voices: SidwaveVoice[], 
   if (raw.length * channels > 255) {
     throw new SidwaveValidationError("$.songs", `${raw.length} songs of ${channels} voice channels exceed the player's 255 stream pointers; use at most ${Math.floor(255 / channels)} songs`);
   }
-  const docSpeed = defaultSpeed === undefined ? 1 : requireNumber(defaultSpeed, "$.speed", { min: 1, max: 4, integer: true });
+  const docSpeed = defaultSpeed === undefined ? 1 : requireNumber(defaultSpeed, "$.speed", { min: 1, max: speedMaximum, integer: true });
   const names = new Set<string>();
   return raw.map((entry: unknown, k: number) => {
     const path = `$.songs[${k}]`;
@@ -1702,7 +1717,7 @@ function parseSongs(raw: unknown, definitions: unknown, voices: SidwaveVoice[], 
       } else loopTo = requireNumber(entry.loop, path + ".loop", { min: 1, max: timeline.length, integer: true }) - 1;
     }
     const tempo = entry.tempo === undefined ? defaultTempo : parseTempo(entry.tempo, path + ".tempo");
-    const speed = entry.speed === undefined ? docSpeed : requireNumber(entry.speed, path + ".speed", { min: 1, max: 4, integer: true });
+    const speed = entry.speed === undefined ? docSpeed : requireNumber(entry.speed, path + ".speed", { min: 1, max: speedMaximum, integer: true });
     return { name, timeline, loop, ...(loopTo === undefined ? {} : { loopTo }), tempo, speed, length_bars };
   });
 }

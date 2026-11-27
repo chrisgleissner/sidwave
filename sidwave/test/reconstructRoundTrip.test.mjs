@@ -87,7 +87,7 @@ test("relaxed round trip of generator tunes: register state only", {
 // score that did not reconstruct exactly when it was added; the test is `todo` until the cause is fixed.
 const REGRESSIONS = new URL("./fixtures/reconstruct-regressions/", import.meta.url);
 for (const file of readdirSync(REGRESSIONS).filter((name) => name.endsWith(".yaml")).sort()) {
-  test(`regression fixture ${file} round trips exactly`, { timeout: 120_000, todo: `known failure: see the header comment of ${file}` }, async () => {
+  test(`regression fixture ${file} round trips exactly`, { timeout: 120_000, ...(file === "combined-seed2.yaml" ? {} : { todo: `known failure: see the header comment of ${file}` }) }, async () => {
     const r = await roundTrip(readFileSync(new URL(file, REGRESSIONS), "utf8"));
     assert.equal(stateDifferences(r.report), 0, JSON.stringify(r.report.fdiffState.first));
   });

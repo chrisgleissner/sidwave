@@ -2606,6 +2606,7 @@ function estimatePlayerCycles(arr: Arrangement, loop: boolean): number {
     if (arr.mirrors?.some(([source]) => source === slot)) regular += 150;
     if (used.some((inst) => inst.wavetable?.some((step) => step.hz !== undefined || step.reg !== undefined))) regular += 32;
     if (used.some((inst) => inst.pulsetable?.steps.some((step) => step.cadence))) regular += 25;
+    if (used.some((inst) => inst.pulsetable?.wrap)) regular += 14; // wrap branch of the pulse table tick
     if (used.some((inst) => inst.filtertable?.steps.some((step) => step.cadence))) regular += 25;
     if (arr.samples) regular += 16;
     // The legacy player still runs its full register/effects path for all

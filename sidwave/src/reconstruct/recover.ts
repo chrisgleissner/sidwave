@@ -793,28 +793,48 @@ function filterSteps(program: ProgramCall[]): Array<Record<string, unknown>> | u
   return steps;
 }
 
+/** Z-function: z[i] is the length of the longest common prefix of a and a[i..]. */
+function zFunction(a: number[]): number[] {
+  const n = a.length;
+  const z = new Array<number>(n).fill(0);
+  for (let i = 1, l = 0, r = 0; i < n; i++) {
+    if (i < r) z[i] = Math.min(r - i, z[i - l]!);
+    while (i + z[i]! < n && a[z[i]!] === a[i + z[i]!]) z[i]!++;
+    if (i + z[i]! > r) {
+      l = i;
+      r = i + z[i]!;
+    }
+  }
+  return z;
+}
+
 /**
  * Folds a step list whose tail repeats into a shorter list with a loop index; a shorter last step still matches.
- * Returns the smallest loop start and, for that start, the smallest period. Step keys are computed once and each
- * period is checked from the end of the list, so a failing period stops at its first mismatch.
+ * Returns the smallest loop start and, for that start, the smallest period, in time linear in the number of steps:
+ * the steps are numbered by (key, calls), reversed, and the Z-function gives for every period the length of the
+ * matching tail. The last step may match with fewer calls, which is checked with a second Z-function of the list without it.
  */
 export function foldLoop(steps: Array<Record<string, unknown>>): { steps: Array<Record<string, unknown>>; loop?: number } {
   const n = steps.length;
-  const keys = steps.map((s) => JSON.stringify({ ...s, calls: undefined }));
+  const ids = new Map<string, number>();
+  const idOf = (key: string): number => {
+    let id = ids.get(key);
+    if (id === undefined) ids.set(key, (id = ids.size));
+    return id;
+  };
+  const keys = steps.map((s) => idOf(JSON.stringify({ ...s, calls: undefined })));
   const calls = steps.map((s) => Number(s.calls));
+  const symbols = steps.map((_, i) => idOf(`${keys[i]}/${calls[i]}`));
+  const r = symbols.slice().reverse();
+  const z = zFunction(r);
+  const z1 = zFunction(r.slice(1));
   let bestStart = Infinity;
   let bestPeriod = 0;
   for (let period = 1; 2 * period <= n; period++) {
-    // The tail from t0 repeats with this period when every step t >= t0 equals the step one period before it.
-    let t0 = n;
-    while (t0 - 1 >= period) {
-      const t = t0 - 1;
-      const same = keys[t] === keys[t - period];
-      const sameCalls = calls[t] === calls[t - period];
-      const lastShort = t === n - 1 && calls[t]! <= calls[t - period]!;
-      if (!(same && (sameCalls || lastShort))) break;
-      t0--;
-    }
+    let len = z[period]!;
+    // Step n-1 (r[0]) may match with fewer calls than the step one period before it.
+    if (r[0] !== r[period] && keys[n - 1] === keys[n - 1 - period] && calls[n - 1]! <= calls[n - 1 - period]!) len = 1 + (period < z1.length ? z1[period]! : 0);
+    const t0 = n - len;
     const first = Math.max(t0, period);
     if (n - first < period) continue;
     const start = Math.max(0, t0 - period);
