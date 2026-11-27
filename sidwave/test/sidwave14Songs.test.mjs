@@ -13,7 +13,7 @@ import { lintSidwave } from "../src/sidwaveOps.js";
 import { SIDWAVE_SCORE_RESOURCES, readSidwaveExample } from "../src/sidwaveExamples.js";
 import { Cpu } from "./helpers/sidwaveEmulator.mjs";
 import os from "node:os";
-import { runCli, EXIT_OK, EXIT_FAILED, EXIT_USAGE } from "../src/cli.js";
+import { runCli, EXIT_OK, EXIT_FAILED, EXIT_USAGE, EXIT_INPUT } from "../src/cli.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sha = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -638,13 +638,13 @@ test("sidwave compile --song n selects the PRG start song and the PSID start son
     assert.equal(cli("compile", "g.sidwave.yaml", "-o", "c.sid").code, EXIT_OK);
     assert.equal(fs.readFileSync(path.join(dir, "c.sid")).readUInt16BE(16), 1);
     // errors: a song that does not exist, a bad value, the game target, a score without songs
-    assert.equal(cli("compile", "g.sidwave.yaml", "--song", "3", "-o", "d.prg").code, EXIT_FAILED);
+    assert.equal(cli("compile", "g.sidwave.yaml", "--song", "3", "-o", "d.prg").code, EXIT_INPUT);
     assert.match(cli("compile", "g.sidwave.yaml", "--song", "3", "-o", "d.prg").err, /song 3 does not exist/);
     assert.equal(cli("compile", "g.sidwave.yaml", "--song", "x").code, EXIT_USAGE);
     assert.equal(cli("compile", "g.sidwave.yaml", "--song").code, EXIT_USAGE);
     assert.match(cli("compile", "g.sidwave.yaml", "--target", "game", "--origin", "0x1000", "--song", "1").err, /--song is not available with --target game/);
     assert.equal(cli("compile", "one.sidwave.yaml", "--song", "0", "-o", "e.prg").code, EXIT_OK);
-    assert.equal(cli("compile", "one.sidwave.yaml", "--song", "1", "-o", "f.prg").code, EXIT_FAILED);
+    assert.equal(cli("compile", "one.sidwave.yaml", "--song", "1", "-o", "f.prg").code, EXIT_INPUT);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

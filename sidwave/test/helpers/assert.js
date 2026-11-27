@@ -28,6 +28,15 @@ if (typeof globalThis.Bun !== "undefined") {
     expectWithMessage(actual, message).toEqual(expected);
   }
 
+  function notDeepEqual(actual, expected, message) {
+    expectWithMessage(actual, message).not.toEqual(expected);
+  }
+
+  function doesNotMatch(actual, pattern, message) {
+    const target = typeof actual === "string" ? actual : String(actual);
+    expectWithMessage(target, message).not.toMatch(pattern);
+  }
+
   function ok(value, message) {
     expectWithMessage(!!value, message).toBe(true);
   }
@@ -130,8 +139,10 @@ if (typeof globalThis.Bun !== "undefined") {
     notEqual,
     notStrictEqual,
     deepEqual,
+    notDeepEqual,
     ok,
     match,
+    doesNotMatch,
     fail,
     doesNotThrow,
     doesNotReject,
@@ -154,8 +165,10 @@ export const {
   notEqual,
   notStrictEqual,
   deepEqual,
+  notDeepEqual,
   ok,
   match,
+  doesNotMatch,
   fail,
   doesNotThrow,
   doesNotReject,
