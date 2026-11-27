@@ -7,6 +7,11 @@ export class InterchangeUsageError extends Error {
   constructor(message: string) { super(message); this.name = "InterchangeUsageError"; }
 }
 
+/** A score that exceeds a fixed capacity of the target format (patterns, instruments, orderlist length). Classified as `limit_exceeded`. */
+export class InterchangeLimitError extends Error {
+  constructor(message: string) { super(message); this.name = "InterchangeLimitError"; }
+}
+
 /** The stem renderer refuses a score (digi samples, more than three SIDs, no songs). Classified as `limit_exceeded`. */
 export class StemsRefusedError extends Error {
   constructor(message: string) { super(message); this.name = "StemsRefusedError"; }

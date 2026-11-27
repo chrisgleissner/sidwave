@@ -270,6 +270,8 @@ Verification of the export: the exported file is read back by `sidwave import` (
 and PSID, and (as a source) a PSID. One command replaces the two-step `import` then `export`; the same conversion is
 available as `convert()` from the package root.
 
+A score that exceeds a fixed capacity of the target format (patterns, instruments, orderlist length) exits 5.
+
 ```
 sidwave convert song.sng song.mid          # GoatTracker song to MIDI
 sidwave convert tune.mid tune.sid          # MIDI to a playable SID file

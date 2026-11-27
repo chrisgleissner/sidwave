@@ -6,6 +6,7 @@
 // tempo. Everything else is listed in the result's `losses`. Mapping: doc/interchange.md.
 
 import type { ParsedSidwave } from "../sidwave.js";
+import { InterchangeLimitError } from "./errors.js";
 import { exportEvents, type ExportedInstrument, type ExportedScore } from "./events.js";
 import { SWM_WRITE_MAX_INSTRUMENTS, SWM_WRITE_MAX_PATTERNS, defaultSwmHeader, SwmError, SWM_NOTEFX, writeSwm, writeSwi, type SwmInstrument, type SwmModule, type SwmPattern, type SwmRow } from "./swm.js";
 
@@ -85,7 +86,7 @@ export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): S
     if (instrumentIndex.has(n.instrument)) continue;
     const src = ev.instruments.find((i) => i.index === n.instrument);
     if (!src) throw new SwmError(`note refers to unknown instrument ${n.instrument}`);
-    if (instruments.length >= SWM_WRITE_MAX_INSTRUMENTS) throw new SwmError(`the score uses more than ${SWM_WRITE_MAX_INSTRUMENTS} instruments`);
+    if (instruments.length >= SWM_WRITE_MAX_INSTRUMENTS) throw new InterchangeLimitError(`the score uses more than ${SWM_WRITE_MAX_INSTRUMENTS} instruments`);
     const label = src.name ?? `inst ${instruments.length + 1}`;
     const name = label.replace(/^lib:/, "").replace(/_/g, " ");
     if (src.vibrato) unexpressible.add(`${label}: vibrato`);
@@ -134,7 +135,7 @@ export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): S
   const P = options.patternRows ?? 32;
   if (![16, 32, 64].includes(P)) throw new RangeError("patternRows must be 16, 32 or 64");
   const chunks = Math.ceil(rowCount / P);
-  if (chunks > 124) throw new SwmError(`the song needs ${chunks} patterns per track; an SWM orderlist holds 124. Use patternRows 64 or a shorter score`);
+  if (chunks > 124) throw new InterchangeLimitError(`the song needs ${chunks} patterns per track; an SWM orderlist holds 124. Use patternRows 64 or a shorter score`);
   const patterns: SwmPattern[] = [];
   const byKey = new Map<string, number>();
   const sequences: Uint8Array[] = [];
@@ -147,7 +148,7 @@ export function exportSwm(doc: ParsedSidwave, options: SwmExportOptions = {}): S
         const key = JSON.stringify(rows);
         let n = byKey.get(key);
         if (n === undefined) {
-          if (patterns.length >= SWM_WRITE_MAX_PATTERNS) throw new SwmError(`the song needs more than ${SWM_WRITE_MAX_PATTERNS} distinct patterns`);
+          if (patterns.length >= SWM_WRITE_MAX_PATTERNS) throw new InterchangeLimitError(`the song needs more than ${SWM_WRITE_MAX_PATTERNS} distinct patterns`);
           patterns.push({ length: P, rows });
           n = patterns.length;
           byKey.set(key, n);

@@ -6,7 +6,7 @@
 import type { ParsedSidwave } from "../sidwave.js";
 import { sidwaveFrameRate } from "../sidwaveCompiler.js";
 import { exportEvents, type EventExportOptions, type ExportedNote } from "./events.js";
-import { InterchangeInputError } from "./errors.js";
+import { InterchangeLimitError } from "./errors.js";
 import { CHIP_C64_6581, writeFurnace, type FurWriteInstrument, type FurWriteSong } from "./furnace.js";
 
 export interface FurnaceExportResult {
@@ -44,7 +44,7 @@ export function exportFurnace(doc: ParsedSidwave, options: EventExportOptions = 
   for (let t = 12; t >= 1; t--) { const e = errorOf(t); if (e <= 1) { ticks = t; best = e; break; } if (e < best) { best = e; ticks = t; } }
   if (best > 1) warnings.push(`No row length from 1 to 12 ticks fits every note start and end; ${ticks} ticks per row leaves an error of up to ${best} ticks.`);
   const rows = Math.max(1, Math.ceil(frameOf(score.durationSeconds) / ticks));
-  if (rows > 256 * PATTERN_ROWS) throw new InterchangeInputError(`the score has ${rows} rows; a Furnace order list holds at most ${256 * PATTERN_ROWS}`);
+  if (rows > 256 * PATTERN_ROWS) throw new InterchangeLimitError(`the score has ${rows} rows; a Furnace order list holds at most ${256 * PATTERN_ROWS}`);
 
   const exported = new Map(score.instruments.map((i) => [i.index, i]));
   const instMap = new Map<string, number>();
@@ -55,7 +55,7 @@ export function exportFurnace(doc: ParsedSidwave, options: EventExportOptions = 
     if (id !== undefined) return id;
     const inst = exported.get(note.instrument);
     id = instruments.length;
-    if (id >= 256) throw new InterchangeInputError("the score uses more than 256 instruments");
+    if (id >= 256) throw new InterchangeLimitError("the score uses more than 256 instruments");
     instMap.set(key, id);
     let flags1 = 0;
     for (const part of (inst?.waveform ?? "pulse").split("+")) flags1 |= BITS[part] ?? 0;

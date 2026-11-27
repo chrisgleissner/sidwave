@@ -7,7 +7,7 @@ import type { ParsedSidwave } from "../sidwave.js";
 import { sidwaveFrameRate } from "../sidwaveCompiler.js";
 import { exportEvents, type EventExportOptions, type ExportedInstrument, type ExportedNote } from "./events.js";
 import { GT, writeGoatTracker, type GtInstrument } from "./goattracker.js";
-import { InterchangeInputError } from "./errors.js";
+import { InterchangeLimitError } from "./errors.js";
 
 export interface GoatTrackerExportResult {
   bytes: Uint8Array;
@@ -58,7 +58,7 @@ export function exportGoatTracker(doc: ParsedSidwave, options: EventExportOption
   if (best > 1) warnings.push(`No row length from 3 to 12 calls fits every note start and end; ${ticks} calls per row leaves an error of up to ${best} calls.`);
   const totalFrames = frameOf(score.durationSeconds);
   const rows = Math.max(1, Math.ceil(totalFrames / ticks));
-  if (rows > 254 * PATTERN_ROWS) throw new InterchangeInputError(`the score has ${rows} rows; a GoatTracker order list holds at most ${254 * PATTERN_ROWS}`);
+  if (rows > 254 * PATTERN_ROWS) throw new InterchangeLimitError(`the score has ${rows} rows; a GoatTracker order list holds at most ${254 * PATTERN_ROWS}`);
 
   // Instruments.
   const instMap = new Map<string, number>();
@@ -74,7 +74,7 @@ export function exportGoatTracker(doc: ParsedSidwave, options: EventExportOption
     if (id !== undefined) return id;
     const inst = exported.get(note.instrument);
     id = instMap.size + 1;
-    if (id >= GT.MAX_INSTR) throw new InterchangeInputError(`the score uses more than ${GT.MAX_INSTR - 1} instruments`);
+    if (id >= GT.MAX_INSTR) throw new InterchangeLimitError(`the score uses more than ${GT.MAX_INSTR - 1} instruments`);
     instMap.set(key, id);
     const out = instruments[id]!;
     const wave = inst ? waveByte(inst) : 0x40;
@@ -94,13 +94,13 @@ export function exportGoatTracker(doc: ParsedSidwave, options: EventExportOption
         if (inst.arpeggio.callsPerStep > 1) steps.push([Math.min(0x0f, inst.arpeggio.callsPerStep - 1), 0x80]);
       }
     } else steps.push([gated, 0x00]);
-    if (wlen + steps.length + 1 > GT.MAX_TABLELEN) throw new InterchangeInputError("the wavetables of the instruments do not fit the 255 entries of a GoatTracker table");
+    if (wlen + steps.length + 1 > GT.MAX_TABLELEN) throw new InterchangeLimitError("the wavetables of the instruments do not fit the 255 entries of a GoatTracker table");
     out.ptr[GT.WTBL] = wlen + 1;
     for (const [l, r] of steps) { ltable[GT.WTBL]![wlen] = l; rtable[GT.WTBL]![wlen] = r; wlen++; }
     ltable[GT.WTBL]![wlen] = 0xff; rtable[GT.WTBL]![wlen] = loopTo >= 0 ? out.ptr[GT.WTBL] + loopTo : 0; wlen++;
     if (inst?.pulseWidth !== undefined && (wave & 0x40)) {
       const pw = Math.max(1, Math.min(4095, inst.pulseWidth));
-      if (plen + 2 > GT.MAX_TABLELEN) throw new InterchangeInputError("the pulse tables of the instruments do not fit the 255 entries of a GoatTracker table");
+      if (plen + 2 > GT.MAX_TABLELEN) throw new InterchangeLimitError("the pulse tables of the instruments do not fit the 255 entries of a GoatTracker table");
       out.ptr[GT.PTBL] = plen + 1;
       ltable[GT.PTBL]![plen] = 0x80 | (pw >> 8); rtable[GT.PTBL]![plen] = pw & 0xff; plen++;
       ltable[GT.PTBL]![plen] = 0xff; rtable[GT.PTBL]![plen] = 0; plen++;
@@ -166,13 +166,13 @@ export function exportGoatTracker(doc: ParsedSidwave, options: EventExportOption
       let id = seen.get(key);
       if (id === undefined) {
         id = patterns.length;
-        if (id >= GT.MAX_PATT) throw new InterchangeInputError(`the score needs more than ${GT.MAX_PATT} patterns`);
+        if (id >= GT.MAX_PATT) throw new InterchangeLimitError(`the score needs more than ${GT.MAX_PATT} patterns`);
         patterns.push(chunk);
         seen.set(key, id);
       }
       order.push(id);
     }
-    if (order.length > GT.MAX_SONGLEN) throw new InterchangeInputError("the order list is longer than GoatTracker allows");
+    if (order.length > GT.MAX_SONGLEN) throw new InterchangeLimitError("the order list is longer than GoatTracker allows");
     lists.push(Uint8Array.from([...order, GT.LOOPSONG, 0]));
   }
   const bytes = writeGoatTracker({ name: score.title, author: score.author ?? "", copyright: "", songs: [lists], instruments, ltable, rtable, patterns });
