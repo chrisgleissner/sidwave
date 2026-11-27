@@ -6,9 +6,11 @@ import type { CliIo } from "./cliCore.js";
 import { runDiffCli } from "./cliDiff.js";
 import { runFormatCli } from "./cliFormat.js";
 import { runMergeCli } from "./cliMerge.js";
+import { runTransformCli } from "./cliTransform.js";
 
 /** The authoring commands. Each one has its own file, its own --help and reports errors itself. */
 export const AUTHORING_COMMANDS: Record<string, (args: string[], io: CliIo) => number> = {
+  transform: runTransformCli,
   format: runFormatCli,
   diff: runDiffCli,
   merge: runMergeCli,
