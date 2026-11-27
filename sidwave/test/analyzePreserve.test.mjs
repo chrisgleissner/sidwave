@@ -40,7 +40,8 @@ test("the bundle holds the score, the report and the manifest; the original is n
   assert.equal(m.verdict.t0, "not applicable");
   assert.equal(m.verdict.t1, "not applicable");
   assert.equal(m.verdict.a1.status, "approximate");
-  assert.equal(m.verdict.ladder.A0, "pass");
+  assert.deepEqual(Object.keys(m.verdict.ladder), ["T0", "T1", "A0", "A1", "highest"]);
+  assert.equal(m.verdict.ladder.A1, "not evaluated");
   assert.equal(m.fingerprints.reference, m.fingerprints.recompiled);
   assert.equal(m.fingerprints.referenceFirstCall, 1);
   assert.ok(m.compiled.bytes > 1000);
