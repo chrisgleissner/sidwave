@@ -1,0 +1,28 @@
+# A small drum library; its patterns use the instruments of fixture-base.
+sidwave: 1.4
+library:
+  name: fixture-drums
+  version: 1.2.0
+  licence: MIT OR Apache-2.0
+  provenance: { author: SIDWave tests, source: "https://example.invalid/drums", created: 2026-11-27 }
+imports:
+  - { as: base, from: ./base.yaml, version: "^1.0.0" }
+instruments:
+  snare: { waveform: noise, adsr: [0, 6, 0, 0], wavetable: [{ wave: noise, note: C6 }, { gate: false }] }
+patterns:
+  beat:
+    length: 0.5
+    bars: 1
+    drums: { kit: { k: base.kick, h: base.hat, s: snare }, steps: "k.h. s.h." }
+  rock:
+    length: 0.5
+    bars: 1
+    groove: "C2@base.kick C2@base.hat C2@snare C2@base.hat C2@base.kick C2@base.hat C2@snare C2@base.hat"
+effects:
+  pew:
+    priority: 8
+    voices: [3]
+    steps:
+      - { freq: 2400, wave: pulse, pulse: 0.25, adsr: [0, 0, 15, 6] }
+      - { freq: 900, wait: 2 }
+      - { gate: false, wait: 3 }

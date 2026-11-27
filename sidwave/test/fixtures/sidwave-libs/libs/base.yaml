@@ -1,0 +1,10 @@
+# Shared instruments for the fixture libraries.
+sidwave: 1.4
+library:
+  name: fixture-base
+  version: 1.0.2
+  licence: CC0-1.0
+  provenance: { author: SIDWave tests, source: original, created: 2026-11-27 }
+instruments:
+  kick: { waveform: pulse, adsr: [0, 8, 0, 0], wavetable: [{ wave: noise, note: A6 }, { wave: pulse, note: A3, slide_to: D2, frames: 3 }, { gate: false }] }
+  hat: { waveform: noise, adsr: [0, 4, 0, 0], wavetable: [{ wave: noise, note: G7 }, { gate: false }] }

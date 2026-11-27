@@ -5,7 +5,7 @@
 
 import { Buffer } from 'node:buffer';
 import pkg from 'yaml';
-import { renderSample, SAMPLE_SOURCE_KEYS, type RenderedSample, type SampleSource, type SidwaveReadOptions } from "./sidwavePcm.js";
+import { renderSample, SAMPLE_SOURCE_KEYS, type RenderedSample, type SampleSource, type SidwaveReadOptions, type SidwaveUsedLibrary } from "./sidwavePcm.js";
 const { parse: yamlParse } = pkg;
 
 export type SystemMode = "PAL" | "NTSC";
@@ -329,6 +329,8 @@ export interface ParsedSidwave {
   end?: { holdBeats: number; release: boolean };
   layout?: SidLayout;
   digiVoices?: Array<{ id: string; chip: number; patterns: Record<string, SidwavePattern> }>;
+  /** SIDWave 1.4: the libraries (from `imports`) that contributed instruments, patterns or effects; absent when none did. */
+  libraries?: SidwaveUsedLibrary[];
   /** Fields that a pre-1.2 document may contain but that have no effect before sidwave: 1.2 (JSON paths). */
   ignoredFields?: string[];
 }
@@ -390,6 +392,19 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   }
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
     throw new SidwaveValidationError("$", "expected a mapping with voices and timeline");
+  }
+
+  // SIDWave 1.4 asset libraries: replace `imports` by the library items the score uses, then parse the result.
+  let libraries: SidwaveUsedLibrary[] | undefined;
+  if (obj.library !== undefined && obj.song === undefined) {
+    throw new SidwaveValidationError("$.library", "this file is a library (it has no voices or timeline); import it from a score with imports instead of compiling it");
+  }
+  if (obj.imports !== undefined && obj.song === undefined) {
+    if (obj.sidwave !== 1.4 && obj.sidwave !== "1.4") throw new SidwaveValidationError("$.imports", "imports require sidwave: 1.4");
+    if (!options.imports) throw new SidwaveValidationError("$.imports", "this score imports libraries, which needs a library resolver; the sidwave command provides one, and library users pass imports in the read options");
+    const resolved = options.imports(obj as Record<string, unknown>);
+    obj = resolved.score;
+    if (resolved.libraries.length) libraries = resolved.libraries;
   }
 
   // Detect legacy CPG shape (song: {...}) vs SIDWave top-level fields.
@@ -565,7 +580,7 @@ export function parseSidwave(input: string | object, options: SidwaveReadOptions
   }
   const effects = obj.effects === undefined ? undefined : parseEffects(obj.effects);
   return { version, song, voices, timeline, instruments, speed, sids, samples, voiceSlots, cpu: obj.cpu,
-    accent, swing, swingUnit, loopTo, end, layout, digiVoices, ...(effects?.length ? { effects } : {}), ...(songs ? { songs, definedSections: isPlainObject(obj.sections) ? Object.keys(obj.sections) : [] } : {}), ...(ignoredFields.length ? { ignoredFields } : {}) };
+    accent, swing, swingUnit, loopTo, end, layout, digiVoices, ...(effects?.length ? { effects } : {}), ...(songs ? { songs, definedSections: isPlainObject(obj.sections) ? Object.keys(obj.sections) : [] } : {}), ...(ignoredFields.length ? { ignoredFields } : {}), ...(libraries ? { libraries } : {}) };
 
 }
 

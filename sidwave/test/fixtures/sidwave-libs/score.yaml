@@ -1,0 +1,20 @@
+# Fixture score: a drum library (which imports a base library) and a packaged pad.
+sidwave: 1.4
+title: Library Fixture
+tempo: 120
+mode: PAL
+imports:
+  - { as: drums, from: ./libs/drums.yaml, version: "^1.2.0", effects: [pew] }
+  - { as: pads, from: "pkg:sidwave-lib-pad/pad.yaml" }
+sids:
+  - { id: sid1, address: "$D400", model: "8580" }
+instruments:
+  lead: { waveform: pulse, adsr: [0, 5, 10, 4], pulse_width: 0.4 }
+voices:
+  - { id: 1, name: Lead, instrument: lead, patterns: { tune: { length: 1, bars: 1, groove: "C4 E4 G4 E4" } } }
+  - { id: 2, name: Pad, instrument: pads.pad, patterns: { hold: { length: 4, bars: 1, groove: "C3" } } }
+  - { id: 3, name: Drums }
+sections:
+  a: { bars: 2, layers: { v1: tune, v2: hold, v3: drums.beat } }
+  b: { bars: 2, layers: { v1: tune, v2: hold, v3: drums.rock } }
+timeline: [a, b]

@@ -1221,6 +1221,112 @@ guide in its header. [Composition index](c64://sound/examples)
 - Use [the game songs](c64://sound/examples/game_songs) for three songs (title, in-game loop, game-over jingle) in one player.
 - Use [stereo echo](c64://sound/examples/stereo_echo) for panning, [the orchestra](c64://sound/examples/ultisid_orchestra) for 24 voices, and [the nine-SID finale](c64://sound/examples/wall_of_sid) for the build to 27 voices. The last piece needs `configure: true` and a fitted SID in socket 1.
 
+## Asset libraries (SIDWave 1.4)
+
+A `sidwave: 1.4` score may import libraries of instruments, patterns and effects. Resolution happens before the score is
+parsed, so a score that uses libraries compiles to the bytes of the equivalent score with the library items written out.
+
+**Observed need.** A drum kit, a bass instrument or a sound effect set that several scores share is copied into each
+score today. Reproducer: the `kick`, `hat` and (in three of them) `snare` instruments are written out separately in
+`chiptune_drive.yaml`, `drum_and_bass.yaml`, `metal_sync.yaml` and `stereo_echo.yaml`; a fix to one copy does not reach
+the others, a copy has no record of where it came from or under which licence it may be used, and nothing detects that
+two copies have drifted apart. A composer who wants to publish a kit has no unit to publish.
+
+**Why 1.4 so far cannot express it.** The only names a score can refer to outside its own `instruments` are the
+built-in `lib:` instruments, a fixed list that ships with the compiler (see "Built-in instruments"). YAML anchors and
+aliases work inside one file only. There is no way to name another file, to say which version of it is meant, or to
+check that its content is what the author tested.
+
+**Design.** A library is a SIDWave file with `sidwave: 1.4`, a `library` block, and the maps `instruments`, `patterns`
+and `effects`. It has no voices, timeline or SID map. A library may import other libraries.
+
+```yaml
+sidwave: 1.4
+library:
+  name: my-drums             # letters, digits, dot, dash, underscore
+  version: 1.2.0             # major.minor.patch
+  licence: CC0-1.0           # SPDX identifier or expression
+  provenance: { author: A. Composer, source: "https://example.org/my-drums", created: 2026-11-27 }
+imports:
+  - { as: base, from: ./base.yaml, version: "^1.0.0" }
+instruments:
+  snare: { waveform: noise, adsr: [0, 6, 0, 0], wavetable: [{ wave: noise, note: C6 }, { gate: false }] }
+patterns:
+  beat: { length: 0.5, bars: 1, drums: { kit: { k: base.kick, s: snare }, steps: "k.s. k.s." } }
+effects:
+  pew: { priority: 8, steps: [{ freq: 2400, wave: pulse, adsr: [0, 0, 15, 6] }, { gate: false, wait: 3 }] }
+```
+
+A score lists the libraries it uses:
+
+```yaml
+imports:
+  - { as: drums, from: ./libs/drums.yaml, version: "^1.2.0", sha256: "<64 hexadecimal digits>", effects: [pew] }
+  - { as: pads, from: "pkg:sidwave-lib-pad/pad.yaml" }
+```
+
+- **Namespaces.** `as` names the namespace (letters, digits, underscore; `lib` is reserved). The score refers to
+  `drums.snare` as an instrument (`instrument:`, `@drums.snare` in a pattern, a `kit` entry) and to `drums.beat` as a
+  pattern in a layer (`layers: { v3: drums.beat }`, also in sequences and with modifiers such as `drums.beat^`). The
+  pattern is added to the voice of that layer under its qualified name. A library's own imports are reached as
+  `drums.base.kick`. Effect names do not allow a dot, so an effect is `drums_pew` (`drums_base_pew` for a nested one),
+  and an import includes only the effects it lists in `effects` (they follow the score's own effects in the order of
+  the imports). Instruments and patterns are included only when the score, or a pattern that was included, refers to
+  them. The built-in `lib:` names are unchanged and may be used next to imports.
+- **Collisions** are errors that name the path: a score instrument, voice pattern or effect with the name of a library
+  item, and two imports with the same `as`.
+- **Resolution.** A local `from` is relative to the importing file. It must resolve (symbolic links followed) to a file
+  inside the directory of the score or of a directory on the library search path (`--allow-dir`, or `allowedDirs` of
+  `confinedReadOptions`). Absolute paths, URLs and anything that leaves those directories are errors; the compiler never
+  reads from the network. `pkg:<package>/<file>` resolves through `node_modules` of the importing file's directory and
+  its parents up to the score directory, then through `node_modules` of each search path directory, with the same
+  confinement. Limits: 16 levels of nested imports, 64 library files, 256 KiB per file, 2 MiB in total.
+- **Cycles** are errors that name the cycle: `import cycle: libs/a.yaml -> libs/b.yaml -> libs/a.yaml`.
+- **Pins.** `version` is a range: `1.2.3`, `^1.2.0`, `~1.2.0`, `1`, `1.x`, `>=1.0.0 <2.0.0`, alternatives with `||`
+  (no pre-release tags). `sha256` is the SHA-256 of the canonical library text: the file as written by `sidwave format`
+  (comments included, so a comment change changes the hash) without the `from` of its own imports. Leaving out `from`
+  lets a bundle move a library without changing its identity. A mismatch is an error that names both hashes. The
+  pins of a library's own imports are checked in the same way.
+- **Reporting.** The parsed document has `libraries` and the compile summary (`sidwave compile --json`, or the
+  `libraries` of `compileSidwaveBytes`) lists each library that contributed an item: namespace, name, version,
+  `sha256` and licence. The command prints one line per library to standard error.
+- **`sidwave lock <score>`** writes the `sha256` of every import into the score in place (or to `-o`), after checking
+  `version`. The rest of the text, including comments, is kept. A second run changes nothing.
+- **`sidwave bundle <score> -o <dir>`** writes the score and the whole closure into one directory: the score under its
+  own name, the libraries as `libs/<name>-<version>.yaml`, every `from` rewritten to a relative path (a `pkg:` import
+  becomes a local one), and `bundle.json` with `format`, the score's file and hash, and for each library its file, name,
+  version, `sha256`, licence, provenance and imports. The bundle compiles with no `node_modules` and no other directory
+  to the same bytes. The target directory must be empty unless `--force` is given. `file:` samples of a score are not
+  part of a bundle.
+
+**Rejected alternative.** Letting a score name any URL and fetching it was rejected: the compiler would make network
+requests while reading a document, a score would change its meaning when the remote file changes, and a bundle could not
+be compiled offline. Merging library names into the score's own names without a namespace was rejected because the
+reader could not tell which `kick` plays when a score and a library both define one. Libraries that carry a whole voice
+with a timeline were rejected because the timeline is the arrangement, which belongs to the score.
+
+**Schema.** `data/sound/sidwave.schema.json`: the score property `imports` (definition `import`) and the definition
+`libraryFile` for library files.
+
+**Parser and compiler.** `src/sidwaveLibs.ts` resolves the imports into an ordinary document (`expandImports`);
+`parseSidwave` calls it through the read option `imports`, which `confinedReadOptions(root, allowedDirs, scoreFile)`
+supplies. Without the option a score with `imports` is rejected, and a library file given to `parseSidwave` is rejected
+with a message that says to import it. The compiler and the player do not know about libraries.
+`src/cliAssets.ts` holds `lock` and `bundle`.
+
+**Cost.** None at run time. The player, the tables and the streams come from the expanded document, so a score with
+imports and the same score written out give identical PRG and PSID bytes (`test/sidwave14Libs.test.mjs`, "compiles to the
+bytes of the flattened score"). Only the items a score refers to are included, so an unused library adds nothing.
+
+**Older documents are unchanged.** A score without `imports` takes the same path as before: the hash fixture
+`test/fixtures/sidwave-s4a/example-hashes.json` passes with a library resolver supplied ("keep their recorded bytes").
+`imports` in a document that is not `sidwave: 1.4` is rejected with `imports require sidwave: 1.4`.
+
+**Tests.** `test/sidwave14Libs.test.mjs`: resolution, namespaces and nested libraries, collisions, cycles, the depth,
+size and count caps, path traversal (`../`, absolute, URLs, symbolic links to files and directories, `pkg:` escapes),
+version ranges and mismatches, hash mismatch and whitespace/location independence, malformed library files, lock, bundle
+round trip, the command line, and byte identity for scores without imports.
+
 ## Authoring and Validation
 
 - Validation uses JSON Schema (`sidwave.schema.json`); the compiler applies the same rules and additionally checks note ranges after transposition and minimum note durations.
