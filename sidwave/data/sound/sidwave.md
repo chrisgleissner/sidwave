@@ -1269,9 +1269,11 @@ imports:
   `drums.snare` as an instrument (`instrument:`, `@drums.snare` in a pattern, a `kit` entry) and to `drums.beat` as a
   pattern in a layer (`layers: { v3: drums.beat }`, also in sequences and with modifiers such as `drums.beat^`). The
   pattern is added to the voice of that layer under its qualified name. A library's own imports are reached as
-  `drums.base.kick`. Effect names do not allow a dot, so an effect is `drums_pew` (`drums_base_pew` for a nested one),
-  and an import includes only the effects it lists in `effects` (they follow the score's own effects in the order of
-  the imports). Instruments and patterns are included only when the score, or a pattern that was included, refers to
+  `drums.base.kick`. Effect names do not allow a dot, so an effect is `drums_pew` (`drums_base_pew` for the effect `pew` of
+  a library imported as `base` by `drums`: the dots of the namespace become underscores). An import includes only the
+  effects it lists in `effects`. A library's own import may list effects too, and then every score that imports the
+  library gets them; a score may also list a nested effect as `base.pew` in its import of `drums`. Effects follow the
+  score's own effects in the order of the imports, each included once. Instruments and patterns are included only when the score, or a pattern that was included, refers to
   them. The built-in `lib:` names are unchanged and may be used next to imports.
 - **Collisions** are errors that name the path: a score instrument, voice pattern or effect with the name of a library
   item, and two imports with the same `as`.

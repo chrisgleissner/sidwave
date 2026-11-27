@@ -465,7 +465,7 @@ export function expandImports(raw: Record<string, unknown>, options: ImportResol
       };
       for (const [name, def] of Object.entries(lib.instruments)) instruments.set(`${ns}.${name}`, { qualified: `${ns}.${name}`, def: structuredClone(def), owner: lib, namespace: ns });
       for (const [name, def] of Object.entries(lib.patterns)) patterns.set(`${ns}.${name}`, { qualified: `${ns}.${name}`, def: qualifyPattern(def, resolveName), owner: lib, namespace: ns });
-      for (const [name, def] of Object.entries(lib.effects)) effects.set(`${ns}.${name}`, { qualified: `${ns}_${name}`, def: structuredClone(def), owner: lib, namespace: ns });
+      for (const [name, def] of Object.entries(lib.effects)) effects.set(`${ns}.${name}`, { qualified: `${ns.replace(/\./g, "_")}_${name}`, def: structuredClone(def), owner: lib, namespace: ns });
       register(lib.imports, `${ns}.`);
     }
   };
@@ -538,12 +538,14 @@ export function expandImports(raw: Record<string, unknown>, options: ImportResol
   // Effects: only those an import lists in its `effects`.
   const selected: Item[] = [];
   const addEffects = (list: LoadedImport[], prefix: string, entryList: ImportEntry[], basePath: string) => {
-    list.forEach(({ as }, i) => {
+    list.forEach(({ as, lib }, i) => {
       for (const name of entryList[i]!.effects) {
         const item = effects.get(`${prefix}${as}.${name}`);
         if (!item) fail(`${basePath}[${i}].effects`, `the library ${as} has no effect ${name}`);
         if (!selected.includes(item)) selected.push(item);
       }
+      // The imports of a library may select effects of their own libraries.
+      addEffects(lib.imports, `${prefix}${as}.`, lib.entries, `${basePath}[${i}] (${lib.label}) $.imports`);
     });
   };
   addEffects(imports, "", entries, "$.imports");
@@ -551,7 +553,7 @@ export function expandImports(raw: Record<string, unknown>, options: ImportResol
     if (score.effects === undefined) score.effects = {};
     if (!isMap(score.effects)) fail("$.effects", "expected a mapping");
     for (const item of selected) {
-      if (hasOwn(score.effects, item.qualified)) fail(`$.effects.${item.qualified}`, `collides with the library effect ${item.namespace}.${item.qualified.slice(item.namespace.length + 1)}`);
+      if (hasOwn(score.effects, item.qualified)) fail(`$.effects.${item.qualified}`, `collides with the library effect ${item.qualified}`);
       score.effects[item.qualified] = item.def;
       included.add(item);
     }

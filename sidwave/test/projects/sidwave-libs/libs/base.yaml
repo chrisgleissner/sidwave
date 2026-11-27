@@ -8,3 +8,9 @@ library:
 instruments:
   kick: { waveform: pulse, adsr: [0, 8, 0, 0], wavetable: [{ wave: noise, note: A6 }, { wave: pulse, note: A3, slide_to: D2, frames: 3 }, { gate: false }] }
   hat: { waveform: noise, adsr: [0, 4, 0, 0], wavetable: [{ wave: noise, note: G7 }, { gate: false }] }
+effects:
+  zap:
+    priority: 4
+    steps:
+      - { freq: 1200, wave: noise, adsr: [0, 0, 15, 4] }
+      - { gate: false, wait: 2 }

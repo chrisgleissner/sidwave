@@ -731,3 +731,24 @@ test("the package ships the tutorial that the lesson scores refer to", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(here, "..", "package.json"), "utf8"));
   assert.ok(manifest.files.includes("doc/tutorial.md"));
 });
+
+test("a nested import selects effects of its library, which get a valid dot-free name", () => {
+  withProject(({ dir, score }) => {
+    assert.deepEqual(parseFile(score).effects.map((e) => e.name), ["drums_pew"], "nothing selects base.zap yet");
+    const drums = path.join(dir, "libs", "drums.yaml");
+    const original = fs.readFileSync(drums, "utf8");
+    fs.writeFileSync(drums, original.replace('version: "^1.0.0" }', 'version: "^1.0.0", effects: [zap] }'));
+    const doc = parseFile(score);
+    assert.deepEqual(doc.effects.map((e) => e.name), ["drums_pew", "drums_base_zap"]);
+    assert.ok(compileSidwaveBytes(doc).summary.effects.length === 2);
+    // The score may select the same nested effect through its own import; it is included once.
+    fs.writeFileSync(drums, original);
+    const text = fs.readFileSync(score, "utf8");
+    fs.writeFileSync(score, text.replace("effects: [pew]", "effects: [pew, base.zap]"));
+    assert.deepEqual(parseFile(score).effects.map((e) => e.name), ["drums_pew", "drums_base_zap"]);
+    fs.writeFileSync(drums, original.replace('version: "^1.0.0" }', 'version: "^1.0.0", effects: [zap] }'));
+    assert.deepEqual(parseFile(score).effects.map((e) => e.name), ["drums_pew", "drums_base_zap"]);
+    fs.writeFileSync(drums, original.replace('version: "^1.0.0" }', 'version: "^1.0.0", effects: [nope] }'));
+    expectError(() => parseFile(score), /no effect nope/);
+  });
+});
