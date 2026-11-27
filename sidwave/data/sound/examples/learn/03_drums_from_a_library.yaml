@@ -3,20 +3,20 @@
 # Concepts: `imports` brings instruments and patterns from a library file, under a name you choose. The library has a
 # version, a licence and a content hash, so a score always plays the same drums.
 #
-# The import below names the library file (libs/chip_kit.yaml), the namespace "kit" and the versions that are
-# acceptable. After it, "kit.beat" and "kit.fill" are drum patterns that can be used as layers, and "kit.kick" is an
-# instrument. Only what the score uses is copied into the compiled music. `sidwave lock` adds a `sha256` to the import
-# line, `sidwave bundle` collects the score and its libraries into one folder, and compiling the score prints the
-# licence of each library it used. The library must lie inside this score's folder (or in a folder given with
-# `--allow-dir`); the sidwave command never reads libraries from the network.
+# The import below names the library file (libs/chip_kit.yaml), the namespace "kit", the versions that are acceptable
+# and the `sha256` of the library, which `sidwave lock` wrote: if the file changes, the score refuses to compile. After
+# the import, "kit.beat" and "kit.fill" are drum patterns that can be used as layers, and "kit.kick" is an instrument.
+# Only what the score uses is copied into the compiled music. `sidwave bundle` collects the score and its libraries into
+# one folder, and compiling prints the licence of each library used. The library must lie inside this score's folder
+# (or in a folder given with `--allow-dir`); the sidwave command never reads libraries from the network.
 #
-# Try this: play the "fill" section first in `timeline`, or write your own kit pattern in libs/chip_kit.yaml.
+# Try this: play the "fill" section first in `timeline`, or write your own kit pattern in libs/chip_kit.yaml (then run `sidwave lock` again).
 sidwave: 1.4
 title: Lesson 3 - Drums
 tempo: 107.41
 mode: PAL
 imports:
-  - { as: kit, from: ./libs/chip_kit.yaml, version: "^1.0.0" }
+  - { as: kit, from: ./libs/chip_kit.yaml, version: "^1.0.0", sha256: 0108b8d40862ad5cf295e8593cd2ad8876225925256082dd9fb73231302a9337 }
 sids:
   - { id: sid1, address: "$D400", model: "8580" }
 instruments:

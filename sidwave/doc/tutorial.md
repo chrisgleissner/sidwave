@@ -57,14 +57,14 @@ imports it under a namespace and uses its items as `namespace.name`.
 
 ```yaml
 imports:
-  - { as: kit, from: ./libs/chip_kit.yaml, version: "^1.0.0" }
+  - { as: kit, from: ./libs/chip_kit.yaml, version: "^1.0.0", sha256: 0108b8d40862ad5cf295e8593cd2ad8876225925256082dd9fb73231302a9337 }
 ```
 
 ```yaml
   groove: { bars: 2, level: mf, layers: { v1: riff, v2: root, v3: kit.beat } }
 ```
 
-`sidwave lock <score>` writes the content hash of each library into the import, so that a changed library is noticed.
+`sidwave lock <score>` wrote the `sha256` of the library into the import, so that a changed library is noticed.
 `sidwave bundle <score> -o folder` copies the score and every library it needs into one folder that compiles without
 anything else. Compiling prints the licence of each library the score used. See
 [Asset libraries](../data/sound/sidwave.md#asset-libraries-sidwave-14).

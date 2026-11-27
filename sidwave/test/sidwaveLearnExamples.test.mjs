@@ -50,6 +50,9 @@ test("lesson 3 uses its library, lesson 7 has two songs and an effect, lesson 8 
   const three = load("03_drums_from_a_library.yaml");
   assert.deepEqual(three.libraries.map((l) => [l.namespace, l.name, l.licence]), [["kit", "learn-chip-kit", "CC0-1.0"]]);
   assert.ok(Object.keys(three.instruments).includes("kit.kick"));
+  const pinned = /sha256: ([0-9a-f]{64})/.exec(fs.readFileSync(path.join(learnDir, "03_drums_from_a_library.yaml"), "utf8"));
+  assert.ok(pinned, "lesson 3 pins its library with sha256");
+  assert.equal(pinned[1], three.libraries[0].sha256, "the pin is the current hash of the library");
   const seven = load("07_songs_and_effects.yaml");
   assert.equal(seven.songs.length, 2);
   assert.equal(seven.songs[1].loopTo, undefined, "the jingle plays once");
