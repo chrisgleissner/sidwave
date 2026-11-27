@@ -786,7 +786,7 @@ function filterSteps(program: ProgramCall[]): Array<Record<string, unknown>> | u
  * Returns the smallest loop start and, for that start, the smallest period. Step keys are computed once and each
  * period is checked from the end of the list, so a failing period stops at its first mismatch.
  */
-function foldLoop(steps: Array<Record<string, unknown>>): { steps: Array<Record<string, unknown>>; loop?: number } {
+export function foldLoop(steps: Array<Record<string, unknown>>): { steps: Array<Record<string, unknown>>; loop?: number } {
   const n = steps.length;
   const keys = steps.map((s) => JSON.stringify({ ...s, calls: undefined }));
   const calls = steps.map((s) => Number(s.calls));
