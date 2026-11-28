@@ -4,11 +4,12 @@ Write Commodore 64 SID music as text. Compile it to a C64 program or a SID file.
 
 [![CI](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/chrisgleissner/sidwave/actions/workflows/ci.yaml)
 [![Codecov](https://codecov.io/gh/chrisgleissner/sidwave/graph/badge.svg)](https://codecov.io/gh/chrisgleissner/sidwave)
-[![sidwave licence: GPL-2.0-or-later with the SIDWave Player Exception](https://img.shields.io/badge/sidwave-GPL--2.0--or--later%20with%20Player%20Exception-blue.svg)](sidwave/LICENSE-EXCEPTION.md)
-[![6502-toolkit licence: MIT](https://img.shields.io/badge/6502--toolkit-MIT-blue.svg)](6502-toolkit/LICENSE)
 [![sidwave on npm](https://img.shields.io/npm/v/sidwave?label=sidwave)](https://www.npmjs.com/package/sidwave)
 [![6502-toolkit on npm](https://img.shields.io/npm/v/6502-toolkit?label=6502-toolkit)](https://www.npmjs.com/package/6502-toolkit)
 [![Tested on Linux](https://img.shields.io/badge/CI-Linux-forestgreen)](#status-and-limitations)
+
+[![sidwave licence: GPL-2.0-or-later with the SIDWave Player Exception](https://img.shields.io/badge/sidwave-GPL--2.0--or--later%20with%20Player%20Exception-blue.svg)](sidwave/LICENSE-EXCEPTION.md)
+[![6502-toolkit licence: MIT](https://img.shields.io/badge/6502--toolkit-MIT-blue.svg)](6502-toolkit/LICENSE)
 
 SIDWave is a music language, compiler and toolkit for the SID sound chip of the Commodore 64. A score is a YAML or JSON file that describes instruments, patterns and a timeline of sections.
 
